@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade Strategy Analyzer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f3460 0%, #16213e 100%); min-height: 100vh; color: #333; }
+.container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+h1 { color: white; font-size: 2em; margin-bottom: 8px; text-align: center; }
+.subtitle { color: #a8d8ea; text-align: center; margin-bottom: 32px; font-size: 0.95em; }
+.card { background: white; border-radius: 16px; padding: 32px; margin-bottom: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+h2 { font-size: 1.2em; color: #0f3460; margin-bottom: 16px; }
+.upload-zone { border: 3px dashed #0f3460; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.3s; margin-bottom: 16px; }
+.upload-zone:hover { background: #f0f4ff; border-color: #e94560; }
+.upload-zone.active { background: #e8f5e9; border-color: #28a745; border-style: solid; }
+.upload-zone .icon { font-size: 3em; margin-bottom: 8px; }
+.upload-zone .label { font-size: 1.1em; color: #0f3460; font-weight: 600; }
+.upload-zone .hint { font-size: 0.85em; color: #888; margin-top: 4px; }
+.file-list { margin-top: 12px; }
+.file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 6px; font-size: 0.9em; }
+.file-item .name { font-weight: 600; }
+.file-item .size { color: #888; }
+.file-item .remove { color: #dc3545; cursor: pointer; font-weight: bold; }
+.btn { display: block; width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 1.1em; font-weight: 700; cursor: pointer; transition: all 0.3s; }
+.btn-primary { background: linear-gradient(135deg, #0f3460, #e94560); color: white; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(233,69,96,0.4); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.progress { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-top: 16px; display: none; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #0f3460, #e94560); width: 0%; transition: width 0.3s; }
+#result { display: none; }
+#result iframe { width: 100%; height: 80vh; border: none; border-radius: 8px; }
+.footer { text-align: center; color: #a8d8ea; font-size: 0.8em; margin-top: 32px; }
+.error { color: #dc3545; background: #f8d7da; padding: 12px; border-radius: 8px; margin-top: 12px; display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🦀 Trade Strategy Analyzer</h1>
+<p class="subtitle">上傳 CSV + SET 檔案，即時生成策略分析報告</p>
+
+<div class="card" id="uploadCard">
+<h2>📤 上傳檔案</h2>
+<div class="upload-zone" id="csvZone" onclick="document.getElementById('csvInput').click()">
+<div class="icon">📊</div>
+<div class="label">交易數據 CSV</div>
+<div class="hint">點擊或拖放 CSV 檔案</div>
+</div>
+<input type="file" id="csvInput" accept=".csv" hidden>
+
+<div class="upload-zone" id="setZone" onclick="document.getElementById('setInput').click()">
+<div class="icon">⚙️</div>
+<div class="label">策略設定 SET（可多個）</div>
+<div class="hint">點擊或拖放 .set 檔案</div>
+</div>
+<input type="file" id="setInput" accept=".set" multiple hidden>
+
+<div class="file-list" id="fileList"></div>
+<div class="error" id="error"></div>
+
+<button class="btn btn-primary" id="analyzeBtn" disabled onclick="analyze()">
+🔍 開始分析
+</button>
+<div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+</div>
+
+<div class="card" id="result">
+<h2>📊 分析報告</h2>
+<iframe id="reportFrame"></iframe>
+<br>
+<button class="btn btn-primary" style="margin-top:16px" onclick="downloadReport()">📥 下載報告 HTML</button>
+</div>
+
+<p class="footer">Trade Strategy Analyzer v1.0 | 純瀏覽器運算，無需伺服器</p>
+</div>
+
+<script>
+let csvFile = null;
+let setFiles = [];
+
+const csvInput = document.getElementById('csvInput');
+const setInput = document.getElementById('setInput');
+const csvZone = document.getElementById('csvZone');
+const setZone = document.getElementById('setZone');
+const fileList = document.getElementById('fileList');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const errorDiv = document.getElementById('error');
+const progressDiv = document.getElementById('progress');
+const progressBar = document.getElementById('progressBar');
+
+// Drag and drop
+[csvZone, setZone].forEach(zone => {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('active'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('active'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('active');
+        const files = Array.from(e.dataTransfer.files);
+        if (zone === csvZone && files[0]) {
+            csvFile = files[0];
+            updateUI();
+        } else {
+            setFiles.push(...files.filter(f => f.name.endsWith('.set')));
+            updateUI();
+        }
+    });
+});
+
+csvInput.addEventListener('change', e => {
+    if (e.target.files[0]) { csvFile = e.target.files[0]; updateUI(); }
+});
+setInput.addEventListener('change', e => {
+    setFiles.push(...Array.from(e.target.files));
+    updateUI();
+});
+
+function updateUI() {
+    fileList.innerHTML = '';
+    errorDiv.style.display = 'none';
+    
+    if (csvFile) {
+        csvZone.classList.add('active');
+        csvZone.querySelector('.label').textContent = csvFile.name;
+        fileList.innerHTML += `<div class="file-item"><span class="name">📊 ${csvFile.name}</span><span class="size">${(csvFile.size/1024).toFixed(1)}KB</span><span class="remove" onclick="removeCsv()">✕</span></div>`;
+    } else {
+        csvZone.classList.remove('active');
+        csvZone.querySelector('.label').textContent = '交易數據 CSV';
+    }
+    
+    setFiles.forEach((f, i) => {
+        fileList.innerHTML += `<div class="file-item"><span class="name">⚙️ ${f.name}</span><span class="size">${(f.size/1024).toFixed(1)}KB</span><span class="remove" onclick="removeSet(${i})">✕</span></div>`;
+    });
+    
+    if (setFiles.length > 0) {
+        setZone.classList.add('active');
+        setZone.querySelector('.label').textContent = `${setFiles.length} 個 SET 檔案`;
+    } else {
+        setZone.classList.remove('active');
+        setZone.querySelector('.label').textContent = '策略設定 SET（可多個）';
+    }
+    
+    analyzeBtn.disabled = !csvFile;
+}
+
+function removeCsv() { csvFile = null; updateUI(); }
+function removeSet(i) { setFiles.splice(i, 1); updateUI(); }
+
+async function analyze() {
+    if (!csvFile) return;
+    
+    analyzeBtn.disabled = true;
+    analyzeBtn.textContent = '⏳ 分析中...';
+    progressDiv.style.display = 'block';
+    errorDiv.style.display = 'none';
+    
+    try {
+        progressBar.style.width = '20%';
+        
+        // Read CSV
+        const csvText = await readFile(csvFile);
+        progressBar.style.width = '40%';
+        
+        // Read SET files
+        const setTexts = {};
+        for (const f of setFiles) {
+            setTexts[f.name] = await readFile(f);
+        }
+        progressBar.style.width = '60%';
+        
+        // Parse and analyze
+        const trades = parseCSV(csvText);
+        progressBar.style.width = '70%';
+        
+        const positions = buildPositions(trades);
+        progressBar.style.width = '80%';
+        
+        const stats = calculateAllStats(positions);
+        progressBar.style.width = '90%';
+        
+        const html = generateReport(stats, positions, setTexts);
+        progressBar.style.width = '100%';
+        
+        // Show result
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        document.getElementById('reportFrame').src = url;
+        document.getElementById('result').style.display = 'block';
+        window._reportHTML = html;
+        
+        analyzeBtn.textContent = '✅ 分析完成！重新分析';
+        analyzeBtn.disabled = false;
+        
+    } catch (e) {
+        errorDiv.textContent = '❌ 錯誤：' + e.message;
+        errorDiv.style.display = 'block';
+        analyzeBtn.textContent = '🔍 重新分析';
+        analyzeBtn.disabled = false;
+    }
+}
+
+function readFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(e);
+        reader.readAsText(file);
+    });
+}
+
+// --- CSV Parser ---
+function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    const trades = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+        const vals = lines[i].split(',');
+        if (vals.length < 10) continue;
+        
+        const trade = {};
+        headers.forEach((h, j) => { trade[h] = (vals[j] || '').trim(); });
+        
+        // Filter non-trades
+        if (trade.Comment && /Transfer|Deposit|Withdraw|Balance/i.test(trade.Comment)) continue;
+        
+        const lots = parseFloat(trade.Lots);
+        if (!lots || lots <= 0) continue;
+        if (!trade.Symbol) continue;
+        
+        trade._lots = lots;
+        trade._netProfit = parseFloat(trade['Net Profit']) || 0;
+        trade._maxPips = parseFloat(trade['Max Pips']) || 0;
+        trade._maxLossPips = parseFloat(trade['Max Loss Pips']) || 0;
+        trade._holdingHours = parseFloat(trade['Holding Time (Hours)']) || 0;
+        trade._openTime = parseDate(trade['Open Time']);
+        trade._closeTime = parseDate(trade['Close Time']);
+        trade._swap = parseFloat(trade.Swap) || 0;
+        trade._commission = parseFloat(trade.Commission) || 0;
+        
+        trades.push(trade);
+    }
+    return trades;
+}
+
+function parseDate(s) {
+    if (!s) return new Date();
+    const parts = s.split(/[/ :]/);
+    if (parts.length >= 6) return new Date(parts[2], parts[1]-1, parts[0], parts[3], parts[4], parts[5]);
+    return new Date();
+}
+
+// --- Position Builder ---
+function buildPositions(trades) {
+    // Sort by close time
+    trades.sort((a, b) => a._closeTime - b._closeTime);
+    
+    // Group by Symbol + Direction + CloseTime (±60s)
+    const positions = [];
+    const used = new Set();
+    
+    for (let i = 0; i < trades.length; i++) {
+        if (used.has(i)) continue;
+        const t = trades[i];
+        const group = [t];
+        used.add(i);
+        
+        for (let j = i + 1; j < trades.length; j++) {
+            if (used.has(j)) continue;
+            const t2 = trades[j];
+            if (t2.Symbol === t.Symbol && 
+                t2.Type === t.Type &&
+                Math.abs(t2._closeTime - t._closeTime) < 60000) {
+                group.push(t2);
+                used.add(j);
+            }
+        }
+        
+        const pos = {
+            symbol: t.Symbol,
+            direction: t.Type.includes('buy') ? 'BUY' : 'SELL',
+            trades: group,
+            net_profit: group.reduce((s, x) => s + x._netProfit, 0),
+            max_pips: Math.max(...group.map(x => x._maxPips)),
+            max_loss_pips: Math.min(...group.map(x => x._maxLossPips)),
+            holding_time_hours: Math.max(...group.map(x => x._holdingHours)),
+            total_lots: group.reduce((s, x) => s + x._lots, 0),
+            total_swap: group.reduce((s, x) => s + x._swap, 0),
+            total_commission: group.reduce((s, x) => s + x._commission, 0),
+            open_time: Math.min(...group.map(x => x._openTime.getTime())),
+            close_time: Math.max(...group.map(x => x._closeTime.getTime())),
+            layer_count: group.length,
+            max_layer: Math.max(...group.map(x => x._lots)),
+            comment: t.Comment || ''
+        };
+        positions.push(pos);
+    }
+    return positions;
+}
+
+// --- Statistics ---
+function calculateAllStats(positions) {
+    const profits = positions.map(p => p.net_profit);
+    const wins = profits.filter(p => p > 0);
+    const losses = profits.filter(p => p <= 0);
+    
+    const totalProfit = profits.reduce((s, p) => s + p, 0);
+    const grossWin = wins.reduce((s, p) => s + p, 0);
+    const grossLoss = Math.abs(losses.reduce((s, p) => s + p, 0));
+    
+    // Max Drawdown
+    let peak = 0, maxDD = 0, cumPnl = 0;
+    for (const p of profits) {
+        cumPnl += p;
+        if (cumPnl > peak) peak = cumPnl;
+        const dd = peak - cumPnl;
+        if (dd > maxDD) maxDD = dd;
+    }
+    
+    // By symbol
+    const bySymbol = {};
+    for (const pos of positions) {
+        if (!bySymbol[pos.symbol]) bySymbol[pos.symbol] = [];
+        bySymbol[pos.symbol].push(pos);
+    }
+    const symbolStats = {};
+    for (const [sym, poss] of Object.entries(bySymbol)) {
+        const sp = poss.map(p => p.net_profit);
+        const sw = sp.filter(p => p > 0);
+        symbolStats[sym] = {
+            count: poss.length,
+            win_rate: (sw.length / poss.length * 100).toFixed(1),
+            avg_profit: (sp.reduce((s,p)=>s+p,0) / sp.length).toFixed(2),
+            profit_factor: (sw.reduce((s,p)=>s+p,0) / Math.abs(sp.filter(p=>p<=0).reduce((s,p)=>s+p,0) || 1)).toFixed(2),
+            max_dd: (() => { let pk=0,md=0,c=0; for(const p of sp){c+=p;if(c>pk)pk=c;const d=pk-c;if(d>md)md=d;} return md.toFixed(2); })()
+        };
+    }
+    
+    return {
+        overall: {
+            total_positions: positions.length,
+            win_rate: (wins.length / positions.length * 100).toFixed(1),
+            profit_factor: (grossWin / (grossLoss || 1)).toFixed(2),
+            total_profit: totalProfit.toFixed(2),
+            avg_profit: (totalProfit / positions.length).toFixed(2),
+            max_dd: maxDD.toFixed(2),
+            avg_layers: (positions.reduce((s,p) => s + p.layer_count, 0) / positions.length).toFixed(1),
+            avg_holding: (positions.reduce((s,p) => s + p.holding_time_hours, 0) / positions.length).toFixed(0),
+            total_swap: positions.reduce((s,p) => s + p.total_swap, 0).toFixed(2),
+            avg_win: wins.length ? (wins.reduce((s,p)=>s+p,0) / wins.length).toFixed(2) : '0',
+            avg_loss: losses.length ? (losses.reduce((s,p)=>s+p,0) / losses.length).toFixed(2) : '0',
+        },
+        by_symbol: symbolStats
+    };
+}
+
+// --- Report Generator ---
+function generateReport(stats, positions, setTexts) {
+    const o = stats.overall;
+    const eqData = [];
+    let cum = 0;
+    for (const p of positions) { cum += p.net_profit; eqData.push(cum); }
+    const minEq = Math.min(...eqData);
+    const maxEq = Math.max(...eqData);
+    const rangeEq = maxEq - minEq || 1;
+    
+    let eqPoints = eqData.map((v, i) => 
+        `${40 + (i/Math.max(eqData.length-1,1))*860},${40 + 260 - ((v-minEq)/rangeEq)*260}`
+    ).join(' ');
+    const zeroY = 40 + 260 - ((0-minEq)/rangeEq)*260;
+    
+    // Symbol rows
+    let symRows = '';
+    for (const [sym, s] of Object.entries(stats.by_symbol).sort((a,b) => parseFloat(b[1].profit_factor) - parseFloat(a[1].profit_factor))) {
+        const pf = parseFloat(s.profit_factor);
+        const bg = pf > 2 ? '#d4edda' : (pf > 1 ? '#fff3cd' : '#f8d7da');
+        symRows += `<tr style="background:${bg}"><td>${sym}</td><td>${s.count}</td><td>${s.win_rate}%</td><td>${s.profit_factor}</td><td>${s.avg_profit}</td><td>${s.max_dd}</td></tr>`;
+    }
+    
+    // Position detail (top 50)
+    let posRows = '';
+    for (let i = 0; i < Math.min(positions.length, 50); i++) {
+        const p = positions[i];
+        const bg = p.net_profit > 0 ? '#d4edda' : '#f8d7da';
+        posRows += `<tr style="background:${bg}"><td>${i+1}</td><td>${p.symbol}</td><td>${p.direction}</td><td>${p.layer_count}</td><td>${p.total_lots.toFixed(2)}</td><td>${p.net_profit.toFixed(2)}</td><td>${p.holding_time_hours.toFixed(1)}h</td></tr>`;
+    }
+    
+    return `<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>交易策略分析報告</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#f5f7fa;color:#333;padding:16px}
+.c{max-width:1000px;margin:0 auto}
+h1{font-size:1.5em;color:#1a1a2e;margin-bottom:8px}
+h2{font-size:1.2em;margin:24px 0 12px;color:#16213e;border-bottom:2px solid #0f3460;padding-bottom:4px}
+.sub{color:#666;font-size:0.9em;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
+.card{background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.1);text-align:center}
+.card .v{font-size:1.3em;font-weight:bold;color:#0f3460}.card .l{font-size:.75em;color:#888;margin-top:4px}
+.card.g .v{color:#28a745}.card.b .v{color:#dc3545}
+table{width:100%;border-collapse:collapse;margin-bottom:16px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+th{background:#0f3460;color:#fff;padding:10px 8px;text-align:left;font-size:.8em}
+td{padding:8px;border-bottom:1px solid #eee;font-size:.85em}
+.chart{background:#fff;border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+@media(max-width:600px){.grid{grid-template-columns:repeat(2,1fr)}th,td{padding:6px 4px;font-size:.75em}}
+</style></head><body><div class="c">
+<h1>🦀 交易策略分析報告</h1>
+<p class="sub">${csvFile ? csvFile.name : 'N/A'} | 倉位數：${o.total_positions}</p>
+<div class="grid">
+<div class="card"><div class="v">${o.total_positions}</div><div class="l">倉位數</div></div>
+<div class="card ${parseFloat(o.win_rate)>60?'g':'b'}"><div class="v">${o.win_rate}%</div><div class="l">勝率</div></div>
+<div class="card ${parseFloat(o.profit_factor)>1.5?'g':'b'}"><div class="v">${o.profit_factor}</div><div class="l">PF</div></div>
+<div class="card ${parseFloat(o.total_profit)>0?'g':'b'}"><div class="v">$${o.total_profit}</div><div class="l">總盈虧</div></div>
+<div class="card b"><div class="v">$${o.max_dd}</div><div class="l">Max DD</div></div>
+<div class="card"><div class="v">${o.avg_layers}</div><div class="l">平均層數</div></div>
+<div class="card"><div class="v">${o.avg_holding}h</div><div class="l">平均持倉</div></div>
+<div class="card"><div class="v">$${o.total_swap}</div><div class="l">總 Swap</div></div>
+</div>
+<h2>📈 收益曲線</h2>
+<div class="chart"><svg viewBox="0 0 940 320" style="width:100%;height:auto">
+<line x1="40" y1="${zeroY.toFixed(1)}" x2="900" y2="${zeroY.toFixed(1)}" stroke="#ccc" stroke-dasharray="4"/>
+<text x="35" y="${zeroY.toFixed(1)}" text-anchor="end" font-size="10" fill="#999">$0</text>
+<text x="35" y="40" text-anchor="end" font-size="10" fill="#999">$${maxEq.toFixed(0)}</text>
+<text x="35" y="300" text-anchor="end" font-size="10" fill="#999">$${minEq.toFixed(0)}</text>
+<polygon points="40,300 ${eqPoints} 900,300" fill="rgba(15,52,96,0.1)"/>
+<polyline points="${eqPoints}" fill="none" stroke="#0f3460" stroke-width="2"/>
+</svg></div>
+<h2>🏆 貨幣對排名</h2>
+<table><tr><th>貨幣對</th><th>倉位數</th><th>勝率</th><th>PF</th><th>平均盈虧</th><th>Max DD</th></tr>${symRows}</table>
+<h2>📋 倉位明細（前 50）</h2>
+<table><tr><th>#</th><th>貨幣對</th><th>方向</th><th>層數</th><th>總手數</th><th>盈虧</th><th>持倉時間</th></tr>${posRows}</table>
+</div></body></html>`;
+}
+
+function downloadReport() {
+    if (!window._reportHTML) return;
+    const blob = new Blob([window._reportHTML], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'trade_strategy_report.html';
+    a.click();
+}
+</script>
+</body>
+</html>
