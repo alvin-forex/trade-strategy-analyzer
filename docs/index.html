@@ -286,6 +286,9 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-market">🌐 市場語境</div>
     <div class="tab" data-tab="tab-copy">🏆 Copy 推薦</div>
     <div class="tab" data-tab="tab-volatility">📏 波幅分析</div>
+    <div class="tab" data-tab="tab-martin">🎲 馬丁風險</div>
+    <div class="tab" data-tab="tab-tpsl">📐 TP/SL</div>
+    <div class="tab" data-tab="tab-simulate">💰 Copy 模擬</div>
     <div class="tab" data-tab="tab-positions">📋 倉位明細</div>
     <div class="tab" data-tab="tab-set">⚙️ SET 參數</div>
   </div>
@@ -331,6 +334,21 @@ svg text { font-family: -apple-system, sans-serif; }
   <div class="card tab-panel" id="tab-volatility">
     <h2><span class="icon">📏</span> 波幅適配分析</h2>
     <div id="volatilityAnalysis"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-martin">
+    <h2><span class="icon">🎲</span> 馬丁風險分析</h2>
+    <div id="martinAnalysis"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-tpsl">
+    <h2><span class="icon">📐</span> TP/SL 分析</h2>
+    <div id="tpslAnalysis"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-simulate">
+    <h2><span class="icon">💰</span> Copy 模擬</h2>
+    <div id="simulateAnalysis"><div class="mc-loading">計算中...</div></div>
   </div>
 
   <div class="card tab-panel" id="tab-copy">
@@ -1124,6 +1142,7 @@ async function analyze() {
       Object.assign(allSetParams, p);
     }
     const setCats = Object.keys(allSetParams).length ? categorizeParams(allSetParams) : null;
+    window._allSetParams = allSetParams;
     prog.style.width='90%';
 
     // === Render ===
@@ -1142,6 +1161,13 @@ async function analyze() {
     const volData = calcVolatilityAnalysis(positions);
     // ATR cross-analysis needs market data, will be completed after loadMarketContext
     renderVolatilityAnalysis(volData, null);
+    // Phase 2: Martin Risk, TP/SL, Copy Sim
+    const martinData = calcMartinRisk(positions);
+    renderMartinRisk(martinData);
+    const tpslData = calcTPSLAnalysis(positions);
+    renderTPSLAnalysis(tpslData);
+    const simBaseData = calcCopySimBase(positions, tpslData);
+    renderCopySim(simBaseData);
     renderPositionTable(positions);
     renderSETParams(setCats);
     prog.style.width='100%';
@@ -1838,6 +1864,818 @@ function renderVolatilityAnalysis(volData, atrData) {
   }
 
   $('volatilityAnalysis').innerHTML = html;
+}
+
+// ============================================================
+// Phase 2: 🎲 馬丁風險分析 (Martin Risk Analysis)
+// ============================================================
+function calcMartinRisk(positions) {
+  if (!positions.length) return null;
+
+  // 1. Per-layer regression analysis
+  const layerMap = {};
+  positions.forEach(p => {
+    const ml = p.max_layer;
+    const key = ml <= 5 ? 'L' + ml : 'L6+';
+    if (!layerMap[key]) layerMap[key] = [];
+    layerMap[key].push(p);
+  });
+
+  const regression = {};
+  const layerOrder = ['L1','L2','L3','L4','L5','L6+'];
+  layerOrder.forEach(key => {
+    const arr = layerMap[key] || [];
+    if (!arr.length) { regression[key] = null; return; }
+    const wins = arr.filter(p => p.net_profit > 0);
+    const totalProfit = arr.reduce((s, p) => s + p.net_profit, 0);
+    const totalLots = arr.reduce((s, p) => s + p.total_lots, 0);
+    const totalNetPips = arr.reduce((s, p) => {
+      return s + (p.trades ? p.trades.reduce((ss, t) => ss + t._netPips, 0) : 0);
+    }, 0);
+    regression[key] = {
+      count: arr.length,
+      winRate: wins.length / arr.length * 100,
+      regressionRate: wins.length / arr.length * 100,
+      avgProfit: totalProfit / arr.length,
+      avgNetPips: totalNetPips / arr.length,
+      avgLots: totalLots / arr.length,
+      totalLots
+    };
+  });
+
+  // 2. Position-adding efficiency
+  const efficiency = {};
+  layerOrder.forEach(key => {
+    const arr = layerMap[key] || [];
+    if (!arr.length) { efficiency[key] = null; return; }
+    const avgProfit = arr.reduce((s, p) => s + p.net_profit, 0) / arr.length;
+    const avgLots = arr.reduce((s, p) => s + p.total_lots, 0) / arr.length;
+    const avgHolding = arr.reduce((s, p) => s + p.holding_time_hours, 0) / arr.length;
+    const costPerLayer = avgLots * avgHolding;
+    efficiency[key] = {
+      avgProfit,
+      avgLots,
+      avgHolding,
+      costPerLayer,
+      efficiency: costPerLayer > 0 ? avgProfit / costPerLayer : 0
+    };
+  });
+
+  // L1-L3 vs L4+ comparison
+  const l123 = positions.filter(p => p.max_layer <= 3);
+  const l4plus = positions.filter(p => p.max_layer >= 4);
+  const efficiencyCompare = {
+    l123: l123.length ? { count: l123.length, avgProfit: l123.reduce((s, p) => s + p.net_profit, 0) / l123.length } : null,
+    l4plus: l4plus.length ? { count: l4plus.length, avgProfit: l4plus.reduce((s, p) => s + p.net_profit, 0) / l4plus.length } : null
+  };
+
+  // 3. Bankruptcy risk assessment
+  const maxLayerInData = Math.max(...positions.map(p => p.max_layer));
+  let riskLevel, riskEmoji, riskColor;
+  if (maxLayerInData <= 3) { riskLevel = 'LOW'; riskEmoji = '\u{1F7E2}'; riskColor = '#28a745'; }
+  else if (maxLayerInData <= 5) { riskLevel = 'MEDIUM'; riskEmoji = '\u{1F7E1}'; riskColor = '#ffc107'; }
+  else if (maxLayerInData <= 7) { riskLevel = 'HIGH'; riskEmoji = '\u{1F534}'; riskColor = '#dc3545'; }
+  else { riskLevel = 'CRITICAL'; riskEmoji = '\u26D4'; riskColor = '#8b0000'; }
+
+  // Cumulative capital requirement per layer
+  const uniqueLots = [...new Set(positions.flatMap(p => p.trades ? p.trades.map(t => t._lots) : []))].sort((a, b) => a - b);
+  const cumulativeLots = [];
+  let cumLots = 0;
+  uniqueLots.forEach((lot, i) => {
+    cumLots += lot;
+    cumulativeLots.push({ layer: i + 1, lots: lot, cumulative: cumLots });
+  });
+
+  // Estimate max loss at each layer
+  const avgMaxLossPips = positions.length ?
+    positions.reduce((s, p) => s + Math.abs(p.trades ? Math.max(...p.trades.map(t => Math.abs(t._maxLossPips))) : 0), 0) / positions.length : 50;
+  cumulativeLots.forEach(cl => {
+    cl.estimatedLoss = cl.cumulative * avgMaxLossPips * 0.1;
+  });
+
+  // 4. Capital efficiency
+  const totalProfit = positions.reduce((s, p) => s + p.net_profit, 0);
+  const maxCumLots = cumulativeLots.length ? Math.max(...cumulativeLots.map(c => c.cumulative)) : 0;
+  const maxRiskExposure = maxCumLots * avgMaxLossPips * 0.1;
+  const capitalEfficiency = maxRiskExposure > 0 ? totalProfit / maxRiskExposure : 0;
+  const avgLayers = positions.reduce((s, p) => s + p.max_layer, 0) / positions.length;
+  const avgLots = positions.reduce((s, p) => s + p.total_lots, 0) / positions.length;
+  const capitalUtilRate = (avgLayers * avgLots) > 0 ? totalProfit / (avgLayers * avgLots) : 0;
+
+  // 5. Pipstep analysis
+  let pipstepData = null;
+  if (window._allSetParams && Object.keys(window._allSetParams).length) {
+    const psKeys = Object.keys(window._allSetParams).filter(k => /pipstep/i.test(k)).sort();
+    if (psKeys.length) {
+      pipstepData = { fromSET: true, steps: [] };
+      psKeys.forEach(k => {
+        pipstepData.steps.push({ key: k, value: parseFloat(window._allSetParams[k]) || 0 });
+      });
+    }
+  }
+  // From CSV: average distance between layers
+  const layerDistances = {};
+  positions.forEach(p => {
+    if (p.trades && p.trades.length >= 2) {
+      const sorted = [...p.trades].sort((a, b) => a._openTime - b._openTime);
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i - 1];
+        const curr = sorted[i];
+        const layerKey = 'L' + curr._layer;
+        const dist = Math.abs(curr._openPrice - prev._openPrice);
+        const mult = pipMultiplier(p.symbol);
+        const distPips = dist * mult;
+        if (!layerDistances[layerKey]) layerDistances[layerKey] = [];
+        layerDistances[layerKey].push(distPips);
+      }
+    }
+  });
+  const avgPipsteps = {};
+  for (const [lk, dists] of Object.entries(layerDistances)) {
+    avgPipsteps[lk] = dists.length ? dists.reduce((s, v) => s + v, 0) / dists.length : 0;
+  }
+
+  return {
+    regression,
+    efficiency,
+    efficiencyCompare,
+    riskLevel, riskEmoji, riskColor, maxLayerInData,
+    cumulativeLots,
+    capitalEfficiency, capitalUtilRate,
+    totalProfit, maxRiskExposure,
+    pipstepData, avgPipsteps,
+    avgMaxLossPips
+  };
+}
+
+function renderMartinRisk(data) {
+  if (!data) { $('martinAnalysis').innerHTML = '<p style="color:#999">數據不足</p>'; return; }
+
+  const riskInfo = infoToggle('martin-risk', '<b>🎲 馬丁風險分析</b><br>深入分析馬丁格爾策略嘅逐層回歸表現、加倉效率、破產風險同資金效率。<br><b>回歸率</b> = 該層最終盈利倉位比例。Martin 策略嘅特徵係深層回歸率極高（L4+ 勝率遠高於 L1）。<br><b>破產風險</b>基於數據中最大層數評估：≤3 🟢、4-5 🟡、6-7 🔴、≥8 ⛔。');
+  let html = riskInfo;
+
+  // Risk level banner
+  html += '<div style="text-align:center;padding:20px;background:' + data.riskColor + '15;border:2px solid ' + data.riskColor + ';border-radius:var(--radius);margin-bottom:20px">';
+  html += '<div style="font-size:2em">' + data.riskEmoji + '</div>';
+  html += '<div style="font-size:1.4em;font-weight:700;color:' + data.riskColor + '">' + data.riskLevel + ' 風險</div>';
+  html += '<div style="font-size:0.9em;color:#666;margin-top:4px">數據中最大層數：L' + data.maxLayerInData + '</div>';
+  html += '</div>';
+
+  // Per-layer regression table
+  const capInfo = infoToggle('martin-capital', '<b>逐層回歸分析</b><br>每層嘅勝率、平均盈利、平均 Net Pips 同回歸率。Martin 策略通常 L1 勝率較低（~50-60%）但 L4+ 勝率極高（~90%+），因為加倉攤平後只微波動即可回本。');
+  html += '<h3 style="margin:16px 0 12px;color:var(--primary)">📊 逐層回歸分析' + capInfo + '</h3>';
+
+  const layerOrder = ['L1','L2','L3','L4','L5','L6+'];
+  const barData = [];
+  layerOrder.forEach(k => {
+    const d = data.regression[k];
+    if (d) barData.push({ label: k, value: d.winRate, color: d.winRate >= 80 ? '#28a745' : d.winRate >= 60 ? '#ffc107' : '#dc3545' });
+  });
+
+  html += '<div class="chart-row">';
+  html += '<div class="chart-box"><h3>各層勝率 (%)</h3>' + makeBarSVG(barData) + '</div>';
+
+  html += '<div class="chart-box"><h3>回歸數據</h3>';
+  html += '<table class="data-table"><tr><th>層數</th><th>倉位</th><th>勝率</th><th>平均盈利</th><th>平均 Pips</th><th>平均手數</th></tr>';
+  layerOrder.forEach(k => {
+    const d = data.regression[k];
+    if (!d) return;
+    html += '<tr><td><strong>' + k + '</strong></td><td>' + d.count + '</td>';
+    html += '<td style="color:' + (d.winRate >= 70 ? 'var(--green)' : d.winRate >= 50 ? 'var(--yellow)' : 'var(--red)') + '">' + pct(d.winRate) + '</td>';
+    html += '<td style="color:' + (d.avgProfit >= 0 ? 'var(--green)' : 'var(--red)') + '">' + fmtMoney(d.avgProfit) + '</td>';
+  html += '<td>' + fmt(d.avgNetPips, 1) + '</td>';
+    html += '<td>' + fmt(d.avgLots, 2) + '</td></tr>';
+  });
+  html += '</table></div></div>';
+
+  // Capital requirement escalation
+  if (data.cumulativeLots.length) {
+    const effInfo = infoToggle('martin-efficiency', '<b>資金需求遞增</b><br>每層嘅累計手數同預估最大虧損。隨層數增加，所需保證金呈指數增長，呢個就係馬丁策略嘅核心風險。');
+    html += '<h3 style="margin:20px 0 12px;color:var(--primary)">📈 資金需求遞增' + effInfo + '</h3>';
+
+    const capBarData = data.cumulativeLots.map(c => ({
+      label: 'L' + c.layer, value: c.cumulative, color: c.layer <= 3 ? '#28a745' : c.layer <= 5 ? '#ffc107' : '#dc3545'
+    }));
+    html += '<div class="chart-row">';
+    html += '<div class="chart-box"><h3>累計手數</h3>' + makeBarSVG(capBarData) + '</div>';
+
+    html += '<div class="chart-box"><h3>各層資金需求</h3>';
+    html += '<table class="data-table"><tr><th>層數</th><th>手數</th><th>累計手數</th><th>預估最大虧損</th></tr>';
+    data.cumulativeLots.forEach(c => {
+      html += '<tr><td>L' + c.layer + '</td><td>' + fmt(c.lots, 2) + '</td><td>' + fmt(c.cumulative, 2) + '</td>';
+      html += '<td style="color:var(--red)">' + fmtMoney(-c.estimatedLoss) + '</td></tr>';
+    });
+    html += '</table></div></div>';
+  }
+
+  // Efficiency comparison
+  const ec = data.efficiencyCompare;
+  if (ec.l123 || ec.l4plus) {
+    html += '<h3 style="margin:20px 0 12px;color:var(--primary)">⚡ 加倉效率比較</h3>';
+    html += '<div class="chart-row">';
+    const effBarData = [];
+    if (ec.l123) effBarData.push({ label: 'L1-L3', value: ec.l123.avgProfit, color: '#28a745' });
+    if (ec.l4plus) effBarData.push({ label: 'L4+', value: ec.l4plus.avgProfit, color: '#dc3545' });
+    html += '<div class="chart-box"><h3>平均盈利比較</h3>' + makeBarSVG(effBarData) + '</div>';
+    html += '<div class="chart-box"><h3>效率數據</h3>';
+    html += '<table class="data-table"><tr><th>組別</th><th>倉位數</th><th>平均盈利</th></tr>';
+    if (ec.l123) html += '<tr><td><strong>L1-L3</strong></td><td>' + ec.l123.count + '</td><td style="color:' + (ec.l123.avgProfit >= 0 ? 'var(--green)' : 'var(--red)') + '">' + fmtMoney(ec.l123.avgProfit) + '</td></tr>';
+    if (ec.l4plus) html += '<tr><td><strong>L4+</strong></td><td>' + ec.l4plus.count + '</td><td style="color:' + (ec.l4plus.avgProfit >= 0 ? 'var(--green)' : 'var(--red)') + '">' + fmtMoney(ec.l4plus.avgProfit) + '</td></tr>';
+    html += '</table></div></div>';
+  }
+
+  // Capital efficiency stats
+  html += '<div class="stats-grid" style="margin-top:16px">';
+  html += statBox(fmt(data.capitalEfficiency, 3), '資金效率（總利潤/最大風險）', data.capitalEfficiency >= 1 ? 'positive' : 'negative');
+  html += statBox(fmt(data.capitalUtilRate, 3), '資金利用率（總利潤/均層×均手）', data.capitalUtilRate >= 0 ? 'positive' : 'negative');
+  html += statBox(fmtMoney(data.totalProfit), '總利潤', data.totalProfit >= 0 ? 'positive' : 'negative');
+  html += statBox(fmtMoney(-data.maxRiskExposure), '最大風險暴露', 'negative');
+  html += '</div>';
+
+  // Pipstep analysis
+  const psInfo = infoToggle('martin-pipstep', '<b>Pipstep 分析</b><br>分析各層之間嘅實際平均距離（pips）。如果 SET 參數包含 pipstep 設定，會同時顯示設定值同實際值。');
+  html += '<h3 style="margin:20px 0 12px;color:var(--primary)">📐 Pipstep 分析' + psInfo + '</h3>';
+
+  if (data.pipstepData) {
+    html += '<div style="margin-bottom:12px;padding:10px;background:#f0f4ff;border-radius:8px;font-size:0.88em">';
+    html += '<strong>SET 參數：</strong>';
+    data.pipstepData.steps.forEach(s => {
+      html += ' <code style="background:#e8eaf6;padding:2px 6px;border-radius:4px;margin:0 4px">' + s.key + '=' + s.value + '</code>';
+    });
+    html += '</div>';
+  }
+
+  const psKeys = Object.keys(data.avgPipsteps);
+  if (psKeys.length) {
+    const psBarData = psKeys.map(k => ({ label: k, value: data.avgPipsteps[k], color: '#0f3460' }));
+    html += '<div class="chart-row"><div class="chart-box"><h3>實際層間平均距離 (pips)</h3>' + makeBarSVG(psBarData) + '</div>';
+    html += '<div class="chart-box"><h3>Pipstep 數據</h3>';
+    html += '<table class="data-table"><tr><th>層數</th><th>平均距離 (pips)</th></tr>';
+    psKeys.forEach(k => {
+      html += '<tr><td><strong>' + k + '</strong></td><td>' + fmt(data.avgPipsteps[k], 1) + ' pips</td></tr>';
+    });
+    html += '</table></div></div>';
+  } else {
+    html += '<p style="color:#999;font-size:0.9em">未偵測到多層交易嘅層間距離數據</p>';
+  }
+
+  // Auto conclusion
+  html += '<div style="margin-top:20px;padding:14px;background:#f8f9fa;border-radius:var(--radius);border-left:4px solid ' + data.riskColor + '">';
+  html += '<strong>📋 馬丁風險結論：</strong><br>';
+  html += '數據中最深達 L' + data.maxLayerInData + '（' + data.riskEmoji + ' ' + data.riskLevel + ' 風險）。';
+  if (data.regression.L1 && data.regression.L4) {
+    html += 'L1 回歸率 ' + pct(data.regression.L1.regressionRate) + ' vs L4 回歸率 ' + pct(data.regression.L4.regressionRate) + '。';
+  }
+  html += '資金效率 ' + fmt(data.capitalEfficiency, 2) + '，每承擔 $1 風險可產生 $' + fmt(data.capitalEfficiency, 2) + ' 利潤。';
+  if (data.maxLayerInData >= 6) {
+    html += '<br><br>⚠️ <b>高層數風險</b>：建議限制最大加倉層數至 L4-L5，並確保賬戶有充足保證金承受極端行情。';
+  }
+  html += '</div>';
+
+  $('martinAnalysis').innerHTML = html;
+}
+
+// ============================================================
+// Phase 2: 📐 TP/SL 分析 (TP/SL Optimization Analysis)
+// ============================================================
+function calcPercentile(sortedArr, p) {
+  if (!sortedArr.length) return 0;
+  const idx = (p / 100) * (sortedArr.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sortedArr[lo];
+  return sortedArr[lo] + (sortedArr[hi] - sortedArr[lo]) * (idx - lo);
+}
+
+function calcTPSLAnalysis(positions) {
+  if (!positions.length) return null;
+
+  // 1. Max Profit distribution (Favorable Excursion)
+  const maxProfits = positions.map(p => p.max_profit).filter(v => v !== 0);
+  const winners = positions.filter(p => p.net_profit > 0);
+  const losers = positions.filter(p => p.net_profit <= 0);
+  const winMaxProfits = winners.map(p => p.max_profit).sort((a, b) => a - b);
+  const loseMaxProfits = losers.map(p => p.max_profit).sort((a, b) => a - b);
+  const allMaxProfits = [...maxProfits].sort((a, b) => a - b);
+
+  const profitDist = {
+    all: allMaxProfits,
+    p10: calcPercentile(allMaxProfits, 10),
+    p25: calcPercentile(allMaxProfits, 25),
+    p50: calcPercentile(allMaxProfits, 50),
+    p75: calcPercentile(allMaxProfits, 75),
+    p90: calcPercentile(allMaxProfits, 90),
+    p95: calcPercentile(allMaxProfits, 95),
+    winners: winMaxProfits,
+    losers: loseMaxProfits
+  };
+
+  // 2. Max Loss distribution (Adverse Excursion)
+  const maxLosses = positions.map(p => p.max_loss).filter(v => v !== 0).sort((a, b) => a - b);
+  const l1Pos = positions.filter(p => p.max_layer === 1);
+  const l2pPos = positions.filter(p => p.max_layer >= 2 && p.max_layer <= 3);
+  const l4pPos = positions.filter(p => p.max_layer >= 4);
+
+  const lossByLayer = {
+    L1: l1Pos.map(p => p.max_loss).sort((a, b) => a - b),
+    L2L3: l2pPos.map(p => p.max_loss).sort((a, b) => a - b),
+    L4p: l4pPos.map(p => p.max_loss).sort((a, b) => a - b),
+    all: maxLosses
+  };
+
+  const lossDist = {
+    all: maxLosses,
+    p10: calcPercentile(maxLosses, 10),
+    p25: calcPercentile(maxLosses, 25),
+    p50: calcPercentile(maxLosses, 50),
+    p75: calcPercentile(maxLosses, 75),
+    p90: calcPercentile(maxLosses, 90),
+    byLayer: lossByLayer
+  };
+
+  // 3. MFE/MAE gap
+  const gaps = positions.map(p => {
+    const totalMaxPips = p.trades ? Math.max(...p.trades.map(t => t._maxPips || 0)) : 0;
+    const totalNetPips = p.trades ? p.trades.reduce((s, t) => s + t._netPips, 0) : 0;
+    return { gap: totalMaxPips - totalNetPips, win: p.net_profit > 0, maxPips: totalMaxPips, netPips: totalNetPips };
+  });
+
+  const winGaps = gaps.filter(g => g.win).map(g => g.gap).sort((a, b) => a - b);
+  const loseGaps = gaps.filter(g => !g.win).map(g => g.gap).sort((a, b) => a - b);
+  const allGaps = gaps.map(g => g.gap).sort((a, b) => a - b);
+
+  const gapAnalysis = {
+    avg: allGaps.length ? allGaps.reduce((s, v) => s + v, 0) / allGaps.length : 0,
+    median: calcPercentile(allGaps, 50),
+    p75: calcPercentile(allGaps, 75),
+    winAvg: winGaps.length ? winGaps.reduce((s, v) => s + v, 0) / winGaps.length : 0,
+    loseAvg: loseGaps.length ? loseGaps.reduce((s, v) => s + v, 0) / loseGaps.length : 0,
+    all: allGaps
+  };
+
+  // 4. TP/SL optimization recommendations
+  function layerMaxLossPips(posArr) {
+    return posArr.map(p => p.trades ? Math.max(...p.trades.map(t => Math.abs(t._maxLossPips || 0))) : 0).sort((a, b) => a - b);
+  }
+  function layerMaxPips(posArr) {
+    return posArr.map(p => p.trades ? Math.max(...p.trades.map(t => t._maxPips || 0)) : 0).filter(v => v > 0).sort((a, b) => a - b);
+  }
+
+  const rec = {
+    L1: {
+      sl: calcPercentile(layerMaxLossPips(l1Pos), 90) * 1.2,
+      tp: calcPercentile(layerMaxPips(l1Pos), 75),
+      tsl: calcPercentile(allGaps, 50)
+    },
+    L2L3: {
+      sl: calcPercentile(layerMaxLossPips(l2pPos), 90) * 1.2,
+      tp: calcPercentile(layerMaxPips(l2pPos), 75),
+      tsl: calcPercentile(allGaps, 50)
+    },
+    L4p: {
+      sl: calcPercentile(layerMaxLossPips(l4pPos), 90) * 1.2,
+      tp: calcPercentile(layerMaxPips(l4pPos), 75),
+      tsl: calcPercentile(allGaps, 50)
+    }
+  };
+
+  // 5. DollarMode analysis
+  let dollarMode = null;
+  if (window._allSetParams && window._allSetParams.DollarStart) {
+    const ds = parseFloat(window._allSetParams.DollarStart) || 0;
+    const dt = parseFloat(window._allSetParams.DollarTrail) || 0;
+    const lotSizes = uniqueLotSizes(positions);
+    const smallestLot = lotSizes[0] || 0.01;
+    const pipsToDS = smallestLot > 0 ? (ds / (smallestLot * 10)) : 0;
+    const profitablePositions = winners.length;
+    const wouldTrigger = winners.filter(p => p.max_profit >= ds).length;
+    const triggerPct = profitablePositions > 0 ? wouldTrigger / profitablePositions * 100 : 0;
+    const avgActualProfit = winners.length ? winners.reduce((s, p) => s + p.net_profit, 0) / winners.length : 0;
+    dollarMode = {
+      dollarStart: ds, dollarTrail: dt, smallestLot, pipsToDS,
+      triggerPct, wouldTrigger, profitablePositions,
+      avgActualProfit, efficiency: ds > 0 ? avgActualProfit / ds : 0
+    };
+  }
+
+  return { profitDist, lossDist, gapAnalysis, recommendations: rec, dollarMode };
+}
+
+function uniqueLotSizes(positions) {
+  const all = positions.flatMap(p => p.trades ? p.trades.map(t => t._lots) : []);
+  return [...new Set(all)].sort((a, b) => a - b);
+}
+
+function makeHistogramSVG(values, bucketCount, color, width, height) {
+  if (!values.length) return '<p style="color:#999">無數據</p>';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (min === max) return '<p style="color:#999">所有數據相同</p>';
+  const range = max - min;
+  const step = range / bucketCount;
+  const buckets = new Array(bucketCount).fill(0);
+  values.forEach(v => {
+    let idx = Math.floor((v - min) / step);
+    if (idx >= bucketCount) idx = bucketCount - 1;
+    buckets[idx]++;
+  });
+  const maxCount = Math.max(...buckets, 1);
+
+  const W = width || 400, H = height || 220, M = 50;
+  const barW = (W - M - 20) / bucketCount * 0.85;
+  const gap = (W - M - 20) / bucketCount;
+
+  let html = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;">';
+  for (let i = 0; i <= 4; i++) {
+    const y = M + (H - M - 30) * i / 4;
+    html += '<line x1="' + M + '" y1="' + y + '" x2="' + (W-10) + '" y2="' + y + '" stroke="#eee" stroke-width="1"/>';
+    html += '<text x="' + (M-5) + '" y="' + (y+4) + '" text-anchor="end" font-size="9" fill="#999">' + Math.round(maxCount * (1 - i/4)) + '</text>';
+  }
+
+  buckets.forEach((count, i) => {
+    const x = M + gap * i + gap/2 - barW/2;
+    const barH = (count / maxCount) * (H - M - 30);
+    const y = M + (H - M - 30) - barH;
+    html += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" rx="3" fill="' + color + '" opacity="0.85"/>';
+    const label = fmt(min + step * (i + 0.5), 0);
+    html += '<text x="' + (M+gap*i+gap/2) + '" y="' + (H-8) + '" text-anchor="middle" font-size="8" fill="#666" transform="rotate(-30,' + (M+gap*i+gap/2) + ',' + (H-8) + ')">' + label + '</text>';
+  });
+
+  html += '</svg>';
+  return html;
+}
+
+function renderTPSLAnalysis(data) {
+  if (!data) { $('tpslAnalysis').innerHTML = '<p style="color:#999">數據不足</p>'; return; }
+
+  const profitInfo = infoToggle('tpsl-profit', '<b>Max Profit 分佈</b><br>所有倉位嘅最大有利偏移（MFE）分佈。顯示各百分位數值。<br>例如 P75 = $X 表示 75% 嘅交易曾達到至少 $X 嘅浮盈。');
+  const lossInfo = infoToggle('tpsl-loss', '<b>Max Loss 分佈</b><br>所有倉位嘅最大不利偏移（MAE）分佈。按層數分組顯示。<br>例如 P90 = $X 表示 90% 嘅交易最大浮虧不超過 $X。');
+  const gapInfo = infoToggle('tpsl-gap', '<b>MFE/MAE 差距分析</b><br>Gap = Max Pips - Net Pips，即有多少浮利被回吐。反映 trailing stop 嘅效率。<br>越大嘅 Gap 表示越多利潤被回吐，可能需要更緊嘅 trailing stop。');
+  const optInfo = infoToggle('tpsl-optimize', '<b>TP/SL 優化建議</b><br>基於歷史數據嘅百分位計算：<b>建議 SL</b> = P90 Max Loss Pips × 1.2（留 20% 緩衝）· <b>建議 TP</b> = P75 Max Pips · <b>建議 TSL</b> = 中位數 Gap（即 DollarMode Trail 嘅參考值）。');
+  const dollarInfo = infoToggle('tpsl-dollar', '<b>DollarMode 分析</b><br>根據 SET 參數嘅 DollarStart 同 DollarTrail 分析 DollarMode 嘅有效性。<br>計算 L1 手數需要多少 pips 才能觸發 DollarStart，以及有幾多盈利倉位會被 DollarMode 捕獲。');
+
+  let html = '';
+
+  // 1. Max Profit distribution
+  html += '<h3 style="margin:0 0 12px;color:var(--primary)">📈 Max Profit 分佈（最大有利偏移）' + profitInfo + '</h3>';
+  const pd = data.profitDist;
+
+  html += '<div class="chart-row">';
+  html += '<div class="chart-box"><h3>分佈直方圖</h3>' + makeHistogramSVG(pd.all, 15, '#28a745') + '</div>';
+  html += '<div class="chart-box"><h3>百分位數據</h3>';
+  html += '<table class="data-table"><tr><th>百分位</th><th>Max Profit</th></tr>';
+  [['P10', pd.p10], ['P25', pd.p25], ['P50', pd.p50], ['P75', pd.p75], ['P90', pd.p90], ['P95', pd.p95]].forEach(function(item) {
+    html += '<tr><td><strong>' + item[0] + '</strong></td><td style="color:var(--green)">' + fmtMoney(item[1]) + '</td></tr>';
+  });
+  html += '</table>';
+  html += '<div style="margin-top:8px;font-size:0.85em;color:#666">75% 嘅盈利倉位曾達到至少 <strong style="color:var(--green)">' + fmtMoney(pd.p75) + '</strong> 浮盈</div>';
+  html += '</div></div>';
+
+  // 2. Max Loss distribution
+  html += '<h3 style="margin:20px 0 12px;color:var(--primary)">📉 Max Loss 分佈（最大不利偏移）' + lossInfo + '</h3>';
+  const ld = data.lossDist;
+
+  html += '<div class="chart-row">';
+  html += '<div class="chart-box"><h3>分佈直方圖</h3>' + makeHistogramSVG(ld.all, 15, '#dc3545') + '</div>';
+  html += '<div class="chart-box"><h3>百分位數據</h3>';
+  html += '<table class="data-table"><tr><th>百分位</th><th>Max Loss</th></tr>';
+  [['P10', ld.p10], ['P25', ld.p25], ['P50', ld.p50], ['P75', ld.p75], ['P90', ld.p90]].forEach(function(item) {
+    html += '<tr><td><strong>' + item[0] + '</strong></td><td style="color:var(--red)">' + fmtMoney(item[1]) + '</td></tr>';
+  });
+  html += '</table>';
+  const lbl = ld.byLayer;
+  if (lbl.L1.length) html += '<div style="margin-top:8px;font-size:0.85em;color:#666">90% 嘅 L1 倉位最大浮虧 &lt; <strong style="color:var(--red)">' + fmtMoney(calcPercentile(lbl.L1, 90)) + '</strong></div>';
+  html += '</div></div>';
+
+  // 3. MFE/MAE gap
+  html += '<h3 style="margin:20px 0 12px;color:var(--primary)">🔄 MFE/MAE 差距分析（利潤回吐）' + gapInfo + '</h3>';
+  const ga = data.gapAnalysis;
+
+  html += '<div class="stats-grid" style="margin-bottom:12px">';
+  html += statBox(fmt(ga.avg, 1) + ' pips', '平均回吐 Gap', ga.avg <= 20 ? 'positive' : 'negative');
+  html += statBox(fmt(ga.median, 1) + ' pips', '中位數 Gap', ga.median <= 15 ? 'positive' : 'negative');
+  html += statBox(fmt(ga.p75, 1) + ' pips', 'P75 Gap', '');
+  html += statBox(fmt(ga.winAvg, 1) + ' pips', '盈利倉平均回吐', '');
+  html += statBox(fmt(ga.loseAvg, 1) + ' pips', '虧損倉平均回吐', '');
+  html += '</div>';
+
+  const gapBarData = [
+    { label: '盈利倉', value: ga.winAvg, color: '#ffc107' },
+    { label: '虧損倉', value: ga.loseAvg, color: '#dc3545' },
+    { label: '全部', value: ga.avg, color: '#0f3460' }
+  ];
+  html += '<div class="chart-row"><div class="chart-box"><h3>回吐 Gap 比較</h3>' + makeBarSVG(gapBarData) + '</div>';
+  html += '<div class="chart-box"><h3>回吐直方圖</h3>' + makeHistogramSVG(ga.all, 15, '#ffc107') + '</div></div>';
+
+  // 4. TP/SL optimization recommendations
+  html += '<h3 style="margin:20px 0 12px;color:var(--primary)">🎯 TP/SL 優化建議' + optInfo + '</h3>';
+  const rec = data.recommendations;
+
+  html += '<div class="chart-row" style="gap:12px">';
+  [['L1（單層）', rec.L1, '#28a745'], ['L2-L3（雙/三層）', rec.L2L3, '#ffc107'], ['L4+（深層）', rec.L4p, '#dc3545']].forEach(function(item) {
+    var label = item[0], r = item[1], borderColor = item[2];
+    if (!r) return;
+    html += '<div class="chart-box" style="border-top:4px solid ' + borderColor + '">';
+    html += '<h3>' + label + '</h3>';
+    html += '<div style="font-size:0.9em;line-height:2">';
+    html += '<div>\u{1F6E1}\uFE0F <b>建議 SL：</b><code style="background:#fde8ea;padding:2px 8px;border-radius:4px;color:var(--red)">' + fmt(r.sl, 1) + ' pips</code></div>';
+    html += '<div>\u{1F3AF} <b>建議 TP：</b><code style="background:#d4edda;padding:2px 8px;border-radius:4px;color:var(--green)">' + fmt(r.tp, 1) + ' pips</code></div>';
+    html += '<div>\u{1F4D0} <b>建議 TSL：</b><code style="background:#fff3cd;padding:2px 8px;border-radius:4px;color:#856404">' + fmt(r.tsl, 1) + ' pips</code></div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  // 5. DollarMode analysis
+  if (data.dollarMode) {
+    var dm = data.dollarMode;
+    html += '<h3 style="margin:20px 0 12px;color:var(--primary)">\u{1F4B5} DollarMode 分析' + dollarInfo + '</h3>';
+    html += '<div class="stats-grid" style="margin-bottom:12px">';
+    html += statBox('$' + fmt(dm.dollarStart, 2), 'DollarStart', '');
+    html += statBox('$' + fmt(dm.dollarTrail, 2), 'DollarTrail', '');
+    html += statBox(fmt(dm.pipsToDS, 1) + ' pips', 'L1 觸發所需 pips', '');
+    html += statBox(pct(dm.triggerPct), '盈利倉觸發率', dm.triggerPct >= 60 ? 'positive' : 'negative');
+    html += statBox(fmt(dm.efficiency, 2), '實際/設定 效率', dm.efficiency >= 1 ? 'positive' : 'negative');
+    html += '</div>';
+    html += '<div style="padding:10px;background:#f0f4ff;border-radius:8px;font-size:0.88em">';
+    html += 'L1 手數 ' + fmt(dm.smallestLot, 2) + ' lot，需 ' + fmt(dm.pipsToDS, 1) + ' pips 觸發 DollarStart($' + fmt(dm.dollarStart, 2) + ')。';
+    html += dm.wouldTrigger + '/' + dm.profitablePositions + ' 個盈利倉位（' + pct(dm.triggerPct) + '）會觸發 DollarMode。';
+    html += '實際平均盈利 $' + fmt(dm.avgActualProfit, 2) + ' vs DollarStart $' + fmt(dm.dollarStart, 2) + '。';
+    html += '</div>';
+  }
+
+  // Auto conclusion
+  html += '<div style="margin-top:20px;padding:14px;background:#f8f9fa;border-radius:var(--radius);border-left:4px solid var(--primary)">';
+  html += '<strong>\u{1F4CB} TP/SL 結論：</strong><br>';
+  html += '建議 L1 止損 <b>' + fmt(rec.L1.sl, 1) + ' pips</b>，止賺 <b>' + fmt(rec.L1.tp, 1) + ' pips</b>，Trailing Stop 參考 <b>' + fmt(rec.L1.tsl, 1) + ' pips</b>。';
+  html += '平均利潤回吐 ' + fmt(ga.avg, 1) + ' pips。';
+  if (ga.avg > 30) {
+    html += '⚠️ 回吐較大，建議使用更緊嘅 Trailing Stop 或 DollarMode 鎖定利潤。';
+  } else {
+    html += '✅ 回吐控制良好。';
+  }
+  html += '</div>';
+
+  $('tpslAnalysis').innerHTML = html;
+}
+
+// ============================================================
+// Phase 2: \u{1F4B0} Copy 模擬 (Copy Trade Simulation)
+// ============================================================
+function calcCopySimBase(positions, tpslData) {
+  if (!positions.length) return null;
+  var defaultSL = tpslData && tpslData.recommendations && tpslData.recommendations.L1 ?
+    tpslData.recommendations.L1.sl : 50;
+  return { positions: positions, defaultSL: defaultSL, tpslData: tpslData };
+}
+
+function runCopySim(positions, mode, params) {
+  var maxLayer = params.maxLayer;
+  var slPips = params.slPips;
+  var accountSize = params.accountSize;
+  var filtered;
+  if (mode === 'cop') {
+    filtered = positions.filter(function(p) { return p.max_layer <= maxLayer; });
+  } else {
+    filtered = positions.map(function(p) {
+      return Object.assign({}, p, { max_layer: Math.min(p.max_layer, maxLayer) });
+    });
+  }
+
+  // Simulate with hard SL
+  var simResults = filtered.map(function(p) {
+    var maxLossPips = p.trades ? Math.max.apply(null, p.trades.map(function(t) { return Math.abs(t._maxLossPips); })) : 0;
+    var simProfit = p.net_profit;
+    if (maxLossPips > slPips && slPips > 0) {
+      var lossRatio = slPips / (maxLossPips || 1);
+      if (p.net_profit < 0) {
+        simProfit = p.net_profit * lossRatio;
+      }
+    }
+    return simProfit;
+  });
+
+  // Build equity curve
+  var equity = [];
+  var cum = 0;
+  simResults.forEach(function(p) { cum += p; equity.push(cum); });
+
+  // Stats
+  var wins = simResults.filter(function(p) { return p > 0; });
+  var losses = simResults.filter(function(p) { return p <= 0; });
+  var totalProfit = simResults.reduce(function(s, p) { return s + p; }, 0);
+  var grossWin = wins.reduce(function(s, p) { return s + p; }, 0);
+  var grossLoss = Math.abs(losses.reduce(function(s, p) { return s + p; }, 0));
+  var winRate = simResults.length ? wins.length / simResults.length * 100 : 0;
+  var pf = grossLoss > 0 ? grossWin / grossLoss : (grossWin > 0 ? 999 : 0);
+
+  // Max DD
+  var peak = 0, maxDD = 0;
+  equity.forEach(function(v) {
+    if (v > peak) peak = v;
+    var dd = peak - v;
+    if (dd > maxDD) maxDD = dd;
+  });
+  var maxDDpct = accountSize > 0 ? (maxDD / accountSize * 100) : 0;
+
+  // Sharpe (simplified)
+  var mean = simResults.length ? totalProfit / simResults.length : 0;
+  var std = simResults.length > 1 ? Math.sqrt(simResults.reduce(function(s, v) { return s + Math.pow(v - mean, 2); }, 0) / simResults.length) : 0;
+  var sharpe = std > 0 ? mean / std * Math.sqrt(252) : 0;
+
+  // Annual return
+  var days = positions.length > 1 ?
+    (positions[positions.length - 1].close_time - positions[0].open_time) / 86400000 : 1;
+  var annualReturn = accountSize > 0 ? (totalProfit / days * 252 / accountSize * 100) : 0;
+
+  return {
+    equity: equity,
+    simResults: simResults,
+    count: simResults.length,
+    totalProfit: totalProfit,
+    winRate: winRate,
+    pf: pf,
+    maxDD: maxDD,
+    maxDDpct: maxDDpct,
+    sharpe: sharpe,
+    annualReturn: annualReturn
+  };
+}
+
+function renderCopySim(data) {
+  if (!data) { $('simulateAnalysis').innerHTML = '<p style="color:#999">數據不足</p>'; return; }
+
+  var simInfo = infoToggle('sim-config', '<b>\u{1F4B0} Copy 模擬</b><br>模擬兩種 Copy Trade 策略：<br><b>跟勝 Copy on Profit</b>：只跟 L1-L2 倉位，設獨立止損。適合保守型 Copy。<br><b>跟虧 Copy on Lose</b>：跟所有層數但設上限，控制最大加倉深度。適合願意承受一定風險但想控制最大虧損嘅 Copy。<br>可調整最大層數、止損 pips 同賬戶大小。');
+  var resultInfo = infoToggle('sim-result', '<b>模擬結果</b><br>並排比較原始策略 vs 模擬策略嘅關鍵指標：勝率、盈虧比、最大回撤、Sharpe 值同年化收益率。');
+
+  var html = simInfo;
+
+  // Mode toggle
+  html += '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">';
+  html += '<button class="btn" id="simModeCop" style="flex:1;min-width:140px;background:linear-gradient(135deg,#28a745,#20c997);color:#fff;padding:12px" onclick="switchSimMode(\'cop\')">\u{1F4C8} 跟勝 Copy on Profit</button>';
+  html += '<button class="btn" id="simModeCol" style="flex:1;min-width:140px;background:#e0e0e0;color:#333;padding:12px" onclick="switchSimMode(\'col\')">\u{1F4C9} 跟虧 Copy on Lose</button>';
+  html += '</div>';
+
+  // Config panel
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;background:#f8f9fb;padding:16px;border-radius:var(--radius)">';
+  html += '<div><label style="font-size:0.85em;color:var(--text2)">最大跟倉層數</label><br><input type="number" id="simMaxLayer" value="2" min="1" max="9" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:1em"></div>';
+  html += '<div><label style="font-size:0.85em;color:var(--text2)">止損 (pips)</label><br><input type="number" id="simSLPips" value="' + fmt(data.defaultSL, 1) + '" min="5" max="500" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:1em"></div>';
+  html += '<div><label style="font-size:0.85em;color:var(--text2)">賬戶大小 ($)</label><br><input type="number" id="simAccountSize" value="10000" min="100" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:1em"></div>';
+  html += '<div style="display:flex;align-items:flex-end"><button class="btn btn-primary" style="padding:10px" onclick="runSim()">\u25B6\uFE0F 執行模擬</button></div>';
+  html += '</div>';
+
+  // Results container
+  html += '<div id="simResults">' + resultInfo + '<p style="color:#999;text-align:center;padding:20px">點擊「執行模擬」開始分析</p></div>';
+
+  $('simulateAnalysis').innerHTML = html;
+
+  // Store for later use
+  window._simData = data;
+  window._simMode = 'cop';
+}
+
+function switchSimMode(mode) {
+  window._simMode = mode;
+  var copBtn = $('simModeCop');
+  var colBtn = $('simModeCol');
+  var maxLayerInput = $('simMaxLayer');
+
+  if (mode === 'cop') {
+    copBtn.style.background = 'linear-gradient(135deg,#28a745,#20c997)';
+    copBtn.style.color = '#fff';
+    colBtn.style.background = '#e0e0e0';
+    colBtn.style.color = '#333';
+    maxLayerInput.value = '2';
+  } else {
+    colBtn.style.background = 'linear-gradient(135deg,#e94560,#dc3545)';
+    colBtn.style.color = '#fff';
+    copBtn.style.background = '#e0e0e0';
+    copBtn.style.color = '#333';
+    maxLayerInput.value = '4';
+  }
+}
+
+function runSim() {
+  var data = window._simData;
+  if (!data || !data.positions.length) return;
+
+  var mode = window._simMode;
+  var maxLayer = parseInt($('simMaxLayer').value) || 2;
+  var slPips = parseFloat($('simSLPips').value) || 50;
+  var accountSize = parseFloat($('simAccountSize').value) || 10000;
+
+  var sim = runCopySim(data.positions, mode, { maxLayer: maxLayer, slPips: slPips, accountSize: accountSize });
+
+  // Original stats
+  var origProfits = data.positions.map(function(p) { return p.net_profit; });
+  var origWins = origProfits.filter(function(p) { return p > 0; });
+  var origLosses = origProfits.filter(function(p) { return p <= 0; });
+  var origTotalProfit = origProfits.reduce(function(s, p) { return s + p; }, 0);
+  var origGW = origWins.reduce(function(s, p) { return s + p; }, 0);
+  var origGL = Math.abs(origLosses.reduce(function(s, p) { return s + p; }, 0));
+  var origWR = origProfits.length ? origWins.length / origProfits.length * 100 : 0;
+  var origPF = origGL > 0 ? origGW / origGL : 0;
+  var origPeak = 0, origMaxDD = 0;
+  origProfits.reduce(function(s, p) { s += p; if (s > origPeak) origPeak = s; var dd = origPeak - s; if (dd > origMaxDD) origMaxDD = dd; return s; }, 0);
+
+  var resultInfo = infoToggle('sim-result', '<b>模擬結果</b><br>並排比較原始策略 vs 模擬策略嘅關鍵指標。');
+  var curveInfo = infoToggle('sim-curve', '<b>收益曲線比較</b><br>藍色 = 原始策略，紅色 = 模擬策略。');
+
+  var html = resultInfo;
+
+  // Mode label
+  var modeLabel = mode === 'cop' ? '\u{1F4C8} 跟勝（Copy on Profit）' : '\u{1F4C9} 跟虧（Copy on Lose）';
+  html += '<div style="text-align:center;padding:12px;background:#f0f4ff;border-radius:8px;margin-bottom:16px;font-weight:700;color:var(--primary)">' + modeLabel + ' · 最大 L' + maxLayer + ' · SL ' + slPips + ' pips · 賬戶 $' + fmt(accountSize, 0) + '</div>';
+
+  // Comparison table
+  html += '<div class="table-wrap"><table class="data-table">';
+  html += '<tr><th>指標</th><th>\u{1F4CA} 原始策略</th><th>\u{1F9EA} 模擬策略</th><th>差異</th></tr>';
+
+  var metrics = [
+    ['倉位數', data.positions.length, sim.count, sim.count - data.positions.length],
+    ['勝率', pct(origWR), pct(sim.winRate), fmt(sim.winRate - origWR, 1) + '%'],
+    ['盈虧比 PF', fmt(origPF), fmt(sim.pf), fmt(sim.pf - origPF)],
+    ['總盈虧', fmtMoney(origTotalProfit), fmtMoney(sim.totalProfit), fmtMoney(sim.totalProfit - origTotalProfit)],
+    ['Max DD', fmtMoney(origMaxDD), fmtMoney(sim.maxDD), fmtMoney(sim.maxDD - origMaxDD)],
+    ['Max DD%', pct(accountSize > 0 ? origMaxDD / accountSize * 100 : 0), pct(sim.maxDDpct), ''],
+    ['Sharpe', '—', fmt(sim.sharpe), ''],
+    ['年化收益率', '—', pct(sim.annualReturn), '']
+  ];
+
+  metrics.forEach(function(m) {
+    var label = m[0], orig = m[1], simVal = m[2], diff = m[3];
+    html += '<tr><td><strong>' + label + '</strong></td><td>' + orig + '</td><td>' + simVal + '</td>';
+    if (typeof diff === 'number') {
+      html += '<td style="color:' + (diff >= 0 ? 'var(--green)' : 'var(--red)') + '">' + (diff >= 0 ? '+' : '') + fmt(diff) + '</td>';
+    } else {
+      html += '<td style="color:' + ((String(diff).charAt(0) === '+' || String(diff).charAt(0) === '0') ? 'var(--green)' : 'var(--red)') + '">' + diff + '</td>';
+    }
+    html += '</tr>';
+  });
+  html += '</table></div>';
+
+  // Equity curve comparison SVG
+  html += '<h3 style="margin:20px 0 12px;color:var(--primary)">\u{1F4C8} 收益曲線比較' + curveInfo + '</h3>';
+  html += makeDualEquitySVG(data.positions, sim.equity);
+
+  // Recommendation
+  html += '<div style="margin-top:16px;padding:14px;background:#f8f9fa;border-radius:var(--radius);border-left:4px solid var(--primary)">';
+  html += '<strong>\u{1F4CB} 模擬結論：</strong><br>';
+  if (sim.winRate > origWR && sim.pf > origPF) {
+    html += '✅ 模擬策略勝率更高（' + pct(sim.winRate) + ' vs ' + pct(origWR) + '），PF 更佳（' + fmt(sim.pf) + ' vs ' + fmt(origPF) + '）。推薦使用此 Copy 策略。';
+  } else if (sim.maxDD < origMaxDD) {
+    html += '⚠️ 模擬策略雖然盈利較少，但 Max DD 大幅降低（' + fmtMoney(sim.maxDD) + ' vs ' + fmtMoney(origMaxDD) + '）。適合風險偏好較低嘅 Copy。';
+  } else {
+    html += '📊 模擬結果與原始策略各有優劣。建議根據個人風險承受能力選擇。';
+  }
+  html += '</div>';
+
+  $('simResults').innerHTML = html;
+}
+
+function makeDualEquitySVG(positions, simEquity) {
+  var origData = [];
+  var cum = 0;
+  positions.forEach(function(p) { cum += p.net_profit; origData.push(cum); });
+
+  var allData = origData.concat(simEquity);
+  if (!allData.length) return '<p>無數據</p>';
+
+  var W = 900, H = 300, M = 50;
+  var minV = Math.min.apply(null, allData.concat([0]));
+  var maxV = Math.max.apply(null, allData.concat([1]));
+  var rangeV = maxV - minV || 1;
+
+  var html = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;">';
+
+  for (var i = 0; i <= 5; i++) {
+    var y = M + (H - 2 * M) * i / 5;
+    var val = maxV - (maxV - minV) * i / 5;
+    html += '<line x1="' + M + '" y1="' + y + '" x2="' + (W-10) + '" y2="' + y + '" stroke="#e8e8e8" stroke-width="1"/>';
+    html += '<text x="' + (M-5) + '" y="' + (y+4) + '" text-anchor="end" font-size="10" fill="#999">$' + fmt(val, 0) + '</text>';
+  }
+
+  var zeroY = M + (H - 2 * M) * (maxV) / rangeV;
+  html += '<line x1="' + M + '" y1="' + zeroY + '" x2="' + (W-10) + '" y2="' + zeroY + '" stroke="#aaa" stroke-width="1" stroke-dasharray="6,3"/>';
+
+  function drawLine(dataArr, color, dash) {
+    var pts = dataArr.map(function(v, i) {
+      var x = M + (i / Math.max(dataArr.length - 1, 1)) * (W - M - 10);
+      var y = M + (H - 2 * M) * (maxV - v) / rangeV;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    html += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>';
+  }
+
+  drawLine(origData, '#0f3460', null);
+  drawLine(simEquity, '#e94560', '8,4');
+
+  html += '<line x1="' + (W-200) + '" y1="20" x2="' + (W-170) + '" y2="20" stroke="#0f3460" stroke-width="2"/>';
+  html += '<text x="' + (W-165) + '" y="24" font-size="11" fill="#0f3460">原始策略</text>';
+  html += '<line x1="' + (W-200) + '" y1="36" x2="' + (W-170) + '" y2="36" stroke="#e94560" stroke-width="2" stroke-dasharray="8,4"/>';
+  html += '<text x="' + (W-165) + '" y="40" font-size="11" fill="#e94560">模擬策略</text>';
+
+  html += '</svg>';
+  return html;
 }
 
 // === Copy Trade Recommendation Matrix ===
