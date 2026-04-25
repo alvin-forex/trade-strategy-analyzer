@@ -256,6 +256,31 @@ svg text { font-family: -apple-system, sans-serif; }
 .archive-dup-dialog .add-inner p { font-size: 0.9em; color: var(--text2); margin-bottom: 16px; }
 .archive-dup-dialog .add-inner button { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; margin: 0 6px; }
 
+/* Market Regime */
+.regime-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 0.82em; font-weight: 600; color: #fff; }
+.regime-best { background: linear-gradient(135deg, #28a745, #20c997); padding: 16px; border-radius: var(--radius); margin: 16px 0; text-align: center; }
+.regime-best h3 { color: #fff; margin-bottom: 4px; }
+.regime-best .regime-stat { font-size: 1.2em; font-weight: 700; }
+.regime-timeline { position: relative; height: 60px; margin: 16px 0; overflow-x: auto; }
+.regime-timeline-inner { display: flex; height: 30px; border-radius: 6px; overflow: hidden; min-width: 100%; }
+.regime-timeline-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.65em; color: #fff; font-weight: 600; min-width: 2px; position: relative; }
+.regime-timeline-markers { position: relative; height: 24px; }
+.regime-timeline-markers .dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; top: 8px; transform: translateX(-4px); border: 1px solid #fff; }
+.regime-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; font-size: 0.82em; }
+.regime-legend-item { display: flex; align-items: center; gap: 4px; }
+.regime-legend-item .swatch { width: 12px; height: 12px; border-radius: 3px; }
+.regime-cmp-table th { background: var(--primary); }
+.regime-cmp-table .csv-a-header { background: #1a5276; }
+.regime-cmp-table .csv-b-header { background: #7d3c98; }
+.regime-cmp-label { display: inline-flex; align-items: center; gap: 4px; }
+.regime-cmp-label input { width: 120px; border: 1px solid #ddd; border-radius: 6px; padding: 4px 8px; font-size: 0.85em; text-align: center; }
+.csv2-zone { border: 2px dashed #a0a8b8; border-radius: var(--radius); padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.2s; margin-top: 12px; }
+.csv2-zone:hover { border-color: #7d3c98; background: #f9f0ff; }
+.csv2-zone.has-file { border-color: var(--green); background: #f0faf3; border-style: solid; }
+.csv2-zone .icon { font-size: 1.8em; }
+.csv2-zone .label { font-weight: 600; color: var(--primary); font-size: 0.9em; }
+.csv2-zone .hint { font-size: 0.78em; color: #999; }
+
 /* Responsive */
 @media (max-width: 600px) {
   .header h1 { font-size: 1.4em; }
@@ -294,6 +319,12 @@ svg text { font-family: -apple-system, sans-serif; }
   <input type="file" id="csvInput" accept=".csv" hidden>
   <input type="file" id="setInput" accept=".set" multiple hidden>
   <div class="file-chips" id="fileChips"></div>
+  <div class="csv2-zone" id="csv2Zone" onclick="$('csv2Input').click()" style="display:none">
+    <div class="icon">📥</div>
+    <div class="label">第二份 CSV（對比用）</div>
+    <div class="hint">可選 · 用於市況×策略對比分析</div>
+  </div>
+  <input type="file" id="csv2Input" accept=".csv" hidden>
   <div class="error" id="error"></div>
   <button class="btn btn-primary" id="analyzeBtn" disabled onclick="analyze()">🔍 開始分析</button>
   <button class="btn" id="downloadBtn" style="display:none;margin-left:8px" onclick="downloadReport()">📥 下載報告</button>
@@ -323,6 +354,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-holding">⏱️ 持倉時間</div>
     <div class="tab" data-tab="tab-direction">↔️ 方向分析</div>
     <div class="tab" data-tab="tab-market">🌐 市場語境</div>
+    <div class="tab" data-tab="tab-regime">🔄 市況×策略</div>
     <div class="tab" data-tab="tab-copy">🏆 Copy 推薦</div>
     <div class="tab" data-tab="tab-volatility">📏 波幅分析</div>
     <div class="tab" data-tab="tab-martin">🎲 馬丁風險</div>
@@ -376,6 +408,11 @@ svg text { font-family: -apple-system, sans-serif; }
     <div id="marketContext"><div class="mc-loading"><div class="spinner"></div>載入市場數據中...</div></div>
   </div>
 
+  <div class="card tab-panel" id="tab-regime">
+    <h2><span class="icon">🔄</span> 市況×策略分析</h2>
+    <div id="regimeContent"><div class="mc-loading">載入市況數據中...</div></div>
+  </div>
+
   <div class="card tab-panel" id="tab-volatility">
     <h2><span class="icon">📏</span> 波幅適配分析</h2>
     <div id="volatilityAnalysis"><div class="mc-loading">計算中...</div></div>
@@ -422,7 +459,7 @@ svg text { font-family: -apple-system, sans-serif; }
 
 <script>
 // === App Version ===
-const APP_VERSION = 'v3.5';
+const APP_VERSION = 'v3.6';
 const APP_VERSION_DATE = '2026-04-25';
 
 // === Helpers ===
@@ -448,6 +485,9 @@ function toggleInfo(id) {
 
 // === State ===
 let csvFile = null, setFiles = [], reportBlobUrl = null;
+let csv2File = null;
+window._csv2Text = null;
+window._csv2Label = '';
 
 // === Upload UI ===
 const csvZone=$('csvZone'), setZone=$('setZone'), csvInput=$('csvInput'), setInput=$('setInput');
@@ -467,14 +507,37 @@ const csvZone=$('csvZone'), setZone=$('setZone'), csvInput=$('csvInput'), setInp
 csvInput.addEventListener('change', e => { if(e.target.files[0]){csvFile=e.target.files[0]; refreshUploadUI();} });
 setInput.addEventListener('change', e => { setFiles.push(...Array.from(e.target.files)); refreshUploadUI(); });
 
+// CSV2 upload handlers
+const csv2Zone = $('csv2Zone'), csv2Input = $('csv2Input');
+csv2Zone.addEventListener('dragover', e => { e.preventDefault(); csv2Zone.style.borderColor='#7d3c98'; });
+csv2Zone.addEventListener('dragleave', () => { csv2Zone.style.borderColor=''; });
+csv2Zone.addEventListener('drop', e => {
+  e.preventDefault(); csv2Zone.style.borderColor='';
+  const files = Array.from(e.dataTransfer.files);
+  if(files[0] && files[0].name.endsWith('.csv')) { csv2File = files[0]; refreshUploadUI(); }
+});
+csv2Input.addEventListener('change', e => { if(e.target.files[0]) { csv2File = e.target.files[0]; refreshUploadUI(); } });
+
 function refreshUploadUI() {
   $('error').style.display='none';
   if(csvFile) { csvZone.classList.add('has-file'); csvZone.querySelector('.label').textContent=csvFile.name; }
   else { csvZone.classList.remove('has-file'); csvZone.querySelector('.label').textContent='交易數據 CSV'; }
   if(setFiles.length) { setZone.classList.add('has-file'); setZone.querySelector('.label').textContent=setFiles.length+' 個 SET 檔案'; }
   else { setZone.classList.remove('has-file'); setZone.querySelector('.label').textContent='策略設定 SET（可多個）'; }
+  // CSV2
+  $('csv2Zone').style.display = csvFile ? '' : 'none';
+  if(csv2File) {
+    csv2Zone.classList.add('has-file');
+    csv2Zone.querySelector('.label').textContent = csv2File.name;
+    csv2Zone.querySelector('.hint').textContent = '✅ 已選擇 · 點擊更換';
+  } else {
+    csv2Zone.classList.remove('has-file');
+    csv2Zone.querySelector('.label').textContent = '第二份 CSV（對比用）';
+    csv2Zone.querySelector('.hint').textContent = '可選 · 用於市況×策略對比分析';
+  }
   let html='';
   if(csvFile) html+=`<span class="chip">📊 ${csvFile.name} <span class="remove" onclick="csvFile=null;refreshUploadUI()">✕</span></span>`;
+  if(csv2File) html+=`<span class="chip" style=\"background:#f3e8ff\">📥 ${csv2File.name} <span class="remove" onclick="csv2File=null;window._csv2Text=null;refreshUploadUI()">✕</span></span>`;
   setFiles.forEach((f,i)=>{ html+=`<span class="chip">⚙️ ${f.name} <span class="remove" onclick="setFiles.splice(${i},1);refreshUploadUI()">✕</span></span>`; });
   $('fileChips').innerHTML=html;
   $('analyzeBtn').disabled=!csvFile;
@@ -1237,6 +1300,9 @@ async function analyze() {
 
     // Fire-and-forget market context loading (async, non-blocking)
     loadMarketContext(positions);
+
+    // Fire-and-forget market regime loading (async, non-blocking)
+    loadMarketRegime(positions);
 
   } catch(e) {
     $('error').textContent='❌ 錯誤：'+e.message;
@@ -3367,6 +3433,455 @@ function renderMarketContext(context) {
   }
 
   $('marketContext').innerHTML = html;
+}
+
+// === Market Regime × Strategy (方案 C) ===
+const REGIME_COLORS = { trend_up: '#28a745', trend_down: '#dc3545', range: '#ffc107', volatile: '#fd7e14', unknown: '#999' };
+const REGIME_LABELS = { trend_up: '上升趨勢', trend_down: '下降趨勢', range: '震蓎盤', volatile: '高波動', unknown: '未知' };
+const REGIME_ORDER = ['trend_up', 'trend_down', 'range', 'volatile', 'unknown'];
+let _regimeCache = {}; // symbol -> { dateStr -> regimeObj }
+
+function classifyMarketRegime(dateStr, indMap, atrAvg50) {
+  // indMap: { sma_20, sma_50, rsi_14, atr_14 } — each is number or null
+  const sma20 = indMap.sma_20;
+  const sma50 = indMap.sma_50;
+  const rsi = indMap.rsi_14;
+  const atr = indMap.atr_14;
+
+  if (sma20 == null || sma50 == null || rsi == null) {
+    return { regime: 'unknown', label_zh: '未知', color: '#999', detail: '指標數據不足' };
+  }
+
+  // Check volatile first (overrides others)
+  if (atr != null && atrAvg50 != null && atrAvg50 > 0 && atr > 1.5 * atrAvg50) {
+    return { regime: 'volatile', label_zh: '高波動', color: '#fd7e14', detail: 'ATR=' + fmt(atr, 5) + ' > 1.5×均值' + fmt(atrAvg50, 5) };
+  }
+
+  // SMA gap as pct of price for threshold
+  const smaGap = sma20 - sma50;
+  const smaMid = (sma20 + sma50) / 2;
+  const gapPct = smaMid !== 0 ? Math.abs(smaGap / smaMid) * 100 : 0;
+  const rangeThreshold = 0.15; // 0.15% gap = range
+
+  if (gapPct < rangeThreshold && rsi >= 40 && rsi <= 60) {
+    return { regime: 'range', label_zh: '震蓎盤', color: '#ffc107', detail: 'SMA差距<0.15%, RSI=' + fmt(rsi, 1) };
+  }
+
+  if (sma20 > sma50 && rsi > 50) {
+    return { regime: 'trend_up', label_zh: '上升趨勢', color: '#28a745', detail: 'SMA20>SMA50, RSI=' + fmt(rsi, 1) };
+  }
+
+  if (sma20 < sma50 && rsi < 50) {
+    return { regime: 'trend_down', label_zh: '下降趨勢', color: '#dc3545', detail: 'SMA20<SMA50, RSI=' + fmt(rsi, 1) };
+  }
+
+  // Fallback: mild direction or mixed signals
+  if (rsi >= 40 && rsi <= 60) {
+    return { regime: 'range', label_zh: '震蓎盤', color: '#ffc107', detail: 'RSI中性=' + fmt(rsi, 1) };
+  }
+
+  return { regime: rsi > 50 ? 'trend_up' : 'trend_down', label_zh: rsi > 50 ? '上升趨勢' : '下降趨勢', color: rsi > 50 ? '#28a745' : '#dc3545', detail: '混合信號, RSI=' + fmt(rsi, 1) };
+}
+
+function buildRegimeMap(symbol) {
+  // Build date -> indicators lookup from cached market data
+  const mData = _marketDataCache[symbol];
+  if (!mData || !mData.indicators) return null;
+
+  const ind = mData.indicators;
+  if (!ind.sma_20 || !ind.sma_50 || !ind.rsi_14 || !ind.atr_14) return null;
+
+  // Build date -> value maps
+  const sma20Map = {};
+  ind.sma_20.forEach(x => { sma20Map[x.d] = x.v; });
+  const sma50Map = {};
+  ind.sma_50.forEach(x => { sma50Map[x.d] = x.v; });
+  const rsiMap = {};
+  ind.rsi_14.forEach(x => { rsiMap[x.d] = x.v; });
+  const atrMap = {};
+  ind.atr_14.forEach(x => { atrMap[x.d] = x.v; });
+
+  // All dates that have all four indicators
+  const allDates = new Set([...Object.keys(sma20Map), ...Object.keys(sma50Map), ...Object.keys(rsiMap), ...Object.keys(atrMap)]);
+  const sortedDates = [...allDates].sort();
+
+  // Pre-compute rolling 50-day ATR average
+  const atrValues = ind.atr_14.map(x => x.v);
+  const atrDates = ind.atr_14.map(x => x.d);
+  const atrAvg50Map = {};
+  for (let i = 0; i < atrDates.length; i++) {
+    const start = Math.max(0, i - 49);
+    const window = atrValues.slice(start, i + 1);
+    const avg = window.reduce((s, v) => s + v, 0) / window.length;
+    atrAvg50Map[atrDates[i]] = avg;
+  }
+
+  // Classify each date
+  const regimeMap = {};
+  sortedDates.forEach(d => {
+    const indMap = {
+      sma_20: sma20Map[d] ?? null,
+      sma_50: sma50Map[d] ?? null,
+      rsi_14: rsiMap[d] ?? null,
+      atr_14: atrMap[d] ?? null
+    };
+    regimeMap[d] = classifyMarketRegime(d, indMap, atrAvg50Map[d] ?? null);
+  });
+
+  return regimeMap;
+}
+
+function getRegimeForDate(regimeMap, dateObj) {
+  if (!regimeMap) return { regime: 'unknown', label_zh: '未知', color: '#999', detail: '無數據' };
+  const dateStr = dateObj.toISOString().slice(0, 10);
+  if (regimeMap[dateStr]) return regimeMap[dateStr];
+  // Find closest date before
+  const keys = Object.keys(regimeMap).sort();
+  let best = null;
+  for (const k of keys) {
+    if (k <= dateStr) best = k;
+    else break;
+  }
+  if (best) return regimeMap[best];
+  return { regime: 'unknown', label_zh: '未知', color: '#999', detail: '無數據' };
+}
+
+async function calcMarketRegime(positions) {
+  // Get unique symbols
+  const symbols = [...new Set(positions.map(p => p.symbol))];
+
+  // Fetch market data for each symbol (if not already cached)
+  for (const sym of symbols) {
+    if (!_marketDataCache[sym]) {
+      await fetchLocalMarketData(sym);
+    }
+  }
+
+  // Build regime map for each symbol
+  const symbolRegimeMaps = {};
+  for (const sym of symbols) {
+    if (!_regimeCache[sym]) {
+      _regimeCache[sym] = buildRegimeMap(sym);
+    }
+    symbolRegimeMaps[sym] = _regimeCache[sym];
+  }
+
+  // Enrich each position with regime
+  const enriched = positions.map(p => {
+    const rMap = symbolRegimeMaps[p.symbol];
+    const regime = getRegimeForDate(rMap, p.open_time);
+    return { ...p, _regime: regime };
+  });
+
+  return enriched;
+}
+
+function calcRegimeStats(enrichedPositions) {
+  const groups = {};
+  REGIME_ORDER.forEach(r => { groups[r] = []; });
+  enrichedPositions.forEach(p => {
+    const r = p._regime ? p._regime.regime : 'unknown';
+    if (!groups[r]) groups[r] = [];
+    groups[r].push(p);
+  });
+
+  const total = enrichedPositions.length;
+  const stats = {};
+  REGIME_ORDER.forEach(r => {
+    const arr = groups[r];
+    if (!arr.length) { stats[r] = null; return; }
+    const wins = arr.filter(p => p.net_profit > 0);
+    const totalWin = wins.reduce((s, p) => s + p.net_profit, 0);
+    const totalLoss = Math.abs(arr.filter(p => p.net_profit <= 0).reduce((s, p) => s + p.net_profit, 0));
+    const l4count = arr.filter(p => p.max_layer >= 4).length;
+    stats[r] = {
+      count: arr.length,
+      pct: arr.length / total * 100,
+      avgProfit: arr.reduce((s, p) => s + p.net_profit, 0) / arr.length,
+      winRate: wins.length / arr.length * 100,
+      profitFactor: totalLoss > 0 ? totalWin / totalLoss : (totalWin > 0 ? 999 : 0),
+      avgLayer: arr.reduce((s, p) => s + p.max_layer, 0) / arr.length,
+      l4pct: l4count / arr.length * 100,
+      totalProfit: arr.reduce((s, p) => s + p.net_profit, 0)
+    };
+  });
+
+  // Find best regime by avgProfit
+  let bestRegime = null;
+  let bestAvg = -Infinity;
+  REGIME_ORDER.forEach(r => {
+    if (stats[r] && stats[r].count >= 2 && stats[r].avgProfit > bestAvg) {
+      bestAvg = stats[r].avgProfit;
+      bestRegime = r;
+    }
+  });
+
+  return { stats, bestRegime, total, groups };
+}
+
+function renderMarketRegime(regimeData, enrichedPositions) {
+  if (!regimeData || !regimeData.total) {
+    $('regimeContent').innerHTML = '<p style="color:#999">📊 數據不足，無法進行市況分析。請確認本地市場數據 JSON 檔案存在。</p>';
+    return;
+  }
+
+  const { stats, bestRegime, total } = regimeData;
+  const hasCSV2 = !!window._csv2Text;
+
+  const regimeInfo = infoToggle('regime-info', '<b>🔄 市況×策略分析</b><br>根據 MT4 D1 歷史數據的技術指標，將每個交易日分類為以下市況：<br>🟢 <b>上升趨勢</b>：SMA20 > SMA50 且 RSI > 50<br>🔴 <b>下降趨勢</b>：SMA20 < SMA50 且 RSI < 50<br>🟡 <b>震蓎盤</b>：SMA 差距小，RSI 40-60<br>🟠 <b>高波動</b>：ATR > 1.5× 50日均值<br>分析策略在不同市況下的表現，找出最佳操作環境。');
+
+  let html = regimeInfo;
+
+  // === 1. 市況概覽 Donut ===
+  html += '<h3 style="margin:16px 0 8px;color:var(--primary)">📊 市況概覽</h3>';
+  const donutData = REGIME_ORDER
+    .filter(r => stats[r] && stats[r].count > 0)
+    .map(r => ({ label: REGIME_LABELS[r], value: stats[r].count, color: REGIME_COLORS[r] }));
+
+  html += '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
+  html += '<div>' + makeDonutSVG(donutData, 180) + '</div>';
+  html += '<div class="regime-legend">';
+  REGIME_ORDER.forEach(r => {
+    if (!stats[r]) return;
+    html += `<div class="regime-legend-item"><span class="swatch" style="background:${REGIME_COLORS[r]}"></span> ${REGIME_LABELS[r]}：${stats[r].count} 倉位 (${pct(stats[r].pct)})</div>`;
+  });
+  html += '</div></div>';
+
+  // === 2. 策略×市況表 ===
+  html += '<h3 style="margin:20px 0 8px;color:var(--primary)">📋 策略×市況表</h3>';
+  html += '<div class="table-wrap"><table class="sortable">';
+  html += '<tr><th>市況</th><th>倉位數</th><th>佔比</th><th>平均盈虧</th><th>勝率</th><th>PF</th><th>平均層數</th><th>L4+%</th></tr>';
+  REGIME_ORDER.forEach(r => {
+    const s = stats[r];
+    if (!s) return;
+    const isBest = r === bestRegime;
+    const rowStyle = isBest ? 'style="background:#f0faf3;font-weight:600"' : '';
+    html += `<tr ${rowStyle}>`;
+    html += `<td><span class="regime-badge" style="background:${REGIME_COLORS[r]}">${REGIME_LABELS[r]}</span>${isBest ? ' ⭐' : ''}</td>`;
+    html += `<td>${s.count}</td>`;
+    html += `<td>${pct(s.pct)}</td>`;
+    html += `<td style="color:${s.avgProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(s.avgProfit)}</td>`;
+    html += `<td>${pct(s.winRate)}</td>`;
+    html += `<td>${s.profitFactor >= 999 ? '∞' : fmt(s.profitFactor)}</td>`;
+    html += `<td>${fmt(s.avgLayer, 1)}</td>`;
+    html += `<td>${pct(s.l4pct)}</td>`;
+    html += '</tr>';
+  });
+  html += '</table></div>';
+
+  // === 3. 最佳市況 ===
+  if (bestRegime && stats[bestRegime]) {
+    const bs = stats[bestRegime];
+    html += '<div class="regime-best">';
+    html += `<h3>🏆 最佳市況：<span style="font-size:1.3em">${REGIME_LABELS[bestRegime]}</span></h3>`;
+    html += `<div class="regime-stat">平均盈虧 ${fmtMoney(bs.avgProfit)} · 勝率 ${pct(bs.winRate)} · PF ${bs.profitFactor >= 999 ? '∞' : fmt(bs.profitFactor)}</div>`;
+    html += `<div style="font-size:0.85em;margin-top:4px;color:#e8f5e9">共 ${bs.count} 倉位 · 佔比 ${pct(bs.pct)}</div>`;
+    html += '</div>';
+  }
+
+  // === 4. 市況時間軸 ===
+  html += '<h3 style="margin:20px 0 8px;color:var(--primary)">📅 市況時間軸</h3>';
+  html += renderRegimeTimeline(enrichedPositions);
+
+  // === 5. CSV2 Comparison ===
+  if (hasCSV2) {
+    html += renderRegimeComparisonSection();
+  }
+
+  $('regimeContent').innerHTML = html;
+}
+
+function renderRegimeTimeline(enrichedPositions) {
+  if (!enrichedPositions || enrichedPositions.length < 2) return '<p style="color:#999">數據不足</p>';
+
+  // Sort by open_time
+  const sorted = [...enrichedPositions].sort((a, b) => a.open_time - b.open_time);
+  const firstDate = sorted[0].open_time.getTime();
+  const lastDate = sorted[sorted.length - 1].open_time.getTime();
+  const dateRange = lastDate - firstDate || 1;
+
+  // Group by month for timeline segments
+  const monthGroups = {};
+  sorted.forEach(p => {
+    const key = p.open_time.toISOString().slice(0, 7); // YYYY-MM
+    if (!monthGroups[key]) monthGroups[key] = { regimeCounts: {}, trades: [] };
+    const r = p._regime ? p._regime.regime : 'unknown';
+    monthGroups[key].regimeCounts[r] = (monthGroups[key].regimeCounts[r] || 0) + 1;
+    monthGroups[key].trades.push(p);
+  });
+
+  const months = Object.keys(monthGroups).sort();
+
+  let html = '<div class="regime-timeline">';
+  html += '<div class="regime-timeline-inner">';
+
+  months.forEach(m => {
+    const g = monthGroups[m];
+    const totalTrades = Object.values(g.regimeCounts).reduce((s, v) => s + v, 0);
+    // Dominant regime for this month
+    let dominant = 'unknown';
+    let maxCount = 0;
+    for (const [r, c] of Object.entries(g.regimeCounts)) {
+      if (c > maxCount) { maxCount = c; dominant = r; }
+    }
+    const widthPct = (totalTrades / sorted.length) * 100;
+    const label = m.slice(5); // MM
+    html += `<div class="regime-timeline-seg" style="width:${Math.max(widthPct, 2)}%;background:${REGIME_COLORS[dominant]}" title="${m}: ${REGIME_LABELS[dominant]} (${totalTrades}倉位)">${widthPct > 5 ? label : ''}</div>`;
+  });
+
+  html += '</div>';
+
+  // Trade markers row
+  html += '<div class="regime-timeline-markers" style="position:relative;height:20px">';
+  sorted.forEach(p => {
+    const xPct = ((p.open_time.getTime() - firstDate) / dateRange) * 100;
+    const dotColor = p.net_profit > 0 ? '#28a745' : '#dc3545';
+    html += `<div class="dot" style="left:${xPct}%;background:${dotColor}" title="${fmtDateShort(p.open_time)} ${p.symbol} ${fmtMoney(p.net_profit)}"></div>`;
+  });
+  html += '</div>';
+
+  html += '</div>';
+
+  // Legend for dots
+  html += '<div style="font-size:0.75em;color:#999;margin-top:4px">';
+  html += '<span style="color:#28a745">●</span> 盈利倉位 &nbsp; ';
+  html += '<span style="color:#dc3545">●</span> 虧損倉位 &nbsp; ';
+  html += `<span style="color:#666">${fmtDateShort(sorted[0].open_time)} ~ ${fmtDateShort(sorted[sorted.length - 1].open_time)}</span>`;
+  html += '</div>';
+
+  return html;
+}
+
+function renderRegimeComparisonSection() {
+  // Parse CSV2
+  const trades2 = parseCSV(window._csv2Text);
+  const positions2 = buildPositions(trades2);
+  positions2.forEach(p => {
+    const entry = calcEntryScore(p);
+    const strategy = calcStrategyScore(p);
+    const final = calcFinalScore(entry.score, strategy.score);
+    p._entryScore = entry;
+    p._strategyScore = strategy;
+    p._finalScore = final;
+  });
+
+  const label1 = window._csv1Label || 'CSV-A';
+  const label2 = window._csv2Label || 'CSV-B';
+
+  // Sync calc regime for positions2 (fire async and render inline)
+  // Since we can't await in sync, we use a placeholder and fill async
+  const placeholderId = 'regimeCmp_' + Date.now();
+  renderRegimeComparisonAsync(positions2, label1, label2, placeholderId);
+  return `<h3 style="margin:20px 0 8px;color:var(--primary)">📊 策略對比：${label1} vs ${label2}</h3>
+    <div id="${placeholderId}"><div class="mc-loading">計算對比數據中...</div></div>`;
+}
+
+async function renderRegimeComparisonAsync(positions2, label1, label2, placeholderId) {
+  const enriched2 = await calcMarketRegime(positions2);
+  const regime2 = calcRegimeStats(enriched2);
+
+  const enriched1 = window._regimeEnriched;
+  const regime1 = window._regimeStats;
+
+  if (!regime1 || !regime2) {
+    const el = document.getElementById(placeholderId);
+    if (el) el.innerHTML = '<p style="color:#999">對比數據不足</p>';
+    return;
+  }
+
+  let html = '';
+
+  // Labels
+  html += '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">';
+  html += `<div class="regime-cmp-label">🅰️ <input value="${label1}" onchange="window._csv1Label=this.value;renderRegimeCmpRefresh()" placeholder="CSV-A 標籤"></div>`;
+  html += `<div class="regime-cmp-label">🅱️ <input value="${label2}" onchange="window._csv2Label=this.value;renderRegimeCmpRefresh()" placeholder="CSV-B 標籤"></div>`;
+  html += '</div>';
+
+  // Comparison table
+  html += '<div class="table-wrap"><table class="regime-cmp-table sortable">';
+  html += '<tr><th>市況</th><th class="csv-a-header">倉位</th><th class="csv-a-header">勝率</th><th class="csv-a-header">PF</th><th class="csv-a-header">平均盈虧</th><th class="csv-b-header">倉位</th><th class="csv-b-header">勝率</th><th class="csv-b-header">PF</th><th class="csv-b-header">平均盈虧</th><th>差異</th></tr>';
+
+  REGIME_ORDER.forEach(r => {
+    const s1 = regime1.stats[r];
+    const s2 = regime2.stats[r];
+    if (!s1 && !s2) return;
+    html += '<tr>';
+    html += `<td><span class="regime-badge" style="background:${REGIME_COLORS[r]}">${REGIME_LABELS[r]}</span></td>`;
+
+    // CSV-A
+    if (s1) {
+      html += `<td>${s1.count}</td>`;
+      html += `<td>${pct(s1.winRate)}</td>`;
+      html += `<td>${s1.profitFactor >= 999 ? '∞' : fmt(s1.profitFactor)}</td>`;
+      html += `<td style="color:${s1.avgProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(s1.avgProfit)}</td>`;
+    } else {
+      html += '<td colspan="4" style="color:#ccc">—</td>';
+    }
+
+    // CSV-B
+    if (s2) {
+      html += `<td>${s2.count}</td>`;
+      html += `<td>${pct(s2.winRate)}</td>`;
+      html += `<td>${s2.profitFactor >= 999 ? '∞' : fmt(s2.profitFactor)}</td>`;
+      html += `<td style="color:${s2.avgProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(s2.avgProfit)}</td>`;
+    } else {
+      html += '<td colspan="4" style="color:#ccc">—</td>';
+    }
+
+    // Difference
+    if (s1 && s2) {
+      const diff = s2.avgProfit - s1.avgProfit;
+      html += `<td style="color:${diff >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:600">${diff >= 0 ? '↑' : '↓'}${fmtMoney(diff)}</td>`;
+    } else {
+      html += '<td style="color:#ccc">—</td>';
+    }
+    html += '</tr>';
+  });
+  html += '</table></div>';
+
+  const el = document.getElementById(placeholderId);
+  if (el) el.innerHTML = html;
+}
+
+function renderRegimeCmpRefresh() {
+  // Re-render comparison section with updated labels
+  const section = $('regimeContent');
+  if (!section) return;
+  // Find and re-render only comparison part
+  const cmpHeader = section.querySelector('h3:last-of-type');
+  // Simplified: just re-trigger the whole regime render
+  if (window._regimeEnriched && window._regimeStats) {
+    renderMarketRegime(window._regimeStats, window._regimeEnriched);
+  }
+}
+
+async function loadMarketRegime(positions) {
+  if (!positions || !positions.length) {
+    $('regimeContent').innerHTML = '<p style="color:#999">無倉位數據</p>';
+    return;
+  }
+
+  try {
+    const enriched = await calcMarketRegime(positions);
+    const regimeData = calcRegimeStats(enriched);
+
+    // Store for comparison
+    window._regimeEnriched = enriched;
+    window._regimeStats = regimeData;
+    window._csv1Label = csvFile ? csvFile.name.replace('.csv', '') : 'CSV-A';
+    window._csv2Label = csv2File ? csv2File.name.replace('.csv', '') : 'CSV-B';
+
+    // Load CSV2 text if present
+    if (csv2File && !window._csv2Text) {
+      window._csv2Text = await readFile(csv2File);
+      window._csv2Label = csv2File.name.replace('.csv', '');
+    }
+
+    renderMarketRegime(regimeData, enriched);
+  } catch (e) {
+    console.error('Market regime error:', e);
+    $('regimeContent').innerHTML = '<p style="color:#999">📊 市況分析載入失敗：' + (e.message || '未知錯誤') + '</p>';
+  }
 }
 
 async function loadMarketContext(positions) {
