@@ -127,6 +127,24 @@ svg text { font-family: -apple-system, sans-serif; }
 /* Footer */
 .footer { text-align: center; color: #aab; font-size: 0.78em; margin-top: 32px; padding: 16px 0; }
 
+/* Market Context */
+.mc-symbol-card { background: #fafbfc; border-radius: 10px; padding: 16px; margin-bottom: 14px; border: 1px solid #e8ecf0; }
+.mc-symbol-card h4 { font-size: 1.05em; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mc-verdict { display: inline-block; padding: 3px 10px; border-radius: 14px; font-size: 0.82em; font-weight: 700; }
+.mc-verdict-ok { background: #d4edda; color: #155724; }
+.mc-verdict-warn { background: #fff3cd; color: #856404; }
+.mc-verdict-neutral { background: #e2e3e5; color: #383d41; }
+.mc-info-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.88em; color: var(--text2); }
+.mc-info-row span { white-space: nowrap; }
+.mc-note { font-size: 0.82em; color: #999; font-style: italic; margin-top: 12px; padding-top: 8px; border-top: 1px dashed #ddd; }
+.mc-loading { text-align: center; padding: 32px; color: var(--text2); font-size: 0.95em; }
+.mc-loading .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e0e0e0; border-top-color: var(--accent); border-radius: 50%; animation: mc-spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes mc-spin { to { transform: rotate(360deg); } }
+.mc-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.mc-summary-item { background: #f0f4ff; border-radius: 8px; padding: 12px; text-align: center; }
+.mc-summary-item .sym { font-weight: 700; color: var(--primary); font-size: 1.1em; }
+.mc-summary-item .trend { font-size: 0.85em; color: var(--text2); margin-top: 2px; }
+
 /* Responsive */
 @media (max-width: 600px) {
   .header h1 { font-size: 1.4em; }
@@ -191,6 +209,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-layer">📚 層數分析</div>
     <div class="tab" data-tab="tab-session">🕐 時段分析</div>
     <div class="tab" data-tab="tab-direction">↔️ 方向分析</div>
+    <div class="tab" data-tab="tab-market">🌐 市場語境</div>
     <div class="tab" data-tab="tab-positions">📋 倉位明細</div>
     <div class="tab" data-tab="tab-set">⚙️ SET 參數</div>
   </div>
@@ -226,6 +245,11 @@ svg text { font-family: -apple-system, sans-serif; }
     <h2><span class="icon">↔️</span> 方向分析</h2>
     <div id="directionChart"></div>
     <div id="directionTable"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-market">
+    <h2><span class="icon">🌐</span> 市場語境分析</h2>
+    <div id="marketContext"><div class="mc-loading"><div class="spinner"></div>載入市場數據中...</div></div>
   </div>
 
   <div class="card tab-panel" id="tab-positions">
@@ -1020,6 +1044,9 @@ async function analyze() {
     btn.disabled=false;
     $('downloadBtn').style.display='inline-block';
 
+    // Fire-and-forget market context loading (async, non-blocking)
+    loadMarketContext(positions);
+
   } catch(e) {
     $('error').textContent='❌ 錯誤：'+e.message;
     $('error').style.display='block';
@@ -1397,6 +1424,348 @@ renderPositionTable = function(positions) {
   window._positions = positions;
   _origRenderPos(positions);
 };
+
+// === Market Context (方案 A) ===
+const YAHOO_SYMBOLS = {
+  'AUDCAD': 'AUDCAD=X',
+  'EURCHF': 'EURCHF=X',
+  'XAUUSD': 'GC=F',
+  'USDJPY': 'USDJPY=X',
+  'NZDUSD': 'NZDUSD=X',
+  'USDCHF': 'USDCHF=X',
+  'USDCAD': 'USDCAD=X',
+  'GBPUSD': 'GBPUSD=X',
+  'EURUSD': 'EURUSD=X',
+  'AUDUSD': 'AUDUSD=X',
+  'NZDCAD': 'NZDCAD=X',
+  'NZDCHF': 'NZDCHF=X',
+  'EURAUD': 'EURAUD=X',
+  'EURGBP': 'EURGBP=X',
+  'GBPCAD': 'GBPCAD=X',
+  'GBPCHF': 'GBPCHF=X',
+  'AUDCHF': 'AUDCHF=X',
+  'AUDJPY': 'AUDJPY=X',
+  'CADJPY': 'CADJPY=X',
+  'CHFJPY': 'CHFJPY=X',
+  'EURCAD': 'EURCAD=X',
+  'EURNZD': 'EURNZD=X',
+  'GBPNZD': 'GBPNZD=X',
+  'AUDNZD': 'AUDNZD=X',
+  'GBPAUD': 'GBPAUD=X',
+  'GBPSGD': 'GBPSGD=X',
+};
+
+function toYahooSymbol(sym) {
+  if (YAHOO_SYMBOLS[sym]) return YAHOO_SYMBOLS[sym];
+  // Fallback: BASE(3) + QUOTE(3) + =X
+  if (sym.length === 6) return sym.substring(0, 3) + sym.substring(3) + '=X';
+  return sym + '=X';
+}
+
+async function fetchMarketData(symbol, startDate, endDate) {
+  const yahooSym = toYahooSymbol(symbol);
+  const period1 = Math.floor(startDate.getTime() / 1000);
+  const period2 = Math.floor(endDate.getTime() / 1000) + 86400; // add 1 day buffer
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${period1}&period2=${period2}&interval=1d`;
+
+  try {
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const json = await resp.json();
+    const result = json.chart && json.chart.result && json.chart.result[0];
+    if (!result || !result.timestamp || !result.indicators) throw new Error('No data');
+
+    const timestamps = result.timestamp;
+    const quotes = result.indicators.quote[0];
+    const dates = [];
+    const closes = [];
+    const opens = [];
+    const highs = [];
+    const lows = [];
+
+    for (let i = 0; i < timestamps.length; i++) {
+      if (quotes.close[i] != null) {
+        dates.push(new Date(timestamps[i] * 1000));
+        closes.push(quotes.close[i]);
+        opens.push(quotes.open[i]);
+        highs.push(quotes.high[i]);
+        lows.push(quotes.low[i]);
+      }
+    }
+    return { dates, opens, highs, lows, closes, source: 'yahoo' };
+  } catch (e) {
+    console.warn('Yahoo Finance fetch failed for', symbol, e.message);
+    return null;
+  }
+}
+
+function buildCSVMarketData(positions, symbol) {
+  // Fallback: extract price trend from CSV trade data
+  const symPositions = positions.filter(p => p.symbol === symbol);
+  symPositions.sort((a, b) => a.open_time - b.open_time);
+  const dates = [];
+  const closes = [];
+
+  symPositions.forEach(p => {
+    if (p.trades && p.trades.length > 0) {
+      // Use the first trade's open price as entry price
+      const avgOpen = p.trades.reduce((s, t) => s + t._openPrice, 0) / p.trades.length;
+      dates.push(new Date(p.open_time));
+      closes.push(avgOpen);
+    }
+  });
+
+  return dates.length >= 2 ? { dates, opens: closes, highs: closes, lows: closes, closes, source: 'csv' } : null;
+}
+
+function analyzeMarketContext(positions, marketDataMap) {
+  // Group positions by symbol
+  const symbolGroups = {};
+  positions.forEach(p => {
+    if (!symbolGroups[p.symbol]) symbolGroups[p.symbol] = [];
+    symbolGroups[p.symbol].push(p);
+  });
+
+  // Sort symbols by count (descending), take top 5
+  const sortedSymbols = Object.entries(symbolGroups)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 5)
+    .map(([sym]) => sym);
+
+  const context = { symbols: [], dataSource: 'yahoo' };
+  let anyCSV = false;
+
+  sortedSymbols.forEach(sym => {
+    const symPositions = symbolGroups[sym];
+    const buyCount = symPositions.filter(p => p.direction === 'BUY').length;
+    const sellCount = symPositions.filter(p => p.direction === 'SELL').length;
+    const dominantDir = buyCount >= sellCount ? 'BUY' : 'SELL';
+
+    const mData = marketDataMap[sym];
+    let trend = 'unknown';
+    let pctChange = 0;
+    let startPrice = 0;
+    let endPrice = 0;
+
+    if (mData && mData.closes && mData.closes.length >= 2) {
+      startPrice = mData.closes[0];
+      endPrice = mData.closes[mData.closes.length - 1];
+      pctChange = startPrice !== 0 ? ((endPrice - startPrice) / startPrice) * 100 : 0;
+
+      // Determine trend: range = less than 1% move
+      if (Math.abs(pctChange) < 1.0) {
+        trend = 'range';
+      } else if (pctChange > 0) {
+        trend = 'up';
+      } else {
+        trend = 'down';
+      }
+
+      if (mData.source === 'csv') anyCSV = true;
+    }
+
+    // Match verdict
+    let verdict = 'neutral';
+    if (trend === 'up' && dominantDir === 'BUY') verdict = 'ok';
+    else if (trend === 'down' && dominantDir === 'SELL') verdict = 'ok';
+    else if (trend === 'up' && dominantDir === 'SELL') verdict = 'warn';
+    else if (trend === 'down' && dominantDir === 'BUY') verdict = 'warn';
+    // range or unknown → neutral
+
+    context.symbols.push({
+      symbol: sym,
+      positionCount: symPositions.length,
+      buyCount,
+      sellCount,
+      dominantDir,
+      trend,
+      pctChange,
+      startPrice,
+      endPrice,
+      verdict,
+      marketData: mData
+    });
+  });
+
+  context.dataSource = anyCSV ? 'csv' : 'yahoo';
+  return context;
+}
+
+function makePriceSVG(dates, closes, positions) {
+  if (!dates || dates.length < 2) return '<p style="color:#999">數據不足</p>';
+
+  const W = 480, H = 180, M = { top: 20, right: 50, bottom: 30, left: 60 };
+  const chartW = W - M.left - M.right;
+  const chartH = H - M.top - M.bottom;
+
+  const minV = Math.min(...closes);
+  const maxV = Math.max(...closes);
+  const rangeV = maxV - minV || 1;
+  const pad = rangeV * 0.05;
+  const yMin = minV - pad;
+  const yMax = maxV + pad;
+  const yRange = yMax - yMin;
+
+  function xPos(i) { return M.left + (i / Math.max(dates.length - 1, 1)) * chartW; }
+  function yPos(v) { return M.top + chartH * (1 - (v - yMin) / yRange); }
+
+  let html = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:480px;height:auto;">`;
+
+  // Background
+  html += `<rect x="${M.left}" y="${M.top}" width="${chartW}" height="${chartH}" fill="#fafbfc" rx="2"/>`;
+
+  // Grid lines (horizontal)
+  const ySteps = 4;
+  for (let i = 0; i <= ySteps; i++) {
+    const y = M.top + (chartH * i / ySteps);
+    const val = yMax - (yRange * i / ySteps);
+    html += `<line x1="${M.left}" y1="${y}" x2="${M.left + chartW}" y2="${y}" stroke="#e8e8e8" stroke-width="0.5"/>`;
+    html += `<text x="${M.left - 4}" y="${y + 3}" text-anchor="end" font-size="8" fill="#999">${fmt(val, closes[0] > 10 ? 2 : 5)}</text>`;
+  }
+
+  // Price line
+  const pts = closes.map((v, i) => `${xPos(i).toFixed(1)},${yPos(v).toFixed(1)}`);
+  const lineColor = closes[closes.length - 1] >= closes[0] ? '#28a745' : '#dc3545';
+  html += `<polyline points="${pts.join(' ')}" fill="none" stroke="${lineColor}" stroke-width="1.8" stroke-linejoin="round"/>`;
+
+  // Trade entry markers
+  const firstDate = dates[0].getTime();
+  const lastDate = dates[dates.length - 1].getTime();
+  const dateRange = lastDate - firstDate || 1;
+
+  positions.forEach(p => {
+    const entryTime = p.open_time.getTime();
+    // Only draw if within chart range
+    if (entryTime >= firstDate && entryTime <= lastDate) {
+      const x = M.left + ((entryTime - firstDate) / dateRange) * chartW;
+      // Find closest close price for y position
+      let closeIdx = 0;
+      for (let i = 0; i < dates.length; i++) {
+        if (dates[i].getTime() <= entryTime) closeIdx = i;
+      }
+      const y = yPos(closes[closeIdx]);
+      const dotColor = p.direction === 'BUY' ? '#28a745' : '#dc3545';
+      html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${dotColor}" stroke="#fff" stroke-width="1" opacity="0.85"/>`;
+    }
+  });
+
+  // Start / End labels
+  html += `<text x="${xPos(0)}" y="${M.top + chartH + 14}" text-anchor="start" font-size="8" fill="#666">${fmtDateShort(dates[0])}</text>`;
+  html += `<text x="${xPos(dates.length - 1)}" y="${M.top + chartH + 14}" text-anchor="end" font-size="8" fill="#666">${fmtDateShort(dates[dates.length - 1])}</text>`;
+
+  html += '</svg>';
+  return html;
+}
+
+function fmtDateShort(d) {
+  if (!d || d.getTime() === 0) return '—';
+  return (d.getMonth() + 1) + '/' + d.getDate();
+}
+
+function renderMarketContext(context) {
+  if (!context || !context.symbols.length) {
+    $('marketContext').innerHTML = '<p style="color:#999">無市場數據可用</p>';
+    return;
+  }
+
+  const isCSV = context.dataSource === 'csv';
+  let html = '';
+
+  // Summary grid
+  html += '<div class="mc-summary-grid">';
+  context.symbols.forEach(s => {
+    const trendEmoji = s.trend === 'up' ? '📈' : s.trend === 'down' ? '📉' : s.trend === 'range' ? '↔️' : '❓';
+    const trendLabel = s.trend === 'up' ? '上升' : s.trend === 'down' ? '下降' : s.trend === 'range' ? '震盪' : '未知';
+    html += `<div class="mc-summary-item">`;
+    html += `<div class="sym">${trendEmoji} ${s.symbol}</div>`;
+    html += `<div class="trend">${trendLabel} ${s.pctChange !== 0 ? '(' + fmt(s.pctChange, 2) + '%)' : ''}</div>`;
+    html += `</div>`;
+  });
+  html += '</div>';
+
+  // Per-symbol detail cards
+  context.symbols.forEach(s => {
+    const trendEmoji = s.trend === 'up' ? '📈' : s.trend === 'down' ? '📉' : s.trend === 'range' ? '↔️' : '❓';
+    const trendLabel = s.trend === 'up' ? '上升趨勢' : s.trend === 'down' ? '下降趨勢' : s.trend === 'range' ? '震盪盤' : '趨勢未知';
+
+    const verdictClass = s.verdict === 'ok' ? 'mc-verdict-ok' : s.verdict === 'warn' ? 'mc-verdict-warn' : 'mc-verdict-neutral';
+    const verdictText = s.verdict === 'ok' ? '✅ 順市' : s.verdict === 'warn' ? '⚠️ 逆市' : '➡️ 中立';
+    const dirLabel = s.dominantDir === 'BUY' ? '主要做多 📈' : '主要做空 📉';
+
+    html += '<div class="mc-symbol-card">';
+    html += `<h4>${trendEmoji} ${s.symbol} <span class="mc-verdict ${verdictClass}">${verdictText}</span></h4>`;
+
+    html += '<div class="mc-info-row">';
+    html += `<span>📊 趨勢：<strong>${trendLabel}</strong></span>`;
+    if (s.startPrice > 0) {
+      const priceFmt = s.startPrice > 10 ? fmt : (v, d) => fmt(v, 5);
+      html += `<span>💲價格：${priceFmt(s.startPrice)} → ${priceFmt(s.endPrice)} (${s.pctChange >= 0 ? '+' : ''}${fmt(s.pctChange, 2)}%)</span>`;
+    }
+    html += `<span>📋 倉位數：${s.positionCount}</span>`;
+    html += '</div>';
+
+    html += '<div class="mc-info-row">';
+    html += `<span>🎯 策略方向：<strong>${dirLabel}</strong>（買 ${s.buyCount} / 賣 ${s.sellCount}）</span>`;
+    html += '</div>';
+
+    // Mini price chart
+    if (s.marketData && s.marketData.dates && s.marketData.dates.length >= 2) {
+      const symPositions = (window._positions || []).filter(p => p.symbol === s.symbol);
+      html += makePriceSVG(s.marketData.dates, s.marketData.closes, symPositions);
+    } else {
+      html += '<p style="color:#999;font-size:0.85em">價格數據不足，無法繪製走勢圖</p>';
+    }
+
+    html += '</div>';
+  });
+
+  // Source note
+  if (isCSV) {
+    html += '<div class="mc-note">📝 價格走勢基於交易記錄（Yahoo Finance 數據暫時不可用，可能受 CORS 限制）</div>';
+  }
+
+  $('marketContext').innerHTML = html;
+}
+
+async function loadMarketContext(positions) {
+  if (!positions || !positions.length) {
+    $('marketContext').innerHTML = '<p style="color:#999">無倉位數據</p>';
+    return;
+  }
+
+  // Extract date range
+  const firstOpen = new Date(Math.min(...positions.map(p => p.open_time.getTime())));
+  const lastClose = new Date(Math.max(...positions.map(p => p.close_time.getTime())));
+  // Expand range by 1 day on each side for context
+  const startDate = new Date(firstOpen.getTime() - 86400000);
+  const endDate = new Date(lastClose.getTime() + 86400000);
+
+  // Extract unique symbols
+  const symbols = [...new Set(positions.map(p => p.symbol))];
+
+  // Fetch market data for each symbol
+  const marketDataMap = {};
+  for (const sym of symbols) {
+    const data = await fetchMarketData(sym, startDate, endDate);
+    if (data && data.closes && data.closes.length >= 2) {
+      marketDataMap[sym] = data;
+    } else {
+      // Fallback to CSV-based data
+      const csvData = buildCSVMarketData(positions, sym);
+      if (csvData) marketDataMap[sym] = csvData;
+    }
+    // Throttle: 500ms between requests
+    if (symbols.indexOf(sym) < symbols.length - 1) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  const context = analyzeMarketContext(positions, marketDataMap);
+  renderMarketContext(context);
+}
+
 
 // === Download Report ===
 function downloadReport() {
