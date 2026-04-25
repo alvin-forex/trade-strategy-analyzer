@@ -56,7 +56,7 @@ def calculate_equity_curve(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
                 in_drawdown = True
                 drawdown_start = dates[i]
             # 更新底部
-            if dd < drawdown_bottom_equity:
+            if drawdown_bottom_equity is None or dd < drawdown_bottom_equity:
                 drawdown_bottom = dates[i]
                 drawdown_bottom_equity = dd
         else:

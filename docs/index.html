@@ -145,6 +145,80 @@ svg text { font-family: -apple-system, sans-serif; }
 .mc-summary-item .sym { font-weight: 700; color: var(--primary); font-size: 1.1em; }
 .mc-summary-item .trend { font-size: 0.85em; color: var(--text2); margin-top: 2px; }
 
+/* Info Tooltips */
+.info-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e8eaf6;
+  color: #5c6bc0;
+  font-size: 13px;
+  cursor: pointer;
+  margin-left: 6px;
+  vertical-align: middle;
+  user-select: none;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.info-toggle:hover { background: #c5cae9; }
+.info-toggle.active { background: #5c6bc0; color: #fff; }
+.info-panel {
+  display: none;
+  background: #f0f4ff;
+  border: 1px solid #c5cae9;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0 16px;
+  font-size: 0.85em;
+  color: #333;
+  line-height: 1.7;
+}
+.info-panel.show { display: block; }
+.info-panel b { color: var(--primary); }
+
+/* Volatility Sweet Spot */
+.vol-optimal-box {
+  background: linear-gradient(135deg, #e8f5e9, #f0f4ff);
+  border: 2px solid #28a745;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  text-align: center;
+}
+.vol-optimal-box .opt-label { font-size: 1.05em; font-weight: 700; color: var(--primary); }
+.vol-optimal-box .opt-range { font-size: 1.3em; font-weight: 700; color: #28a745; margin: 6px 0; }
+.vol-optimal-box .opt-desc { font-size: 0.88em; color: var(--text2); }
+.vol-symbol-rec {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.vol-symbol-rec .vsr-item {
+  flex: 1;
+  min-width: 200px;
+  background: #fafbfc;
+  border-radius: 10px;
+  padding: 12px;
+  border-left: 4px solid var(--primary);
+}
+.vol-symbol-rec .vsr-item .vsr-sym { font-weight: 700; color: var(--primary); font-size: 1.1em; }
+.vol-symbol-rec .vsr-item .vsr-range { color: #28a745; font-weight: 600; margin-top: 4px; }
+.vol-symbol-rec .vsr-item .vsr-hint { font-size: 0.82em; color: var(--text2); margin-top: 4px; }
+.vol-advice-box {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 12px 0;
+  border-left: 4px solid #5c6bc0;
+  font-size: 0.9em;
+  line-height: 1.8;
+}
+.vol-advice-box b { color: var(--primary); }
+
 /* Responsive */
 @media (max-width: 600px) {
   .header h1 { font-size: 1.4em; }
@@ -292,6 +366,17 @@ function gradeClass(g) { return 'grade grade-' + g.toLowerCase(); }
 function gradeColor(g) { return {A:'#28a745',B:'#ffc107',C:'#fd7e14',D:'#dc3545'}[g]||'#999'; }
 function gradeOf(score) { return score >= 80 ? 'A' : score >= 60 ? 'B' : score >= 40 ? 'C' : 'D'; }
 function readFile(f) { return new Promise((ok,no)=>{ const r=new FileReader(); r.onload=e=>ok(e.target.result); r.onerror=no; r.readAsText(f); }); }
+
+// === Info Toggle Helpers ===
+function infoToggle(id, content) {
+  return ` <span class="info-toggle" onclick="toggleInfo('${id}')">?</span><div class="info-panel" id="info-${id}">${content}</div>`;
+}
+function toggleInfo(id) {
+  const el = document.getElementById('info-' + id);
+  const toggle = el.previousElementSibling;
+  el.classList.toggle('show');
+  toggle.classList.toggle('active');
+}
 
 // === State ===
 let csvFile = null, setFiles = [], reportBlobUrl = null;
@@ -1125,7 +1210,8 @@ function renderStats(s) {
 }
 
 function renderEquityCurve(positions) {
-  $('equityChart').innerHTML = '<h3 style="margin-bottom:12px;color:var(--primary)">累計收益曲線</h3>' + makeEquitySVG(positions);
+  const info = infoToggle('equity', '<b>收益曲線</b>顯示每個已平倉倉位嘅累計淨盈虧。每個數據點代表一個倉位平倉後嘅總結餘變化。<br>📈 向上 = 盈利累積 · 📉 向下 = 虧損累積。虛線為零線基準。可觀察資金增長嘅穩定性同最大回撤位置。');
+  $('equityChart').innerHTML = '<h3 style="margin-bottom:12px;color:var(--primary)">累計收益曲線' + info + '</h3>' + makeEquitySVG(positions);
 }
 
 function renderScoreSection(positions) {
@@ -1148,9 +1234,13 @@ function renderScoreSection(positions) {
     stratGrades[p._strategyScore.grade]++;
   });
 
+  const entryInfo = infoToggle('entry-score', '<b>📊 Entry Score 入場評分</b><br>由三個維度組成：<b>方向（35%）</b>— 根據 L1 最大有利波幅（Max Pips）判斷方向正確程度，>20 pips 滿分。<br><b>時機（35%）</b>— 計算 max_pips / (max_pips + |max_loss_pips|)，反映入場後能否把握主要行情。L4+ 倉位有 1.2x 加成。<br><b>初始回撤（30%）</b>— 1 - min(|max_loss_pips|/200, 1.0)，入場後最大浮虧越小越高分。');
+  const stratInfo = infoToggle('strat-score', '<b>📈 Strategy Score 策略評分</b><br>由五個維度組成：<b>回歸性（30%）</b>— L4+ 倉位若盈利滿分，否則視虧損程度扣分。<br><b>出場效率（25%）</b>— 盈利倉：實際盈利/最大浮盈；虧損倉：實際虧損/最大浮虧。<br><b>風險控制（20%）</b>— 層數分 + 回撤比率。<br><b>利潤質量（15%）</b>— 簡單二元：盈利 0.7 / 虧損 0.3。<br><b>成本效率（10%）</b>— 每小時持倉成本（手續費+swap）。');
+  const finalInfo = infoToggle('final-score', '<b>🎯 Final Score 最終評分</b><br>Final = Entry × 0.4 + Strategy × 0.6。<br>評級標準：<b>A ≥ 80</b>（可 Copy）、<b>B ≥ 60</b>（需評估）、<b>C ≥ 40</b>（需調整）、<b>D < 40</b>（不建議）。');
+
   let html = '<div class="chart-row">';
-  html += '<div class="chart-box"><h3>綜合評級分佈</h3>' + makeDonutSVG(donutData, 220) + '</div>';
-  html += '<div class="chart-box"><h3>Entry vs Strategy 評級</h3>';
+  html += '<div class="chart-box"><h3>綜合評級分佈' + finalInfo + '</h3>' + makeDonutSVG(donutData, 220) + '</div>';
+  html += '<div class="chart-box"><h3>Entry vs Strategy 評級' + entryInfo + '</h3>';
   html += '<table style="width:100%;font-size:0.85em"><tr><th>評級</th><th>Entry</th><th>Strategy</th><th>Final</th></tr>';
   ['A','B','C','D'].forEach(g => {
     const c = gradeColor(g);
@@ -1165,9 +1255,9 @@ function renderScoreSection(positions) {
   const avgFinal = positions.reduce((s,p)=>s+p._finalScore.score,0)/positions.length;
 
   html += '<div class="stats-grid" style="margin-top:16px">';
-  html += statBox(avgEntry, '平均 Entry Score', avgEntry>=60?'positive':'negative');
-  html += statBox(avgStrat, '平均 Strategy Score', avgStrat>=60?'positive':'negative');
-  html += statBox(avgFinal, '平均 Final Score', avgFinal>=60?'positive':'negative');
+  html += statBox(avgEntry, '平均 Entry Score' + entryInfo, avgEntry>=60?'positive':'negative');
+  html += statBox(avgStrat, '平均 Strategy Score' + stratInfo, avgStrat>=60?'positive':'negative');
+  html += statBox(avgFinal, '平均 Final Score' + finalInfo, avgFinal>=60?'positive':'negative');
   html += '</div>';
 
   $('scoreChart').innerHTML = html;
@@ -1179,8 +1269,10 @@ function statBox(val, lbl, cls='') {
 }
 
 function renderSymbolTable(symStats) {
+  const info = infoToggle('symbol-table', '<b>💱 貨幣對排名</b><br>按 Profit Factor 排序顯示每個貨幣對嘅獨立表現。包括勝率、PF、總盈虧、最大回撤、平均盈虧、平均層數同平均評分。<br>💡 PF > 2 = 綠色背景（優秀）、1-2 = 黃色（一般）、< 1 = 紅色（虧損）。可快速識別策略喺邊個貨幣對表現最佳。');
   const sorted = Object.entries(symStats).sort((a,b)=>parseFloat(b[1].profitFactor)-parseFloat(a[1].profitFactor));
-  let html = '<table class="sortable"><tr>';
+  let html = info;
+  html += '<table class="sortable"><tr>';
   html += '<th>貨幣對</th><th>倉位</th><th>勝率</th><th>PF</th><th>總盈虧</th><th>Max DD</th><th>平均盈虧</th><th>平均層數</th><th>平均評分</th>';
   html += '</tr>';
   sorted.forEach(([sym, s]) => {
@@ -1202,6 +1294,7 @@ function renderSymbolTable(symStats) {
 }
 
 function renderLayerSection(ls) {
+  const info = infoToggle('layer-analysis', '<b>📚 層數分析</b><br>層數偵測：將所有交易嘅 unique 手數由細到大排序，動態映射為 L1（最小手數）、L2、L3...<br>例如手數 0.01/0.02/0.04 → L1/L2/L3。<br><b>L1-only 佔比越高越好</b>，代表策略主要單層交易；<b>L4+ 佔比越低越好</b>，高層代表馬丁加倉已深入。<br>L4+ 回歸率 = L4+ 倉位中最終盈利嘅比例，反映策略嘅馬丁自救能力。');
   // Bar chart
   const barData = [
     {label:'L1 only', value:ls['L1 only'].avgProfit, color:'#28a745'},
@@ -1210,7 +1303,8 @@ function renderLayerSection(ls) {
     {label:'L4+', value:ls['L4+'].avgProfit, color:'#dc3545'}
   ];
 
-  let html = '<div class="chart-row">';
+  let html = info;
+  html += '<div class="chart-row">';
   html += '<div class="chart-box"><h3>各層平均盈虧</h3>' + makeBarSVG(barData) + '</div>';
 
   // Distribution donut
@@ -1246,12 +1340,14 @@ function renderLayerSection(ls) {
 }
 
 function renderSessionSection(ss) {
+  const info = infoToggle('session-analysis', '<b>🕐 時段分析</b><br>根據倉位開倉時間（HKT）劃分為四個時段：<br><b>亞洲盤</b> 00:00–08:00 · <b>歐洲盤</b> 14:00–22:00 · <b>美洲盤</b> 21:00–05:00（亞洲盤優先匹配 0-4 時）· <b>其他</b>（剩餘時段）。<br>💡 可找出策略喺邊個交易時段表現最好，從而優化開市時間或調整參數。');
   const barData = Object.entries(ss).map(([name,d]) => ({
     label: name, value: d.avgProfit,
     color: name==='亞洲盤'?'#28a745':name==='歐洲盤'?'#0f3460':name==='美洲盤'?'#e94560':'#999'
   }));
 
-  let html = '<div class="chart-row">';
+  let html = info;
+  html += '<div class="chart-row">';
   html += '<div class="chart-box"><h3>時段平均盈虧</h3>' + makeBarSVG(barData) + '</div>';
   html += '<div class="chart-box"><h3>時段數據</h3>';
   html += '<table style="width:100%;font-size:0.85em"><tr><th>時段</th><th>倉位</th><th>平均盈虧</th><th>勝率</th></tr>';
@@ -1267,12 +1363,14 @@ function renderSessionSection(ss) {
 }
 
 function renderDirectionSection(ds) {
+  const info = infoToggle('direction-analysis', '<b>↔️ 方向分析</b><br>比較 BUY（做多）同 SELL（做空）兩個方向嘅獨立表現。<br>包括平均盈虧、勝率同倉位數量。可判斷策略偏向邊個方向更有優勢，從而考慮是否需要調整方向過濾或只喺有利方向開倉。');
   const barData = Object.entries(ds).map(([name,d]) => ({
     label: name==='BUY'?'📈 BUY':'📉 SELL', value: d.avgProfit,
     color: name==='BUY'?'#28a745':'#e94560'
   }));
 
-  let html = '<div class="chart-row">';
+  let html = info;
+  html += '<div class="chart-row">';
   html += '<div class="chart-box"><h3>方向平均盈虧</h3>' + makeHBarSVG(barData) + '</div>';
   html += '<div class="chart-box"><h3>方向數據</h3>';
   html += '<table style="width:100%;font-size:0.85em"><tr><th>方向</th><th>倉位</th><th>平均盈虧</th><th>勝率</th></tr>';
@@ -1292,6 +1390,7 @@ function renderDirectionSection(ds) {
 let sortCol = null, sortAsc = true;
 
 function renderPositionTable(positions) {
+  const posInfo = infoToggle('position-detail', '<b>📋 倉位明細</b><br>列出所有已平倉倉位嘅詳細資料，包括貨幣對、方向、層數、總手數、淨盈虧、各項評分等。<br>點擊欄位標題可排序（升/降序），點擊每行可展開查看該倉位嘅完整交易明細同評分明細。');
   const cols = [
     {key:'#', label:'#'},
     {key:'symbol', label:'貨幣對'},
@@ -1307,7 +1406,7 @@ function renderPositionTable(positions) {
     {key:'open_time', label:'開倉時間'}
   ];
 
-  let html = '<table class="sortable"><tr>';
+  let html = posInfo + '<table class="sortable"><tr>';
   cols.forEach(c => {
     html += `<th onclick="sortPositions('${c.key}')">${c.label} <span class="sort-arrow">⇅</span></th>`;
   });
@@ -1525,29 +1624,60 @@ function calcATRCrossAnalysis(positions, marketDataMap) {
     '高波幅': d => d.atrPips > p67
   };
 
-  const result = { thresholds: { low: p33, mid: p67 }, buckets: {}, total: atrData.length };
+  const result = { thresholds: { low: p33, mid: p67 }, buckets: {}, symbolBuckets: {}, total: atrData.length };
 
   for (const [bName, fn] of Object.entries(buckets)) {
     const subset = atrData.filter(fn);
     if (!subset.length) { result.buckets[bName] = null; continue; }
     const wins = subset.filter(d => d.win);
+    const totalWin = subset.filter(d => d.win).reduce((s, d) => s + d.profit, 0);
+    const totalLoss = Math.abs(subset.filter(d => !d.win).reduce((s, d) => s + d.profit, 0));
     const avgATR = subset.reduce((s, d) => s + d.atrPips, 0) / subset.length;
     const avgProfit = subset.reduce((s, d) => s + d.profit, 0) / subset.length;
     const l4count = subset.filter(d => d.layer >= 4).length;
     result.buckets[bName] = {
       count: subset.length,
       winRate: wins.length / subset.length * 100,
+      profitFactor: totalLoss > 0 ? totalWin / totalLoss : (totalWin > 0 ? 999 : 0),
       avgProfit,
       avgATR,
       l4pct: l4count / subset.length * 100
     };
   }
 
+  // Per-symbol ATR buckets (for top symbols)
+  const symGroups = {};
+  atrData.forEach(d => {
+    const sym = d.position.symbol;
+    if (!symGroups[sym]) symGroups[sym] = [];
+    symGroups[sym].push(d);
+  });
+
+  for (const [sym, symAtrData] of Object.entries(symGroups)) {
+    if (symAtrData.length < 3) continue;
+    const symBuckets = {};
+    for (const [bName, fn] of Object.entries(buckets)) {
+      const subset = symAtrData.filter(fn);
+      if (!subset.length) continue;
+      const wins = subset.filter(d => d.win);
+      const totalWin = subset.filter(d => d.win).reduce((s, d) => s + d.profit, 0);
+      const totalLoss = Math.abs(subset.filter(d => !d.win).reduce((s, d) => s + d.profit, 0));
+      symBuckets[bName] = {
+        count: subset.length,
+        winRate: wins.length / subset.length * 100,
+        profitFactor: totalLoss > 0 ? totalWin / totalLoss : (totalWin > 0 ? 999 : 0),
+        avgATR: subset.reduce((s, d) => s + d.atrPips, 0) / subset.length
+      };
+    }
+    result.symbolBuckets[sym] = symBuckets;
+  }
+
   return result;
 }
 
 function renderVolatilityAnalysis(volData, atrData) {
-  let html = '';
+  const volInfo = infoToggle('vol-layer', '<b>📊 各層波幅分析</b><br>波幅 = max_pips（最大有利波幅）+ |max_loss_pips|（最大不利波幅），反映交易期間價格嘅實際波動範圍。<br>按層數分組顯示，可觀察深層（L3/L4+）嘅波幅是否顯著大於 L1，從而評估加倉後嘅風險暴露。');
+  let html = volInfo;
 
   // === Section 1: Per-layer volatility ===
   html += '<h3 style="margin:0 0 12px;color:var(--primary)">📊 各層波幅分析</h3>';
@@ -1581,7 +1711,8 @@ function renderVolatilityAnalysis(volData, atrData) {
 
   // === Section 2: ATR Cross-Analysis ===
   if (atrData) {
-    html += '<h3 style="margin:20px 0 12px;color:var(--primary)">🌡️ ATR 市況交叉分析</h3>';
+    const atrInfo = infoToggle('vol-atr', '<b>🌡️ ATR 市況交叉分析</b><br>ATR（Average True Range）來自本地 D1 數據，已換算為 pips。倉位按開倉時 ATR 值嘅百分位數分為三組：<b>低波幅</b>（下三分位）、<b>中波幅</b>（中間）、<b>高波幅</b>（上三分位）。<br>💡 可判斷策略喺邊種市況環境下表現最佳，從而調整入場條件或止損範圍。');
+    html += '<h3 style="margin:20px 0 12px;color:var(--primary)">🌡️ ATR 市況交叉分析' + atrInfo + '</h3>';
 
     // Thresholds
     html += '<div class="stats-grid" style="margin-bottom:12px">';
@@ -1618,21 +1749,86 @@ function renderVolatilityAnalysis(volData, atrData) {
     });
     html += '</table></div></div>';
 
+    // === PF by ATR bucket chart ===
+    const pfBarData = [];
+    bucketOrder.forEach(b => {
+      const d = atrData.buckets[b];
+      if (d) pfBarData.push({ label: b, value: Math.min(d.profitFactor, 5), color: b === '低波幅' ? '#28a745' : b === '中波幅' ? '#ffc107' : '#dc3545' });
+    });
+    html += '<div class="chart-box" style=\"margin-top:12px\"><h3>各波幅環境盈虧比（PF）</h3>' + makeBarSVG(pfBarData) + '</div>';
+
     // Auto verdict
     const best = bucketOrder.map(b => ({ name: b, d: atrData.buckets[b] })).filter(x => x.d).sort((a, b) => b.d.winRate - a.d.winRate)[0];
     const worst = bucketOrder.map(b => ({ name: b, d: atrData.buckets[b] })).filter(x => x.d).sort((a, b) => a.d.winRate - b.d.winRate)[0];
 
     if (best && worst) {
       const verdictColor = best.d.winRate - worst.d.winRate > 20 ? '#e94560' : '#28a745';
-      html += '<div style="margin-top:12px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid ' + verdictColor + '">';
-      html += '<strong>📋 策略波幅適配結論：</strong><br>';
-      html += `策略喺 <strong>${best.name}</strong>（ATR ~${fmt(best.d.avgATR, 0)} pips）環境下勝率最高 ${pct(best.d.winRate)}，`;
-      html += `喺 <strong>${worst.name}</strong>（ATR ~${fmt(worst.d.avgATR, 0)} pips）環境下勝率只有 ${pct(worst.d.winRate)}。`;
-      if (best.d.winRate - worst.d.winRate > 20) {
-        html += '<br><span style="color:#dc3545">⚠️ 波幅敏感度高，建議喺低波幅時段運行或收窄入場條件。</span>';
-      } else {
-        html += '<br><span style="color:#28a745">✅ 波幅敏感度低，策略適應性較強。</span>';
+
+      // === Optimal ATR Range Box ===
+      html += '<div class="vol-optimal-box">';
+      html += '<div class="opt-label">🎯 策略最適合 ATR 範圍</div>';
+      html += `<div class="opt-range">${fmt(best.d.avgATR * 0.7, 0)} – ${fmt(best.d.avgATR * 1.3, 0)} pips（${best.name}環境）</div>`;
+      html += `<div class="opt-desc">此範圍內勝率 ${pct(best.d.winRate)}，盈虧比 ${fmt(best.d.profitFactor)}，共 ${best.d.count} 個倉位</div>`;
+      html += '</div>';
+
+      // === Per-symbol ATR recommendation (top 3) ===
+      if (atrData.symbolBuckets && Object.keys(atrData.symbolBuckets).length > 0) {
+        const symEntries = Object.entries(atrData.symbolBuckets).sort((a, b) => {
+          const aTotal = Object.values(a[1]).reduce((s, d) => s + d.count, 0);
+          const bTotal = Object.values(b[1]).reduce((s, d) => s + d.count, 0);
+          return bTotal - aTotal;
+        }).slice(0, 3);
+        if (symEntries.length > 0) {
+          html += '<div class="vol-symbol-rec">';
+          symEntries.forEach(([sym, buckets]) => {
+            const bestSym = Object.entries(buckets).sort((a, b) => b[1].winRate - a[1].winRate)[0];
+            if (bestSym) {
+              const [bName, bData] = bestSym;
+              html += '<div class="vsr-item">';
+              html += `<div class="vsr-sym">💱 ${sym}</div>`;
+              html += `<div class="vsr-range">最佳 ATR：${fmt(bData.avgATR * 0.7, 0)}–${fmt(bData.avgATR * 1.3, 0)} pips（${bName}）</div>`;
+              html += `<div class="vsr-hint">勝率 ${pct(bData.winRate)} · PF ${fmt(bData.profitFactor)} · ${bData.count} 倉位</div>`;
+              html += '</div>';
+            }
+          });
+          html += '</div>';
+        }
       }
+
+      // === Actionable advice ===
+      html += '<div class="vol-advice-box">';
+      html += '<strong>📝 操作建議：</strong><br>';
+
+      // Session advice based on best ATR
+      if (best.name === '低波幅') {
+        html += '🕐 <b>推薦時段：</b>亞洲盤（00:00–08:00 HKT）通常波幅較低，適合此策略運行。避免美洲盤開市（21:00+）時段。<br>';
+        html += '📏 <b>止損建議：</b>可使用較窄嘅止損（ATR × 1.2–1.5），因低波幅環境下價格波動有限。<br>';
+        html += '📰 <b>新聞時段：</b>建議避開重大數據公佈時段（如 NFP、CPI），因突發波幅會超出策略最佳範圍。';
+      } else if (best.name === '中波幅') {
+        html += '🕐 <b>推薦時段：</b>歐洲盤開市（14:00–16:00 HKT）波幅適中，適合此策略。美洲盤早段亦可嘗試。<br>';
+        html += '📏 <b>止損建議：</b>使用標準止損（ATR × 1.5–2.0），保持風險可控。<br>';
+        html += '📰 <b>新聞時段：</b>中等波幅策略對新聞敏感度一般，但仍建議喺極端行情（利率決議等）時暫停。';
+      } else {
+        html += '🕐 <b>推薦時段：</b>美洲盤（21:00–05:00 HKT）或歐美重疊時段波幅充足，適合此策略捕捉大行情。<br>';
+        html += '📏 <b>止損建議：</b>需要較寬嘅止損（ATR × 2.0–2.5），避免被正常波動掃出場。<br>';
+        html += '📰 <b>新聞時段：</b>高波幅策略可善用新聞行情，但需確保有足夠資金承受加倉風險。';
+      }
+
+      if (best.d.winRate - worst.d.winRate > 20) {
+        html += '<br><br>⚠️ <b>波幅敏感度高</b>（勝率差距 > 20%）。強烈建議喺非最佳波幅環境下收窄入場條件或暫停交易。';
+        if (worst.name === '高波幅') {
+          html += ' 可考慮加入 ATR 過濾器：當 ATR > ' + fmt(worst.d.avgATR * 0.8, 0) + ' pips 時禁止開新倉。';
+        }
+      } else {
+        html += '<br><br>✅ <b>波幅敏感度低</b>，策略喺唔同市況下適應性較強。';
+      }
+      html += '</div>';
+
+      // === Original verdict (keep for reference) ===
+      html += '<div style="margin-top:12px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid ' + verdictColor + '">';
+      html += '<strong>📋 波幅適配摘要：</strong> ';
+      html += `<strong>${best.name}</strong>（ATR ~${fmt(best.d.avgATR, 0)} pips）勝率 ${pct(best.d.winRate)} vs `;
+      html += `<strong>${worst.name}</strong>（ATR ~${fmt(worst.d.avgATR, 0)} pips）勝率 ${pct(worst.d.winRate)}。`;
       html += '</div>';
     }
   } else {
@@ -1742,14 +1938,15 @@ function calcSymbolLayerMatrix(positions) {
 }
 
 function renderCopyMatrix(matrixData) {
+  const copyInfo = infoToggle('copy-grade', '<b>📋 Copy 推薦矩陣</b><br>交叉分析每個貨幣對 × 層數深度嘅獨立表現。<br><b>評級標準：</b>A = 勝率≥60% + PF≥1.5 · B = 勝率≥50% + PF≥1.2 · C = 勝率≥40% + PF≥1.0 · D = 其餘。<br>L4+ 最高只能評 B（高層風險）。⭐⭐⭐ = 勝率>70% + PF>2 + 平均層數<2。');
   const { matrix, ranked, symbols } = matrixData;
   if (!ranked.length) {
-    $('copyMatrix').innerHTML = '<p style="color:#999">數據不足，需要至少 3 個倉位才能分析</p>';
+    $('copyMatrix').innerHTML = copyInfo + '<p style="color:#999">數據不足，需要至少 3 個倉位才能分析</p>';
     return;
   }
 
   const groups = ['L1', 'L2', 'L3', 'L4+'];
-  let html = '';
+  let html = copyInfo;
 
   // === Top recommendation summary ===
   const top3 = ranked.slice(0, 3);
@@ -1819,11 +2016,12 @@ function renderCopyMatrix(matrixData) {
 }
 
 function renderSETParams(cats) {
+  const setInfo = infoToggle('set-params', '<b>⚙️ SET 參數</b><br>從上傳嘅 .set 檔案解析而嚟，按類別分組顯示：<b>基本設定</b>、<b>MA 系統</b>、<b>濾鏡系統</b>、<b>馬丁加倉</b>、<b>TP/SL 系統</b>、<b>新聞過濾</b>、<b>冷卻系統</b> 等。<br>可快速查閱 EA 嘅完整參數配置，方便對比唔同 set 檔案嘅差異。');
   if(!cats) {
-    $('setParams').innerHTML = '<p style="color:#999">未上傳 SET 檔案</p>';
+    $('setParams').innerHTML = setInfo + '<p style="color:#999">未上傳 SET 檔案</p>';
     return;
   }
-  let html = '';
+  let html = setInfo;
   for(const [cat, params] of Object.entries(cats)) {
     const keys = Object.keys(params);
     if(!keys.length) continue;
@@ -2089,8 +2287,10 @@ function renderMarketContext(context) {
     return;
   }
 
+  const mcInfo = infoToggle('market-context', '<b>🌐 市場語境分析</b><br>使用本地 MT4 D1 歷史數據（data/{PAIR}_D1.json）顯示交易期間嘅價格走勢。<br>判斷邏輯：<b>✅ 順市</b>— 策略方向同趨勢一致 · <b>⚠️ 逆市</b>— 策略方向同趨勢相反 · <b>➡️ 中立</b>— 橫行或數據不足。<br>範圍判定：|價格變動| < 1% = 橫行震盪。圖表上嘅圓點代表開倉位置（綠=BUY，紅=SELL）。');
+
   const isCSV = context.dataSource === 'csv';
-  let html = '';
+  let html = mcInfo;
 
   // Summary grid
   html += '<div class="mc-summary-grid">';

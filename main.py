@@ -19,7 +19,7 @@ from src.statistics import (
     calculate_layer_stats, calculate_time_stats,
     calculate_direction_stats
 )
-from src.equity_curve import generate_equity_curve
+from src.equity_curve import calculate_equity_curve
 from src.report_generator import generate_html_report
 
 
@@ -59,8 +59,10 @@ def main():
         trades = pos.get('trades', [])
         l1 = [t for t in trades if t.get('layer', 0) == 1]
         if l1:
-            pos['entry_score'] = calculate_entry_score(l1[0], pos)
-            pos['strategy_score'] = calculate_strategy_score(pos)
+            entry_result = calculate_entry_score(pos)
+            pos['entry_score'] = entry_result['score']
+            strategy_result = calculate_strategy_score(pos)
+            pos['strategy_score'] = strategy_result['score']
             pos['final_score'] = pos['entry_score'] * 0.4 + pos['strategy_score'] * 0.6
         else:
             pos['entry_score'] = 0
@@ -89,7 +91,7 @@ def main():
 
     # 6. Equity curve
     print("\n[6/7] 收益曲線...")
-    curve = generate_equity_curve(positions)
+    curve = calculate_equity_curve(positions)
     print(f"   ✓ {len(curve)} 個數據點")
 
     # 7. Generate report
