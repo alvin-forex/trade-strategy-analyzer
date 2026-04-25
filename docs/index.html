@@ -1304,6 +1304,9 @@ async function analyze() {
     // Fire-and-forget market regime loading (async, non-blocking)
     loadMarketRegime(positions);
 
+    // === Auto-save to local API (fire-and-forget) ===
+    _autoSaveToAPI(positions, overall, layerStats, symbolStats, setParams);
+
   } catch(e) {
     $('error').textContent='❌ 錯誤：'+e.message;
     $('error').style.display='block';
@@ -4004,6 +4007,98 @@ function saveCurrentArchive() {
   const positions = window._positions;
   if (!positions || !positions.length) { alert('❌ 沒有分析結果可存檔'); return; }
   _doSaveArchive(positions, false);
+}
+
+// === Auto-save to local API ===
+function _autoSaveToAPI(positions, overall, layerStats, setParams) {
+  if (!positions || !positions.length || !overall) return;
+
+  // Build payload matching history_manager.py expected format
+  const gradeDist = { A: 0, B: 0, C: 0, D: 0 };
+  let sumEntry = 0, sumStrategy = 0, sumFinal = 0;
+  positions.forEach(p => {
+    if (p._finalScore) {
+      const g = gradeOf(p._finalScore.score);
+      gradeDist[g]++;
+      sumEntry += p._entryScore ? p._entryScore.score : 0;
+      sumStrategy += p._strategyScore ? p._strategyScore.score : 0;
+      sumFinal += p._finalScore.score;
+    }
+  });
+  const n = positions.length || 1;
+
+  // Signal ID from CSV filename
+  let signalId = '';
+  if (typeof csvFile !== 'undefined' && csvFile) {
+    const m = csvFile.name.match(/(\d+)/);
+    if (m) signalId = m[1];
+  }
+
+  // EA + pair from SET
+  let eaName = '', pairName = '';
+  if (typeof setFiles !== 'undefined' && setFiles.length > 0) {
+    const sm = setFiles[0].name.match(/^(\w+?)_v[\d.]+_(\w+)/);
+    if (sm) { eaName = sm[1]; pairName = sm[2]; }
+  }
+  if (!pairName && positions.length) {
+    const syms = [...new Set(positions.map(p => p.symbol))];
+    pairName = syms.length === 1 ? syms[0] : syms.slice(0, 2).join('+');
+  }
+
+  // Symbol-level stats
+  const symStats = [];
+  if (typeof symbolStats === 'object' && symbolStats) {
+    for (const [sym, ss] of Object.entries(symbolStats)) {
+      symStats.push({
+        symbol: sym, positions: ss.totalPositions || 0,
+        win_rate: +(ss.winRate || 0).toFixed(1),
+        avg_profit: +(ss.totalProfit || 0).toFixed(2),
+        profit_factor: +(ss.profitFactor || 0).toFixed(2),
+        max_dd: +(ss.maxDD || 0).toFixed(2)
+      });
+    }
+  }
+
+  const payload = {
+    signal_id: signalId,
+    ea_name: eaName,
+    pair: pairName,
+    csv_filename: (typeof csvFile !== 'undefined' && csvFile) ? csvFile.name : '',
+    analysis_date: new Date().toISOString().slice(0, 10),
+    total_positions: overall.totalPositions,
+    total_trades: overall.totalTrades,
+    win_rate: +overall.winRate.toFixed(1),
+    profit_factor: +overall.profitFactor.toFixed(2),
+    total_profit: +overall.totalProfit.toFixed(2),
+    max_dd: +overall.maxDD.toFixed(2),
+    max_dd_percent: +overall.maxDDpct.toFixed(1),
+    avg_layers: +overall.avgLayers.toFixed(2),
+    avg_holding_minutes: +(overall.avgHolding * 60).toFixed(0),
+    sharpe: +(overall.sharpe || 0).toFixed(2),
+    l1_only_ratio: +(layerStats && layerStats._health ? layerStats._health.l1onlyRatio : 0).toFixed(1),
+    l4_plus_ratio: +(layerStats && layerStats._health ? layerStats._health.l4plusRatio : 0).toFixed(1),
+    l4_recovery_rate: +(layerStats && layerStats['L4+'] ? layerStats['L4+'].recoveryRate : 0).toFixed(1),
+    entry_score_avg: +(sumEntry / n).toFixed(1),
+    strategy_score_avg: +(sumStrategy / n).toFixed(1),
+    final_score_avg: +(sumFinal / n).toFixed(1),
+    grade_a_count: gradeDist.A,
+    grade_b_count: gradeDist.B,
+    grade_c_count: gradeDist.C,
+    grade_d_count: gradeDist.D,
+    symbol_stats: symStats
+  };
+
+  // Fire-and-forget POST to local API
+  const urls = ['http://localhost:8787/api/save', 'http://127.0.0.1:8787/api/save'];
+  urls.forEach(url => {
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => {
+      if (d.ok) console.log('[History] Saved #' + d.id);
+    }).catch(() => {}); // Silent fail — local API may not be running
+  });
 }
 
 function _doSaveArchive(positions, isAuto) {
