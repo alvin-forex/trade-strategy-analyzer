@@ -355,6 +355,8 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-direction">↔️ 方向分析</div>
     <div class="tab" data-tab="tab-market">🌐 市場語境</div>
     <div class="tab" data-tab="tab-regime">🔄 市況×策略</div>
+    <div class="tab" data-tab="tab-compare">⚖️ 策略對比</div>
+    <div class="tab" data-tab="tab-symbol-drill">🔍 貨幣穿透</div>
     <div class="tab" data-tab="tab-copy">🏆 Copy 推薦</div>
     <div class="tab" data-tab="tab-volatility">📏 波幅分析</div>
     <div class="tab" data-tab="tab-martin">🎲 馬丁風險</div>
@@ -413,6 +415,24 @@ svg text { font-family: -apple-system, sans-serif; }
     <div id="regimeContent"><div class="mc-loading">載入市況數據中...</div></div>
   </div>
 
+  <div class="card tab-panel" id="tab-compare">
+    <h2><span class="icon">⚖️</span> 策略對比分析</h2>
+    <div id="compareContent"><p style="color:#999;padding:20px">請上載第二份 CSV 以啟用對比分析</p></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-symbol-drill">
+    <h2><span class="icon">🔍</span> 貨幣對穿透分析</h2>
+    <div id="symbolDrillContent">
+      <div style="padding:16px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="symbolDrillInput" type="text" placeholder="輸入貨幣對（如 EURCHF）" style="flex:1;min-width:200px;padding:10px 14px;border:2px solid #c0c8d8;border-radius:8px;font-size:1em">
+          <button class="btn btn-primary" onclick="searchSymbolDrill()">🔍 搜尋</button>
+        </div>
+        <div id="symbolDrillResults" style="margin-top:16px"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="card tab-panel" id="tab-volatility">
     <h2><span class="icon">📏</span> 波幅適配分析</h2>
     <div id="volatilityAnalysis"><div class="mc-loading">計算中...</div></div>
@@ -459,7 +479,7 @@ svg text { font-family: -apple-system, sans-serif; }
 
 <script>
 // === App Version ===
-const APP_VERSION = 'v3.6';
+const APP_VERSION = 'v3.7';
 const APP_VERSION_DATE = '2026-04-25';
 
 // === Helpers ===
@@ -1222,6 +1242,8 @@ async function analyze() {
     prog.style.width='50%';
 
     const positions = buildPositions(trades);
+    window._lastAnalyzedPositions = positions;
+    if (!window._csv1Label && csvFile) window._csv1Label = csvFile.name.replace(/\.csv$/i,'');
     prog.style.width='60%';
 
     // Score every position
@@ -1306,6 +1328,26 @@ async function analyze() {
 
     // === Auto-save to local API (fire-and-forget) ===
     _autoSaveToAPI(positions, overall, layerStats, symbolStats, setParams);
+
+    // === Load CSV2 and render compare tab (if available) ===
+    if (csv2File && !window._csv2Text) {
+      window._csv2Text = await readFile(csv2File);
+      window._csv2Label = csv2File.name.replace(/\.csv$/i, '');
+    }
+    if (window._csv2Text) {
+      try {
+        const trades2 = parseCSV(window._csv2Text);
+        const positions2 = buildPositions(trades2);
+        positions2.forEach(p => {
+          const e2 = calcEntryScore(p);
+          const s2 = calcStrategyScore(p);
+          p._entryScore = e2;
+          p._strategyScore = s2;
+          p._finalScore = calcFinalScore(e2.score, s2.score);
+        });
+        renderCompareTab(positions, positions2);
+      } catch(e2) { console.warn('CSV2 compare failed:', e2); }
+    }
 
   } catch(e) {
     $('error').textContent='❌ 錯誤：'+e.message;
@@ -3949,6 +3991,308 @@ async function loadMarketContext(positions) {
 
 
 // === Download Report ===
+// === ⚖️ Compare Tab ===
+function renderCompareTab(positions1, positions2) {
+  const stats1 = calcStats(positions1);
+  const stats2 = calcStats(positions2);
+  const sym1 = calcSymbolStats(positions1);
+  const sym2 = calcSymbolStats(positions2);
+  const layer1 = calcLayerStats(positions1);
+  const layer2 = calcLayerStats(positions2);
+  const grade1 = calcCopyGrade(stats1);
+  const grade2 = calcCopyGrade(stats2);
+  const label1 = window._csv1Label || (csvFile ? csvFile.name.replace(/\.csv$/i,'') : 'CSV-A');
+  const label2 = window._csv2Label || 'CSV-B';
+  const sigId1 = csvFile ? (csvFile.name.match(/\d+/)||['?'])[0] : '?';
+  const sigId2 = csv2File ? (csv2File.name.match(/\d+/)||['?'])[0] : '?';
+
+  function diffCell(v1, v2, fmtFn, higherBetter) {
+    const d = v2 - v1;
+    if (Math.abs(d) < 0.001) return '<span style="color:#999">—</span>';
+    const better = higherBetter ? (d > 0) : (d < 0);
+    const color = better ? 'var(--green)' : 'var(--red)';
+    const prefix = d > 0 ? '+' : '';
+    return `<span style="color:${color};font-weight:600">${prefix}${fmtFn ? fmtFn(d) : d.toFixed(2)}</span>`;
+  }
+
+  let html = '';
+
+  // Labels
+  html += '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">';
+  html += `<div style="padding:8px 16px;background:#eef5ff;border-radius:8px;font-weight:600">🅰️ <input value="${label1}" onchange="window._csv1Label=this.value" style="border:none;background:transparent;font-weight:600;color:var(--primary);width:140px"></div>`;
+  html += `<div style="padding:8px 16px;background:#f3e8ff;border-radius:8px;font-weight:600">🅱️ <input value="${label2}" onchange="window._csv2Label=this.value" style="border:none;background:transparent;font-weight:600;color:#7d3c98;width:140px"></div>`;
+  html += '</div>';
+
+  // A. Overview Comparison
+  html += '<h3 style="color:var(--primary)">📊 總覽對比</h3>';
+  html += '<div class="table-wrap"><table class="data-table">';
+  html += `<tr><th>指標</th><th style="color:var(--primary)">${label1}</th><th style="color:#7d3c98">${label2}</th><th>差異</th></tr>`;
+
+  const rows = [
+    ['Signal ID', sigId1, sigId2, null],
+    ['倉位數', stats1.totalPositions, stats2.totalPositions, true],
+    ['交易筆數', positions1.length, positions2.length, true],
+    ['勝率', pct(stats1.winRate), pct(stats2.winRate), null],
+    ['Profit Factor', fmt(stats1.profitFactor), fmt(stats2.profitFactor), null],
+    ['總盈虧', fmtMoney(stats1.totalProfit), fmtMoney(stats2.totalProfit), null],
+    ['Max DD', fmtMoney(stats1.maxDD), fmtMoney(stats2.maxDD), null],
+    ['Sharpe', fmt(stats1.sharpe), fmt(stats2.sharpe), null],
+    ['平均層數', fmt(stats1.avgLayers||0,1), fmt(stats2.avgLayers||0,1), null],
+    ['Copy Grade', grade1.stars+' '+grade1.label, grade2.stars+' '+grade2.label, null],
+  ];
+  rows.forEach(r => {
+    html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3] !== null ? '' : '—'}</td></tr>`;
+  });
+  html += '</table></div>';
+
+  // B. Symbol Cross-Comparison
+  const allSymbols = new Set([...Object.keys(sym1), ...Object.keys(sym2)]);
+  const commonSymbols = [...allSymbols].sort();
+  html += '<h3 style="color:var(--primary);margin-top:24px">💱 貨幣對交叉對比</h3>';
+  html += '<div class="table-wrap"><table class="data-table">';
+  html += `<tr><th>貨幣對</th><th style="color:var(--primary)">A 倉位</th><th style="color:var(--primary)">A WR</th><th style="color:var(--primary)">A PF</th><th style="color:var(--primary)">A 盈虧</th><th style="color:#7d3c98">B 倉位</th><th style="color:#7d3c98">B WR</th><th style="color:#7d3c98">B PF</th><th style="color:#7d3c98">B 盈虧</th><th>優勢</th></tr>`;
+  commonSymbols.forEach(sym => {
+    const a = sym1[sym], b = sym2[sym];
+    const inA = !!a, inB = !!b;
+    const rowStyle = (inA && inB) ? '' : 'style="opacity:0.6"';
+    html += `<tr ${rowStyle}>`;
+    html += `<td><b>${sym}</b></td>`;
+    if (a) {
+      html += `<td>${a.totalPositions}</td><td>${pct(a.winRate)}</td><td>${fmt(a.profitFactor)}</td><td style="color:${a.totalProfit>=0?'var(--green)':'var(--red)'}">${fmtMoney(a.totalProfit)}</td>`;
+    } else {
+      html += '<td colspan="4" style="color:#ccc">—</td>';
+    }
+    if (b) {
+      html += `<td>${b.totalPositions}</td><td>${pct(b.winRate)}</td><td>${fmt(b.profitFactor)}</td><td style="color:${b.totalProfit>=0?'var(--green)':'var(--red)'}">${fmtMoney(b.totalProfit)}</td>`;
+    } else {
+      html += '<td colspan="4" style="color:#ccc">—</td>';
+    }
+    // Advantage
+    let adv = '—';
+    if (inA && inB) {
+      const profitDiff = (b.totalProfit||0) - (a.totalProfit||0);
+      if (Math.abs(profitDiff) < 0.01) adv = '打和';
+      else if (profitDiff > 0) adv = '<span style="color:#7d3c98;font-weight:600">B 勝</span>';
+      else adv = '<span style="color:var(--primary);font-weight:600">A 勝</span>';
+    } else if (inA) adv = '<span style="color:var(--primary)">僅 A</span>';
+    else adv = '<span style="color:#7d3c98">僅 B</span>';
+    html += `<td>${adv}</td></tr>`;
+  });
+  html += '</table></div>';
+
+  // C. Layer Distribution Comparison
+  html += '<h3 style="color:var(--primary);margin-top:24px">📚 層數分佈對比</h3>';
+  const layerKeys = ['L1', 'L2', 'L3', 'L4+'];
+  html += '<div style="display:flex;gap:24px;flex-wrap:wrap">';
+  html += '<div style="flex:1;min-width:280px"><h4 style="color:var(--primary)">🅰️ ' + label1 + '</h4>';
+  html += renderMiniLayerBar(layer1, 'var(--primary)');
+  html += '</div>';
+  html += '<div style="flex:1;min-width:280px"><h4 style="color:#7d3c98">🅱️ ' + label2 + '</h4>';
+  html += renderMiniLayerBar(layer2, '#7d3c98');
+  html += '</div></div>';
+
+  // D. Symbol Filter
+  html += '<h3 style="color:var(--primary);margin-top:24px">🔎 貨幣對篩選器</h3>';
+  html += '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">';
+  html += '<input id="compareSymbolFilter" type="text" placeholder="輸入貨幣對（如 EURCHF）" style="flex:1;padding:8px 12px;border:2px solid #c0c8d8;border-radius:8px">';
+  html += '<button class="btn btn-primary" onclick="renderCompareFilter()">篩選</button>';
+  html += '</div>';
+  html += '<div id="compareFilterResults"></div>';
+
+  $('compareContent').innerHTML = html;
+}
+
+function renderMiniLayerBar(layerStats, color) {
+  const keys = ['L1','L2','L3','L4+'];
+  let maxVal = 0;
+  keys.forEach(k => { if (layerStats[k]) maxVal = Math.max(maxVal, layerStats[k].count || 0); });
+  if (maxVal === 0) return '<p style="color:#999">無數據</p>';
+  let html = '<div style="display:flex;align-items:flex-end;gap:8px;height:80px;padding-top:8px">';
+  keys.forEach(k => {
+    const s = layerStats[k];
+    const val = s ? s.count : 0;
+    const h = maxVal > 0 ? (val / maxVal * 60) : 0;
+    html += `<div style="text-align:center;flex:1">`;
+    html += `<div style="font-size:0.75em;margin-bottom:2px">${val}</div>`;
+    html += `<div style="height:${Math.max(h,2)}px;background:${color};border-radius:4px 4px 0 0;transition:height 0.3s"></div>`;
+    html += `<div style="font-size:0.7em;margin-top:4px;color:#666">${k}</div>`;
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderCompareFilter() {
+  const sym = ($('compareSymbolFilter').value || '').toUpperCase().trim();
+  const el = $('compareFilterResults');
+  if (!sym || sym.length < 6) { el.innerHTML = '<p style="color:#999">請輸入完整貨幣對代碼（如 EURCHF）</p>'; return; }
+
+  // Get current CSV1 positions
+  if (!csvFile) { el.innerHTML = '<p style="color:#999">請先載入並分析主 CSV</p>'; return; }
+  const positions1 = window._lastAnalyzedPositions || [];
+  const positions2 = [];
+  if (window._csv2Text) {
+    try {
+      const t2 = parseCSV(window._csv2Text);
+      const p2 = buildPositions(t2);
+      positions2.push(...p2);
+    } catch(e) {}
+  }
+
+  const filterA = positions1.filter(p => p.symbol === sym);
+  const filterB = positions2.filter(p => p.symbol === sym);
+  const label1 = window._csv1Label || 'CSV-A';
+  const label2 = window._csv2Label || 'CSV-B';
+
+  if (filterA.length === 0 && filterB.length === 0) {
+    el.innerHTML = `<p style="color:#999">兩份 CSV 中均未找到 ${sym} 的倉位</p>`;
+    return;
+  }
+
+  let html = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
+
+  // CSV-A positions
+  html += '<div style="flex:1;min-width:300px">';
+  html += `<h4 style="color:var(--primary)">🅰️ ${label1} — ${sym}（${filterA.length} 倉位）</h4>`;
+  if (filterA.length > 0) {
+    const s = calcStats(filterA);
+    html += `<div style="font-size:0.85em;margin-bottom:8px">勝率 ${pct(s.winRate)} · PF ${fmt(s.profitFactor)} · 盈虧 ${fmtMoney(s.totalProfit)}</div>`;
+    html += renderMiniPosTable(filterA);
+  } else {
+    html += '<p style="color:#ccc">—</p>';
+  }
+  html += '</div>';
+
+  // CSV-B positions
+  html += '<div style="flex:1;min-width:300px">';
+  html += `<h4 style="color:#7d3c98">🅱️ ${label2} — ${sym}（${filterB.length} 倉位）</h4>`;
+  if (filterB.length > 0) {
+    const s = calcStats(filterB);
+    html += `<div style="font-size:0.85em;margin-bottom:8px">勝率 ${pct(s.winRate)} · PF ${fmt(s.profitFactor)} · 盈虧 ${fmtMoney(s.totalProfit)}</div>`;
+    html += renderMiniPosTable(filterB);
+  } else {
+    html += '<p style="color:#ccc">—</p>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function renderMiniPosTable(positions) {
+  let html = '<div class="table-wrap" style="max-height:300px;overflow-y:auto"><table class="data-table" style="font-size:0.8em">';
+  html += '<tr><th>開倉時間</th><th>方向</th><th>層數</th><th>盈虧</th><th>Pips</th></tr>';
+  positions.slice(0, 50).forEach(p => {
+    const profit = p.profit || 0;
+    const pips = p.pips || 0;
+    html += `<tr><td>${fmtDateShort(p.open_time)}</td><td>${p.direction||'?'}</td><td>L${p.max_layer||1}</td><td style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtMoney(profit)}</td><td>${pips.toFixed(1)}</td></tr>`;
+  });
+  html += '</table></div>';
+  return html;
+}
+
+// === 🔍 Symbol Drill ===
+async function searchSymbolDrill() {
+  const sym = ($('symbolDrillInput').value || '').toUpperCase().trim();
+  const el = $('symbolDrillResults');
+  if (!sym || sym.length < 6) {
+    el.innerHTML = '<p style="color:#999">請輸入完整貨幣對代碼（如 EURCHF）</p>';
+    return;
+  }
+  el.innerHTML = '<div class="mc-loading">搜尋中...</div>';
+
+  // 1. Search local API
+  let apiResults = [];
+  try {
+    const resp = await fetch('http://localhost:8787/api/list?limit=100');
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.records) {
+        data.records.forEach(rec => {
+          let symStats = null;
+          try { symStats = typeof rec.symbols_summary === 'string' ? JSON.parse(rec.symbols_summary) : rec.symbols_summary; } catch(e) {}
+          if (symStats && symStats[sym]) {
+            const s = symStats[sym];
+            apiResults.push({
+              signal_id: rec.signal_id,
+              ea: rec.ea_name,
+              date: rec.analysis_date || rec.created_at,
+              positions: s.totalPositions,
+              winRate: s.winRate,
+              pf: s.profitFactor,
+              profit: s.totalProfit,
+              avgLayers: s.avgLayers,
+              grade: s._grade || '—'
+            });
+          }
+        });
+      }
+    }
+  } catch(e) {
+    console.warn('API not available:', e);
+  }
+
+  // 2. Current CSV data
+  const currentPositions = (window._lastAnalyzedPositions || []).filter(p => p.symbol === sym);
+
+  // 3. Render
+  renderSymbolDrillResults(el, sym, apiResults, currentPositions);
+}
+
+function renderSymbolDrillResults(el, symbol, apiResults, currentPositions) {
+  let html = '';
+
+  // Current CSV analysis
+  if (currentPositions.length > 0) {
+    const s = calcStats(currentPositions);
+    html += '<div style="background:#f0faf3;border-radius:10px;padding:16px;margin-bottom:16px">';
+    html += `<h3 style="color:var(--green);margin:0 0 8px">📊 當前 CSV — ${symbol}（${currentPositions.length} 倉位）</h3>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">`;
+    html += statBox(pct(s.winRate), '勝率', 'green');
+    html += statBox(fmt(s.profitFactor), 'PF', 'green');
+    html += statBox(fmtMoney(s.totalProfit), '總盈虧', s.totalProfit >= 0 ? 'green' : 'red');
+    html += statBox(fmt(s.avgLayers||0,1), '平均層數', 'neutral');
+    html += statBox(fmt(s.sharpe), 'Sharpe', 'neutral');
+    html += statBox(fmtMoney(s.maxDD), 'Max DD', 'red');
+    html += '</div></div>';
+  }
+
+  // API History
+  if (apiResults.length > 0) {
+    html += '<h3 style="color:var(--primary)">📁 歷史記錄（${apiResults.length} 筆）</h3>';
+    html += '<div class="table-wrap"><table class="data-table">';
+    html += '<tr><th>Signal</th><th>EA</th><th>日期</th><th>倉位數</th><th>勝率</th><th>PF</th><th>盈虧</th><th>平均層數</th></tr>';
+    apiResults.forEach(r => {
+      html += '<tr>';
+      html += `<td><b>${r.signal_id}</b></td>`;
+      html += `<td>${r.ea || '—'}</td>`;
+      html += `<td>${(r.date||'').slice(0,10)}</td>`;
+      html += `<td>${r.positions}</td>`;
+      html += `<td>${pct(r.winRate)}</td>`;
+      html += `<td>${fmt(r.pf)}</td>`;
+      html += `<td style="color:${(r.profit||0)>=0?'var(--green)':'var(--red)'}">${fmtMoney(r.profit)}</td>`;
+      html += `<td>${fmt(r.avgLayers||0,1)}</td>`;
+      html += '</tr>';
+    });
+    html += '</table></div>';
+  } else if (currentPositions.length === 0) {
+    html += '<div style="text-align:center;padding:24px;color:#999">';
+    html += '<div style="font-size:2em;margin-bottom:8px">🔍</div>';
+    html += `<div>未找到 ${symbol} 的分析記錄</div>`;
+    html += '<div style="font-size:0.85em;margin-top:4px">提示：上載更多 CSV 並分析後，數據會自動累積到歷史記錄</div>';
+    html += '</div>';
+  }
+
+  // API status
+  if (apiResults.length === 0 && currentPositions.length === 0) {
+    html += '<div style="background:#fff3e0;border-radius:8px;padding:12px;margin-top:12px;font-size:0.85em;color:#e65100">';
+    html += '⚠️ 本地 API 未連接或無數據。如需查詢歷史記錄，請確保 api_server.py 運行中（localhost:8787）。';
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
 function downloadReport() {
   // Generate self-contained report HTML on-the-fly
   const reportHTML = '<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Trade Strategy Analysis Report</title><style>' +
