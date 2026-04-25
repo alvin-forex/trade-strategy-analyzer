@@ -689,7 +689,12 @@ function buildPositions(trades) {
     const totalCommission = group.reduce((s,x)=>s+x._commission,0);
     const openTime = Math.min(...group.map(x=>x._openTime.getTime()));
     const closeTime = Math.max(...group.map(x=>x._closeTime.getTime()));
-    const holdingHours = (closeTime - openTime) / 3600000;
+    let holdingHours = (closeTime - openTime) / 3600000;
+    // Fallback: if calculated holding is negative (MT4 data anomaly), use CSV's Holding Time (Hours)
+    if (holdingHours < 0) {
+      holdingHours = group.reduce((s,x) => s + x._holdingHours, 0) / group.length;
+    }
+    holdingHours = Math.max(0, holdingHours);
 
     positions.push({
       symbol: t.Symbol,
