@@ -320,6 +320,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-symbol">💱 貨幣對</div>
     <div class="tab" data-tab="tab-layer">📚 層數分析</div>
     <div class="tab" data-tab="tab-session">🕐 時段分析</div>
+    <div class="tab" data-tab="tab-holding">⏱️ 持倉時間</div>
     <div class="tab" data-tab="tab-direction">↔️ 方向分析</div>
     <div class="tab" data-tab="tab-market">🌐 市場語境</div>
     <div class="tab" data-tab="tab-copy">🏆 Copy 推薦</div>
@@ -357,6 +358,11 @@ svg text { font-family: -apple-system, sans-serif; }
     <h2><span class="icon">🕐</span> 時段分析</h2>
     <div id="sessionChart"></div>
     <div id="sessionTable"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-holding">
+    <h2><span class="icon">⏱️</span> 持倉時間分析</h2>
+    <div id="holdingChart"></div>
   </div>
 
   <div class="card tab-panel" id="tab-direction">
@@ -1196,7 +1202,10 @@ async function analyze() {
     renderScoreSection(positions);
     renderSymbolTable(symbolStats);
     renderLayerSection(layerStats);
-    renderSessionSection(sessionStats);
+    const hourlyStats = calcHourlyStats(positions);
+    renderSessionSection(sessionStats, hourlyStats);
+    const holdingStats = calcHoldingStats(positions);
+    renderHoldingSection(holdingStats);
     renderDirectionSection(dirStats);
     // Copy Trade Matrix
     const copyMatrixData = calcSymbolLayerMatrix(positions);
@@ -1258,7 +1267,7 @@ function renderStats(s) {
     {val:fmtMoney(s.maxDD), lbl:'Max DD', cls:'negative'},
     {val:pct(s.maxDDpct), lbl:'Max DD%'},
     {val:fmt(s.avgLayers,1), lbl:'平均層數'},
-    {val:fmt(s.avgHolding,0)+'h', lbl:'平均持倉'},
+    {val:fmt(s.avgHolding*60,0)+'m', lbl:'平均持倉'},
     {val:fmtMoney(s.avgWin), lbl:'平均盈利'},
     {val:fmtMoney(s.avgLoss), lbl:'平均虧損'},
     {val:fmt(s.avgWLRatio), lbl:'賠率 W/L'},
@@ -1414,8 +1423,8 @@ function renderLayerSection(ls) {
   $('layerTable').innerHTML = '';
 }
 
-function renderSessionSection(ss) {
-  const info = infoToggle('session-analysis', '<b>🕐 時段分析</b><br>根據倉位開倉時間（HKT）劃分為四個時段：<br><b>亞洲盤</b> 00:00–08:00 · <b>歐洲盤</b> 14:00–22:00 · <b>美洲盤</b> 21:00–05:00（亞洲盤優先匹配 0-4 時）· <b>其他</b>（剩餘時段）。<br>💡 可找出策略喺邊個交易時段表現最好，從而優化開市時間或調整參數。');
+function renderSessionSection(ss, hourly) {
+  const info = infoToggle('session-analysis', '<b>🕐 時段分析</b><br>根據倉位開倉時間（HKT）劃分為四個時段：<br><b>亞洲盤</b> 00:00–08:00 · <b>歐洲盤</b> 14:00–22:00 · <b>美洲盤</b> 21:00–05:00（亞洲盤優先匹配 0-4 時）· <b>其他</b>（剩餘時段）。<br>💡 下方 24 小時棒型圖逐小時顯示盈虧，一眼睇到邊個鐘數最賺錢。');
   const barData = Object.entries(ss).map(([name,d]) => ({
     label: name, value: d.avgProfit,
     color: name==='亞洲盤'?'#28a745':name==='歐洲盤'?'#0f3460':name==='美洲盤'?'#e94560':'#999'
@@ -1433,8 +1442,131 @@ function renderSessionSection(ss) {
   });
   html += '</table></div></div>';
 
+  // 24h hourly bar chart
+  html += '<h3 style="margin:20px 0 12px;color:var(--primary)">📊 24 小時盈虧分佈（逐小時）</h3>';
+  const hBarData = [];
+  for(let h=0;h<24;h++) {
+    const d = hourly[h];
+    const sessionColor = (h<8)?'#28a745':(h>=14&&h<22)?'#0f3460':(h>=21||h<5)?'#e94560':'#999';
+    hBarData.push({
+      label: String(h).padStart(2,'0'),
+      value: d.avgProfit,
+      color: d.count ? (d.avgProfit>=0 ? sessionColor : '#dc3545') : '#e8ecf0'
+    });
+  }
+  html += '<div class="chart-box">' + makeBarSVG(hBarData) + '</div>';
+
+  // Hourly detail table
+  html += '<div class="table-wrap" style="margin-top:12px"><table style="font-size:0.82em">';
+  html += '<tr><th>小時</th><th>時段</th><th>倉位</th><th>平均盈虧</th><th>總盈虧</th><th>勝率</th></tr>';
+  for(let h=0;h<24;h++) {
+    const d = hourly[h];
+    if(!d.count) continue;
+    const sessName = (h<8)?'亞洲盤':(h>=14&&h<22)?'歐洲盤':(h>=21||h<5)?'美洲盤':'其他';
+    html += `<tr><td><strong>${String(h).padStart(2,'0')}:00</strong></td><td>${sessName}</td><td>${d.count}</td>`;
+    html += `<td style="color:${d.avgProfit>=0?'var(--green)':'var(--red)'}">${fmtMoney(d.avgProfit)}</td>`;
+    html += `<td style="color:${d.totalProfit>=0?'var(--green)':'var(--red)'}">${fmtMoney(d.totalProfit)}</td>`;
+    html += `<td>${pct(d.winRate)}</td></tr>`;
+  }
+  html += '</table></div>';
+
   $('sessionChart').innerHTML = html;
   $('sessionTable').innerHTML = '';
+}
+
+// === Hourly Stats ===
+function calcHourlyStats(positions) {
+  const hours = {};
+  for(let h=0;h<24;h++) hours[h]={count:0, profits:[], wins:0};
+  positions.forEach(p => {
+    const h = p.open_time.getHours();
+    hours[h].count++;
+    hours[h].profits.push(p.net_profit);
+    if(p.net_profit > 0) hours[h].wins++;
+  });
+  const result = {};
+  for(let h=0;h<24;h++) {
+    const d = hours[h];
+    result[h] = {
+      count: d.count,
+      avgProfit: d.count ? d.profits.reduce((s,v)=>s+v,0)/d.count : 0,
+      winRate: d.count ? d.wins/d.count*100 : 0,
+      totalProfit: d.profits.reduce((s,v)=>s+v,0)
+    };
+  }
+  return result;
+}
+
+// === Holding Time Stats ===
+function calcHoldingStats(positions) {
+  const groups = {
+    '<30m': p => p.holding_time_hours < 0.5,
+    '30m-1h': p => p.holding_time_hours >= 0.5 && p.holding_time_hours < 1,
+    '1-4h': p => p.holding_time_hours >= 1 && p.holding_time_hours < 4,
+    '4-12h': p => p.holding_time_hours >= 4 && p.holding_time_hours < 12,
+    '12h+': p => p.holding_time_hours >= 12
+  };
+  const total = positions.length;
+  const result = {};
+  for(const [name, fn] of Object.entries(groups)) {
+    const subset = positions.filter(fn);
+    const profits = subset.map(p=>p.net_profit);
+    const wins = profits.filter(p=>p>0);
+    result[name] = {
+      count: subset.length,
+      pct: total ? (subset.length/total*100) : 0,
+      avgProfit: subset.length ? profits.reduce((s,v)=>s+v,0)/subset.length : 0,
+      winRate: subset.length ? wins.length/subset.length*100 : 0,
+      avgHoldingMin: subset.length ? subset.reduce((s,p)=>s+p.holding_time_hours,0)/subset.length*60 : 0
+    };
+  }
+  const allMin = positions.map(p=>p.holding_time_hours*60).sort((a,b)=>a-b);
+  result._overall = {
+    avg: allMin.length ? allMin.reduce((s,v)=>s+v,0)/allMin.length : 0,
+    median: allMin.length ? allMin[Math.floor(allMin.length/2)] : 0,
+    p10: allMin.length ? allMin[Math.floor(allMin.length*0.1)] : 0,
+    p90: allMin.length ? allMin[Math.floor(allMin.length*0.9)] : 0,
+    min: allMin.length ? allMin[0] : 0,
+    max: allMin.length ? allMin[allMin.length-1] : 0
+  };
+  return result;
+}
+
+function renderHoldingSection(hs) {
+  const info = infoToggle('holding-time', '<b>⏱️ 持倉時間分析</b><br>將每個倉位嘅持倉時間（分鐘）分段統計，睇下策略喺唔同持倉時間嘅表現。<br>💡 如果短持倉（<30m）勝率特別高，可能策略適合短線；如果長持倉（12h+）表現差，可能需要調整出場邏輯或 DollarMode Trail 參數。');
+  const colors = ['#28a745','#17a2b8','#0f3460','#fd7e14','#dc3545'];
+  const keys = ['<30m','30m-1h','1-4h','4-12h','12h+'];
+  let html = info;
+
+  const ov = hs._overall;
+  html += '<div class="stats-grid" style="margin-bottom:16px">';
+  html += statBox(fmt(ov.avg,0)+'m', '平均持倉', '');
+  html += statBox(fmt(ov.median,0)+'m', '中位數持倉', '');
+  html += statBox(fmt(ov.p10,0)+'m', 'P10 持倉', '');
+  html += statBox(fmt(ov.p90,0)+'m', 'P90 持倉', '');
+  html += statBox(fmt(ov.min,0)+'m', '最短', '');
+  html += statBox(fmt(ov.max,0)+'m', '最長', '');
+  html += '</div>';
+
+  const barData = keys.map((k,i) => ({ label: k, value: hs[k].avgProfit, color: colors[i] }));
+  html += '<div class="chart-row">';
+  html += '<div class="chart-box"><h3>分段平均盈虧</h3>' + makeBarSVG(barData) + '</div>';
+  const donutData = keys.map((k,i) => ({ label: k, value: hs[k].count, color: colors[i] })).filter(d=>d.value>0);
+  html += '<div class="chart-box"><h3>持倉分佈</h3>' + makeDonutSVG(donutData) + '</div>';
+  html += '</div>';
+
+  html += '<div class="table-wrap" style="margin-top:12px"><table>';
+  html += '<tr><th>持倉時間</th><th>倉位數</th><th>佔比</th><th>平均盈虧</th><th>勝率</th><th>平均持倉</th></tr>';
+  keys.forEach((k,i) => {
+    const d = hs[k];
+    html += `<tr><td><strong>${k}</strong></td><td>${d.count}</td><td>${pct(d.pct)}</td>`;
+    html += `<td style="color:${d.avgProfit>=0?'var(--green)':'var(--red)'}">${fmtMoney(d.avgProfit)}</td>`;
+    html += `<td>${pct(d.winRate)}</td>`;
+    html += `<td>${fmt(d.avgHoldingMin,0)}m</td></tr>`;
+  });
+  html += '</table></div>';
+
+  $('holdingChart').innerHTML = html;
 }
 
 function renderDirectionSection(ds) {
@@ -1477,7 +1609,7 @@ function renderPositionTable(positions) {
     {key:'_strategyScore.score', label:'Strategy'},
     {key:'_finalScore.score', label:'Final'},
     {key:'_finalScore.grade', label:'評級'},
-    {key:'holding_time_hours', label:'持倉(h)'},
+    {key:'holding_time_hours', label:'持倉(m)', fmt: v => fmt(v*60,0)},
     {key:'open_time', label:'開倉時間'}
   ];
 
@@ -1500,7 +1632,7 @@ function renderPositionTable(positions) {
     html += `<td>${scoreCell(p._strategyScore.score)}</td>`;
     html += `<td>${scoreCell(p._finalScore.score)}</td>`;
     html += `<td><span class="${gradeClass(p._finalScore.grade)}">${p._finalScore.grade}</span></td>`;
-    html += `<td>${fmt(p.holding_time_hours,1)}</td>`;
+    html += `<td>${fmt(p.holding_time_hours*60,0)}m</td>`;
     html += `<td style="font-size:0.8em">${fmtDate(p.open_time)}</td>`;
     html += `<td><span class="expand-btn" onclick="toggleSubRow(${i})">▼</span></td>`;
     html += '</tr>';
@@ -1556,7 +1688,7 @@ function renderSubDetail(p) {
 
   // Position info
   html += '<div style="margin-top:6px;font-size:0.82em;color:#666">';
-  html += `開倉: ${fmtDate(p.open_time)} | 平倉: ${fmtDate(p.close_time)} | 持倉: ${fmt(p.holding_time_hours,1)}h`;
+  html += `開倉: ${fmtDate(p.open_time)} | 平倉: ${fmtDate(p.close_time)} | 持倉: ${fmt(p.holding_time_hours*60,0)}m`;
   html += ` | Swap: ${fmtMoney(p.total_swap)} | 手續費: ${fmtMoney(p.total_commission)}`;
   html += ` | L1 Max Pips: ${fmt(p.l1_max_pips,1)} | L1 Max Loss Pips: ${fmt(p.l1_max_loss_pips,1)}`;
   html += '</div>';
