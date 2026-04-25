@@ -26,10 +26,11 @@ def generate_html_report(
     equity_data = []
     cum_pnl = 0
     for p in positions:
-        cum_pnl += p.get('total_net_profit', 0) or 0
+        pnl = p.get('net_profit', 0) or 0
+        cum_pnl += pnl
         equity_data.append({
             'date': p.get('close_time', '').strftime('%Y-%m-%d %H:%M') if hasattr(p.get('close_time', ''), 'strftime') else str(p.get('close_time', '')),
-            'pnl': p.get('total_net_profit', 0) or 0,
+            'pnl': pnl,
             'cum_pnl': round(cum_pnl, 2)
         })
     
@@ -58,8 +59,9 @@ def generate_html_report(
             <td>{layer_key}</td>
             <td>{s.get('count', 0)}</td>
             <td>{s.get('percentage', 0):.1f}%</td>
-            <td>{s.get('avg_profit', 0):.2f}</td>
+            <td>${s.get('avg_profit', 0):.2f}</td>
             <td>{s.get('win_rate', 0):.1f}%</td>
+            <td>{s.get('profit_factor', 0):.2f}</td>
         </tr>"""
     
     # Time stats
@@ -82,18 +84,23 @@ def generate_html_report(
             <td>{d}</td>
             <td>{s.get('count', 0)}</td>
             <td>{s.get('win_rate', 0):.1f}%</td>
-            <td>{s.get('avg_profit', 0):.2f}</td>
+            <td>${s.get('avg_profit', 0):.2f}</td>
+            <td>{s.get('profit_factor', 0):.2f}</td>
         </tr>"""
     
-    # Top 20 positions detail
+    # Top 50 positions detail
     pos_rows = ""
     for i, p in enumerate(positions[:50]):
-        net = p.get('total_net_profit', 0) or 0
+        net = p.get('net_profit', 0) or 0
         color = '#d4edda' if net > 0 else '#f8d7da'
         sym = p.get('symbol', 'N/A')
         direction = p.get('direction', 'N/A')
-        layers = p.get('layer_count', 0)
+        layers = p.get('max_layer', 0)
         ht = p.get('holding_time_hours', 0) or 0
+        entry_s = p.get('entry_score', 0)
+        strat_s = p.get('strategy_score', 0)
+        final_s = p.get('final_score', 0)
+        grade_color = '#28a745' if final_s >= 80 else ('#ffc107' if final_s >= 60 else ('#fd7e14' if final_s >= 40 else '#dc3545'))
         
         pos_rows += f"""
         <tr style="background:{color}">
@@ -104,6 +111,7 @@ def generate_html_report(
             <td>{p.get('total_lots', 0):.2f}</td>
             <td>{net:.2f}</td>
             <td>{ht:.1f}h</td>
+            <td style="color:{grade_color};font-weight:bold">{final_s:.0f}</td>
         </tr>"""
     
     # SET params summary
@@ -113,6 +121,25 @@ def generate_html_report(
         for k, v in params.items():
             items += f"<tr><td><code>{k}</code></td><td>{v}</td></tr>\n"
         set_summary += f"<h4>{category}</h4><table class='set-table'>{items}</table>"
+    
+    # Grade distribution
+    graded = {'A': 0, 'B': 0, 'C': 0, 'D': 0}
+    for p in positions:
+        s = p.get('final_score', 0)
+        if s >= 80: graded['A'] += 1
+        elif s >= 60: graded['B'] += 1
+        elif s >= 40: graded['C'] += 1
+        else: graded['D'] += 1
+    
+    grade_html = f"""
+    <h2>🏅 質量評分分佈</h2>
+    <div class="summary-grid">
+        <div class="card" style="border-left:4px solid #28a745"><div class="value" style="color:#28a745">{graded['A']}</div><div class="label">A 優質 (≥80)</div></div>
+        <div class="card" style="border-left:4px solid #ffc107"><div class="value" style="color:#ffc107">{graded['B']}</div><div class="label">B 一般 (60-79)</div></div>
+        <div class="card" style="border-left:4px solid #fd7e14"><div class="value" style="color:#fd7e14">{graded['C']}</div><div class="label">C 偏弱 (40-59)</div></div>
+        <div class="card" style="border-left:4px solid #dc3545"><div class="value" style="color:#dc3545">{graded['D']}</div><div class="label">D 差 (<40)</div></div>
+    </div>
+    """
     
     # Equity curve SVG
     equity_svg = generate_equity_svg(equity_data)
@@ -175,6 +202,8 @@ tr:hover {{ opacity: 0.9; }}
 <h2>📈 收益曲線</h2>
 <div class="chart-container">{equity_svg}</div>
 
+{grade_html}
+
 <h2>🏆 貨幣對排名</h2>
 <table>
 <tr><th>貨幣對</th><th>倉位數</th><th>勝率</th><th>PF</th><th>平均盈虧</th><th>Max DD</th><th>平均層數</th></tr>
@@ -183,7 +212,7 @@ tr:hover {{ opacity: 0.9; }}
 
 <h2>📊 層數分析</h2>
 <table>
-<tr><th>層數範圍</th><th>倉位數</th><th>佔比</th><th>平均盈虧</th><th>勝率</th></tr>
+<tr><th>層數範圍</th><th>倉位數</th><th>佔比</th><th>平均盈虧</th><th>勝率</th><th>PF</th></tr>
 {layer_rows}
 </table>
 
@@ -195,13 +224,13 @@ tr:hover {{ opacity: 0.9; }}
 
 <h2>📐 方向分析</h2>
 <table>
-<tr><th>方向</th><th>倉位數</th><th>勝率</th><th>平均盈虧</th></tr>
+<tr><th>方向</th><th>倉位數</th><th>勝率</th><th>平均盈虧</th><th>PF</th></tr>
 {dir_rows}
 </table>
 
 <h2>📋 倉位明細（前 50）</h2>
 <table>
-<tr><th>#</th><th>貨幣對</th><th>方向</th><th>層數</th><th>總手數</th><th>盈虧</th><th>持倉時間</th></tr>
+<tr><th>#</th><th>貨幣對</th><th>方向</th><th>層數</th><th>總手數</th><th>盈虧</th><th>持倉時間</th><th>評分</th></tr>
 {pos_rows}
 </table>
 

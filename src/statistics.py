@@ -188,14 +188,21 @@ def calculate_layer_stats(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
                 'count': 0,
                 'percentage': 0,
                 'avg_profit': 0,
-                'win_rate': 0
+                'win_rate': 0,
+                'profit_factor': 0
             }
+        wins = [p for p in pos_list if p['net_profit'] > 0]
+        losses = [p for p in pos_list if p['net_profit'] <= 0]
+        gross_win = sum(p['net_profit'] for p in wins)
+        gross_loss = abs(sum(p['net_profit'] for p in losses))
+        pf = gross_win / gross_loss if gross_loss > 0 else float('inf')
         return {
             'name': name,
             'count': len(pos_list),
             'percentage': round(len(pos_list) / total * 100, 2),
             'avg_profit': round(np.mean([p['net_profit'] for p in pos_list]), 2),
-            'win_rate': round(len([p for p in pos_list if p['net_profit'] > 0]) / len(pos_list) * 100, 2)
+            'win_rate': round(len(wins) / len(pos_list) * 100, 2),
+            'profit_factor': round(pf, 2)
         }
 
     return {
@@ -222,11 +229,12 @@ def calculate_time_stats(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
         Dict: 時段統計
     """
     def get_session(hour):
+        # HKT hours — Asia first (eats 0-4 that America would also claim)
         if 0 <= hour < 8:
             return 'Asia'
-        elif 14 <= hour < 22:
+        elif 14 <= hour < 21:
             return 'Europe'
-        elif hour >= 21 or hour < 5:
+        elif 21 <= hour <= 23:
             return 'America'
         else:
             return 'Other'
@@ -243,12 +251,19 @@ def calculate_time_stats(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
             return {
                 'count': 0,
                 'avg_profit': 0,
-                'win_rate': 0
+                'win_rate': 0,
+                'profit_factor': 0
             }
+        wins = [p for p in session_positions if p['net_profit'] > 0]
+        losses = [p for p in session_positions if p['net_profit'] <= 0]
+        gross_win = sum(p['net_profit'] for p in wins)
+        gross_loss = abs(sum(p['net_profit'] for p in losses))
+        pf = gross_win / gross_loss if gross_loss > 0 else float('inf')
         return {
             'count': len(session_positions),
             'avg_profit': round(np.mean([p['net_profit'] for p in session_positions]), 2),
-            'win_rate': round(len([p for p in session_positions if p['net_profit'] > 0]) / len(session_positions) * 100, 2)
+            'win_rate': round(len(wins) / len(session_positions) * 100, 2),
+            'profit_factor': round(pf, 2)
         }
 
     return {
@@ -277,12 +292,19 @@ def calculate_direction_stats(positions: List[Dict[str, Any]]) -> Dict[str, Any]
             return {
                 'count': 0,
                 'avg_profit': 0,
-                'win_rate': 0
+                'win_rate': 0,
+                'profit_factor': 0
             }
+        wins = [p for p in dir_positions if p['net_profit'] > 0]
+        losses = [p for p in dir_positions if p['net_profit'] <= 0]
+        gross_win = sum(p['net_profit'] for p in wins)
+        gross_loss = abs(sum(p['net_profit'] for p in losses))
+        pf = gross_win / gross_loss if gross_loss > 0 else float('inf')
         return {
             'count': len(dir_positions),
             'avg_profit': round(np.mean([p['net_profit'] for p in dir_positions]), 2),
-            'win_rate': round(len([p for p in dir_positions if p['net_profit'] > 0]) / len(dir_positions) * 100, 2)
+            'win_rate': round(len(wins) / len(dir_positions) * 100, 2),
+            'profit_factor': round(pf, 2)
         }
 
     return {
