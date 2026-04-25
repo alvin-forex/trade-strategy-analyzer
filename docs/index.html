@@ -1425,80 +1425,75 @@ renderPositionTable = function(positions) {
   _origRenderPos(positions);
 };
 
-// === Market Context (方案 A) ===
-const YAHOO_SYMBOLS = {
-  'AUDCAD': 'AUDCAD=X',
-  'EURCHF': 'EURCHF=X',
-  'XAUUSD': 'GC=F',
-  'USDJPY': 'USDJPY=X',
-  'NZDUSD': 'NZDUSD=X',
-  'USDCHF': 'USDCHF=X',
-  'USDCAD': 'USDCAD=X',
-  'GBPUSD': 'GBPUSD=X',
-  'EURUSD': 'EURUSD=X',
-  'AUDUSD': 'AUDUSD=X',
-  'NZDCAD': 'NZDCAD=X',
-  'NZDCHF': 'NZDCHF=X',
-  'EURAUD': 'EURAUD=X',
-  'EURGBP': 'EURGBP=X',
-  'GBPCAD': 'GBPCAD=X',
-  'GBPCHF': 'GBPCHF=X',
-  'AUDCHF': 'AUDCHF=X',
-  'AUDJPY': 'AUDJPY=X',
-  'CADJPY': 'CADJPY=X',
-  'CHFJPY': 'CHFJPY=X',
-  'EURCAD': 'EURCAD=X',
-  'EURNZD': 'EURNZD=X',
-  'GBPNZD': 'GBPNZD=X',
-  'AUDNZD': 'AUDNZD=X',
-  'GBPAUD': 'GBPAUD=X',
-  'GBPSGD': 'GBPSGD=X',
-};
+// === Market Context (方案 A) — Local MT4 .hst Data ===
+let _marketDataCache = {}; // Cache loaded JSON data
 
-function toYahooSymbol(sym) {
-  if (YAHOO_SYMBOLS[sym]) return YAHOO_SYMBOLS[sym];
-  // Fallback: BASE(3) + QUOTE(3) + =X
-  if (sym.length === 6) return sym.substring(0, 3) + sym.substring(3) + '=X';
-  return sym + '=X';
-}
+async function fetchLocalMarketData(symbol) {
+  // Check cache first
+  if (_marketDataCache[symbol]) return _marketDataCache[symbol];
 
-async function fetchMarketData(symbol, startDate, endDate) {
-  const yahooSym = toYahooSymbol(symbol);
-  const period1 = Math.floor(startDate.getTime() / 1000);
-  const period2 = Math.floor(endDate.getTime() / 1000) + 86400; // add 1 day buffer
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${period1}&period2=${period2}&interval=1d`;
-
+  // Try local JSON from docs/data/{PAIR}_D1.json
+  const jsonUrl = `data/${symbol}_D1.json`;
   try {
-    const resp = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
+    const resp = await fetch(jsonUrl);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const json = await resp.json();
-    const result = json.chart && json.chart.result && json.chart.result[0];
-    if (!result || !result.timestamp || !result.indicators) throw new Error('No data');
+    const data = await resp.json();
 
-    const timestamps = result.timestamp;
-    const quotes = result.indicators.quote[0];
+    // Parse bars into arrays
     const dates = [];
-    const closes = [];
     const opens = [];
     const highs = [];
     const lows = [];
+    const closes = [];
 
-    for (let i = 0; i < timestamps.length; i++) {
-      if (quotes.close[i] != null) {
-        dates.push(new Date(timestamps[i] * 1000));
-        closes.push(quotes.close[i]);
-        opens.push(quotes.open[i]);
-        highs.push(quotes.high[i]);
-        lows.push(quotes.low[i]);
-      }
+    if (data.bars) {
+      data.bars.forEach(bar => {
+        const d = new Date(bar.d + 'T00:00:00');
+        dates.push(d);
+        opens.push(bar.o);
+        highs.push(bar.h);
+        lows.push(bar.l);
+        closes.push(bar.c);
+      });
     }
-    return { dates, opens, highs, lows, closes, source: 'yahoo' };
+
+    const result = { dates, opens, highs, lows, closes, source: 'local', indicators: data.indicators || null };
+    _marketDataCache[symbol] = result;
+    return result;
   } catch (e) {
-    console.warn('Yahoo Finance fetch failed for', symbol, e.message);
+    console.warn('Local market data not found for', symbol, e.message);
     return null;
   }
+}
+
+// Filter market data to date range
+function filterMarketDataByRange(mData, startDate, endDate) {
+  if (!mData || !mData.dates.length) return mData;
+  const startMs = startDate.getTime();
+  const endMs = endDate.getTime();
+  const filtered = { dates: [], opens: [], highs: [], lows: [], closes: [], source: mData.source, indicators: null };
+
+  for (let i = 0; i < mData.dates.length; i++) {
+    const t = mData.dates[i].getTime();
+    if (t >= startMs && t <= endMs) {
+      filtered.dates.push(mData.dates[i]);
+      filtered.opens.push(mData.opens[i]);
+      filtered.highs.push(mData.highs[i]);
+      filtered.lows.push(mData.lows[i]);
+      filtered.closes.push(mData.closes[i]);
+    }
+  }
+
+  // Also filter indicators by date range
+  if (mData.indicators) {
+    filtered.indicators = {};
+    const dateSet = new Set(filtered.dates.map(d => d.toISOString().slice(0, 10)));
+    for (const [key, arr] of Object.entries(mData.indicators)) {
+      filtered.indicators[key] = arr.filter(item => dateSet.has(item.d));
+    }
+  }
+
+  return filtered;
 }
 
 function buildCSVMarketData(positions, symbol) {
@@ -1589,7 +1584,7 @@ function analyzeMarketContext(positions, marketDataMap) {
     });
   });
 
-  context.dataSource = anyCSV ? 'csv' : 'yahoo';
+  context.dataSource = anyCSV ? 'csv' : 'local';
   return context;
 }
 
@@ -1723,7 +1718,9 @@ function renderMarketContext(context) {
 
   // Source note
   if (isCSV) {
-    html += '<div class="mc-note">📝 價格走勢基於交易記錄（Yahoo Finance 數據暫時不可用，可能受 CORS 限制）</div>';
+    html += '<div class="mc-note">📝 價格走勢基於交易記錄（本地歷史數據未找到此貨幣對）</div>';
+  } else {
+    html += '<div class="mc-note">📊 價格數據來源：MT4 本地歷史（.hst），無需外部 API</div>';
   }
 
   $('marketContext').innerHTML = html;
@@ -1745,20 +1742,17 @@ async function loadMarketContext(positions) {
   // Extract unique symbols
   const symbols = [...new Set(positions.map(p => p.symbol))];
 
-  // Fetch market data for each symbol
+  // Fetch local market data for each symbol
   const marketDataMap = {};
   for (const sym of symbols) {
-    const data = await fetchMarketData(sym, startDate, endDate);
-    if (data && data.closes && data.closes.length >= 2) {
-      marketDataMap[sym] = data;
+    const rawData = await fetchLocalMarketData(sym);
+    if (rawData && rawData.closes && rawData.closes.length >= 2) {
+      // Filter to match CSV date range
+      marketDataMap[sym] = filterMarketDataByRange(rawData, startDate, endDate);
     } else {
       // Fallback to CSV-based data
       const csvData = buildCSVMarketData(positions, sym);
       if (csvData) marketDataMap[sym] = csvData;
-    }
-    // Throttle: 500ms between requests
-    if (symbols.indexOf(sym) < symbols.length - 1) {
-      await new Promise(r => setTimeout(r, 500));
     }
   }
 
