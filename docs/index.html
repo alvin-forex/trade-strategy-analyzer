@@ -211,6 +211,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-direction">↔️ 方向分析</div>
     <div class="tab" data-tab="tab-market">🌐 市場語境</div>
     <div class="tab" data-tab="tab-copy">🏆 Copy 推薦</div>
+    <div class="tab" data-tab="tab-volatility">📏 波幅分析</div>
     <div class="tab" data-tab="tab-positions">📋 倉位明細</div>
     <div class="tab" data-tab="tab-set">⚙️ SET 參數</div>
   </div>
@@ -251,6 +252,11 @@ svg text { font-family: -apple-system, sans-serif; }
   <div class="card tab-panel" id="tab-market">
     <h2><span class="icon">🌐</span> 市場語境分析</h2>
     <div id="marketContext"><div class="mc-loading"><div class="spinner"></div>載入市場數據中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-volatility">
+    <h2><span class="icon">📏</span> 波幅適配分析</h2>
+    <div id="volatilityAnalysis"><div class="mc-loading">計算中...</div></div>
   </div>
 
   <div class="card tab-panel" id="tab-copy">
@@ -1043,6 +1049,10 @@ async function analyze() {
     // Copy Trade Matrix
     const copyMatrixData = calcSymbolLayerMatrix(positions);
     renderCopyMatrix(copyMatrixData);
+    // Volatility Analysis (basic from CSV)
+    const volData = calcVolatilityAnalysis(positions);
+    // ATR cross-analysis needs market data, will be completed after loadMarketContext
+    renderVolatilityAnalysis(volData, null);
     renderPositionTable(positions);
     renderSETParams(setCats);
     prog.style.width='100%';
@@ -1401,6 +1411,233 @@ function sortPositions(col) {
 
 function getNestedValue(obj, path) {
   return path.split('.').reduce((o,k)=>o&&o[k], obj);
+}
+
+// === Pip size helper ===
+function pipMultiplier(symbol) {
+  // Returns how many pips per 1 unit of price
+  const jpy = ['USDJPY','EURJPY','GBPJPY','AUDJPY','NZDJPY','CADJPY','CHFJPY','GBPAUD','GBPCAD','GBPCHF','GBPNZD'];
+  if (jpy.some(j => symbol.includes('JPY'))) return 100; // JPY pairs: price diff 0.01 = 1 pip
+  if (symbol === 'XAUUSD' || symbol === 'XAGUSD') return 0.1; // Gold: price diff 1 = 10 pips
+  if (symbol.startsWith('XAU') || symbol.startsWith('XAG')) return 0.1;
+  if (symbol === 'BTCUSD') return 1; // BTC: price diff 1 = 1 pip
+  return 10000; // Standard 5-digit: price diff 0.0001 = 1 pip
+}
+
+// === Volatility Adaptation Analysis ===
+function calcVolatilityAnalysis(positions) {
+  const symbols = [...new Set(positions.map(p => p.symbol))];
+  const layerGroups = {
+    'L1': p => p.max_layer === 1,
+    'L2': p => p.max_layer === 2,
+    'L3': p => p.max_layer === 3,
+    'L4+': p => p.max_layer >= 4
+  };
+  const results = { layers: {}, symbols: {}, atrBuckets: {} };
+
+  // 1. Per-layer volatility stats (from CSV data)
+  for (const [gName, fn] of Object.entries(layerGroups)) {
+    const subset = positions.filter(fn);
+    if (!subset.length) { results.layers[gName] = null; continue; }
+
+    const amplitudes = subset.map(p => {
+      const mp = p.trades ? Math.max(...p.trades.map(t => t._maxPips || 0)) : 0;
+      const ml = p.trades ? Math.max(...p.trades.map(t => Math.abs(t._maxLossPips || 0))) : 0;
+      return mp + ml;
+    }).filter(a => a > 0);
+
+    const wins = subset.filter(p => p.net_profit > 0);
+    const avgAmp = amplitudes.length ? amplitudes.reduce((s, v) => s + v, 0) / amplitudes.length : 0;
+    const minAmp = amplitudes.length ? Math.min(...amplitudes) : 0;
+    const maxAmp = amplitudes.length ? Math.max(...amplitudes) : 0;
+
+    results.layers[gName] = {
+      count: subset.length,
+      winRate: wins.length / subset.length * 100,
+      avgAmplitude: avgAmp,
+      minAmplitude: minAmp,
+      maxAmplitude: maxAmp,
+      avgProfit: subset.reduce((s, p) => s + p.net_profit, 0) / subset.length
+    };
+  }
+
+  // 2. Per-symbol volatility stats
+  symbols.forEach(sym => {
+    const subset = positions.filter(p => p.symbol === sym);
+    const amplitudes = subset.map(p => {
+      const mp = p.trades ? Math.max(...p.trades.map(t => t._maxPips || 0)) : 0;
+      const ml = p.trades ? Math.max(...p.trades.map(t => Math.abs(t._maxLossPips || 0))) : 0;
+      return mp + ml;
+    }).filter(a => a > 0);
+
+    const avgAmp = amplitudes.length ? amplitudes.reduce((s, v) => s + v, 0) / amplitudes.length : 0;
+    results.symbols[sym] = { avgAmplitude: avgAmp, count: subset.length };
+  });
+
+  return results;
+}
+
+function calcATRCrossAnalysis(positions, marketDataMap) {
+  // For each position, find the ATR at open time, then bucket by ATR range
+  const atrData = [];
+
+  positions.forEach(p => {
+    const mData = marketDataMap[p.symbol];
+    if (!mData || !mData.indicators || !mData.indicators.atr_14) return;
+
+    const mult = pipMultiplier(p.symbol);
+    const openDate = p.open_time.toISOString().slice(0, 10);
+
+    // Find ATR for the closest date before or on open_time
+    const atrArr = mData.indicators.atr_14;
+    let atrPips = null;
+    for (let i = atrArr.length - 1; i >= 0; i--) {
+      if (atrArr[i].d <= openDate) {
+        atrPips = atrArr[i].v * mult;
+        break;
+      }
+    }
+    if (atrPips === null || atrPips <= 0) return;
+
+    atrData.push({
+      position: p,
+      atrPips,
+      profit: p.net_profit,
+      win: p.net_profit > 0,
+      layer: p.max_layer
+    });
+  });
+
+  if (atrData.length < 5) return null;
+
+  // Bucket by ATR percentile
+  const atrValues = atrData.map(d => d.atrPips).sort((a, b) => a - b);
+  const p33 = atrValues[Math.floor(atrValues.length * 0.33)];
+  const p67 = atrValues[Math.floor(atrValues.length * 0.67)];
+
+  const buckets = {
+    '低波幅': d => d.atrPips <= p33,
+    '中波幅': d => d.atrPips > p33 && d.atrPips <= p67,
+    '高波幅': d => d.atrPips > p67
+  };
+
+  const result = { thresholds: { low: p33, mid: p67 }, buckets: {}, total: atrData.length };
+
+  for (const [bName, fn] of Object.entries(buckets)) {
+    const subset = atrData.filter(fn);
+    if (!subset.length) { result.buckets[bName] = null; continue; }
+    const wins = subset.filter(d => d.win);
+    const avgATR = subset.reduce((s, d) => s + d.atrPips, 0) / subset.length;
+    const avgProfit = subset.reduce((s, d) => s + d.profit, 0) / subset.length;
+    const l4count = subset.filter(d => d.layer >= 4).length;
+    result.buckets[bName] = {
+      count: subset.length,
+      winRate: wins.length / subset.length * 100,
+      avgProfit,
+      avgATR,
+      l4pct: l4count / subset.length * 100
+    };
+  }
+
+  return result;
+}
+
+function renderVolatilityAnalysis(volData, atrData) {
+  let html = '';
+
+  // === Section 1: Per-layer volatility ===
+  html += '<h3 style="margin:0 0 12px;color:var(--primary)">📊 各層波幅分析</h3>';
+  const layers = ['L1', 'L2', 'L3', 'L4+'];
+  const layerLabels = { L1: 'L1 (單層)', L2: 'L2 (雙層)', L3: 'L3 (三層)', 'L4+': 'L4+ (深層)' };
+  const layerColors = { L1: '#28a745', L2: '#17a2b8', L3: '#ffc107', 'L4+': '#dc3545' };
+
+  // Bar chart data
+  const barData = [];
+  layers.forEach(g => {
+    const d = volData.layers[g];
+    if (d) barData.push({ label: layerLabels[g], value: d.avgAmplitude, color: layerColors[g] });
+  });
+
+  html += '<div class="chart-row">';
+  html += '<div class="chart-box"><h3>平均波幅 (pips)</h3>' + makeBarSVG(barData) + '</div>';
+
+  // Table
+  html += '<div class="chart-box"><h3>層數波幅數據</h3>';
+  html += '<table style="width:100%;font-size:0.85em"><tr><th>層數</th><th>倉位</th><th>平均波幅</th><th>波幅範圍</th><th>勝率</th><th>平均盈虧</th></tr>';
+  layers.forEach(g => {
+    const d = volData.layers[g];
+    if (!d) return;
+    html += `<tr><td><strong>${layerLabels[g]}</strong></td><td>${d.count}</td>`;
+    html += `<td>${fmt(d.avgAmplitude, 1)} pips</td>`;
+    html += `<td>${fmt(d.minAmplitude, 0)} ~ ${fmt(d.maxAmplitude, 0)} pips</td>`;
+    html += `<td style="color:${d.winRate >= 60 ? 'var(--green)' : d.winRate >= 40 ? 'var(--yellow)' : 'var(--red)'}">${pct(d.winRate)}</td>`;
+    html += `<td style="color:${d.avgProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(d.avgProfit)}</td></tr>`;
+  });
+  html += '</table></div></div>';
+
+  // === Section 2: ATR Cross-Analysis ===
+  if (atrData) {
+    html += '<h3 style="margin:20px 0 12px;color:var(--primary)">🌡️ ATR 市況交叉分析</h3>';
+
+    // Thresholds
+    html += '<div class="stats-grid" style="margin-bottom:12px">';
+    html += statBox(fmt(atrData.thresholds.low, 1) + ' pips', '低/中 分界線', '');
+    html += statBox(fmt(atrData.thresholds.mid, 1) + ' pips', '中/高 分界線', '');
+    html += statBox(atrData.total + ' 倉位', '已匹配 ATR', '');
+    html += '</div>';
+
+    // ATR bucket table
+    const bucketOrder = ['低波幅', '中波幅', '高波幅'];
+    const bucketIcons = { '低波幅': '🟢', '中波幅': '🟡', '高波幅': '🔴' };
+    const bucketBarData = [];
+
+    html += '<div class="chart-row">';
+
+    // Bar chart for win rate by ATR bucket
+    bucketOrder.forEach(b => {
+      const d = atrData.buckets[b];
+      if (d) bucketBarData.push({ label: b, value: d.winRate, color: b === '低波幅' ? '#28a745' : b === '中波幅' ? '#ffc107' : '#dc3545' });
+    });
+    html += '<div class="chart-box"><h3>各波幅環境勝率</h3>' + makeBarSVG(bucketBarData) + '</div>';
+
+    // Detail table
+    html += '<div class="chart-box"><h3>ATR 分組詳情</h3>';
+    html += '<table style="width:100%;font-size:0.85em"><tr><th>波幅環境</th><th>倉位</th><th>平均 ATR</th><th>勝率</th><th>平均盈虧</th><th>L4+佔比</th></tr>';
+    bucketOrder.forEach(b => {
+      const d = atrData.buckets[b];
+      if (!d) return;
+      html += `<tr><td>${bucketIcons[b]} <strong>${b}</strong></td><td>${d.count}</td>`;
+      html += `<td>${fmt(d.avgATR, 1)} pips</td>`;
+      html += `<td style="color:${d.winRate >= 60 ? 'var(--green)' : d.winRate >= 40 ? 'var(--yellow)' : 'var(--red)'}">${pct(d.winRate)}</td>`;
+      html += `<td style="color:${d.avgProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(d.avgProfit)}</td>`;
+      html += `<td style="color:${d.l4pct > 30 ? 'var(--red)' : 'var(--green)'}">${pct(d.l4pct)}</td></tr>`;
+    });
+    html += '</table></div></div>';
+
+    // Auto verdict
+    const best = bucketOrder.map(b => ({ name: b, d: atrData.buckets[b] })).filter(x => x.d).sort((a, b) => b.d.winRate - a.d.winRate)[0];
+    const worst = bucketOrder.map(b => ({ name: b, d: atrData.buckets[b] })).filter(x => x.d).sort((a, b) => a.d.winRate - b.d.winRate)[0];
+
+    if (best && worst) {
+      const verdictColor = best.d.winRate - worst.d.winRate > 20 ? '#e94560' : '#28a745';
+      html += '<div style="margin-top:12px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid ' + verdictColor + '">';
+      html += '<strong>📋 策略波幅適配結論：</strong><br>';
+      html += `策略喺 <strong>${best.name}</strong>（ATR ~${fmt(best.d.avgATR, 0)} pips）環境下勝率最高 ${pct(best.d.winRate)}，`;
+      html += `喺 <strong>${worst.name}</strong>（ATR ~${fmt(worst.d.avgATR, 0)} pips）環境下勝率只有 ${pct(worst.d.winRate)}。`;
+      if (best.d.winRate - worst.d.winRate > 20) {
+        html += '<br><span style="color:#dc3545">⚠️ 波幅敏感度高，建議喺低波幅時段運行或收窄入場條件。</span>';
+      } else {
+        html += '<br><span style="color:#28a745">✅ 波幅敏感度低，策略適應性較強。</span>';
+      }
+      html += '</div>';
+    }
+  } else {
+    html += '<div style="margin-top:16px;padding:12px;background:#fff3cd;border-radius:8px">';
+    html += '⚠️ ATR 交叉分析需要本地市場數據（data/{PAIR}_D1.json）。如未載入，僅顯示基於 CSV 嘅波幅統計。';
+    html += '</div>';
+  }
+
+  $('volatilityAnalysis').innerHTML = html;
 }
 
 // === Copy Trade Recommendation Matrix ===
@@ -1941,6 +2178,20 @@ async function loadMarketContext(positions) {
 
   const context = analyzeMarketContext(positions, marketDataMap);
   renderMarketContext(context);
+
+  // === ATR Cross-Analysis for Volatility tab ===
+  // Re-fetch with full indicators (unfiltered) for ATR
+  const fullMktMap = {};
+  for (const sym of symbols) {
+    if (_marketDataCache[sym]) {
+      fullMktMap[sym] = _marketDataCache[sym];
+    }
+  }
+  const atrCross = calcATRCrossAnalysis(positions, fullMktMap);
+  if (atrCross) {
+    const volData = calcVolatilityAnalysis(positions);
+    renderVolatilityAnalysis(volData, atrCross);
+  }
 }
 
 
