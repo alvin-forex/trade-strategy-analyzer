@@ -210,6 +210,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-session">🕐 時段分析</div>
     <div class="tab" data-tab="tab-direction">↔️ 方向分析</div>
     <div class="tab" data-tab="tab-market">🌐 市場語境</div>
+    <div class="tab" data-tab="tab-copy">🏆 Copy 推薦</div>
     <div class="tab" data-tab="tab-positions">📋 倉位明細</div>
     <div class="tab" data-tab="tab-set">⚙️ SET 參數</div>
   </div>
@@ -250,6 +251,11 @@ svg text { font-family: -apple-system, sans-serif; }
   <div class="card tab-panel" id="tab-market">
     <h2><span class="icon">🌐</span> 市場語境分析</h2>
     <div id="marketContext"><div class="mc-loading"><div class="spinner"></div>載入市場數據中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-copy">
+    <h2><span class="icon">🏆</span> Copy Trade 推薦矩陣</h2>
+    <div id="copyMatrix"><div class="mc-loading">計算中...</div></div>
   </div>
 
   <div class="card tab-panel" id="tab-positions">
@@ -1034,6 +1040,9 @@ async function analyze() {
     renderLayerSection(layerStats);
     renderSessionSection(sessionStats);
     renderDirectionSection(dirStats);
+    // Copy Trade Matrix
+    const copyMatrixData = calcSymbolLayerMatrix(positions);
+    renderCopyMatrix(copyMatrixData);
     renderPositionTable(positions);
     renderSETParams(setCats);
     prog.style.width='100%';
@@ -1392,6 +1401,180 @@ function sortPositions(col) {
 
 function getNestedValue(obj, path) {
   return path.split('.').reduce((o,k)=>o&&o[k], obj);
+}
+
+// === Copy Trade Recommendation Matrix ===
+function calcSymbolLayerMatrix(positions) {
+  // Build: symbol × layer_group → stats
+  const symbols = [...new Set(positions.map(p => p.symbol))];
+  const layerGroups = {
+    'L1': p => p.max_layer === 1,
+    'L2': p => p.max_layer === 2,
+    'L3': p => p.max_layer === 3,
+    'L4+': p => p.max_layer >= 4
+  };
+  const matrix = {}; // matrix[symbol][group] = {count, winRate, avgProfit, profitFactor, avgScore, grade, totalProfit, maxDD}
+
+  symbols.forEach(sym => {
+    const symPos = positions.filter(p => p.symbol === sym);
+    matrix[sym] = {};
+
+    Object.entries(layerGroups).forEach(([groupName, fn]) => {
+      const subset = symPos.filter(fn);
+      if (subset.length === 0) {
+        matrix[sym][groupName] = null;
+        return;
+      }
+
+      const profits = subset.map(p => p.net_profit);
+      const wins = profits.filter(p => p > 0);
+      const losses = profits.filter(p => p <= 0);
+      const totalWin = wins.reduce((s, v) => s + v, 0);
+      const totalLoss = Math.abs(losses.reduce((s, v) => s + v, 0));
+      const winRate = wins.length / subset.length * 100;
+      const profitFactor = totalLoss > 0 ? totalWin / totalLoss : totalWin > 0 ? 999 : 0;
+      const avgProfit = profits.reduce((s, v) => s + v, 0) / subset.length;
+      const avgScore = subset.reduce((s, p) => s + (p._finalScore ? p._finalScore.score : 0), 0) / subset.length;
+
+      // Max DD for this group
+      let peak = 0, maxDD = 0, cumul = 0;
+      profits.forEach(p => {
+        cumul += p;
+        if (cumul > peak) peak = cumul;
+        const dd = peak - cumul;
+        if (dd > maxDD) maxDD = dd;
+      });
+
+      // Copy Grade logic (per symbol×layer)
+      let grade, label, color, desc;
+      if (subset.length < 3) {
+        grade = 'D'; label = '樣本不足'; color = '#999'; desc = '少於 3 個倉位';
+      } else if (winRate >= 70 && profitFactor >= 2.0 && groupName !== 'L4+') {
+        grade = 'A'; label = '首選 Copy'; color = '#28a745'; desc = '高勝率 + 高 PF';
+      } else if (winRate >= 60 && profitFactor >= 1.5 && groupName !== 'L4+') {
+        grade = 'A'; label = '推薦 Copy'; color = '#28a745'; desc = '穩定盈利';
+      } else if (winRate >= 50 && profitFactor >= 1.2) {
+        grade = 'B'; label = '可考慮'; color = '#ffc107'; desc = '中等表現';
+      } else if (winRate >= 40 && profitFactor >= 1.0) {
+        grade = 'C'; label = '需評估'; color = '#fd7e14'; desc = '表現一般';
+      } else {
+        grade = 'D'; label = '不建議'; color = '#dc3545'; desc = winRate < 40 ? '勝率過低' : profitFactor < 1 ? 'PF < 1' : '風險偏高';
+      }
+      // L4+ always max B
+      if (groupName === 'L4+' && grade === 'A') {
+        grade = 'B'; label = '高層風險'; color = '#ffc107'; desc = '雖盈利但 L4+ 風險高';
+      }
+
+      matrix[sym][groupName] = {
+        count: subset.length,
+        winRate,
+        avgProfit,
+        profitFactor,
+        avgScore,
+        totalProfit: totalWin - totalLoss,
+        maxDD,
+        grade, label, color, desc
+      };
+    });
+
+    // Best layer recommendation for this symbol
+    const groups = ['L1', 'L2', 'L3', 'L4+'];
+    let bestGroup = null, bestScore = -1;
+    groups.forEach(g => {
+      const d = matrix[sym][g];
+      if (!d || d.count < 3) return;
+      // Score: winRate weight 40% + PF weight 30% + count weight 20% + avgProfit norm 10%
+      const score = d.winRate * 0.4 + Math.min(d.profitFactor, 5) / 5 * 100 * 0.3 + Math.min(d.count, 50) / 50 * 100 * 0.2 + (d.avgProfit > 0 ? 100 : 0) * 0.1;
+      if (score > bestScore) { bestScore = score; bestGroup = g; }
+    });
+    matrix[sym]._best = bestGroup ? { group: bestGroup, score: bestScore, data: matrix[sym][bestGroup] } : null;
+  });
+
+  // Overall ranking
+  const ranked = symbols.map(sym => ({
+    sym,
+    best: matrix[sym]._best,
+    totalProfit: positions.filter(p => p.symbol === sym).reduce((s, p) => s + p.net_profit, 0)
+  })).filter(s => s.best).sort((a, b) => b.best.score - a.best.score);
+
+  return { matrix, ranked, symbols };
+}
+
+function renderCopyMatrix(matrixData) {
+  const { matrix, ranked, symbols } = matrixData;
+  if (!ranked.length) {
+    $('copyMatrix').innerHTML = '<p style="color:#999">數據不足，需要至少 3 個倉位才能分析</p>';
+    return;
+  }
+
+  const groups = ['L1', 'L2', 'L3', 'L4+'];
+  let html = '';
+
+  // === Top recommendation summary ===
+  const top3 = ranked.slice(0, 3);
+  html += '<div class="stats-grid" style="margin-bottom:20px">';
+  top3.forEach((r, i) => {
+    const medal = ['🥇', '🥈', '🥉'][i];
+    const d = r.best.data;
+    html += `<div class="stat-box" style="border-left:4px solid ${d.color}">
+      <div class="val" style="font-size:1.1em">${medal} ${r.sym}</div>
+      <div class="lbl">最佳層數: ${r.best.group} · ${d.label}</div>
+      <div style="font-size:0.8em;color:#666;margin-top:4px">勝率 ${pct(d.winRate)} · PF ${fmt(d.profitFactor)} · ${d.count} 倉位</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // === Full matrix table ===
+  html += '<div class="table-wrap"><table class="sortable">';
+  html += '<tr><th>貨幣對</th>';
+  groups.forEach(g => html += `<th style="text-align:center">${g}</th>`);
+  html += '<th>推薦層數</th><th>推薦評級</th></tr>';
+
+  // Sort by total ranking
+  const sortedSymbols = ranked.map(r => r.sym).concat(symbols.filter(s => !ranked.find(r => r.sym === s)));
+  sortedSymbols.forEach(sym => {
+    const best = matrix[sym]._best;
+    html += '<tr>';
+    html += `<td><strong>${sym}</strong></td>`;
+
+    groups.forEach(g => {
+      const d = matrix[sym][g];
+      if (!d) {
+        html += '<td style="text-align:center;color:#ccc">—</td>';
+        return;
+      }
+      const bg = d.grade === 'A' ? '#d4edda' : d.grade === 'B' ? '#fff3cd' : d.grade === 'C' ? '#ffeeba' : d.count < 3 ? '#f5f5f5' : '#f8d7da';
+      html += `<td style="text-align:center;background:${bg};font-size:0.82em;padding:6px 4px">`;
+      html += `<span class="grade grade-${d.grade.toLowerCase()}" style="font-size:0.7em">${d.grade}</span>`;
+      html += `<div style="margin-top:2px">${pct(d.winRate)}</div>`;
+      html += `<div style="color:#888;font-size:0.9em">PF ${fmt(d.profitFactor)}</div>`;
+      html += `<div style="color:${d.avgProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(d.avgProfit)}</div>`;
+      html += `<div style="color:#aaa;font-size:0.85em">${d.count} 倉</div>`;
+      html += '</td>';
+    });
+
+    if (best) {
+      html += `<td style="text-align:center"><strong>${best.group}</strong></td>`;
+      html += `<td style="text-align:center"><span style="color:${best.data.color};font-weight:bold">${best.data.label}</span></td>`;
+    } else {
+      html += '<td style="text-align:center;color:#999">—</td>';
+      html += '<td style="text-align:center;color:#999">數據不足</td>';
+    }
+    html += '</tr>';
+  });
+
+  html += '</table></div>';
+
+  // === Legend ===
+  html += '<div style="margin-top:16px;font-size:0.82em;color:#666;display:flex;gap:16px;flex-wrap:wrap">';
+  html += '<span><span class="grade grade-a" style="font-size:0.7em">A</span> 推薦 Copy（勝率≥60%, PF≥1.5）</span>';
+  html += '<span><span class="grade grade-b" style="font-size:0.7em">B</span> 可考慮（勝率≥50%, PF≥1.2）</span>';
+  html += '<span><span class="grade grade-c" style="font-size:0.7em">C</span> 需評估（勝率≥40%, PF≥1.0）</span>';
+  html += '<span><span class="grade grade-d" style="font-size:0.7em">D</span> 不建議</span>';
+  html += '<span style="color:#999">L4+ 最高只能評 B（高層風險）</span>';
+  html += '</div>';
+
+  $('copyMatrix').innerHTML = html;
 }
 
 function renderSETParams(cats) {
