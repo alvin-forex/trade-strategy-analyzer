@@ -470,7 +470,13 @@ svg text { font-family: -apple-system, sans-serif; }
 
   <div class="card tab-panel" id="tab-archive">
     <h2><span class="icon">📁</span> 歷史記錄</h2>
-    <div id="archiveContent"><p style="color:#999">暫無存檔記錄</p></div>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-secondary" onclick="loadArchiveFromAPI()">🔄 載入記錄</button>
+      <button class="btn btn-secondary" onclick="$('jsonImportInput').click()">📥 匯入 JSON</button>
+      <input type="file" id="jsonImportInput" accept=".json" hidden onchange="importAnalysisJSON(this.files[0])">
+      <span id="archiveStatus" style="font-size:0.85em;color:#999"></span>
+    </div>
+    <div id="archiveContent"><p style="color:#999">點擊「載入記錄」從本地 API 載入，或「匯入 JSON」匯入之前下載的分析檔案</p></div>
   </div>
 </div>
 
@@ -4371,7 +4377,7 @@ function saveCurrentArchive() {
 }
 
 // === Auto-save to local API ===
-function _autoSaveToAPI(positions, overall, layerStats, setParams) {
+async function _autoSaveToAPI(positions, overall, layerStats, setParams) {
   if (!positions || !positions.length || !overall) return;
 
   // Build payload matching history_manager.py expected format
@@ -4449,17 +4455,31 @@ function _autoSaveToAPI(positions, overall, layerStats, setParams) {
     symbol_stats: symStats
   };
 
-  // Fire-and-forget POST to local API
+  // Try POST to local API; fallback to download JSON
   const urls = ['http://localhost:8787/api/save', 'http://127.0.0.1:8787/api/save'];
-  urls.forEach(url => {
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(r => r.json()).then(d => {
-      if (d.ok) console.log('[History] Saved #' + d.id);
-    }).catch(() => {}); // Silent fail — local API may not be running
-  });
+  let savedOk = false;
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      if (d.ok) { console.log('[History] Saved #' + d.id); savedOk = true; break; }
+    } catch(e) { /* try next or fallback */ }
+  }
+  if (!savedOk) {
+    // API unreachable (GitHub Pages HTTPS → localhost HTTP blocked, or server down)
+    // Auto-download JSON so user can import later
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `analysis_${payload.signal_id || 'unknown'}_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    console.log('[History] API unreachable — downloaded JSON for manual import');
+  }
 }
 
 function _doSaveArchive(positions, isAuto) {
@@ -4810,6 +4830,79 @@ function renderArchiveTab() {
   }
 
   $('archiveContent').innerHTML = html;
+}
+
+// === Load archive from local API ===
+async function loadArchiveFromAPI() {
+  const el = $('archiveContent');
+  const status = $('archiveStatus');
+  status.textContent = '載入中...';
+  try {
+    const resp = await fetch('http://localhost:8787/api/list?limit=100');
+    if (!resp.ok) throw new Error('API 回應 ' + resp.status);
+    const data = await resp.json();
+    if (!data.data || !data.data.length) {
+      el.innerHTML = '<p style="color:#999">本地 API 無記錄</p>';
+      status.textContent = '無記錄';
+      return;
+    }
+    let html = '<div class="table-wrap"><table class="data-table"><tr><th>ID</th><th>Signal</th><th>EA</th><th>貨幣對</th><th>勝率</th><th>PF</th><th>盈虧</th><th>倉位</th><th>日期</th></tr>';
+    data.data.forEach(r => {
+      const profitColor = r.total_profit >= 0 ? 'var(--green)' : 'var(--red)';
+      html += `<tr>
+        <td>#${r.id} v${r.version||1}</td>
+        <td><strong>${r.signal_id||'—'}</strong></td>
+        <td>${r.ea_name||'—'}</td>
+        <td>${r.pair||'—'}</td>
+        <td>${r.win_rate}%</td>
+        <td>${r.profit_factor}</td>
+        <td style="color:${profitColor}">${r.total_profit>=0?'+':''}${r.total_profit}</td>
+        <td>${r.total_positions}</td>
+        <td>${r.created_at}</td>
+      </tr>`;
+    });
+    html += '</table></div>';
+    el.innerHTML = html;
+    status.textContent = `已載入 ${data.data.length} 筆記錄`;
+    status.style.color = 'var(--green)';
+  } catch(e) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:#fd7e14">⚠️ 無法連接本地 API (localhost:8787)<br><span style="font-size:0.85em;color:#999">請確認 api_server.py 正在運行，或在 WSL 終端執行：<br><code>cd trade_strategy_analyzer && python3 scripts/api_server.py</code></span></div>';
+    status.textContent = '連接失敗';
+    status.style.color = 'var(--red)';
+  }
+}
+
+// === Import analysis JSON → save to local API ===
+async function importAnalysisJSON(file) {
+  if (!file) return;
+  const status = $('archiveStatus');
+  status.textContent = '匯入中...';
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    // Try to save to local API
+    let savedOk = false;
+    const urls = ['http://localhost:8787/api/save', 'http://127.0.0.1:8787/api/save'];
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const d = await r.json();
+        if (d.ok) { savedOk = true; status.textContent = `✅ 已匯入 Signal ${payload.signal_id||'?'} → #${d.id}`; status.style.color = 'var(--green)'; break; }
+      } catch(e) {}
+    }
+    if (!savedOk) {
+      status.textContent = '⚠️ API 未連接，無法匯入。請在本地頁面操作。';
+      status.style.color = 'var(--red)';
+    } else {
+      // Refresh the list
+      loadArchiveFromAPI();
+    }
+  } catch(e) {
+    status.textContent = '❌ JSON 格式錯誤: ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+  // Reset file input
+  $('jsonImportInput').value = '';
 }
 
 // === Init version label ===

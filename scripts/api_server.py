@@ -14,6 +14,7 @@ Runs on localhost:8787 alongside OpenClaw.
 
 import sys
 import os
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -25,6 +26,19 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import json
+import urllib.request
+import urllib.parse
+
+# Telegram notification — write to notification log
+# OpenClaw agent picks up via heartbeat/polling
+def notify_telegram(message: str):
+    """Write notification to shared file for OpenClaw to pick up."""
+    try:
+        with open('/tmp/trade-analyzer-notify.json', 'a') as f:
+            import time
+            f.write(json.dumps({"ts": time.time(), "msg": message}) + '\n')
+    except Exception:
+        pass
 
 app = FastAPI(title="Trade Strategy Analyzer API")
 
@@ -48,6 +62,16 @@ async def api_save(data: dict):
     """Save analysis data from frontend."""
     try:
         aid = save_analysis(data)
+        # Notify via Telegram (fire-and-forget in background thread)
+        sig = data.get('signal_id', '?')
+        ea = data.get('ea_name', '?')
+        wr = data.get('win_rate', 0)
+        pf = data.get('profit_factor', 0)
+        profit = data.get('total_profit', 0)
+        positions = data.get('total_positions', 0)
+        emoji = '🟢' if profit >= 0 else '🔴'
+        msg = f"✅ 新分析已存檔\n{emoji} Signal {sig} | {ea} | {positions} 倉位\nWR {wr:.1f}% | PF {pf:.2f} | {emoji} ${profit:+.2f}"
+        threading.Thread(target=notify_telegram, args=(msg,), daemon=True).start()
         return {"ok": True, "id": aid}
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
