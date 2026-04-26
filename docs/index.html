@@ -485,8 +485,16 @@ svg text { font-family: -apple-system, sans-serif; }
 
 <script>
 // === App Version ===
-const APP_VERSION = 'v3.7';
-const APP_VERSION_DATE = '2026-04-25';
+const APP_VERSION = 'v3.8';
+const APP_VERSION_DATE = '2026-04-27';
+
+// === Cloudflare Tunnel API URL (auto-detect from URL param or use tunnel) ===
+window._tradeApiUrl = (function() {
+  const param = new URLSearchParams(window.location.search).get('api');
+  if (param) return param;
+  // Default: try tunnel first, fallback to localhost
+  return 'https://saves-regular-storm-scotia.trycloudflare.com';
+})();
 
 // === Helpers ===
 function $(id) { return document.getElementById(id); }
@@ -4215,7 +4223,8 @@ async function searchSymbolDrill() {
   // 1. Search local API
   let apiResults = [];
   try {
-    const resp = await fetch('http://localhost:8787/api/list?limit=100');
+    const apiUrl = window._tradeApiUrl || 'http://localhost:8787';
+    const resp = await fetch(apiUrl + '/api/list?limit=100');
     if (resp.ok) {
       const data = await resp.json();
       if (data.records) {
@@ -4455,8 +4464,9 @@ async function _autoSaveToAPI(positions, overall, layerStats, setParams) {
     symbol_stats: symStats
   };
 
-  // Try POST to local API; fallback to download JSON
-  const urls = ['http://localhost:8787/api/save', 'http://127.0.0.1:8787/api/save'];
+  // Try POST to API via tunnel/localhost; fallback to download JSON
+  const apiUrl = window._tradeApiUrl || 'http://localhost:8787';
+  const urls = [apiUrl + '/api/save', 'http://localhost:8787/api/save'];
   let savedOk = false;
   for (const url of urls) {
     try {
@@ -4838,7 +4848,8 @@ async function loadArchiveFromAPI() {
   const status = $('archiveStatus');
   status.textContent = '載入中...';
   try {
-    const resp = await fetch('http://localhost:8787/api/list?limit=100');
+    const apiUrl = window._tradeApiUrl || 'http://localhost:8787';
+    const resp = await fetch(apiUrl + '/api/list?limit=100');
     if (!resp.ok) throw new Error('API 回應 ' + resp.status);
     const data = await resp.json();
     if (!data.data || !data.data.length) {
@@ -4866,7 +4877,7 @@ async function loadArchiveFromAPI() {
     status.textContent = `已載入 ${data.data.length} 筆記錄`;
     status.style.color = 'var(--green)';
   } catch(e) {
-    el.innerHTML = '<div style="padding:20px;text-align:center;color:#fd7e14">⚠️ 無法連接本地 API (localhost:8787)<br><span style="font-size:0.85em;color:#999">請確認 api_server.py 正在運行，或在 WSL 終端執行：<br><code>cd trade_strategy_analyzer && python3 scripts/api_server.py</code></span></div>';
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:#fd7e14">⚠️ 無法連接 API<br><span style="font-size:0.85em;color:#999">請確認 api_server.py 正在運行，Cloudflare Tunnel 已開啟</span></div>';
     status.textContent = '連接失敗';
     status.style.color = 'var(--red)';
   }
@@ -4882,14 +4893,13 @@ async function importAnalysisJSON(file) {
     const payload = JSON.parse(text);
     // Try to save to local API
     let savedOk = false;
-    const urls = ['http://localhost:8787/api/save', 'http://127.0.0.1:8787/api/save'];
-    for (const url of urls) {
-      try {
-        const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-        const d = await r.json();
-        if (d.ok) { savedOk = true; status.textContent = `✅ 已匯入 Signal ${payload.signal_id||'?'} → #${d.id}`; status.style.color = 'var(--green)'; break; }
-      } catch(e) {}
-    }
+    const apiUrl = window._tradeApiUrl || 'http://localhost:8787';
+    const saveUrl = apiUrl + '/api/save';
+    try {
+      const r = await fetch(saveUrl, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const d = await r.json();
+      if (d.ok) { savedOk = true; status.textContent = `✅ 已匯入 Signal ${payload.signal_id||'?'} → #${d.id}`; status.style.color = 'var(--green)'; }
+    } catch(e) {}
     if (!savedOk) {
       status.textContent = '⚠️ API 未連接，無法匯入。請在本地頁面操作。';
       status.style.color = 'var(--red)';
