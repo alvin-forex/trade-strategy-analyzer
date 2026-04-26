@@ -45,12 +45,7 @@ app = FastAPI(title="Trade Strategy Analyzer API")
 # CORS — allow GitHub Pages and localhost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://alvin-forex.github.io",
-        "http://localhost:*",
-        "http://127.0.0.1:*",
-        "null",  # local file://
-    ],
+    allow_origins=["*"],  # Tunnel URL changes each session; restrict later with named tunnel
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
