@@ -4,6 +4,7 @@ Report Generator - HTML 報告生成
 """
 
 import os
+import re
 from typing import Dict, List, Any
 from datetime import datetime
 
@@ -141,6 +142,18 @@ def generate_html_report(
     </div>
     """
     
+    # ── Signal hyperlink from CSV filename ──
+    signal_header = _render_signal_header(csv_name)
+
+    # ── Strategy detection section ──
+    strategy_html = _render_strategy_detection(stats.get('strategy_info', {}))
+
+    # ── Market context section ──
+    market_ctx_html = _render_market_context(stats.get('market_context', {}))
+
+    # ── Copy trade simulation section ──
+    copy_trade_html = _render_copy_trade(stats.get('copy_trade', {}))
+
     # Equity curve SVG
     equity_svg = generate_equity_svg(equity_data)
     
@@ -180,6 +193,7 @@ tr:hover {{ opacity: 0.9; }}
 <body>
 <div class="container">
 <h1>🦀 交易策略分析報告</h1>
+{signal_header}
 <p class="subtitle">{csv_name} | 生成時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
 
 <div class="summary-grid">
@@ -203,6 +217,10 @@ tr:hover {{ opacity: 0.9; }}
 <div class="chart-container">{equity_svg}</div>
 
 {grade_html}
+
+{strategy_html}
+
+{market_ctx_html}
 
 <h2>🏆 貨幣對排名</h2>
 <table>
@@ -233,6 +251,8 @@ tr:hover {{ opacity: 0.9; }}
 <tr><th>#</th><th>貨幣對</th><th>方向</th><th>層數</th><th>總手數</th><th>盈虧</th><th>持倉時間</th><th>評分</th></tr>
 {pos_rows}
 </table>
+
+{copy_trade_html}
 
 <h2>⚙️ 策略參數</h2>
 {set_summary}
@@ -287,3 +307,230 @@ def generate_equity_svg(equity_data: list) -> str:
         <polyline points="{polyline}" fill="none" stroke="#0f3460" stroke-width="2"/>
     </svg>
     """
+
+
+# ══════════════════════════════════════════════════════════════
+# 額外 Section Renderers
+# ══════════════════════════════════════════════════════════════
+
+
+def _render_signal_header(csv_name: str) -> str:
+    """Extract signal ID from CSV filename and render hyperlink."""
+    m = re.search(r'page-(\d+)', csv_name)
+    if not m:
+        return ""
+    signal_id = m.group(1)
+    url = f"https://signals.algoforest.com/signals/{signal_id}"
+    return f"""
+    <div style="margin-bottom:12px;padding:12px 16px;background:#e8f0fe;border-radius:8px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:1.2em;">📡</span>
+        <span style="font-size:1.1em;font-weight:bold;">AlgoForest Signal #{signal_id}</span>
+        <a href="{url}" target="_blank" style="margin-left:auto;padding:4px 12px;background:#0f3460;color:white;border-radius:4px;text-decoration:none;font-size:0.85em;">在 AlgoForest 查看 →</a>
+    </div>"""
+
+
+def _render_strategy_detection(strategy_info: dict) -> str:
+    """Render strategy detection section (martin/grid/dca/signal)."""
+    if not strategy_info or not strategy_info.get('strategy_type'):
+        return ""
+
+    stype = strategy_info.get('strategy_type', 'UNKNOWN')
+    is_martin = strategy_info.get('is_martingale', False)
+    lot_exp = strategy_info.get('lot_exp')
+    max_levels = strategy_info.get('max_levels', 0)
+    details = strategy_info.get('details', {})
+
+    # Color by type
+    type_colors = {
+        'MARTINGALE': '#dc3545', 'GRID': '#ffc107', 'DCA': '#17a2b8',
+        'SIGNAL': '#28a745', 'SCALPER': '#6f42c1', 'TREND': '#0f3460',
+    }
+    color = type_colors.get(stype, '#6c757d')
+
+    # Type badge
+    html = f"""
+    <h2>⚠️ 策略偵測</h2>
+    <div class="summary-grid">
+        <div class="card" style="border-left:4px solid {color}">
+            <div class="value" style="color:{color}">{stype}</div>
+            <div class="label">策略類型</div>
+        </div>"""
+
+    if is_martin:
+        html += f"""
+        <div class="card" style="border-left:4px solid #dc3545">
+            <div class="value" style="color:#dc3545">⚠️ 馬丁格爾</div>
+            <div class="label">風險等級：高</div>
+        </div>"""
+
+    if lot_exp is not None:
+        html += f"""
+        <div class="card">
+            <div class="value">{lot_exp}</div>
+            <div class="label">lotExp (倍率)</div>
+        </div>"""
+
+    if max_levels:
+        html += f"""
+        <div class="card">
+            <div class="value">{max_levels}</div>
+            <div class="label">最大層數</div>
+        </div>"""
+
+    lot_pattern = details.get('lot_pattern', '')
+    if lot_pattern:
+        html += f"""
+        <div class="card">
+            <div class="value" style="font-size:1em">{lot_pattern}</div>
+            <div class="label">手數模式</div>
+        </div>"""
+
+    pipstep_pattern = details.get('pipstep_pattern', '')
+    if pipstep_pattern:
+        html += f"""
+        <div class="card">
+            <div class="value" style="font-size:1em">{pipstep_pattern}</div>
+            <div class="label">加倉距離模式</div>
+        </div>"""
+
+    html += "</div>"
+
+    # Pipstep values detail
+    pipstep_vals = strategy_info.get('pipstep_values', [])
+    if pipstep_vals:
+        html += "<table><tr><th>層數</th>"
+        for i in range(len(pipstep_vals)):
+            html += f"<th>L{i+2}</th>"
+        html += "</tr><tr><td>加倉距離(pips)</td>"
+        for v in pipstep_vals:
+            html += f"<td>{v}</td>"
+        html += "</tr></table>"
+
+    # Lot values detail
+    lot_vals = details.get('lot_values', [])
+    if lot_vals:
+        html += "<table><tr><th>層數</th>"
+        for i in range(len(lot_vals)):
+            html += f"<th>L{i+1}</th>"
+        html += "</tr><tr><td>手數</td>"
+        for v in lot_vals:
+            html += f"<td>{v}</td>"
+        html += "</tr></table>"
+
+    return html
+
+
+def _render_market_context(market_context: dict) -> str:
+    """Render market context analysis section."""
+    if not market_context:
+        return ""
+
+    html = "<h2>🌍 市場環境分析</h2>"
+
+    dim_labels = {
+        'D1_adx_regime': 'D1 ADX 市況',
+        'D1_trend': 'D1 趨勢',
+        'D1_rsi_bucket': 'D1 RSI 區間',
+        'D1_atr_pct_bucket': 'D1 ATR 波幅',
+    }
+
+    for dim_key, label in dim_labels.items():
+        dim_data = market_context.get(dim_key, [])
+        if not dim_data:
+            continue
+
+        html += f"<h3>{label}</h3>"
+        html += "<table><tr><th>環境</th><th>倉位數</th><th>勝率</th><th>平均盈虧</th><th>平均層數</th><th>平均持倉</th></tr>"
+
+        for item in dim_data:
+            avg_pl = item.get('avg_pl', 0) or 0
+            # Color by avg P/L
+            if avg_pl > 300:
+                bg = '#d4edda'
+            elif avg_pl > 100:
+                bg = '#fff3cd'
+            elif avg_pl < 0:
+                bg = '#f8d7da'
+            else:
+                bg = 'white'
+
+            pl_color = '#28a745' if avg_pl > 0 else '#dc3545'
+
+            html += f"""
+            <tr style="background:{bg}">
+                <td><strong>{item.get('label', '?')}</strong></td>
+                <td>{item.get('count', 0)}</td>
+                <td>{item.get('win_rate', 0):.1f}%</td>
+                <td style="color:{pl_color};font-weight:bold">${avg_pl:.2f}</td>
+                <td>{item.get('avg_layers', 0):.1f}</td>
+                <td>{item.get('avg_hold', 0):.0f}h</td>
+            </tr>"""
+
+        html += "</table>"
+
+    return html
+
+
+def _render_copy_trade(copy_trade: dict) -> str:
+    """Render copy trade simulation results."""
+    if not copy_trade:
+        return ""
+
+    html = """
+    <h2>📊 Copy Trade 模擬結果</h2>
+    <p style="color:#666;font-size:0.85em;margin-bottom:12px;">
+        模擬在 L1 入場後延遲跟單的效果 — 等價格向有利/不利方向移動 N pips 先入場
+    </p>
+    <table>
+    <tr><th>場景</th><th>等待 Pips</th><th>總模擬</th><th>觸發數</th><th>觸發率</th><th>平均盈虧</th><th>總盈虧</th><th>勝率</th><th>平均 Pips</th></tr>"""
+
+    for key, s in sorted(copy_trade.items()):
+        if not isinstance(s, dict):
+            continue
+
+        parts = key.split('_')
+        sim_type = parts[0] if parts else key
+        wait_str = parts[-1] if len(parts) > 1 else '?'
+
+        # Label
+        if 'PROFIT' in sim_type:
+            type_label = '📈 跟漲'
+            type_color = '#28a745'
+        elif 'LOSE' in sim_type:
+            type_label = '📉 跟跌'
+            type_color = '#fd7e14'
+        elif 'ACTUAL' in sim_type:
+            type_label = '📌 實際'
+            type_color = '#0f3460'
+        else:
+            type_label = sim_type
+            type_color = '#333'
+
+        trigger_rate = s.get('trigger_rate', 0) or 0
+        avg_profit = s.get('avg_profit')
+        total_profit = s.get('total_profit')
+        win_rate = s.get('win_rate')
+        avg_pips = s.get('avg_pips')
+
+        pl_color = '#28a745' if avg_profit and avg_profit > 0 else ('#dc3545' if avg_profit and avg_profit < 0 else '#333')
+
+        avg_profit_str = f"${avg_profit:.2f}" if avg_profit is not None else 'N/A'
+        total_profit_str = f"${total_profit:.2f}" if total_profit is not None else 'N/A'
+        win_rate_str = f"{win_rate:.1f}%" if win_rate is not None else 'N/A'
+        avg_pips_str = f"{avg_pips:.1f}" if avg_pips is not None else 'N/A'
+
+        html += f"""
+        <tr>
+            <td style="color:{type_color};font-weight:bold">{type_label}</td>
+            <td>{wait_str}</td>
+            <td>{s.get('total', 0)}</td>
+            <td>{s.get('triggered', 0)}</td>
+            <td>{trigger_rate:.1f}%</td>
+            <td style="color:{pl_color};font-weight:bold">{avg_profit_str}</td>
+            <td style="color:{pl_color}">{total_profit_str}</td>
+            <td>{win_rate_str}</td>
+            <td>{avg_pips_str}</td>
+        </tr>"""
+
+    html += "</table>"
+    return html
