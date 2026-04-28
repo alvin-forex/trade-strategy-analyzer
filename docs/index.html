@@ -316,8 +316,8 @@ svg text { font-family: -apple-system, sans-serif; }
       <div class="hint">可多個 · 選填</div>
     </div>
   </div>
-  <input type="file" id="csvInput" accept=".csv,.CSV,text/csv,text/plain,application/vnd.ms-excel,application/octet-stream" hidden>
-  <input type="file" id="setInput" accept=".set,.SET" multiple hidden>
+  <input type="file" id="csvInput" accept="*/*" hidden>
+  <input type="file" id="setInput" accept="*/*" multiple hidden>
   <div class="file-chips" id="fileChips"></div>
   <div class="csv2-zone" id="csv2Zone" onclick="$('csv2Input').click()" style="display:none">
     <div class="icon">📥</div>
@@ -533,13 +533,30 @@ const csvZone=$('csvZone'), setZone=$('setZone'), csvInput=$('csvInput'), setInp
   z.addEventListener('drop', e => {
     e.preventDefault(); z.style.borderColor='';
     const files = Array.from(e.dataTransfer.files);
-    if (zid==='csvZone' && files[0]) { csvFile=files[0]; }
-    else { setFiles.push(...files.filter(f=>f.name.endsWith('.set'))); }
+    if (zid==='csvZone' && files[0]) {
+      if(!files[0].name.toLowerCase().endsWith('.csv')) { alert('請拖放 .csv 檔案'); return; }
+      csvFile=files[0];
+    }
+    else {
+      const valid = files.filter(f=>f.name.toLowerCase().endsWith('.set'));
+      if(valid.length===0) { alert('請拖放 .set 檔案'); return; }
+      setFiles.push(...valid);
+    }
     refreshUploadUI();
   });
 });
-csvInput.addEventListener('change', e => { if(e.target.files[0]){csvFile=e.target.files[0]; refreshUploadUI();} });
-setInput.addEventListener('change', e => { setFiles.push(...Array.from(e.target.files)); refreshUploadUI(); });
+csvInput.addEventListener('change', e => { if(e.target.files[0]){
+    const f=e.target.files[0];
+    if(!f.name.toLowerCase().endsWith('.csv')){
+      alert('請選擇 .csv 檔案'); e.target.value=''; return;
+    }
+    csvFile=f; refreshUploadUI();
+  } });
+setInput.addEventListener('change', e => {
+  const newFiles=Array.from(e.target.files).filter(f=>f.name.toLowerCase().endsWith('.set'));
+  if(newFiles.length===0){ alert('請選擇 .set 檔案'); e.target.value=''; return; }
+  setFiles.push(...newFiles); refreshUploadUI();
+});
 
 // CSV2 upload handlers
 const csv2Zone = $('csv2Zone'), csv2Input = $('csv2Input');
