@@ -99,12 +99,22 @@ def generate_html_report(
         elif s >= 40: graded['C'] += 1
         else: graded['D'] += 1
     
-    grade_html = f"""
+    grade_inline = f"""
     <div class="grade-bar">
         <span style="color:#28a745">A:{graded['A']}</span>
         <span style="color:#ffc107">B:{graded['B']}</span>
         <span style="color:#fd7e14">C:{graded['C']}</span>
         <span style="color:#dc3545">D:{graded['D']}</span>
+    </div>
+    """
+    
+    grade_html = f"""
+    <h2>🏅 質量評分分佈</h2>
+    <div class="summary-grid">
+        <div class="card" style="border-left:4px solid #28a745"><div class="value" style="color:#28a745">{graded['A']}</div><div class="label">A 優質 (≥80)</div></div>
+        <div class="card" style="border-left:4px solid #ffc107"><div class="value" style="color:#ffc107">{graded['B']}</div><div class="label">B 一般 (60-79)</div></div>
+        <div class="card" style="border-left:4px solid #fd7e14"><div class="value" style="color:#fd7e14">{graded['C']}</div><div class="label">C 偏弱 (40-59)</div></div>
+        <div class="card" style="border-left:4px solid #dc3545"><div class="value" style="color:#dc3545">{graded['D']}</div><div class="label">D 差 (<40)</div></div>
     </div>
     """
     
@@ -242,6 +252,10 @@ h3 {{ font-size: 0.9em; margin: 10px 0 4px; color: #1a1a2e; }}
 .si {{ white-space: nowrap; }}
 .strategy-tag {{ display: inline-block; padding: 3px 8px; background: #fff3cd; border-radius: 4px; font-size: 0.78em; margin-bottom: 8px; }}
 .grade-bar {{ display: inline-flex; gap: 10px; padding: 4px 10px; background: white; border-radius: 5px; font-weight: bold; font-size: 0.82em; margin-left: 8px; }}
+.summary-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }}
+.card {{ background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }}
+.card .value {{ font-size: 1.4em; font-weight: bold; color: #0f3460; }}
+.card .label {{ font-size: 0.75em; color: #888; margin-top: 4px; }}
 table {{ width: 100%; border-collapse: collapse; margin-bottom: 12px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
 th {{ background: #0f3460; color: white; padding: 7px 5px; text-align: left; font-size: 0.75em; }}
 td {{ padding: 6px 5px; border-bottom: 1px solid #eee; font-size: 0.8em; }}
@@ -262,11 +276,12 @@ details[open] summary {{ border-radius: 4px 4px 0 0; }}
 <p class="subtitle">生成時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
 
 {summary_text}
-{strategy_line}{grade_html}
+{strategy_line}{grade_inline}
 
 <h2>📈 收益曲線</h2>
 <div class="chart-container">{equity_svg}</div>
 
+{grade_html}
 {market_context_html}
 
 <h2>🏆 貨幣對</h2>
