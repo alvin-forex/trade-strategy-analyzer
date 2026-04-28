@@ -77,9 +77,9 @@ def categorize_parameters(params: Dict[str, str]) -> Dict[str, Any]:
 
     # MA / STC / 入市系統
     ma_keywords = ['BasicMaTimeframes', 'BasicMaLine1_Period', 'BasicMaLine2_Period',
-                   'BasicMaLine345_Period', 'BasicMaLine6_Period', 'BasicMaShift',
+                   'BasicMaLine345_Period', 'BasicMaLine6_Period', 'BasicMaMethod', 'BasicMaPrice', 'BasicMaShift',
                    'FollowMADirection', 'CloseByMADirection',
-                   'EnterMaTimeframes', 'EnterMaLine_Period', 'EnterMaShift',
+                   'EnterMaTimeframes', 'EnterMaLine_Period', 'EnterMaMethod', 'EnterMaPrice', 'EnterMaShift',
                    'MA_TopReturnTF', 'MA_TopReturnPeriod1', 'MA_TopReturnPeriod2',
                    'MA_TopReturnShift', 'MA_TopReturnStart', 'MA_TopReturnDist',
                    # MKD STC 系統
@@ -108,8 +108,17 @@ def categorize_parameters(params: Dict[str, str]) -> Dict[str, Any]:
                        'UseCCY', 'ValStr']
 
     # 馬丁 / 層數系統
-    martin_keywords = ['EntryLot', 'lotExp', 'pipstep2', 'pipstep3', 'pipstep4',
-                      'pipstep5', 'pipstep6', 'pipstep7', 'pipstep8', 'slInLevel',
+    martin_keywords = ['EntryLot', 'lotExp', 'effPipstep', 'PipstepMode', 'LotsizeMode',
+                      'preOrderCount', 'preOrderLot', 'slInLevel', 'TeleportOrder',
+                      'teleStart', 'teleDist', 'teleLifetime',
+                      'pipstep2', 'pipstep3', 'pipstep4',
+                      'pipstep5', 'pipstep6', 'pipstep7', 'pipstep8',
+                      'pipstep9', 'pipstep10', 'pipstep11', 'pipstep12',
+                      'pipstep13', 'pipstep14', 'pipstep15', 'pipstep16',
+                      'lotsize2', 'lotsize3', 'lotsize4', 'lotsize5',
+                      'lotsize6', 'lotsize7', 'lotsize8', 'lotsize9',
+                      'lotsize10', 'lotsize11', 'lotsize12', 'lotsize13',
+                      'lotsize14', 'lotsize15', 'lotsize16',
                       # MKD 層數系統
                       'PipStep1', 'lot1', 'beDist1', 'tpDist1', 'slDist1', 'trailStart1', 'trailDist1',
                       'PipStep2', 'lot2', 'beDist2', 'tpDist2', 'slDist2', 'trailStart2', 'trailDist2',
