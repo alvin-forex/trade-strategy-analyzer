@@ -22,7 +22,7 @@ from src.csv_parser import parse_csv
 from src.set_parser import parse_set
 from src.position_builder import build_positions
 from src.entry_quality import evaluate_positions
-from src.trade_statistics import (
+from src.statistics import (
     calculate_overall_stats, calculate_symbol_stats,
     calculate_layer_stats, calculate_time_stats,
     calculate_direction_stats
