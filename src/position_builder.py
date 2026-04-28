@@ -91,7 +91,7 @@ def add_position_key(df: pd.DataFrame) -> pd.DataFrame:
     df['direction'] = df['Type'].str.upper()
 
     # 將 Close Time 四捨五入到分鐘（處理 ±60秒容差）
-    df['close_time_rounded'] = df['Close Time'].dt.floor('T')
+    df['close_time_rounded'] = df['Close Time'].dt.floor('min')
 
     # 創建倉位鍵
     df['position_key'] = (
