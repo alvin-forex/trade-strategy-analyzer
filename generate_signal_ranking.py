@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Generate Signal Ranking HTML (DDE v3 Copy Strategy format)
-Avg Score = mean of all non-zero weighted_scores (CoP + CoL) across per-symbol per-level analysis
+Generate Signal Ranking HTML (DDE v4 — 5 dimensions)
+Win Rate 20% + Holding Time 5% + Trade Count 15% + Martin Layers 25% + Risk/Reward 35%
 """
 import sys
 import os
@@ -14,7 +14,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent / 'scripts'))
 sys.path.insert(0, str(Path(__file__).parent))
 
-from generate_all_levels_from_csv import analyze_trades_from_csv, analyze_by_levels
+from dde_v4_scorer import score_v4, read_csv_trades
 
 BASE_DIR = Path(__file__).parent
 SAMPLES_DIR = BASE_DIR / 'samples'
@@ -71,9 +71,9 @@ def get_score_class(score):
 
 def compute_signal_score(signal_id):
     """
-    Compute DDE v3 score for a signal.
-    Per-symbol, per-level analysis.
-    Avg Score = mean of all non-zero weighted_scores (CoP + CoL).
+    Compute DDE v4 score for a signal.
+    Per-symbol analysis using 5 dimensions:
+    Win Rate 20% + Holding Time 5% + Trade Count 15% + Martin Layers 25% + Risk/Reward 35%
     """
     csv_path = None
     for pattern in [f'forex-forest-signals-page-{signal_id}.csv', f'forex-forest-signals-page-{signal_id} (2).csv']:
@@ -85,51 +85,45 @@ def compute_signal_score(signal_id):
     if not csv_path:
         return None
     
-    trades = analyze_trades_from_csv(str(csv_path))
+    trades = read_csv_trades(str(csv_path))
     if not trades:
         return None
     
     by_symbol = defaultdict(list)
     for t in trades:
-        sym = t.get('symbol', t.get('currency', 'UNKNOWN'))
+        sym = t.get('symbol', 'UNKNOWN')
         by_symbol[sym].append(t)
     
     all_scores = []
-    star4 = 0
-    total = 0
+    red_cards = 0
+    total_symbols = 0
     
     for sym, sym_trades in by_symbol.items():
-        lr = analyze_by_levels(sym_trades, LEVEL_RANGES)
-        for level_name, ld in lr.items():
-            if ld.get('stats', {}).get('count', 0) == 0:
-                continue
-            for strategy in ['copy_on_profit', 'copy_on_lose']:
-                sdata = ld.get(strategy, {})
-                for wp, wp_data in sdata.items():
-                    score = wp_data.get('weighted_score', 0)
-                    rating = wp_data.get('rating', '')
-                    total += 1
-                    if score > 0:
-                        all_scores.append(score)
-                        if '⭐⭐⭐⭐' in rating:
-                            star4 += 1
+        total_symbols += 1
+        result = score_v4(sym_trades)
+        if result:
+            all_scores.append(result['score'])
+            if result.get('red_card'):
+                red_cards += 1
     
     if not all_scores:
         return None
     
     avg_score = round(sum(all_scores) / len(all_scores), 1)
+    clean_symbols = len(all_scores) - red_cards
     
     return {
         'avg_score': avg_score,
-        'star4_count': star4,
-        'cmp_total': len(all_scores),
-        'star4_pct': round(star4 / len(all_scores) * 100),
+        'clean_symbols': clean_symbols,
+        'total_symbols': total_symbols,
+        'clean_pct': round(clean_symbols / total_symbols * 100) if total_symbols else 0,
+        'red_cards': red_cards,
     }
 
 
 def main():
     print("=" * 60)
-    print("🦀 Signal Ranking Generator — DDE v3 Copy Strategy")
+    print("🦀 Signal Ranking Generator — DDE v4 (5 Dimensions)")
     print("=" * 60)
     
     with open(OUTPUT_DIR / 'batch_analysis_results.json') as f:
@@ -154,14 +148,14 @@ def main():
             print("SKIP")
             continue
         
-        print(f"Score={score_data['avg_score']} ⭐4={score_data['star4_count']}/{score_data['cmp_total']} ({score_data['star4_pct']}%)")
+        print(f"Score={score_data['avg_score']} Clean={score_data['clean_symbols']}/{score_data['total_symbols']} ({score_data['clean_pct']}%)")
         
         results.append({
             'signal_id': sid,
             'avg_score': score_data['avg_score'],
-            'star4_count': score_data['star4_count'],
-            'cmp_total': score_data['cmp_total'],
-            'star4_pct': score_data['star4_pct'],
+            'clean_symbols': score_data['clean_symbols'],
+            'total_symbols': score_data['total_symbols'],
+            'clean_pct': score_data['clean_pct'],
             'total_trades': rec.get('total_trades', 0),
             'win_rate': rec.get('win_rate', 0),
             'profit_factor': rec.get('profit_factor', 0),
@@ -179,14 +173,14 @@ def main():
     avg_score = sum(r['avg_score'] for r in results) / total_signals if total_signals else 0
     best_score = results[0]['avg_score'] if results else 0
     worst_score = results[-1]['avg_score'] if results else 0
-    avg_star4_pct = sum(r['star4_pct'] for r in results) / total_signals if total_signals else 0
+    avg_clean_pct = sum(r['clean_pct'] for r in results) / total_signals if total_signals else 0
     
     html = f'''<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Signal Ranking - DDE v3 Copy Strategy</title>
+<title>Signal Ranking - DDE v4 (5 Dimensions)</title>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0e17;color:#d0d0d0;padding:12px;font-size:13px}}
@@ -220,18 +214,18 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 </style>
 </head>
 <body>
-<h1>📊 Signal Ranking — DDE v3 Copy Strategy</h1>
-<div class="sub">Trigger 40% + Alpha Capture 40% + DDE 20% | {total_signals} signals | {datetime.now().strftime('%Y-%m-%d')}</div>
+<h1>📊 Signal Ranking — DDE v4 (5 Dimensions)</h1>
+<div class="sub">WR 20% + HT 5% + TC 15% + ML 25% + RR 35% | {total_signals} signals | {datetime.now().strftime('%Y-%m-%d')} | <a href="https://alvin-forex.github.io/trade-strategy-analyzer/ccy_timeframe_volatility.html" style="color:#64b5f6">📊 CCY波幅表</a></div>
 <div class="sum">
 <div><div class="v">{total_signals}</div><div class="l">Signals</div></div>
 <div><div class="v">{avg_score:.1f}</div><div class="l">Avg Score</div></div>
 <div><div class="v">{best_score:.1f}</div><div class="l">Best</div></div>
 <div><div class="v">{worst_score:.1f}</div><div class="l">Worst</div></div>
-<div><div class="v">{avg_star4_pct:.0f}%</div><div class="l">Avg ⭐⭐⭐⭐</div></div>
+<div><div class="v">{avg_clean_pct:.0f}%</div><div class="l">Avg Clean%</div></div>
 </div>
 <div style="overflow-x:auto;width:100%"><table><thead><tr>
-<th>#</th><th>Signal</th><th>Avg Score</th><th>⭐⭐⭐⭐</th><th>⭐⭐⭐⭐%</th>
-<th>Trades</th><th>Win%</th><th>PF</th><th>Total Profit</th><th>TF</th><th>Cmp</th>
+<th>#</th><th>Signal</th><th>DDE v4</th><th>Clean</th><th>Clean%</th>
+<th>Trades</th><th>Win%</th><th>PF</th><th>Total Profit</th><th>TF</th><th>Cmp</th> 
 <th>EA</th><th>LV</th><th>Eq Max DD</th>
 </tr></thead><tbody>
 '''
@@ -262,14 +256,14 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 <td>{rank}</td>
 <td class="sig">{r['signal_id']}</td>
 <td class="{score_cls}">{r['avg_score']}</td>
-<td class="p4">{r['star4_count']}</td>
-<td class="p4">{r['star4_pct']}%</td>
+<td class="p4">{r['clean_symbols']}</td>
+<td class="p4">{r['clean_pct']}%</td>
 <td>{r['total_trades']:,}</td>
 <td>{r['win_rate']:.1f}%</td>
 <td>{pf_str}</td>
 <td class="g">{r['total_profit']:,.0f} pips</td>
 <td><span class="tf">{r['timeframe']}</span></td>
-<td>{r['cmp_total']}</td>
+<td>{r['total_symbols']}</td>
 <td><span class="ea-tag {ea_cls}">{r['ea_type']}</span></td>
 <td class="m">{r['layer_info']}</td>
 <td class="m {dd_cls}">{r['max_dd']:,.0f} pips</td>
@@ -278,7 +272,7 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
     
     html += '</tbody></table></div></body></html>'
     
-    output_path = OUTPUT_DIR / 'signal_ranking_dde_v3.html'
+    output_path = OUTPUT_DIR / 'signal_ranking_dde_v4.html'
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html)
     
