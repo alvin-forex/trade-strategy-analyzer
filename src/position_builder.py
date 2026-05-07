@@ -138,6 +138,7 @@ def calculate_position_stats(group: pd.DataFrame, position_key: str) -> Dict[str
 
     # 盈虧統計
     net_profit = group['Net Profit'].sum()
+    net_pips = group['Net Pips'].sum() if 'Net Pips' in group.columns else 0
     max_profit = group['Max Profit'].sum()
     max_loss = group['Max Loss'].sum()
     max_pips = group['Max Pips'].max()  # 使用最大浮盈
@@ -173,6 +174,7 @@ def calculate_position_stats(group: pd.DataFrame, position_key: str) -> Dict[str
         'max_layer': max_layer,
         'layer_count': len(group),
         'net_profit': net_profit,
+        'net_pips': net_pips,
         'max_profit': max_profit,
         'max_loss': max_loss,
         'max_pips': max_pips,

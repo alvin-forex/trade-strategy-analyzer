@@ -42,6 +42,7 @@ def parse_csv(csv_path: str) -> pd.DataFrame:
 
     # 過濾非交易記錄（balance transfer、deposit 等）
     if 'Comment' in df.columns:
+        df['Comment'] = df['Comment'].fillna('').astype(str)
         non_trade = df['Comment'].str.contains('Transfer|Deposit|Withdraw|Balance', case=False, na=False)
         removed = non_trade.sum()
         if removed > 0:

@@ -27,10 +27,15 @@ def calculate_overall_stats(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
     total_positions = len(positions)
     total_trades = sum(len(p.get('trades', [])) for p in positions)
 
-    # 盈虧
+    # 盈虧 (USD)
     net_profits = [p['net_profit'] for p in positions]
     total_profit = sum(net_profits)
     avg_profit = np.mean(net_profits)
+
+    # 盈虧 (Pips)
+    net_pips_list = [p.get('net_pips', 0) for p in positions]
+    total_profit_pips = sum(net_pips_list)
+    avg_profit_pips = np.mean(net_pips_list) if net_pips_list else 0
 
     # 勝率
     wins = [p for p in positions if p['net_profit'] > 0]
@@ -44,13 +49,23 @@ def calculate_overall_stats(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
     # 賠率
     avg_win_loss_ratio = abs(avg_win / avg_loss) if avg_loss != 0 else 0
 
-    # Profit Factor
+    # Profit Factor (USD)
     total_gross_profit = sum([p['net_profit'] for p in wins])
     total_gross_loss = abs(sum([p['net_profit'] for p in losses]))
     profit_factor = total_gross_profit / total_gross_loss if total_gross_loss > 0 else float('inf')
 
-    # 最大回撤
+    # Profit Factor (Pips)
+    pips_wins = [p for p in positions if p.get('net_pips', 0) > 0]
+    pips_losses = [p for p in positions if p.get('net_pips', 0) <= 0]
+    total_gross_pips_profit = sum([p.get('net_pips', 0) for p in pips_wins])
+    total_gross_pips_loss = abs(sum([p.get('net_pips', 0) for p in pips_losses]))
+    profit_factor_pips = total_gross_pips_profit / total_gross_pips_loss if total_gross_pips_loss > 0 else float('inf')
+
+    # 最大回撤 (USD)
     max_dd, max_dd_percent = calculate_max_drawdown(net_profits)
+
+    # 最大回撤 (Pips)
+    max_dd_pips, _ = calculate_max_drawdown(net_pips_list)
 
     # 平均層數和持倉時間
     avg_layers = np.mean([p['max_layer'] for p in positions])
@@ -115,8 +130,12 @@ def calculate_overall_stats(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
         'avg_win_loss_ratio': round(avg_win_loss_ratio, 2),
         'profit_factor': round(profit_factor, 2),
         'total_profit': round(total_profit, 2),
+        'total_profit_pips': round(total_profit_pips, 2),
         'avg_profit': round(avg_profit, 2),
+        'avg_profit_pips': round(avg_profit_pips, 2),
+        'profit_factor_pips': round(profit_factor_pips, 2),
         'max_dd': round(max_dd, 2),
+        'max_dd_pips': round(max_dd_pips, 2),
         'max_dd_percent': round(max_dd_percent, 2),
         'avg_layers': round(avg_layers, 2),
         'avg_holding_time_hours': round(avg_holding_time, 2),

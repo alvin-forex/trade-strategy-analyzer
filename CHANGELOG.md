@@ -4,6 +4,65 @@
 - **Major**：新功能模組 / 架構改動
 - **Minor**：bug fix / 小優化 / UI 調整
 
+## [v4.0] — 2026-05-02
+### 🔥 DDE v3 Copy Strategy 評分系統
+
+**重大架構更新 — 全新評分引擎**
+
+- **DDE v3 評分公式**：Trigger Rate (40%) + Alpha Capture Profit (40%) + DDE Drawdown Efficiency (20%)
+  - 取代舊 Entry Score + Strategy Score 兩層架構
+  - 專注 Copy Trade 場景，評估跟單可行性同回報
+
+- **Scoring Audit（3 項修復）**：
+  - ✅ balance/credit 過濾 — Type=balance/credit 必須排除
+  - ✅ 小樣本回退 — n < 30 自動混和 global percentiles
+  - ✅ ETE → DDE — 舊 ETE 分辨力接近零（96-97%），DDE 分佈合理（0-100）
+
+- **Alpha Capture 動態評分**：
+  - Baseline = max(signal P50, global P25=$1.52)
+  - P85 → 120 分（capped），P50-P85 → 70-100，below P50 → 0-70
+  - Floor $5.00 過濾垃圾交易
+
+- **Signal Ranking 總表**（57 signals）：
+  - 欄位：# / Signal / Avg Score / ⭐⭐⭐⭐ / ⭐⭐⭐⭐% / Trades / Win% / PF / Total Profit / TF / Cmp / EA / LV / Eq Max DD
+  - 移除無意義欄位：Bar / Grid / DD Ctrl / TP/SL 命中率 / EA Family / Parameter Impact
+  - EA CSS 標籤（DW/SMA/MKD/S10/Flash/GEM）+ DD 顏色分級
+  - 置左對齊 + mobile 橫向捲動
+
+- **Martin Detection（馬丁偵測）**：
+  - Classic Martin（profit > 0 且 pips < 0）
+  - Reverse Martin（pips > 0 且 profit < 0）
+  - Cost Killed（gross profit > 0 但 net profit < 0）
+  - 51/57 signals (89%) 有馬丁特徵
+
+- **Martin LV 分佈分析**（由 .set 計算）：
+  - DW: 21 signals, 8LV（LotMul ×2.5）
+  - SMA: 15 signals, 7-15LV（lotExp + pipstep）
+  - MKD: 9 signals, 6-10LV（PipStep）
+  - S10: 2 signals, 0LV（平注碼 MaxBuyCount=10, autoLotSize）
+  - Flash: 1 signal, 11LV
+  - GEM: 1 signal, 0LV
+
+- **TP/SL 建議**（Copy on Profit 專用）：
+  - TP = P85 of Max Pips（盈利交易，85% 可達成）
+  - SL = P85 of Max Loss Pips（所有交易，85% 扛得住）
+  - 固定值，小樣本自動 fallback 到 global percentiles
+  - 2,314 個 TP/SL 配對，R:R 中位數 2.05
+  - 只喺 CoP 顯示，CoL 唔顯示（recovery 策略唔同邏輯）
+
+- **報告生成**：
+  - 57 份 detailed_comparison_all_levels_*.html（全部含 DDE + Martin + TP/SL）
+  - signal_ranking_dde_v3.html 排名總表
+  - full_cross_reference.html（.set vs 交易表現對照）
+  - dd_control_analysis.html（DD 控制分析）
+
+- **數據管理**：
+  - 57 個 CSV 齊全（samples/）
+  - CSV 比對：38 identical, 19 differ (scraper fresher), 1 patched
+  - batch_analysis_results.json: 58 entries (57 unique, signal 25668 duplicate)
+
+- **PRD 更新**：v0.3 → v0.5，完整記錄 DDE v3 系統
+
 ---
 
 ## [v3.5] — 2026-04-25

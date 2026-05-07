@@ -231,13 +231,74 @@ SET上傳 → parseSET() → setParams{}    buildLayerMapping(trades) → layerM
 
 ---
 
+## 15. 🔬 DDE v3 Copy Strategy 評分（後端 Python）
+
+### 點解要 DDE v3
+
+原始 PRD v0.3 嘅 Entry Score + Strategy Score 兩層架構，設計給單一策略深度分析。但當要比較 57 個唔同 EA、唔同參數、唔同時間框架嘅信號時，需要一個統一嘅跨策略評分標準。
+
+DDE v3 專注於一個具體場景：**「如果我 Copy 呢個信號，成功機率同回報係點？」**
+
+### 評分維度設計思維
+
+**Trigger Rate (40%)** — 「幾容易觸發跟單？」
+- CoP：盈利交易中幾多曾到達 wait_pips → 觸發率
+- CoL：虧損交易中幾多曾跌到 wait_pips → 觸發率
+- 40% 權重因為「觸發唔到就跟唔到」，係最基本的門檻
+
+**Alpha Capture (40%)** — 「跟咗之後食到幾多利潤？」
+- 動態百分位評分，唔用固定基準（因為唔同 EA、唔同貨幣對利潤尺度差異巨大）
+- 小樣本自動 fallback 到 global percentiles（n < 30）
+- 120 分上限容許「超越 P75」嘅優秀表現獲得 bonus
+
+**DDE (20%)** — 「跟咗之後頂得住幾耐回撤？」
+- dd_ratio = |max_loss_pips| / profit_pips，capped at 2.0
+- 取代舊 ETE，因為 ETE 嘅 wait_pips/Max Pips 比例幾乎全部 96-97%，完全冇分辨力
+- DDE 分佈合理（0-100），有效區分高風險同低風險組合
+
+### 為何分 per-symbol per-level per-wait_pips
+
+唔同貨幣對嘅波幅特性完全唔同（XAUUSD vs EURCHF），唔同層數嘅風險都唔同（L1 vs L4+）。如果用聚合數據計算一個平均分，會掩蓋個別組合嘅好壞。
+
+所以每個 signal 有 8-30 個貨幣對 × 4 個層數 × 8 個 wait_pips（CoP 4 + CoL 4）= 幾百個評分維度。呢啲維度嘅 non-zero 平均值就係 Avg Score。
+
+### LEVEL_RANGES 點解用 pips 而唔用 Lots
+
+因為唔同 EA 嘅加倉方式完全唔同：
+- DW: LotMul ×2.5 遞增
+- SMA: lotExp 指數 + pipstep
+- MKD: PipStep 網格
+- S10: 固定 lotSize
+
+用 Lots 分層無法統一。改用 Max Pips 絕對值分 L1(0-50)/L2(50-100)/L3(100-150)/L4+(150+)，跨 EA 可比較。
+
+### Martin Detection 設計思維
+
+馬丁策略嘅「獲利」可能係假象：
+- Classic Martin: 方向錯咗但靠加倉拉平成本獲利 → profit > 0 但 pips < 0
+- Reverse Martin: 方向啱但成本吃掉利潤 → pips > 0 但 profit < 0
+- Cost Killed: 毛利正但 net 為負 → swap/commission 太高
+
+51/57 signals 有馬丁特徵，說明大部分 AlgoForest 信號都依賴馬丁加倉。呢個資訊對 Copy Trade 決策至關重要。
+
+### TP/SL P85 嘅選擇
+
+Alvin 要求「85% 成功率」：
+- P85 本身已排除 top 15% 極端值（自帶 trim）
+- 唔使用 P50（太保守，50% 交易到唔到 TP）
+- 唔使用 P95（太激進，只有 5% margin）
+- P85 = 「絕大多數都能達到」嘅最佳平衡點
+
+---
+
 ## 已知限制
 
-1. **無回測引擎** — 唔可以模擬「如果用唔同 SET 會點」，只能分析已經跑出嚟嘅結果
+1. **無 Tick Data** — 無法精確知道入場後嘅實時價格走勢，TP/SL 觸發時間只係估算
 2. **D1 精度** — 市況分類用日線，對於 M5/H1 EA 可能唔夠精細
-3. **單文件限制** — 4365 行已經開始難維護，未來可能需要拆分
+3. **單文件限制** — 前端 4365 行已經開始難維護，後端 generate_all_levels_from_csv.py 已 1356 行
 4. **無多用戶** — localStorage 只支持單用戶，唔支持跨設備同步
 5. **5MB 存檔上限** — 大量歷史分析可能爆限
+6. **CoP 勝率 100% 問題** — 其他 AI 指出 CoP 只睇盈利交易導致勝率永遠 100%，20% 權重白送。待討論改進方案。
 
 ---
 

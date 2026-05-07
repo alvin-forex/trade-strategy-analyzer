@@ -1,16 +1,16 @@
 # PRD：交易策略分析系統（Trade Strategy Analyzer）
 
-> **版本：** v0.3（四方 Review 整合版：GLM-5 + GLM-4.7 + ChatGPT + Deepseek）
-> **日期：** 2026-04-24
+> **版本：** v0.5（DDE v3 Copy Strategy 整合版）
+> **日期：** 2026-05-02
 > **作者：** 丁蟹 + Alvin
-> **狀態：** 待多模型 Review
+> **狀態：** 已實作，持續迭代中
 
 ---
 
 ## 1. 背景與目標
 
 ### 1.1 問題
-Alvin 在 Forex Forest 平台管理多個信號頁（如 #14581），每個信號頁跑不同的 EA 策略。目前：
+Alvin 在 AlgoForest（Forex Forest）平台管理多個信號頁（如 #14581），每個信號頁跑不同的 EA 策略。目前：
 - 只能從平台下載 `.csv` 交易數據和 `.set` 策略設定檔
 - 缺乏系統化方法分析策略的**入市準確性**和**性價比**
 - 無法從歷史交易中提煉出哪些策略適合 Copy Trade
@@ -27,8 +27,13 @@ Alvin 在 Forex Forest 平台管理多個信號頁（如 #14581），每個信�
 **目標二：Copy Trade 策略篩選**
 - 從交易數據中識別高勝率、高性價比的策略
 - 分析單層 vs 多層（馬丁）交易的表現
-- 建議最優 TP/SL/TSL 設定
+- 建議最優 TP/SL 設定
 - 評估 Copy on Profit vs Copy on Lose 的適用性
+
+**目標三：DDE v3 Copy Strategy 評分排名**
+- 用統一嘅 DDE v3 公式對所有信號進行跨策略比較
+- 產生排名總表，識別最佳 Copy 信號
+- 為每個貨幣對、每個層數提供精細化建議
 
 ---
 
@@ -36,13 +41,13 @@ Alvin 在 Forex Forest 平台管理多個信號頁（如 #14581），每個信�
 
 ### 2.1 交易數據（.csv）
 
-來源：Forex Forest 信號頁下載
+來源：AlgoForest 信號頁下載（scraper 或 Windows 手動）
 
 | 欄位 | 類型 | 說明 | 分析用途 |
 |------|------|------|---------|
 | Open Time | datetime | 開倉時間 | 時段分析、入市時機 |
-| Type | string | buy / sell | 方向 |
-| Lots | float | 手數 | 判斷第幾層（0.02=L1, 0.04=L2, 0.06=L3, 0.12=L4, 0.21=L5, 0.38=L6） |
+| Type | string | buy / sell / balance / credit | 方向（非 buy/sell 需過濾） |
+| Lots | float | 手數 | 判斷層數（結合 .set pipstep/lotsize） |
 | Symbol | string | 貨幣對 | 分組 |
 | Open Price | float | 開倉價 | 計算實際點差 |
 | Close Time | datetime | 平倉時間 | 倉位重構分組鍵 |
@@ -60,675 +65,465 @@ Alvin 在 Forex Forest 平台管理多個信號頁（如 #14581），每個信�
 | Holding Time (Hours) | float | 持倉小時 | 效率分析 |
 | Holding Time | string | 可讀格式 | 顯示用 |
 
-**已知特徵：**
-- 一個 .csv 包含一個信號頁所有貨幣對的交易
-- 同一貨幣對可能有多筆交易（馬丁多層）
-- Magic Number 區分方向（88=BUY, 77=SELL）
-- Close Time 相同 + Symbol 相同的多筆交易 = 同一倉位被整體平倉
-- Lots 遞增模式：0.02 → 0.04 → 0.06 → 0.12 → 0.21 → 0.38（lotExp=1.8）
+**數據過濾規則：**
+- `Type=balance` / `Type=credit` 不屬於交易，必須排除
+- 只處理 `Type=buy` / `Type=sell` 行
+- 此過濾對所有分析指標有直接影響
+
+**數據來源比對：**
+- Scraper 版本（即時從 AlgoForest 下載）通常較新鮮
+- Windows 手動下載版本可能是較早 snapshot
+- 兩者差異通常只有幾行（新交易加入）
+- 建議優先使用 Scraper 版本
 
 ### 2.2 策略設定檔（.set）
 
-來源：Forex Forest 信號頁下載，key=value 格式。
+來源：AlgoForest 信號頁下載，key=value 格式。每個 signal 可有多個 .set（按上載日期排列）。
 
-#### 基本設定
-```
-EA_NAME=SMA v3.00
-EA_VERSION=20250805
-EA_SYMBOL=USDJPY          # 此設定對應的貨幣對
-EA_PERIOD=240             # 圖表時間框架（分鐘），240=H4
-OpenType=2                # 開倉類型
-TradeType=2               # 交易類型
-Trading_Mode=2            # 交易模式
-```
+#### EA 家族參數對照
 
-#### MA 系統（方向判定 + 入市觸發）
-```
-BasicMaTimeframes=60      # 主MA時間框架（H1）
-BasicMaLine1_Period=80    # 長線MA1 — 大方向
-BasicMaLine2_Period=120   # 長線MA2 — 大方向
-BasicMaLine345_Period=20  # 中線MA
-BasicMaLine6_Period=5     # 短線MA
-BasicMaShift=1            # 用前一支bar
+| EA 家族 | 代表版本 | 加倉方式 | LV 層數 | TP 模式 | SL 模式 |
+|---------|----------|----------|---------|---------|---------|
+| **Dragon Wave (DW)** | v1/v2/v2.10 | LotMul 倍投（×2.5） | 8 | VirtualTP=0（隱藏） | VirtualSL |
+| **SMA** | v2/v3/Pro v5 | lotExp 指數遞增 + pipstep | 7-15 | DollarMode + DynamicTP | slInLevel |
+| **MKD** | v2/v3/Pro v5 | PipStep 網格 | 6-10 | PipStep 追蹤 | TradeCloseOnlyOnDD |
+| **S10** | — | 固定 lotSize（平注碼馬丁） | 0（或 10 層平注） | TrailingStart+Dist | TradeCloseOnlyOnDD |
+| **Flash** | — | CheckLevels | 11 | — | — |
+| **GEM** | — | 無馬丁 | 0 | — | — |
 
-FollowMADirection=0       # 否跟隨MA方向
-CloseByMADirection=0      # 否按MA方向平倉
+**S10 特殊說明：**
+- `MaxBuyCount=10` / `MaxSellCount=10` = 最大同時持倉數量
+- 每層固定 `lotSize=0.15`，無遞增（平注碼馬丁）
+- 有 `autoLotSize` 功能（根據賬戶餘額自動調整）
+- `TrailingStart=25` / `TrailingDist=5` 替代傳統 TP
+- `TakeProfit=0` 表示用 Trailing 替代固定 TP
 
-EnterMaTimeframes=30      # 入市MA時間框架（M30）
-EnterMaLine_Period=3      # 入市觸發MA — 短期穿越
-EnterMaShift=1            # 用前一支bar
-```
-
-**推斷邏輯：**
-- MA Line1(80) > MA Line2(120) = 上升趨勢 → 只做 BUY
-- MA Line1(80) < MA Line2(120) = 下降趨勢 → 只做 SELL
-- EnterMA(3) 在 M30 穿越觸發具體入市時機
-
-#### 濾鏡系統（全部要通過先入市）
-```
-UseAISignal=1             # ⚠️ AI信號（邏輯未知，待確認）
-
-UseVlt=1                  # 波幅濾鏡
-  VolatilityApplied=0
-  VltTf=30                # M30
-  VltPeriod=48            # ATR(48)
-  VltFrom=8               # 波幅下限
-  VltUntil=20             # 波幅上限
-
-UseRSI=1                  # RSI濾鏡
-  effRsi_TF=60            # H1
-  effRsi_period=8         # RSI(8)
-  effRsi_price=0          # Close price
-  effRsi_shift=1          # 用前一支bar
-  effRsi_high=70.0        # RSI>70 唔買（超買）
-  effRsi_low=30.0         # RSI<30 唔賣（超賣）
-
-UseBB=1                   # 布林帶濾鏡
-  effBB_TF=60             # H1
-  effBB_period=20         # BB(20)
-  effBB_deviation=2.0     # 2倍標準差
-  effBB_shift=0           # 當前bar
-  effBB_price=0           # Close price
-
-UseCorrelation=0          # 相關性濾鏡（此例關閉）
-  CorrTf=240, CorrPeriod=20, MaxCorr=70, MinCorr=0
-```
-
-#### 馬丁加倉系統
-```
-EntryLot=0.02             # 第1層手數
-lotExp=1.8                # 每層倍率（1.8x）
-pipstep2=50               # 第2層距離（pips）
-pipstep3=60               # 第3層
-pipstep4=70               # 第4層
-pipstep5=80               # 第5層
-pipstep6=90               # 第6層
-pipstep7=100              # 第7層
-pipstep8=110              # 第8層
-slInLevel=9               # 第9層止損（到第9層就止損）
-```
-
-**層數計算：**
-| 層數 | Lots | 倍率 | pipstep | 累計 pips |
-|------|------|------|---------|-----------|
-| L1 | 0.02 | 1.0 | — | 0 |
-| L2 | 0.04 | 2.0 | 50 | 50 |
-| L3 | 0.06 | 3.0 | 60 | 110 |
-| L4 | 0.12 | 6.0 | 70 | 180 |
-| L5 | 0.21 | 10.5 | 80 | 260 |
-| L6 | 0.38 | 19.0 | 90 | 350 |
-| L7+ | ... | ... | 100-110 | 450+ |
-
-#### TP/SL 系統（出市條件）
-
-**動態 TP（DynamicTP=1）：**
-```
-MA_TopReturnTF=5          # M5 MA回折偵測
-MA_TopReturnPeriod1=5     # MA(5)
-MA_TopReturnPeriod2=10    # MA(10)
-MA_TopReturnShift=1       # 前一支bar
-MA_TopReturnStart=30.0    # 跑咗30 pips後啟動
-MA_TopReturnDist=5.0      # MA回折5 pips觸發TP
-DynTP_DollarTrail=0.5     # $0.5追蹤
-```
-
-**金額 TP（DollarMode=1）：**
-```
-DollarStart=2.0           # 賺$2開始追蹤
-DollarTrail=1.0           # 回落$1就TP
-DollarBreakStart=2.0      # 賺$2後啟動保本
-DollarBreakEven=1.0       # 保本$1
-DollarLoss=0.0            # 無硬止損金額
-```
-
-**第0層（首層）TP：**
-```
-DollarMode0=1             # 第0層獨立金額TP
-DollarStart0=2.0
-DollarTrail0=1.0
-DollarBreakStart0=2.0
-DollarBreakEven0=1.0
-```
-
-**硬性止損：**
-```
-slInLevel=9               # 第9層止損
-TradeCloseOnlyOnDD=15.0   # DD 15%全部平倉
-TradeModeResetOnDD=15.0   # DD 15%重設
-```
-
-#### Cooldown（冷卻期）
-```
-CooldownAfterClose=1      # 平倉後冷卻
-CooldownMA_TF=60          # H1 MA
-CooldownMA_Period=25      # MA(25)
-CooldownMA_Shift=1        
-UseCooldownAfterClose=0   # 未啟用按分鐘冷卻
-CooldownMinute=60         # 60分鐘
-```
-
-#### 新聞過濾
-```
-HighNews=1                # 高影響新聞
-  HighIndentBefore=1440   # 前24小時
-  HighIndentAfter=720     # 後12小時
-NFPNews=1                 # 非農
-  NFPIndentBefore=1440    # 前24小時
-  NFPIndentAfter=720      # 後12小時
-SpeaksNews=1              # 央行官員講話
-  SpeaksIndentBefore=1440
-  SpeaksIndentAfter=720
-```
-
-#### 其他
-```
-MaxSpread=3.0             # 最大點差
-MaxSlippage=3.0           # 最大滑點
-ExportSummaryReport=1     # 導出報告
-SendBEDSignal=1           # 發送信號
-```
+**LV（馬丁層數）偵測方法：**
+- 由 .set 檔案 case-insensitive 計算 `pipstep\d*` / `lotsize\d*` / `LotMul` 等參數
+- DW：LotMul 加倉預設 8 層
+- SMA：數 pipstep2 到最大 pipstepN
+- MKD：數 PipStep1 到 PipStepN
+- S10：MaxBuyCount 即為層數，但屬平注碼
 
 ---
 
-## 3. 數據處理邏輯
+## 3. DDE v3 Copy Strategy 評分系統
 
-### 3.1 倉位重構
+> **核心更新**：取代原有嘅 Entry Score + Strategy Score 兩層架構。DDE v3 專注於 Copy Trade 場景，評估「跟單」嘅可行性同回報。
 
-CSV 中每一行是一筆獨立交易，但實際上多筆交易組成一個「倉位」。重構規則：
+### 3.1 評分公式
 
-**分組鍵：Symbol + Direction + Close Time（容差 ±60 秒）**
+**DDE v3 Score = Trigger Rate (40%) + Alpha Capture Profit (40%) + DDE (20%)**
 
-> **改進說明**：加入 Direction 防止 BUY/SELL 被錯誤合併；加入時間容差處理批量平倉嘅 1-2 秒差異。
-
-**部分平倉檢測：**
-- 如果同 Symbol 嘅交易 Close Time 差距 > 5 分鐘 → 可能係部分平倉
-- 標記為特殊倉位，分開統計
+#### 指標 1：Trigger Rate（觸發率）— 權重 40%
 
 ```
-範例：
-Open Time          | Symbol | Lots | Close Time         | Magic
-2026-02-05 11:00   | GBPCHF | 0.02 | 2026-03-02 15:12   | 88    ← L1
-2026-02-09 11:00   | GBPCHF | 0.04 | 2026-03-02 15:12   | 88    ← L2
-2026-02-27 17:00   | GBPCHF | 0.21 | 2026-03-02 15:12   | 88    ← L5
-2026-02-26 20:00   | GBPCHF | 0.12 | 2026-03-02 15:12   | 88    ← L4
+Trigger Rate Score = min(trigger_rate × 100, 100) × 0.4
 ```
 
-同一 Symbol + 同一 Close Time = 一個倉位，包含 L1 到 L5。
+- **Copy on Profit**：`trigger_rate = 觸發數 / 盈利交易數`
+  - 只計 `net_profit > 0` 嘅交易
+  - 觸發判定：`Max Pips >= wait_pips`
+  - wait_pips 測試值：5, 10, 15, 20
+- **Copy on Lose**：`trigger_rate = 觸發數 / 虧損交易數`
+  - 只計 `net_profit <= 0` 嘅交易
+  - 觸發判定：`|Max Loss Pips| >= wait_pips`
+  - wait_pips 測試值：10, 15, 20, 25
 
-**倉位級別統計：**
-- 倉位總手數 = sum(Lots)
-- 倉位總盈虧 = sum(Net Profit)
-- 倉位最大層數 = max(layer)
-- 倉位總持倉時間 = max(Close Time) - min(Open Time)
+#### 指標 2：Alpha Capture Score（利潤捕捉分）— 權重 40%
 
-**層數判定：** 根據 Lots 推算（基於 lotExp）
-- 0.02 = L1
-- 0.04 = L2（0.02 × 1.8 ≈ 0.036，四捨五入到 0.04）
-- 0.06 = L3
-- 0.12 = L4
-- 0.21 = L5
-- 0.38 = L6
+**動態百分位評分（0-120 scale）：**
 
-### 3.2 .set 解析
+```
+baseline = max(signal_P50, global_P25)  # 下限保護
+floor = $5.00  # 垃圾交易過濾
 
-解析 key=value 格式，自動分類參數：
+if avg_profit >= P75:
+    score = 100 + bonus  # bonus capped at 20, total capped at 120
+elif avg_profit >= P50:
+    score = 70 + (avg_profit - P50) / (P75 - P50) × 30  # 線性插值 70-100
+elif avg_profit >= baseline:
+    score = (avg_profit - baseline) / (P50 - baseline) × 70  # 線性插值 0-70
+else:
+    score = 0
 
-| 分類 | 前綴/關鍵字 |
-|------|------------|
-| 基本 | EA_NAME, EA_SYMBOL, EA_PERIOD, Trading_Mode |
-| MA系統 | BasicMa*, EnterMa* |
-| 濾鏡 | Use*, eff*, Vlt*, Corr* |
-| 馬丁 | EntryLot, lotExp, pipstep* |
-| TP/SL | Dollar*, DynamicTP, MA_TopReturn*, slInLevel |
-| 新聞 | HighNews*, NFPNews*, SpeaksNews* |
-| 冷卻 | Cooldown* |
+Alpha Capture Score = score × 0.4
+```
 
----
+**百分位計算：**
+- `compute_signal_percentiles()` — 計算信號級別嘅 P25/P50/P75
+- `get_effective_percentiles()` — 小樣本回退（n < 30 時自動混和 global percentiles）
+- Global percentiles 基於所有 57 個信號嘅綜合數據
 
-## 4. 功能需求
+#### 指標 3：DDE（Drawdown Efficiency，回撤效率）— 權重 20%
 
-### 4.1 Phase 1：MVP（核心分析）
+> **歷史**：取代舊嘅 ETE（Early Trigger Efficiency），因為 ETE 嘅分辨力接近零（96-97% 跨所有 wait_pips）。
 
-#### F1：文件解析
-- 讀取 .csv，自動識別欄位
-- 讀取 .set，自動分類參數
-- 支援一個 .csv 對應多個 .set（不同貨幣對不同設定）
+```
+dd_ratio = |max_loss_pips| / profit_pips  # 單筆交易
+dd_ratio = min(dd_ratio, 2.0)            # cap at 2.0
+avg_dd_ratio = mean(dd_ratios)            # 該組合平均
+DDE Score = max(0, 100 - 50 × avg_dd_ratio) × 0.2
+```
 
-#### F2：倉位重構
-- 按 Symbol + Close Time 分組
-- 自動識別層數（根據 Lots 推算）
-- 計算倉位級別統計
+**DDE 分佈實況（57 signals）：**
+- 中位數：76.0 分
+- P25-P75：62.5 - 87.5
+- 範圍：0 - 100
+- 分辨力遠勝舊 ETE（96-97%）
 
-#### F3：入市質量評估（兩層評分架構）
+### 3.2 評級標準
 
-> **⚠️ 四方 Review 共識**：馬丁策略唔可以用「單筆 L1 表現」混合評估「多層策略」。ChatGPT 同 Deepseek 一致建議拆成兩層。
+| 分數 | 評級 | 含義 |
+|------|------|------|
+| ≥ 80 | ⭐⭐⭐⭐ | 高質量，建議 Copy |
+| ≥ 60 | ⭐⭐⭐ | 中等，需要評估 |
+| ≥ 40 | ⭐⭐ | 偏弱，需要調整 |
+| < 40 | ⭐ | 不建議 |
 
-##### Layer 1：Entry Signal Quality（入市信號質量）
+### 3.3 Signal Ranking 計算方法
 
-只評估每個倉位嘅**第 1 層（L1）**，純粹量度入市信號嘅好壞：
+**Avg Score = mean(所有 non-zero CoP + CoL scores)**
 
-**維度 1：方向準確性（Direction，35%）**
-- **⚠️ 關鍵修正**：用 `Max Pips` 而唔係 `Net Pips` 判斷方向
-  - 原因：L1 可能 Max Pips=100 但最終 Net Pips=-10（因為加倉後才回歸）
-  - 用 Net Pips 會誤判為「方向錯」，但其實入市方向係啱嘅
-- Max Pips > 20 = 方向正確 ✅ / Max Pips ≤ 20 = 方向弱 ⚠️ / Max Pips ≈ 0 = 方向錯 ❌
-- **方向強度**：min(Max Pips / 100, 1.0) 作為強度係數
+- 分別計算每個貨幣對、每個層數（L1-L4+）、每個 wait_pips 組合嘅 DDE v3 分數
+- 過濾 score = 0 嘅組合（trigger_count = 0，即冇足夠數據）
+- 取所有 non-zero scores 嘅平均值作為信號嘅 Avg Score
 
-**維度 2：入市時機（Timing，35%）**
-- `Max Pips` = 入市後最大有利幅度
-- `Max Loss Pips` = 入市後最大不利幅度
-- **時機分數** = Max Pips / (Max Pips + |Max Loss Pips|)
-  - 接近 1.0 = 即刻大賺 🟢 / 0.5 = 先虧再賺 🟡 / 接近 0.0 = 大幅浮虧 🔴
-- **邊界處理**：Max Pips 同 |Max Loss Pips| 都 < 5 pips → 時機分數 = 0.5
-- **馬丁修正**：多層倉位嘅 L1 本來就會承受較大浮虧（pipstep 設計），加入衰減因子減輕懲罰
+**Cmp = non-zero scoring entries 總數**
 
-**維度 3：初始回撤（Initial Drawdown，30%）**
-- `Max Loss Pips` = L1 最大浮虧深度
-- **回撤分數** = 1 - min(|Max Loss Pips| / 200, 1.0)
-  - <50 pips = 小回撤 🟢 / 50-150 = 中等 🟡 / >150 = 大回撤 🔴
+- 代表「有幾多個有效嘅評分維度」
+- Cmp 越大 = 數據越豐富，評分越可靠
 
-**Entry Score 評級：**
-- 🟢 A（80-100）：入市信號優質
-- 🟡 B（60-79）：入市信號一般
-- 🟠 C（40-59）：入市信號偏弱
-- 🔴 D（0-39）：入市信號差
+**⭐⭐⭐⭐ count = non-zero entries 中 score ≥ 80 嘅數量**
 
----
+**⭐⭐⭐⭐% = ⭐⭐⭐⭐ count / Cmp × 100**
 
-##### Layer 2：Strategy Execution Quality（策略執行質量）
+### 3.4 LEVEL_RANGES（層數分組）
 
-評估**整個倉位**（L1 到 LN）嘅策略執行效果：
+基於 CSV 數據嘅 `Net Pips`（或 `Max Pips`）絕對值：
 
-**維度 1：回歸性（Regression，30%）**
-- 高層數（L4+）倉位最終 Net Profit 正 vs 負嘅比例
-- **分層回歸度**：每層嘅勝率（L1~55%, L4~75%, L6~95%）
-  - L4+ 回歸度必須顯著高於 L1，否則馬丁無意義
-- **Recovery Factor by Layer**：Net Profit / Max Floating Loss
-  - 量化「賺得多但頂過好深 DD」嘅情況
-- **Time-to-Recover**：L4+ 平均幾耐先回本
-  - 成功但要 20 日 = 資金效率差
+| 層數 | Pips 範圍 | 含義 |
+|------|-----------|------|
+| L1 | 0 - 50 | 淺層交易 |
+| L2 | 50 - 100 | 中層交易 |
+| L3 | 100 - 150 | 深層交易 |
+| L4+ | 150+ | 極深層交易 |
 
-**維度 2：出場效率（Exit Efficiency，25%）**
-- 贏倉：Net Profit / Max Profit（食咗幾多利潤）
-- 輸倉：|Net Loss| / |Max Loss|（止損及唔及時）
-- **TP 系統判定**：反推每個倉位係 DollarMode 定 DynamicTP 觸發出場
-  - 如果 Net Pips < MA_TopReturnStart(30) 但接近 DollarStart/pip_value → DollarMode
-  - 如果 Net Pips > 30 且 MA 回折明顯 → DynamicTP
+### 3.5 Copy on Profit vs Copy on Lose
 
-**維度 3：風險控制（Risk Control，20%）**
-- 最大層數、Max DD、DD 持續時間
-- **Layer Escalation Probability**：P(L1→L2)、P(L2→L3)...
-- **Margin Stress**：同時持倉嘅總手數（多貨幣對系統性風險）
+**Copy on Profit（跟單盈利）—「確認方向後再進場」**
 
-**維度 4：收益質量（Profit Quality，15%）**
-- Profit Factor、盈虧偏度（Skewness）
-- 正偏度 = 偶爾大賺小虧（好）/ 負偏度 = 經常小賺偶爾大虧（馬丁失效特徵）
-
-**維度 5：成本 + 持倉（Cost + Holding，10%）**
-- Swap + Commission 佔比
-- 持倉效率：每小時收益
-- Exposure Time %：幾多時間有倉
-
----
-
-##### 綜合評分
-
-**Final Score = Entry Score × 0.4 + Strategy Score × 0.6**
-
-> **為何 Strategy 佔 0.6？** 因為馬丁策略嘅核心價值在於多層後嘅回歸能力同出場效率，而非單純 L1 入市質量。L1 錯唔代表策略錯（係預期內），L1 好反而可能冇觸發盈利最大化。
-
-**綜合評級：**
-- 🟢 A（80-100）：策略優質，可 Copy
-- 🟡 B（60-79）：策略一般，需評估
-- 🟠 C（40-59）：策略偏弱，需調整
-- 🔴 D（0-39）：策略差，不建議跟
-
-#### F4：基礎統計
-
-**整體統計：**
-| 指標 | 計算方式 |
-|------|---------|
-| 總倉位數 | 重構後的倉位數量 |
-| 總交易數 | CSV 行數 |
-| 勝率 | Net Profit > 0 的倉位 / 總倉位 |
-| 平均盈利 | 贏倉的平均 Net Profit |
-| 平均虧損 | 輸倉的平均 Net Profit |
-| 賠率（Avg W/L Ratio） | 平均盈利 / |平均虧損| |
-| Profit Factor | 總盈利 / 總虧損 |
-| Max DD（最大回撤） | 連續虧損最大值 |
-| Max DD% | 最大回撤 / 最高淨值 |
-| 平均層數 | 所有倉位的平均層數 |
-| 平均持倉時間 | 所有倉位的平均持倉時間 |
-| 總 Swap 成本 | 所有 Swap 的總和 |
-| 總 Commission | 所有 Commission 的總和 |
-| Sharpe Ratio | (平均收益 - 無風險利率) / 收益標準差 |
-| Calmar Ratio | 總收益 / Max DD |
-| Sortino Ratio | (平均收益 - 無風險利率) / 下行標準差 |
-| 回撤恢復時間 | DD 底部到新高的天數 |
-| 最大連虧倉位數 | 連續虧損的最大倉位數 |
-| 最大連虧金額 | 連續虧損的最大金額 |
-| 盈虧偏度（Skewness） | 正偏=偶爾大賺小虧（好），負偏=經常小賺偶爾大虧（差） |
-| 盈虧中位數 vs 平均數 | median < mean = 正偏（好） |
-
-**按貨幣對統計：**
-- 每對貨幣獨立計算上述所有指標
-- 排名：按 PF 或勝率排序
-- 識別：最適合 / 最不適合該策略的貨幣對
-
-**按層數統計：**
-| 層數 | 出現次數 | 佔比 | 平均盈虧 | 勝率 |
-|------|---------|------|---------|------|
-| L1 only | — | — | — | — |
-| L1-L2 | — | — | — | — |
-| L1-L3 | — | — | — | — |
-| L1-L4+ | — | — | — | — |
-
-- **馬丁健康度**：L1 only 佔比越高越健康
-- **風險回歸分析**：高層數倉位最終是否獲利回歸？
-
-**按方向統計（BUY vs SELL）：**
-- BUY（Magic=88）和 SELL（Magic=77）分別統計
-- 識別策略是否偏向某個方向
-
-**按時段統計：**
-- 將 Open Time 按交易時段分組：
-  - 亞洲盤（00:00-08:00 HKT）
-  - 歐洲盤（14:00-22:00 HKT）
-  - 美洲盤（21:00-05:00 HKT）
-- 識別策略在哪個時段表現最好
-
-#### F5：HTML 報告生成
-
-**單一 HTML 文件，移動端友好：**
-
-結構：
-1. **摘要卡片**：策略名稱、期間、總盈虧、勝率、PF
-2. **入市質量分佈圖**：A/B/C/D 各佔多少
-3. **貨幣對排名表**：按 PF 排序，顏色標記
-4. **層數分析**：各層出現頻率、盈虧
-5. **時段分析**：哪個時段最適合
-6. **交易明細表**：可排序、可篩選
-7. **倉位詳情**：每個倉位的層數展開
-
----
-
-### 4.2 Phase 2：深度分析
-
-#### F6：馬丁層數風險分析
-
-**風險隨層數遞增：**
-- 每層的累計資金需求：L1=0.02, L2=0.06, L3=0.12, ..., L6=0.83
-- 每層的最大浮虧（Max Loss Pips × Lots）
-- **絕對風險金額**（唔只列 pips，要計 $）：
-  - 到 L9 止損時，累計約 630 pips，0.83 總手數 ≈ $5,229（以 USDJPY 計）
-- **pipstep 遞增模式分析**：線性（每次+10）vs 幾何（每次×1.5）的影響
-  - 此策略為線性遞增：50→60→70→80→90→100→110
-  - 意味著越深層數，平均成本越接近，不利於快速回歸
-
-**層數風險指標：**
-| 指標 | 說明 |
+| 項目 | 說明 |
 |------|------|
-| 平均層數 | 越低越好 |
-| L4+ 出現頻率 | 越低越好 |
-| 破產風險等級 | L9=CRITICAL, L7+=HIGH, L5+=MEDIUM |
-| 階梯式倉位分佈 | L1-only / L1-L2 / L1-L3 / L4+ 各佔多少 |
+| 策略意義 | 信號已浮盈 N pips 後才跟單，犧牲部分利潤換取準確度 |
+| 只看 | `net_profit > 0` 嘅盈利交易 |
+| 觸發判定 | `Max Pips >= wait_pips` |
+| Wait pips | 5, 10, 15, 20 |
+| 包含 TP/SL 建議 | ✅ 是（每貨幣對每層數） |
 
-**回歸性分析（核心）：**
+**Copy on Lose（跟單虧損）—「遲進場博反彈」**
 
-1. **分層回歸度**：每層的勝率（L1: ~55%, L2: ~60%, ... L6: ~95%）
-   - 關鍵：L4+ 回歸度必須顯著高於 L1，否則馬丁無意義
-
-2. **加倉效率**：每加一層，平均獲利提升多少
-   - L4+ 平均 Net Profit 應顯著高於 L1-L3
-   - 如果 L4+ 平均虧損 = 馬丁失效
-
-3. **資金效率**：
-   - 資金利用率 = 總盈利 / 最大風險暴露
-   - 風險暴露 = Max Layers × Avg Lot Size
-
-4. **實際案例驗證**：
-   - 用 CSV 中 GBPAUD 6層打穿案例（-$627.57）展示風險
-   - 用成功回歸案例展示馬丁有效性
-
-#### F7：TP/SL 系統深度分析
-
-**DynamicTP vs DollarMode 交互邏輯（⚠️ Review 重點）：**
-
-兩個 TP 系統同時啟用：
-1. `DynamicTP=1`：MA 回折偵測（跑 30 pips 後啟動，MA 回折 5 pips 觸發）
-2. `DollarMode=1`：金額追蹤（賺 $2 啟動，回落 $1 觸發）
-
-**交互分析：**
-- L1 (0.02手)：DollarStart=$2 只需 ~10 pips 就達到 → **DollarMode 大概率先觸發**
-- L6 (0.38手)：DollarStart=$2 只需 ~5.3 pips → DollarMode 極快觸發
-- **結論**：DollarMode 在各層數都是主要出場機制，DynamicTP 只在特殊情況觸發
-- `DynTP_DollarTrail=0.5` 可能是 DynamicTP 觸發後的額外追蹤，比 DollarTrail=$1.0 更緊
-
-**DollarMode0 vs DollarMode 的區別：**
-- DollarMode0 = L1 專用設定（Start=2.0, Trail=1.0）
-- DollarMode = L2+ 設定（同樣 Start=2.0, Trail=1.0）
-- 金額固定但不同層數的 pip 敏感度差異巨大
-- L1: $2 trail ≈ 100 pips 的 20%；L6: $2 trail ≈ 5.3 pips 的 38%
-
-**`DollarLoss=0.0` 風險：**
-- 無硬止損金額，唯一止損是 slInLevel=9 + DD 15%
-- 如果市場單邊快速移動，可能跳過 L9 導致更大虧損
-
-**TP/SL 優化建議：**
-- 分析 Max Profit / Max Pips 分佈百分位
-- 建議 SL 設在 P75 或 P90 的 Max Loss Pips
-- TSL 建議：Max Pips vs Net Pips 差距中位數
-
-#### F8：Copy Trade 策略建議（基於原始數據）
-
-**策略分級：**
-- ⭐⭐⭐ **首選 Copy**：高勝率(>70%) + 高PF(>2.0) + 平均層數<2 + 回歸性好
-- ⭐⭐ **可用 Copy**：中等勝率(50-70%) + PF>1.5 + 回歸性一般
-- ⭐ **需調整**：勝率<50% 或 PF<1.0
-- ❌ **不建議**：高層數依賴 + 回歸性差 + 大DD
-
-**Copy 模式建議：**
-- **Copy on Profit（跟勝）**：
-  - 適合：高勝率、低層數
-  - 建議：只跟 L1-L2，設定獨立硬止損
-  - 倍數：按原始數據
-- **Copy on Lose（跟虧加碼）**：
-  - 適合：馬丁策略、回歸性好
-  - 適合：馬丁策略、回歸性好
-  - ⚠️ **唔好用固定 0.3x 倍數**，改用動態風險預算：
-    - 最多承受 X% 賬戶 DD（如 10%）
-    - Max layers cap（動態，基於當前賬戶餘額）
-    - Equity stop（如 -10% 即停）
-    - Symbol diversification limit（防止同方向貨幣對同時爆）
-  - 獨立止損（唔等原倉位）
-
-**資金管理建議：**
-- 建議最低賬戶規模 = Max DD × 10
-- 同時持倉分析：多貨幣對同時加層的系統性風險
-- 歷史收益曲線：按時間排序的累計盈虧
-
-**Copy Trade 模擬驗證：**
-- 模擬 Copy on Profit / Copy on Lose 的歷史表現
-- 輸出：勝率、PF、Max DD、年化收益
-- 按不同止損層級模擬歷史收益曲線
+| 項目 | 說明 |
+|------|------|
+| 策略意義 | 信號已浮虧 N pips 後博反彈跟單，減少浮虧同時增加盈利 |
+| 只看 | `net_profit <= 0` 嘅虧損交易（或全部交易） |
+| 觸發判定 | `|Max Loss Pips| >= wait_pips` |
+| Wait pips | 10, 15, 20, 25 |
+| 包含 TP/SL 建議 | ❌ 否（CoL 係 recovery 策略，TP/SL 邏輯唔同） |
 
 ---
 
-### 4.3 Phase 3：知識庫 + 未來方向
+## 4. Martin Detection（馬丁偵測）
 
-#### F9：策略檔案
-- 存入 Obsidian（Markdown + YAML frontmatter）
-- 包含：策略名稱、版本、完整參數、歷史表現、評分
+### 4.1 偵測類型
 
-#### F10：策略比較
-- 同一 EA 不同參數設定對比
-- 不同 EA 同一貨幣對對比
+| 類型 | 判定條件 | 含義 |
+|------|----------|------|
+| **Classic Martin** | `profit > 0` 且 `pips < 0` | 馬丁拉平成本獲利，但方向其實錯咗 |
+| **Reverse Martin** | `pips > 0` 且 `profit < 0` | 方向啱但 swap/commission 吃掉利潤 |
+| **Cost Killed** | `gross_profit > 0` 且 `net_profit < 0` | 毛利正但成本吃掉淨利 |
 
-#### F11：市況反推（未來方向）
-- 不依賴外部數據
-- 從策略參數和交易結果反推可能的市況特徵
-- 例如：高層數 = 震盪市、快進快出 = 趨勢市
+### 4.2 統計
+
+- **51/57 個信號（89%）有馬丁特徵**
+- **112 個 Classic Martin 貨幣對**被偵測到
+- 偵測結果顯示在每份 Detailed Report 嘅 Martin Detection 區塊
 
 ---
 
-## 5. 輸出格式
+## 5. TP/SL 建議（Copy on Profit 專用）
 
-### 5.1 HTML 分析報告
-- 單一 HTML 文件，移動端友好
-- 明亮主題
-- 繁體中文
-- 包含：摘要卡片、統計表格、貨幣對排名、交易明細
+### 5.1 公式
 
-### 5.2 結構化數據（JSON）
-```json
-{
-  "strategy_id": "14581_SMA_v3.00",
-  "analysis_date": "2026-04-24",
-  "date_range": {"from": "2025-11-01", "to": "2026-03-02"},
-  "overall_stats": {
-    "total_positions": 0,
-    "win_rate": 0,
-    "profit_factor": 0,
-    "max_dd": 0,
-    "avg_layers": 0
-  },
-  "symbol_stats": [...],
-  "layer_stats": [...],
-  "positions": [
-    {
-      "symbol": "USDJPY",
-      "direction": "BUY",
-      "layers": 3,
-      "total_lots": 0.12,
-      "net_profit": 10.5,
-      "entry_quality_score": 85,
-      "entry_quality_grade": "A",
-      "trades": [...]
-    }
-  ],
-  "recommendations": {
-    "copy_grade": "⭐⭐⭐",
-    "copy_mode": "Copy on Profit",
-    "reason": "..."
-  }
-}
+> 經 Gemini 諮詢 + Alvin 確認
+
+**TP = P85 of Max Pips（盈利交易，trim 極端值）**
+- 含義：85% 嘅盈利交易曾到達此位置
+- 「85% 可達成」
+
+**SL = P85 of Max Loss Pips（所有交易，trim 極端值）**
+- 含義：85% 嘅交易最大回撤不超過此值
+- 「85% 扛得住」
+
+**格式：固定值（唔用 range）**
+
+### 5.2 小樣本回退
+
+- 當某貨幣對某層數嘅交易數量 < 30 → 使用 global percentiles（所有信號嘅綜合數據）
+- 當數據充足（≥ 30）→ 使用信號自身嘅 percentiles
+- P85 本身已排除 top 15% 極端值，無需額外 trim
+
+### 5.3 統計實況（57 signals）
+
+| 指標 | 數值 |
+|------|------|
+| TP/SL 配對總數 | 2,314 |
+| R:R 中位數 | 2.05 |
+| R:R ≥ 1.0 | 96% |
+| P85（足夠數據） | 193 個 |
+| Hybrid（混合） | 258 個 |
+| Global fallback | 1,863 個 |
+
+### 5.4 只在 CoP 部分顯示
+
+- TP/SL 建議只出現在 Copy on Profit 分析區塊
+- Copy on Lose 不顯示 TP/SL（因為係 recovery 策略，出場邏輯唔同）
+
+---
+
+## 6. 報告輸出格式
+
+### 6.1 Signal Ranking 總表
+
+**HTML 文件**：`output/signal_ranking_dde_v3.html`
+
+**欄位：**
+
+| # | 欄位 | 說明 |
+|---|------|------|
+| 1 | # | 排名序號 |
+| 2 | Signal | Signal ID |
+| 3 | Avg Score | DDE v3 平均分 |
+| 4 | ⭐⭐⭐⭐ | 評分 ≥ 80 嘅數量 |
+| 5 | ⭐⭐⭐⭐% | 高評分佔比 |
+| 6 | Trades | 總交易數 |
+| 7 | Win% | 勝率 |
+| 8 | PF | Profit Factor |
+| 9 | Total Profit | 總盈利（$） |
+| 10 | TF | 時間框架（M30/H1/H4/D1+） |
+| 11 | Cmp | 有效評分維度數 |
+| 12 | EA | EA 家族標籤 |
+| 13 | LV | 馬丁層數 |
+| 14 | Eq Max DD | 最大權益回撤 |
+
+**不顯示嘅欄位**（老闆確認）：
+- ❌ Bar（無意義）
+- ❌ Grid 類型（同 EA 重疊）
+- ❌ DD Control（無意義，改用 LV）
+- ❌ TP/SL 命中率（總表無意義）
+- ❌ 出場效率（總表無意義）
+- ❌ EA Family Deep Compare（總表無意義）
+- ❌ Parameter Impact（總表無意義）
+
+**EA CSS 標籤：**
+
+| EA | 背景色 | 文字色 |
+|----|--------|--------|
+| DW | #4a148c | #ce93d8 |
+| SMA | #1b5e20 | #a5d6a7 |
+| MKD | #e65100 | #ffcc80 |
+| S10 | #0d47a1 | #90caf9 |
+| Flash | #880e4f | #f48fb1 |
+| GEM | #37474f | #b0bec5 |
+
+**DD 顏色分級：**
+- 🟢 `dd-g`（#4CAF50）：DD < $3,000
+- 🟡 `dd-y`（#FFC107）：DD $3,000-$6,000
+- 🔴 `dd-r`（#FF5722）：DD > $6,000
+
+**Score 顏色：**
+- 🟢 `s90`（#4CAF50）：≥ 90
+- 🟢 `s85`（#8BC34A）：≥ 85
+- 🟡 `s75`（#FFC107）：≥ 75
+- 🔴 `s0`（#FF5722）：< 75
+
+**格式要求：**
+- 置左對齊
+- 橫向捲動（mobile-friendly）
+- Highlight 頭 10 名
+- 顯示所有 57 個信號（唔只頭 10）
+
+### 6.2 Detailed Comparison Report（個別信號詳細報告）
+
+**HTML 文件**：`output/detailed_comparison_all_levels_{signal_id}.html`
+
+**結構：**
+
+1. **📋 分析摘要表** — 貨幣對 × L1-L4+ 交易數 + 勝率
+2. **每個貨幣對**（8-30 個）：
+   - **L1-L4+ 每級**：
+     - **Copy on Profit 評分表**：Wait 5/10/15/20 × 觸發率/平均獲利/DDE/評分/評級 + **TP/SL 建議值**
+     - **Copy on Lose 評分表**：Wait 10/15/20/25 × 觸發率/回收率/平均獲利/評分/評級
+3. **Martin Detection**（如有）：
+   - Classic Martin 交易明細
+   - Reverse Martin 匯總 + 明細
+   - Cost Killed 匯總 + 明細
+
+### 6.3 Signal Info Card（計劃中）
+
+> **狀態**：待實作，Option A 已確認
+
+**位置**：每份 Detailed Report 嘅最頂部（title 下面）
+
+**內容：**
+1. **Signal 基本資料**：Signal ID、EA 名稱+版本、EA 家族標籤、LV、.set 數量
+2. **.set 版本歷史**：按上載日期排列，淨列出有差異嘅參數（只比較相同貨幣對）
+3. **核心參數摘要**：加倉設定、風控設定、TP/SL 設定
+
+---
+
+## 7. 批量分析流程
+
+### 7.1 數據收集
+
+```
+Windows 原始檔：/mnt/c/Users/Alvin/Downloads/Set File From Signal Page/{signal_id}/
+  ├── *.csv     # 交易數據
+  └── *.set     # 策略設定檔（可能多個，按日期）
+
+Scraper 下載：/home/alvin/.openclaw/workspace/trade_strategy_analyzer/samples/
+  └── forex-forest-signals-page-{signal_id}.csv
 ```
 
-### 5.3 Obsidian 策略檔案
-```markdown
----
-type: strategy_profile
-ea: SMA v3.00
-version: "20250805"
-signal_page: "14581"
-analysis_date: 2026-04-24
-copy_grade: "⭐⭐⭐"
-tags: [strategy, forex, sma, martin]
----
+### 7.2 報告生成流程
 
-# SMA v3.00 - Signal #14581
+```bash
+# 1. 生成個別信號詳細報告（57份）
+python3 generate_all_levels_from_csv.py --signal {signal_id} --csv samples/{signal_id}.csv
 
-## 策略概述
-...
-
-## 參數設定
-...
-
-## 歷史表現
-...
+# 2. 生成 Signal Ranking 總表
+python3 generate_signal_ranking.py
 ```
 
+### 7.3 關鍵腳本
+
+| 腳本 | 用途 | 大小 |
+|------|------|------|
+| `generate_all_levels_from_csv.py` | 主 scoring engine（DDE v3、Alpha Capture、Martin Detection、TP/SL） | 52KB / 1356 行 |
+| `generate_signal_ranking.py` | 從 detailed HTML 提取分數，生成排名總表 | ~10KB / 294 行 |
+| `batch_detailed_all.py` | 批量下載 CSV + 生成報告 | 6.7KB |
+| `batch_analyze.py` | 批量基礎分析 | 30KB |
+| `scripts/algoforest_scraper.py` | AlgoForest 網頁 scraper | — |
+| `scripts/api_server.py` | FastAPI 服務（localhost:8787） | — |
+| `scripts/history_manager.py` | 分析歷史管理 | — |
+
 ---
 
-## 6. 技術架構
+## 8. 技術架構
 
-### 6.1 技術棧
-- **語言**：Python 3
-- **數據處理**：Pandas
-- **報告生成**：Jinja2 HTML 模板
-- **交互方式**：CLI 腳本（初期）→ Telegram Bot 上傳（後期）
+### 8.1 技術棧
+- **後端**：Python 3（Pandas、HTML template string）
+- **前端**：單一 HTML 文件（GitHub Pages 部署：https://alvin-forex.github.io/trade-strategy-analyzer/）
+- **數據存儲**：SQLite（`data/analysis_history.db`）、JSON（`batch_analysis_results.json`）
+- **API 服務**：FastAPI（localhost:8787）
+- **通訊**：Telegram Bot（發送 HTML 報告附件）
 
-### 6.2 目錄結構
+### 8.2 目錄結構
 ```
 trade_strategy_analyzer/
-├── PRD.md                    # 本文件
-├── samples/                  # 範例數據
-│   ├── signal_14581_trades.csv
-│   ├── SMA_v3.00_USDJPY_H4.set
-│   └── SMA_v3.00_USDCHF_H1.set
-├── src/
-│   ├── __init__.py
-│   ├── csv_parser.py         # CSV 解析
-│   ├── set_parser.py         # .set 解析
-│   ├── position_builder.py   # 倉位重構
-│   ├── entry_quality.py      # 入市質量評估
-│   ├── statistics.py         # 統計計算
-│   ├── report_generator.py   # HTML 報告
-│   └── templates/
-│       └── report.html       # HTML 模板
-├── output/                   # 輸出目錄
-└── requirements.txt
-```
-
-### 6.3 運行方式
-```bash
-# Phase 1 MVP
-python3 -m src.main \
-  --csv samples/signal_14581_trades.csv \
-  --set samples/SMA_v3.00_USDJPY_H4.set \
-  --set samples/SMA_v3.00_USDCHF_H1.set \
-  --output output/report_14581.html
+├── PRD.md                              # 本文件
+├── PRD_v0.4.md                         # 舊版 PRD（歷史參考）
+├── FEATURE_ARCHITECTURE.md             # 功能架構思路
+├── CHANGELOG.md                        # 版本更新日誌
+├── generate_all_levels_from_csv.py     # 主 scoring engine（DDE v3）
+├── generate_signal_ranking.py          # Signal Ranking 排名生成
+├── batch_detailed_all.py               # 批量 detailed reports
+├── batch_analyze.py                    # 批量基礎分析
+├── generate_batch_reports.py           # 批量報告生成
+├── generate_cross_signal_summary.py    # 跨信號摘要
+├── generate_detailed_comparison.py     # 個別詳細對比
+├── generate_8325_report.py             # 特定信號報告
+├── samples/                            # 57 個 CSV 數據檔
+├── output/                             # 所有生成嘅 HTML 報告
+│   ├── signal_ranking_dde_v3.html      # 排名總表
+│   ├── detailed_comparison_all_levels_*.html  # 57 份詳細報告
+│   ├── full_cross_reference.html       # .set vs 交易表現對照
+│   ├── dd_control_analysis.html        # DD 控制分析
+│   ├── cross_signal_summary.html       # 跨信號摘要
+│   └── batch_analysis_results.json     # 58 entries batch 結果
+├── scripts/
+│   ├── api_server.py                   # FastAPI localhost:8787
+│   ├── history_manager.py              # 分析歷史管理
+│   ├── export_hst.py                   # MT4 .hst → JSON
+│   ├── algoforest_scraper.py           # AlgoForest 網頁 scraper
+│   └── extract_signal_data.py          # 數據提取
+├── docs/
+│   └── data/                           # 34 個 D1 JSON 市場數據 + manifest.json
+├── ea_manuals/                         # EA 手冊（MKD、S10、DragonWare、SMA、Flash）
+├── data/
+│   └── analysis_history.db             # SQLite 分析歷史（13 records）
+├── market_data/
+├── uploads/
+├── secrets/
+├── src/                                # 前端模組（已部署到 GitHub Pages）
+└── templates/
 ```
 
 ---
 
-## 7. 已確認決策
+## 9. 已確認決策
 
-| # | 問題 | 決策 |
-|---|------|------|
-| 1 | 入市質量評分 | 盡量利用 CSV 內所有相關欄位，6 個維度加權評估 |
-| 2 | 馬丁層數分析 | 層數越大=風險越大，分析回歸性（高層數最終是否獲利） |
-| 3 | Copy Trade 倍數 | 暫時按原始數據，不做複雜計算 |
-| 4 | 市況分類 | 暫不做，將來從參數+產品特性反推（Phase 3） |
-| 5 | 多策略組合 | 待定（Phase 3） |
+| # | 問題 | 決策 | 確認日期 |
+|---|------|------|----------|
+| 1 | 評分系統 | DDE v3（Trigger Rate 40% + Alpha Capture 40% + DDE 20%） | 2026-05-02 |
+| 2 | ETE vs DDE | DDE 取代 ETE（ETE 分辨力接近零） | 2026-05-02 |
+| 3 | balance/credit 過濾 | 必須排除 Type=balance/credit | 2026-05-02 |
+| 4 | 小樣本回退 | n < 30 自動混和 global percentiles | 2026-05-02 |
+| 5 | 總表欄位 | 不顯示 Bar/Grid/DD Ctrl/TP/SL命中率/EA Family/Parameter Impact | 2026-05-02 |
+| 6 | Martin LV | 由 .set 計算，顯示喺總表 | 2026-05-02 |
+| 7 | TP/SL 公式 | P85 of Max Pips / Max Loss Pips，固定值 | 2026-05-02 |
+| 8 | TP/SL 位置 | 只喺 CoP 部分，每貨幣對每層數 | 2026-05-02 |
+| 9 | CoL TP/SL | 不顯示（recovery 策略邏輯唔同） | 2026-05-02 |
+| 10 | Gemini 諮詢 | Scoring 改動前必須先同 Gemini 討論 | 2026-05-02 |
+| 11 | 排版 | 置左對齊，mobile 橫向捲動 | 2026-05-02 |
+| 12 | 報告語言 | 中文標籤（專業術語除外） | 2026-05-02 |
+| 13 | 報告交付 | HTML 附件經 Telegram 發送 | 2026-05-02 |
+| 14 | S10 馬丁 | MaxBuyCount=10 是平注碼馬丁，非遞增式 | 2026-05-02 |
 
 ---
 
-## 8. 待確認事項
+## 10. 待確認 / 待開發
 
-| # | 問題 | 影響 | 狀態 |
+| # | 項目 | 狀態 | 備註 |
 |---|------|------|------|
-| 1 | `UseAISignal=1` 的具體邏輯是什麼？ | 入市條件可能不完整 | ⚠️ 待確認 |
-| 2 | 一個信號頁是否只跑一個 EA？ | 策略歸類 | ⚠️ 待確認 |
-| 3 | CSV 中同 Symbol 同 Close Time 但不同 Magic Number？ | 倉位重構邏輯 | ⚠️ 待確認 |
-| 4 | `.set` 檔名規則是否固定？ | 自動識別 | ⚠️ 待確認 |
+| 1 | Signal Info Card | 🔜 待開發 | Option A 已確認，加喺 detailed report 頂部 |
+| 2 | .set 版本差異比較 | 🔜 待開發 | 淨列出有差異嘅參數，只比較相同貨幣對 |
+| 3 | SKILL：自動化分析流程 | 🔜 待開發 | "分析 signal {ID}" → scraper → 分析 → Telegram |
+| 4 | CoP/CoL 評分公式改進 | ⏳ 討論中 | 其他 AI 反饋：CoP 勝率永遠 100%（20% 白送），建議改用 Early Efficiency |
+| 5 | Tick Data 精確度 | ⏳ 待確認 | 目前無 Tick Data，可能不準確 |
+| 6 | `UseAISignal=1` 邏輯 | ⚠️ 待確認 | SMA .set 入面嘅 AI 信號，具體邏輯未知 |
 
 ---
 
-## 9. 開發計劃
+## 11. 驗證數據
 
-### Phase 1：MVP
-- [ ] csv_parser.py — CSV 讀取與解析
-- [ ] set_parser.py — .set 讀取與參數分類
-- [ ] position_builder.py — 倉位重構（Symbol + Direction + Close Time 分組，容差 ±60s）
-- [ ] entry_quality.py — 6 維度入市質量評估（含回歸性維度）
-- [ ] statistics.py — 整體/貨幣對/層數/時段統計（含 Sharpe/Calmar/Sortino）
-- [ ] equity_curve.py — 歷史收益曲線
-- [ ] report_generator.py — HTML 報告生成
-- [ ] 整合測試（用 sample 數據）
+### Signal Ranking Top 10（DDE v3, 2026-05-02）
 
-### Phase 2：深度分析
-- [ ] 馬丁層數風險分析（回歸性）
-- [ ] TP/SL 優化建議
-- [ ] Copy Trade 策略分級與建議
-- [ ] JSON 輸出格式
+| # | Signal | Score | EA | TF | Trades |
+|---|--------|-------|----|----|--------|
+| 1 | 22200 | 93.3 | DW | H4 | 130 |
+| 2 | 5636 | 91.9 | SMA | M30 | — |
+| 3 | 31781 | 91.8 | DW | H1 | — |
+| 4 | 10437 | 90.7 | DW | M30 | 1,706 |
+| 5 | 7919 | 91.1 | MKD | H1 | — |
+| 6 | 36338 | 90.5 | DW | H1 | — |
+| 7 | 33101 | 89.6 | DW | M30 | — |
+| 8 | 17823 | 89.6 | SMA | H4 | — |
+| 9 | 2351 | 89.4 | SMA | H4 | — |
+| 10 | 13863 | 89.8 | SMA | D1+ | — |
 
-### Phase 3：知識庫 + 未來
-- [ ] Obsidian 策略檔案生成
-- [ ] 策略比較功能
-- [ ] 市況反推（從參數+結果反推市況）
-- [ ] 多策略組合分析
+**總計：57 signals, avg score 85.8, best 93.3 (22200), worst 67.3 (34259)**
 
 ---
 
-*此 PRD v0.2 待多模型 Review 後定稿。*
+*此 PRD v0.5 已整合 DDE v3 Copy Strategy 系統。下次大改時同步更新 FEATURE_ARCHITECTURE.md 和 CHANGELOG.md。*
