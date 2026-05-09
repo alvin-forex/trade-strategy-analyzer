@@ -16,32 +16,36 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 # CSV data directory
 CSV_DIR = Path("/home/alvin/.openclaw/workspace/trade_strategy_analyzer/samples")
 
-# Global TP/SL percentile baselines (pre-computed from 58 signals)
+# Global TP/SL percentile baselines (lot-based, pre-computed from 58 signals)
 # P85 of winning trades' Max Pips per level
 GLOBAL_TP_BASELINES = {
-    'L1': 53.0, 'L2': 129.8, 'L3': 137.3, 'L4+': 195.5
+    'L1': 48.0, 'L2': 88.5, 'L3': 74.6, 'L4': 109.3,
+    'L5': 109.6, 'L6': 128.7, 'L7': 138.6, 'L8': 150.2, 'L9+': 163.4,
 }
 # P85 of all trades' Max Loss Pips per level
 GLOBAL_SL_BASELINES = {
-    'L1': 44.7, 'L2': 63.3, 'L3': 58.4, 'L4+': 70.9
+    'L1': 76.4, 'L2': 115.8, 'L3': 97.5, 'L4': 143.3,
+    'L5': 129.7, 'L6': 126.7, 'L7': 109.0, 'L8': 92.1, 'L9+': 73.8,
 }
 
-# Global percentile baselines (pre-computed from 58 signals, 89,158 winning trades)
+# Global percentile baselines (lot-based, pre-computed from 58 signals)
 GLOBAL_BASELINES = {
     'global_p25': 1.52,
     'floor': 5.00,
     'min_sample': 30,
-    'profit': {  # From winning trades per level
-        'L1': {'p50': 3.82, 'p75': 8.89},
-        'L2': {'p50': 66.41, 'p75': 80.28},
-        'L3': {'p50': 120.07, 'p75': 132.90},
-        'L4+': {'p50': 321.63, 'p75': 587.03},
+    'profit': {
+        'L1': {'p50': 3.12, 'p75': 6.5}, 'L2': {'p50': 14.56, 'p75': 36.4},
+        'L3': {'p50': 6.32, 'p75': 18.22}, 'L4': {'p50': 19.79, 'p75': 52.01},
+        'L5': {'p50': 41.09, 'p75': 83.15}, 'L6': {'p50': 61.74, 'p75': 118.22},
+        'L7': {'p50': 118.1, 'p75': 196.84}, 'L8': {'p50': 187.64, 'p75': 310.81},
+        'L9+': {'p50': 334.19, 'p75': 600.37},
     },
-    'lose': {  # From recovered trades per level
-        'L1': {'p50': 4.40, 'p75': 10.65},
-        'L2': {'p50': 66.74, 'p75': 80.73},
-        'L3': {'p50': 119.78, 'p75': 132.15},
-        'L4+': {'p50': 306.84, 'p75': 546.51},
+    'lose': {
+        'L1': {'p50': 2.96, 'p75': 6.17}, 'L2': {'p50': 13.83, 'p75': 34.58},
+        'L3': {'p50': 6.00, 'p75': 17.31}, 'L4': {'p50': 18.80, 'p75': 49.41},
+        'L5': {'p50': 39.04, 'p75': 78.99}, 'L6': {'p50': 58.65, 'p75': 112.31},
+        'L7': {'p50': 112.19, 'p75': 187.00}, 'L8': {'p50': 178.26, 'p75': 295.27},
+        'L9+': {'p50': 317.48, 'p75': 570.35},
     }
 }
 
@@ -236,6 +240,45 @@ def analyze_trades_from_csv(csv_file):
                 continue
     
     return trades
+
+def load_signal_lot_mapping():
+    """Load per-signal lot→level mapping from SET files."""
+    mapping_path = Path(__file__).parent / 'signal_lot_mapping.json'
+    if mapping_path.exists():
+        with open(mapping_path) as f:
+            return json.load(f)
+    return {}
+
+def assign_lot_level(trade_lot, lot_layers):
+    """
+    Assign level based on closest lot size match from SET file.
+    Returns (level_name, is_autolot) or None if no mapping.
+    """
+    if not lot_layers:
+        return None
+    best = min(lot_layers, key=lambda x: abs(x[1] - trade_lot))
+    best_level, best_lot = best[0], best[1]
+    tolerance = best_lot * 0.25 if best_lot > 0 else 0.01
+    is_autolot = abs(trade_lot - best_lot) > tolerance
+    if best_level >= 9:
+        return ('L9+', is_autolot)
+    return (f'L{best_level}', is_autolot)
+
+def infer_levels_from_csv_lots(trades):
+    """
+    Fallback: infer levels from unique lot values when no SET mapping.
+    Smallest lot = L1, ascending.
+    """
+    unique_lots = sorted(set(round(t['volume'], 4) for t in trades))
+    if len(unique_lots) == 1:
+        return {unique_lots[0]: 'L1'}
+    mapping = {}
+    for i, lot in enumerate(unique_lots):
+        if i >= 8:
+            mapping[lot] = 'L9+'
+        else:
+            mapping[lot] = f'L{i+1}'
+    return mapping
 
 def detect_martin_trades(trades):
     """
@@ -688,6 +731,61 @@ def analyze_by_levels(trades, level_ranges):
     
     return level_results
 
+def analyze_by_levels_lotbased(trades, achieved_levels):
+    """
+    Analyze trades by lot-based levels.
+    achieved_levels: list of level names that have trades (e.g. ['L1', 'L2', 'L3', 'L9+'])
+    """
+    level_results = {}
+
+    for level_name in achieved_levels:
+        level_trades = [t for t in trades if t.get('lot_level') == level_name]
+
+        total_trades = len(level_trades)
+        if total_trades == 0:
+            level_results[level_name] = {
+                'stats': {'count': 0, 'min_profit': 0, 'max_profit': 0},
+                'copy_on_profit': {},
+                'copy_on_lose': {}
+            }
+            continue
+
+        win_trades = sum(1 for t in level_trades if t.get('net_profit', 0) > 0)
+        win_rate = win_trades / total_trades if total_trades > 0 else 0
+        total_profit = sum(t.get('net_profit', 0) for t in level_trades)
+        avg_profit = total_profit / total_trades if total_trades > 0 else 0
+        avg_tp = sum(t.get('tp', 0) for t in level_trades) / total_trades if total_trades > 0 else 0
+        avg_sl = sum(t.get('sl', 0) for t in level_trades) / total_trades if total_trades > 0 else 0
+
+        stats = {
+            'count': total_trades,
+            'min_profit': min((t.get('net_profit', 0) for t in level_trades), default=0),
+            'max_profit': max((t.get('net_profit', 0) for t in level_trades), default=0),
+            'win_rate': win_rate,
+            'total_profit': total_profit,
+            'avg_profit': avg_profit,
+            'avg_tp': avg_tp,
+            'avg_sl': avg_sl
+        }
+
+        # Copy on Profit analysis
+        profit_results = analyze_copy_on_profit(level_trades, [5, 10, 15, 20], level_name)
+
+        # Copy on Lose analysis
+        lose_results = analyze_copy_on_lose(level_trades, [10, 15, 20, 25], level_name)
+
+        # TP/SL suggestion
+        tpsl = calculate_tpsl(level_trades, level_name)
+
+        level_results[level_name] = {
+            'stats': stats,
+            'copy_on_profit': profit_results,
+            'copy_on_lose': lose_results,
+            'tpsl': tpsl
+        }
+
+    return level_results
+
 # Windows .set files directory
 SET_FILES_DIR = Path("/mnt/c/Users/Alvin/Downloads/Set File From Signal Page")
 
@@ -806,24 +904,22 @@ def compute_worthiness(trades):
     """
     Compute worthiness metrics (R-Multiple, Kelly, Safety Margin) for a list of trades.
     Returns dict with per-level + overall metrics.
+    Uses lot-based levels if available on trades.
     """
-    level_ranges = {
-        'L1': (0, 50),
-        'L2': (50, 100),
-        'L3': (100, 150),
-        'L4+': (150, float('inf'))
-    }
     if not trades:
         return None
     
+    # Determine levels from trade data
+    achieved = sorted(set(t.get('lot_level', 'L1') for t in trades),
+                      key=lambda x: (99 if x == 'L9+' else int(x[1:])))
+    
     results = {}
     
-    for level_name in ['L1', 'L2', 'L3', 'L4+', 'Overall']:
+    for level_name in achieved + ['Overall']:
         if level_name == 'Overall':
             level_trades = trades
         else:
-            lo, hi = level_ranges.get(level_name, (0, float('inf')))
-            level_trades = [t for t in trades if lo <= abs(t.get('max_pips', 0) or 0) < hi]
+            level_trades = [t for t in trades if t.get('lot_level') == level_name]
         
         n = len(level_trades)
         if n < 5:
@@ -891,15 +987,14 @@ def compute_martin_level_analysis(trades):
     """
     Compute per-level Martin depth analysis for a list of trades.
     Returns dict with per-level Martin metrics.
+    Uses lot-based levels if available on trades.
     """
-    level_ranges = {
-        'L1': (0, 50),
-        'L2': (50, 100),
-        'L3': (100, 150),
-        'L4+': (150, float('inf'))
-    }
     if not trades:
         return None
+    
+    # Determine levels from trade data
+    achieved = sorted(set(t.get('lot_level', 'L1') for t in trades),
+                      key=lambda x: (99 if x == 'L9+' else int(x[1:])))
     
     total = len(trades)
     classic_martin_trades = [t for t in trades if t.get('net_profit', 0) > 0 and t.get('net_pips', 0) < 0]
@@ -922,9 +1017,8 @@ def compute_martin_level_analysis(trades):
         'levels': {}
     }
     
-    for level_name in ['L1', 'L2', 'L3', 'L4+']:
-        lo, hi = level_ranges.get(level_name, (0, float('inf')))
-        level_trades = [t for t in trades if lo <= abs(t.get('max_pips', 0) or 0) < hi]
+    for level_name in achieved:
+        level_trades = [t for t in trades if t.get('lot_level') == level_name]
         level_martin = [t for t in level_trades if t.get('net_profit', 0) > 0 and t.get('net_pips', 0) < 0]
         
         n = len(level_trades)
@@ -982,8 +1076,8 @@ def compute_copy_trade_suggestion(trades, worthiness, martin_analysis, levels_da
     best_cop_score = 0
     best_cop_wait = 0
     best_cop_level = ''
-    for lv in ['L1', 'L2', 'L3', 'L4+']:
-        lv_data = levels_data.get(lv, {})
+    for lv in levels_data:
+        lv_data = levels_data[lv]
         cop = lv_data.get('copy_on_profit', {})
         for wp, r in cop.items():
             if r.get('weighted_score', 0) > best_cop_score:
@@ -995,8 +1089,8 @@ def compute_copy_trade_suggestion(trades, worthiness, martin_analysis, levels_da
     best_col_score = 0
     best_col_wait = 0
     best_col_level = ''
-    for lv in ['L1', 'L2', 'L3', 'L4+']:
-        lv_data = levels_data.get(lv, {})
+    for lv in levels_data:
+        lv_data = levels_data[lv]
         col = lv_data.get('copy_on_lose', {})
         for wp, r in col.items():
             if r.get('weighted_score', 0) > best_col_score:
@@ -1266,8 +1360,16 @@ def build_signal_info_card(signal_id):
     return '\n'.join(html_parts)
 
 
-def generate_html_report(csv_file, all_currency_data, level_ranges):
+def generate_html_report(csv_file, all_currency_data, level_ranges=None):
     """Generate HTML report for all currencies and levels"""
+    
+    # Determine all achieved levels across all currencies
+    all_achieved_levels = set()
+    for currency, data in all_currency_data.items():
+        for lv_name in data['levels']:
+            if data['levels'][lv_name]['stats']['count'] > 0:
+                all_achieved_levels.add(lv_name)
+    achieved_levels = sorted(all_achieved_levels, key=lambda x: (99 if x == 'L9+' else int(x[1:])))
     
     # Extract signal ID from various CSV naming patterns
     stem = Path(csv_file).stem
@@ -1455,6 +1557,45 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
             margin-top: 2px;
         }}
         
+        /* Tooltip for score details */
+        .info-icon {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: #666;
+            font-size: 10px;
+            font-style: italic;
+            cursor: help;
+            position: relative;
+        }}
+        .info-icon .tip {{
+            display: none;
+            position: absolute;
+            left: 20px;
+            top: -10px;
+            background: #333;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 9px;
+            white-space: nowrap;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            line-height: 1.5;
+        }}
+        .info-icon:hover .tip {{ display: block; }}
+        
+        /* Sortable table headers */
+        th.sortable {{ cursor: pointer; user-select: none; }}
+        th.sortable:hover {{ background: #c5cae9; }}
+        th.sortable::after {{ content: ' ⇕'; font-size: 9px; opacity: 0.5; }}
+        th.sort-asc::after {{ content: ' ↑'; opacity: 1; color: #1976d2; }}
+        th.sort-desc::after {{ content: ' ↓'; opacity: 1; color: #1976d2; }}
+        
         .best-score {{
             background: #e8f5e9;
             font-weight: bold;
@@ -1494,11 +1635,11 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
             <table class="comparison-table">
                 <thead>
                     <tr>
-                        <th>Currency</th>
-                        <th>L1 Trades</th>
-                        <th>L2 Trades</th>
-                        <th>L3 Trades</th>
-                        <th>L4+ Trades</th>
+                        <th>Currency</th>"""
+    for lv in achieved_levels:
+        html += f"""
+                        <th>{lv} Trades</th>"""
+    html += """
                         <th>Total Trades</th>
                         <th>Overall Win Rate</th>
                     </tr>
@@ -1510,12 +1651,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
     for currency in currency_pairs:
         data = all_currency_data[currency]
         
-        total_trades = sum([
-            data['levels']['L1']['stats']['count'],
-            data['levels']['L2']['stats']['count'],
-            data['levels']['L3']['stats']['count'],
-            data['levels']['L4+']['stats']['count']
-        ])
+        total_trades = sum(data['levels'].get(lv, {}).get('stats', {}).get('count', 0) for lv in achieved_levels)
         
         if total_trades == 0:
             continue
@@ -1525,15 +1661,15 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
         
         html += f"""
                     <tr>
-                        <td><strong>{currency}</strong></td>
-                        <td>{data['levels']['L1']['stats']['count']}</td>
-                        <td>{data['levels']['L2']['stats']['count']}</td>
-                        <td>{data['levels']['L3']['stats']['count']}</td>
-                        <td>{data['levels']['L4+']['stats']['count']}</td>
+                        <td><strong>{currency}</strong></td>"""
+        for lv in achieved_levels:
+            count = data['levels'].get(lv, {}).get('stats', {}).get('count', 0)
+            html += f"""
+                        <td>{count}</td>"""
+        html += f"""
                         <td>{total_trades}</td>
                         <td class="score-cell {win_rate_class}">{win_rate:.2%}</td>
-                    </tr>
-"""
+                    </tr>"""
     
     html += """
                 </tbody>
@@ -1547,12 +1683,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
         stats = data['stats']
         levels = data['levels']
         
-        total_trades = sum([
-            levels['L1']['stats']['count'],
-            levels['L2']['stats']['count'],
-            levels['L3']['stats']['count'],
-            levels['L4+']['stats']['count']
-        ])
+        total_trades = sum(levels.get(lv, {}).get('stats', {}).get('count', 0) for lv in achieved_levels)
         
         if total_trades == 0:
             continue
@@ -1810,8 +1941,10 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
             </div>
 """
         
-        # Build each level
-        for level_name in ['L1', 'L2', 'L3', 'L4+']:
+        # Build each level (only levels that exist for this currency)
+        for level_name in achieved_levels:
+            if level_name not in levels:
+                continue
             level_data = levels[level_name]
             level_stats = level_data['stats']
             
@@ -1857,7 +1990,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
                                 <th>DDE</th>
                                 <th>Score</th>
                                 <th>Rating</th>
-                                <th>Score Details</th>
+                                <th>ℹ️</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1877,7 +2010,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
                             <td>{dde_info.split('→')[0].strip()}</td>
                             <td class="score-cell {result['rating_class']}">{result['weighted_score']:.1f}</td>
                             <td class="score-cell {result['rating_class']}">{result['rating']}</td>
-                            <td class="score-details">{result['score_details']['trigger_rate']}<br>{result['score_details']['alpha_profit']}<br>{result['score_details']['dde']}<br><strong>{result['score_details']['total']}</strong></td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">{result['score_details']['trigger_rate']}<br>{result['score_details']['alpha_profit']}<br>{result['score_details']['dde']}<br><strong>{result['score_details']['total']}</strong></span></span></td>
                         </tr>
 """
             
@@ -1901,7 +2034,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
                                 <th>Avg After</th>
                                 <th>Score</th>
                                 <th>Rating</th>
-                                <th>Score Details</th>
+                                <th>ℹ️</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1920,7 +2053,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
                             <td>${result['avg_profit_after']:.2f}</td>
                             <td class="score-cell {result['rating_class']}">{result['weighted_score']:.1f}</td>
                             <td class="score-cell {result['rating_class']}">{result['rating']}</td>
-                            <td class="score-details">{result['score_details']['recovery_rate']}<br>{result['score_details']['alpha_profit']}<br>{result['score_details']['trigger_rate_info']}<br><strong>{result['score_details']['total']}</strong></td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">{result['score_details']['recovery_rate']}<br>{result['score_details']['alpha_profit']}<br>{result['score_details']['trigger_rate_info']}<br><strong>{result['score_details']['total']}</strong></span></span></td>
                         </tr>
 """
             
@@ -1948,6 +2081,34 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
             </span>
         </div>
     </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {{
+    document.querySelectorAll('.comparison-table').forEach(function(table) {{
+        var headers = table.querySelectorAll('thead th');
+        headers.forEach(function(th, colIdx) {{
+            if (th.textContent.trim() === '\u2139\uFE0F') return;
+            th.classList.add('sortable');
+            th.addEventListener('click', function() {{
+                var tbody = table.querySelector('tbody');
+                if (!tbody) return;
+                var rows = Array.from(tbody.querySelectorAll('tr'));
+                var asc = th.classList.contains('sort-asc');
+                headers.forEach(function(h) {{ h.classList.remove('sort-asc','sort-desc'); }});
+                if (asc) {{ th.classList.add('sort-desc'); }} else {{ th.classList.add('sort-asc'); }}
+                rows.sort(function(a, b) {{
+                    var aVal = a.children[colIdx] ? a.children[colIdx].textContent.trim() : '';
+                    var bVal = b.children[colIdx] ? b.children[colIdx].textContent.trim() : '';
+                    var aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+                    var bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+                    if (!isNaN(aNum) && !isNaN(bNum)) {{ return asc ? aNum - bNum : bNum - aNum; }}
+                    return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                }});
+                rows.forEach(function(r) {{ tbody.appendChild(r); }});
+            }});
+        }});
+    }});
+}});
+</script>
 </body>
 </html>
 """
@@ -1956,36 +2117,65 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
 
 def main():
     import sys
+    import re as _re
     
-    print("🚀 Starting all-levels comparison analysis from CSV...")
-    
-    # Level ranges (L1, L2, L3, L4+)
-    level_ranges = {
-        'L1': (0, 50),
-        'L2': (50, 100),
-        'L3': (100, 150),
-        'L4+': (150, float('inf'))
-    }
+    print("🚀 Starting lot-based level analysis from CSV...")
     
     # Get CSV file path from command line or find automatically
     if len(sys.argv) > 1:
         csv_file = Path(sys.argv[1])
     else:
-        # Find CSV files
         csv_files = list(CSV_DIR.glob("signal_*.csv"))
-        
         if not csv_files:
             print(f"❌ No CSV files found in {CSV_DIR}")
             return
-        
-        # Process the first CSV file found
         csv_file = csv_files[0]
     
     print(f"📄 Processing CSV file: {csv_file}")
     
+    # Extract signal ID
+    stem = csv_file.stem
+    if 'forex-forest-signals-page-' in stem:
+        signal_id = stem.replace('forex-forest-signals-page-', '')
+    elif stem.startswith('signal_') and stem.endswith('_trades'):
+        signal_id = stem.replace('signal_', '').replace('_trades', '')
+    else:
+        signal_id = stem
+    
     # Analyze trades from CSV
     trades = analyze_trades_from_csv(csv_file)
     print(f"📊 Total trades: {len(trades)}")
+    
+    # === LOT-BASED LEVEL DETECTION ===
+    global_lot_mapping = load_signal_lot_mapping()
+    signal_lot_layers = None
+    is_autolot_signal = False
+    if signal_id in global_lot_mapping:
+        signal_lot_layers = global_lot_mapping[signal_id].get('lot_layers', [])
+        # Check AutoLot: unique lots >> SET layers
+        unique_lots = len(set(round(t['volume'], 4) for t in trades))
+        set_layers = len(signal_lot_layers)
+        if unique_lots > set_layers * 2 and set_layers > 1:
+            is_autolot_signal = True
+    
+    # Assign lot-based levels to each trade
+    if signal_lot_layers:
+        for t in trades:
+            result = assign_lot_level(t['volume'], signal_lot_layers)
+            if result:
+                t['lot_level'] = result[0]
+                t['is_autolot'] = result[1] or is_autolot_signal
+            else:
+                t['lot_level'] = 'L1'
+                t['is_autolot'] = is_autolot_signal
+        print(f"   Level detection: SET-based ({len(signal_lot_layers)} layers){' [AUTOLOT]' if is_autolot_signal else ''}")
+    else:
+        lot_to_level = infer_levels_from_csv_lots(trades)
+        for t in trades:
+            lot_key = round(t['volume'], 4)
+            t['lot_level'] = lot_to_level.get(lot_key, 'L1')
+            t['is_autolot'] = False
+        print(f"   Level detection: CSV-inferred ({len(lot_to_level)} unique lots)")
     
     # Group trades by currency
     currency_data = defaultdict(list)
@@ -1996,11 +2186,14 @@ def main():
     
     print(f"📈 Found {len(currency_data)} currency pairs")
     
-    # Analyze each currency by levels
+    # Analyze each currency by lot-based levels
     all_currency_data = {}
     
     for currency, currency_trades in currency_data.items():
-        print(f"  🔄 Processing {currency}...")
+        # Get achieved levels for this currency
+        ccy_achieved = sorted(set(t.get('lot_level', 'L1') for t in currency_trades),
+                             key=lambda x: (99 if x == 'L9+' else int(x[1:])))
+        print(f"  🔄 Processing {currency}... ({len(currency_trades)} trades, levels: {','.join(ccy_achieved)})")
         
         # Calculate basic stats
         total_trades = len(currency_trades)
@@ -2024,8 +2217,8 @@ def main():
             'martin': martin,
         }
         
-        # Analyze by levels
-        levels = analyze_by_levels(currency_trades, level_ranges)
+        # Analyze by lot-based levels
+        levels = analyze_by_levels_lotbased(currency_trades, ccy_achieved)
         
         all_currency_data[currency] = {
             'stats': stats,
@@ -2037,7 +2230,7 @@ def main():
     
     # Generate HTML report
     print("📝 Generating HTML report...")
-    html = generate_html_report(csv_file, all_currency_data, level_ranges)
+    html = generate_html_report(csv_file, all_currency_data)
     
     # Save report
     stem = Path(csv_file).stem

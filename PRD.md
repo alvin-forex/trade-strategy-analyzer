@@ -527,3 +527,103 @@ trade_strategy_analyzer/
 ---
 
 *此 PRD v0.5 已整合 DDE v3 Copy Strategy 系統。下次大改時同步更新 FEATURE_ARCHITECTURE.md 和 CHANGELOG.md。*
+
+---
+
+## 12. v0.6 更新：Enhanced Report + Signal Ranking Links（2026-05-09）
+
+### 12.1 Signal Ranking 頁面修改
+
+- **Signal ID → 連結**：點擊跳轉至 `https://forex-forest.com/signals/{id}`
+- **📊 Report Icon**：Signal ID 旁加 report icon，連結至 `detailed_comparison_all_levels_{id}.html`
+
+### 12.2 Detailed Report 新增三個模組
+
+每個 CCY section 現在包含（按順序）：
+
+1. **🎯 Copy Trade 建議引擎** — 自動生成建議
+   - 決策邏輯：基於期望值、馬丁依賴度、勝率、CoP/CoL 最佳分數
+   - 信心度：🟢 高 / 🟡 中 / 🔴 低
+   - 建議策略 + Wait Pips + TP/SL
+   - 理由 + 背景數據摘要
+
+2. **📈 值博率分析** — Expectancy + Kelly + Safety Margin
+   - 每層級（L1-L4+）+ Overall
+   - 指標：勝率、盈虧比、期望值(R-Multiple)、Kelly%、1/4 Kelly、BE勝率、安全邊際
+   - 安全邊際分級：🟢 >15% 穩健、🟡 5-15% 一般、🔴 <5% 危險
+
+3. **🎰 馬丁層級深度分析** — Martin Level Depth
+   - 整體馬丁盈利依賴度
+   - 每層級：觸發率、平均深度(pips)、最大深度(pips)、平均DD($)、最大DD($)
+   - 觸發率顏色分級：紅 >10%、橙 >3%、綠 ≤3%
+
+### 12.3 實作細節
+
+| 項目 | 說明 |
+|---|---|
+| 新增函數 | `compute_worthiness()`, `compute_martin_level_analysis()`, `compute_copy_trade_suggestion()` |
+| 修改函數 | `generate_html_report()`, `generate_signal_ranking.py` |
+| 數據流 | `raw_trades` 加入 `all_currency_data` 供新模組使用 |
+| 層級定義 | 使用 Max Pips 絕對值：L1: 0-50, L2: 50-100, L3: 100-150, L4+: 150+ |
+
+### 12.4 Copy Trade 建議決策規則
+
+| 條件 | 建議 | 信心度 |
+|---|---|---|
+| 期望值 < 0.1 OR 馬丁依賴 > 70% | ❌ 不建議 Copy | 🔴 低 |
+| 馬丁依賴 < 30% AND 勝率 > 60% AND CoP 有數據 | ✅ CoP，Wait 參考最佳 CoP | 視乎指標 |
+| 馬丁依賴 ≥ 30% AND CoL 有數據 | ⚠️ CoL，Wait 參考最佳 CoL | 視乎指標 |
+| 信心度 🟢 高 | 期望值 > 0.5R + 馬丁依賴 < 20% + 勝率 > 80% | — |
+
+---
+
+## 13. v0.7 更新：Lot-Based 層級重構 + UI 改進（2026-05-09）
+
+### 13.1 核心重構：Pip-Based → Lot-Based 層級偵測
+
+**問題**：舊系統用硬編碼 pip 範圍（L1=0-50, L2=50-100 等）定義層級，與 EA 實際設定嘅馬丁層級完全無關。
+
+**新做法**：
+
+| 來源 | 優先級 | 說明 |
+|---|---|---|
+| SET 檔 `signal_lot_mapping.json` | Primary | 用 lot→level 對照表直接映射 |
+| CSV Lots 唯一值推算 | Fallback | 無 SET 時按 unique lot 排序推算層級 |
+| AutoLot 偵測 | 標記 | unique lots >> SET layers 時標記 AL |
+
+**層級顯示**：L1 到 L9+（統一截斷）
+
+**新 Global Baselines**（基於 lot-based，55 signals）：
+
+| 層級 | 交易數 | 勝率 | TP(P85) | SL(P85) |
+|---|---|---|---|---|
+| L1 | 79,230 | 72.7% | 48.0 | 76.4 |
+| L2 | 13,563 | 71.2% | 88.5 | 115.8 |
+| L3 | 15,837 | 69.8% | 74.6 | 97.5 |
+| L4 | 5,416 | 68.0% | 109.3 | 143.3 |
+| L5 | 3,186 | 68.1% | 109.6 | 129.7 |
+| L6 | 2,201 | 66.9% | 128.7 | 126.7 |
+| L7 | 1,321 | 65.3% | 138.6 | 109.0 |
+| L8 | 1,022 | 62.6% | 150.2 | 92.1 |
+| L9+ | 1,865 | 50.8% | 163.4 | 73.8 |
+
+### 13.2 UI 改進
+
+- **Score Details → Mouseover**：CoP/CoL 評分表嘅公式拆解改為 ℹ️ icon，hover 先顯示
+- **可排序表格**：所有表格點擊表頭可排序（JavaScript client-side）
+- **動態 Summary 表格**：欄位按實際 achieved levels 動態生成
+
+### 13.3 AutoLot Signals
+
+以下 6 個 signals 被偵測為 AutoLot（unique lots >> SET layers）：
+
+- 10437 (DW), 3291 (DW), 1980 (SMA), 10864 (SMA), 1470 (MKD), 23617 (MKD)
+
+### 13.4 新增/修改函數
+
+| 函數 | 用途 |
+|---|---|
+| `load_signal_lot_mapping()` | 載入 SET lot 對照表 |
+| `assign_lot_level()` | SET-based lot→level 映射 |
+| `infer_levels_from_csv_lots()` | Fallback: CSV lots 推算層級 |
+| `analyze_by_levels_lotbased()` | 取代舊 `analyze_by_levels()` |
