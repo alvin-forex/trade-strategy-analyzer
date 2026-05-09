@@ -802,6 +802,308 @@ def detect_martin_lv(params):
     return 0
 
 
+def compute_worthiness(trades):
+    """
+    Compute worthiness metrics (R-Multiple, Kelly, Safety Margin) for a list of trades.
+    Returns dict with per-level + overall metrics.
+    """
+    level_ranges = {
+        'L1': (0, 50),
+        'L2': (50, 100),
+        'L3': (100, 150),
+        'L4+': (150, float('inf'))
+    }
+    if not trades:
+        return None
+    
+    results = {}
+    
+    for level_name in ['L1', 'L2', 'L3', 'L4+', 'Overall']:
+        if level_name == 'Overall':
+            level_trades = trades
+        else:
+            lo, hi = level_ranges.get(level_name, (0, float('inf')))
+            level_trades = [t for t in trades if lo <= abs(t.get('max_pips', 0) or 0) < hi]
+        
+        n = len(level_trades)
+        if n < 5:
+            results[level_name] = None
+            continue
+        
+        wins = [t for t in level_trades if t.get('net_profit', 0) > 0]
+        losses = [t for t in level_trades if t.get('net_profit', 0) <= 0]
+        
+        w = len(wins) / n  # win rate
+        avg_win = sum(t['net_profit'] for t in wins) / len(wins) if wins else 0
+        avg_loss = abs(sum(t['net_profit'] for t in losses) / len(losses)) if losses else 0
+        
+        r_ratio = avg_win / avg_loss if avg_loss > 0 else 999.0  # profit/loss ratio
+        
+        # Expectancy (R-Multiple): E = (W * R) - (1 - W)
+        expectancy = (w * r_ratio) - (1 - w)
+        
+        # Kelly: K = W - ((1-W) / R)
+        if r_ratio > 0:
+            kelly = w - ((1 - w) / r_ratio)
+        else:
+            kelly = 0
+        kelly_quarter = max(0, kelly * 0.25) * 100  # 1/4 Kelly as %
+        
+        # Breakeven win rate: 1 / (1 + R)
+        be_wr = 1 / (1 + r_ratio) if r_ratio > 0 else 1.0
+        safety_margin = w - be_wr  # actual WR minus breakeven WR
+        
+        # Safety margin grade
+        if safety_margin > 0.15:
+            safety_grade = '🟢'
+            safety_label = '穩健'
+        elif safety_margin > 0.05:
+            safety_grade = '🟡'
+            safety_label = '一般'
+        else:
+            safety_grade = '🔴'
+            safety_label = '危險'
+        
+        # Total profit
+        total_profit = sum(t['net_profit'] for t in level_trades)
+        
+        results[level_name] = {
+            'trades': n,
+            'wins': len(wins),
+            'win_rate': round(w * 100, 1),
+            'avg_win': round(avg_win, 2),
+            'avg_loss': round(avg_loss, 2),
+            'rr_ratio': round(r_ratio, 2),
+            'expectancy': round(expectancy, 3),
+            'kelly': round(kelly * 100, 1),
+            'kelly_quarter': round(kelly_quarter, 1),
+            'breakeven_wr': round(be_wr * 100, 1),
+            'safety_margin': round(safety_margin * 100, 1),
+            'safety_grade': safety_grade,
+            'safety_label': safety_label,
+            'total_profit': round(total_profit, 2),
+        }
+    
+    return results
+
+
+def compute_martin_level_analysis(trades):
+    """
+    Compute per-level Martin depth analysis for a list of trades.
+    Returns dict with per-level Martin metrics.
+    """
+    level_ranges = {
+        'L1': (0, 50),
+        'L2': (50, 100),
+        'L3': (100, 150),
+        'L4+': (150, float('inf'))
+    }
+    if not trades:
+        return None
+    
+    total = len(trades)
+    classic_martin_trades = [t for t in trades if t.get('net_profit', 0) > 0 and t.get('net_pips', 0) < 0]
+    total_profit = sum(t.get('net_profit', 0) for t in trades if t.get('net_profit', 0) > 0)
+    martin_profit = sum(t['net_profit'] for t in classic_martin_trades)
+    
+    # Martin profit dependency
+    martin_dependency = (martin_profit / total_profit * 100) if total_profit > 0 else 0
+    
+    # Martin win rate (among martin trades)
+    martin_wins = len([t for t in classic_martin_trades if t['net_profit'] > 0])
+    martin_wr = martin_wins / len(classic_martin_trades) * 100 if classic_martin_trades else 0
+    
+    results = {
+        'overall_dependency': round(martin_dependency, 1),
+        'overall_martin_count': len(classic_martin_trades),
+        'overall_martin_wr': round(martin_wr, 1),
+        'overall_total_profit': round(total_profit, 2),
+        'overall_martin_profit': round(martin_profit, 2),
+        'levels': {}
+    }
+    
+    for level_name in ['L1', 'L2', 'L3', 'L4+']:
+        lo, hi = level_ranges.get(level_name, (0, float('inf')))
+        level_trades = [t for t in trades if lo <= abs(t.get('max_pips', 0) or 0) < hi]
+        level_martin = [t for t in level_trades if t.get('net_profit', 0) > 0 and t.get('net_pips', 0) < 0]
+        
+        n = len(level_trades)
+        n_martin = len(level_martin)
+        
+        trigger_rate = n_martin / n * 100 if n > 0 else 0
+        avg_depth = sum(abs(t.get('max_loss_pips', 0)) for t in level_martin) / n_martin if n_martin > 0 else 0
+        max_depth = max((abs(t.get('max_loss_pips', 0)) for t in level_martin), default=0)
+        avg_dd = sum(abs(t.get('max_loss', 0)) for t in level_martin) / n_martin if n_martin > 0 else 0
+        max_dd = max((abs(t.get('max_loss', 0)) for t in level_martin), default=0)
+        
+        # Severity color
+        if trigger_rate > 10:
+            trigger_color = '#c62828'  # red
+        elif trigger_rate > 3:
+            trigger_color = '#f57c00'  # orange
+        else:
+            trigger_color = '#2e7d32'  # green
+        
+        results['levels'][level_name] = {
+            'trades': n,
+            'martin_count': n_martin,
+            'trigger_rate': round(trigger_rate, 1),
+            'avg_depth_pips': round(avg_depth, 1),
+            'max_depth_pips': round(max_depth, 1),
+            'avg_dd': round(avg_dd, 2),
+            'max_dd': round(max_dd, 2),
+            'trigger_color': trigger_color,
+        }
+    
+    return results
+
+
+def compute_copy_trade_suggestion(trades, worthiness, martin_analysis, levels_data):
+    """
+    Generate Copy Trade suggestion based on worthiness + martin analysis.
+    Returns dict with recommendation details.
+    """
+    if not trades or not worthiness:
+        return None
+    
+    overall = worthiness.get('Overall')
+    if not overall:
+        return None
+    
+    expectancy = overall['expectancy']
+    win_rate = overall['win_rate']
+    rr_ratio = overall['rr_ratio']
+    
+    # Martin dependency
+    martin_dep = martin_analysis['overall_dependency'] if martin_analysis else 0
+    martin_count = martin_analysis['overall_martin_count'] if martin_analysis else 0
+    
+    # Find best CoP score across all levels
+    best_cop_score = 0
+    best_cop_wait = 0
+    best_cop_level = ''
+    for lv in ['L1', 'L2', 'L3', 'L4+']:
+        lv_data = levels_data.get(lv, {})
+        cop = lv_data.get('copy_on_profit', {})
+        for wp, r in cop.items():
+            if r.get('weighted_score', 0) > best_cop_score:
+                best_cop_score = r['weighted_score']
+                best_cop_wait = wp
+                best_cop_level = lv
+    
+    # Find best CoL score
+    best_col_score = 0
+    best_col_wait = 0
+    best_col_level = ''
+    for lv in ['L1', 'L2', 'L3', 'L4+']:
+        lv_data = levels_data.get(lv, {})
+        col = lv_data.get('copy_on_lose', {})
+        for wp, r in col.items():
+            if r.get('weighted_score', 0) > best_col_score:
+                best_col_score = r['weighted_score']
+                best_col_wait = wp
+                best_col_level = lv
+    
+    # Get suggested TP/SL from best level
+    best_tpsl = levels_data.get(best_cop_level or 'L1', {}).get('tpsl', {})
+    tp_val = best_tpsl.get('tp', 'N/A')
+    sl_val = best_tpsl.get('sl', 'N/A')
+    rr_val = best_tpsl.get('rr_ratio', 'N/A')
+    rr_flag = best_tpsl.get('rr_flag', '')
+    
+    # Decision logic
+    recommendation = ''
+    strategy = ''
+    wait_pips = 0
+    confidence = '🔴 低'
+    confidence_class = 'low'
+    reason = ''
+    
+    # Rule 1: Not recommended
+    if expectancy < 0.1 or martin_dep > 70:
+        recommendation = '❌ 不建議 Copy'
+        strategy = 'N/A'
+        reason_parts = []
+        if expectancy < 0.1:
+            reason_parts.append(f'期望值過低 ({expectancy:.3f}R)')
+        if martin_dep > 70:
+            reason_parts.append(f'馬丁盈利依賴度過高 ({martin_dep:.1f}%)')
+        reason = '、'.join(reason_parts)
+        confidence = '🔴 低'
+        confidence_class = 'low'
+    
+    # Rule 2: CoP - signal-driven, low martin dependency
+    elif martin_dep < 30 and win_rate > 60 and best_cop_score > 0:
+        recommendation = '✅ 建議 CoP (Copy on Profit)'
+        strategy = 'CoP'
+        wait_pips = best_cop_wait
+        reason = f'馬丁依賴度低 ({martin_dep:.1f}%)、勝率 {win_rate:.1f}%、信號質素高'
+        
+        # Confidence
+        if expectancy > 0.5 and martin_dep < 20 and win_rate > 80:
+            confidence = '🟢 高'
+            confidence_class = 'high'
+        else:
+            confidence = '🟡 中'
+            confidence_class = 'medium'
+    
+    # Rule 3: CoL - martin-reliant, use recovery strategy
+    elif martin_dep >= 30 and best_col_score > 0:
+        recommendation = '⚠️ 建議 CoL (Copy on Lose)'
+        strategy = 'CoL'
+        wait_pips = best_col_wait
+        reason = f'馬丁依賴度 {martin_dep:.1f}%，適合等待回撤後跟單博反彈'
+        
+        if expectancy > 0.3 and martin_dep < 50:
+            confidence = '🟡 中'
+            confidence_class = 'medium'
+        else:
+            confidence = '🔴 低'
+            confidence_class = 'low'
+    
+    # Rule 4: Default - try CoP if available
+    elif best_cop_score > 0:
+        recommendation = '⚠️ 可嘗試 CoP (Copy on Profit)'
+        strategy = 'CoP'
+        wait_pips = best_cop_wait
+        reason = f'期望值 {expectancy:.3f}R、勝率 {win_rate:.1f}%，數據勉強支持 CoP'
+        confidence = '🟡 中'
+        confidence_class = 'medium'
+    
+    # Rule 5: No good option
+    else:
+        recommendation = '❌ 不建議 Copy'
+        strategy = 'N/A'
+        reason = f'缺乏有效嘅 CoP/CoL 觸發數據'
+        confidence = '🔴 低'
+        confidence_class = 'low'
+    
+    # Format TP/SL display
+    tp_display = f'{tp_val:.1f} pips' if isinstance(tp_val, (int, float)) else str(tp_val)
+    sl_display = f'{sl_val:.1f} pips' if isinstance(sl_val, (int, float)) else str(sl_val)
+    rr_display = f'{rr_flag} {rr_val:.2f}' if isinstance(rr_val, (int, float)) else str(rr_val)
+    
+    return {
+        'recommendation': recommendation,
+        'strategy': strategy,
+        'confidence': confidence,
+        'confidence_class': confidence_class,
+        'wait_pips': wait_pips,
+        'tp': tp_display,
+        'sl': sl_display,
+        'rr_display': rr_display,
+        'best_cop_score': round(best_cop_score, 1),
+        'best_col_score': round(best_col_score, 1),
+        'best_cop_level': best_cop_level,
+        'best_col_level': best_col_level,
+        'reason': reason,
+        'expectancy': expectancy,
+        'win_rate': win_rate,
+        'rr_ratio': rr_ratio,
+        'martin_dep': martin_dep,
+    }
+
+
 def build_signal_info_card(signal_id):
     """Build Signal Info Card HTML from .set files in Windows directory"""
     signal_dir = SET_FILES_DIR / str(signal_id)
@@ -1287,6 +1589,139 @@ def generate_html_report(csv_file, all_currency_data, level_ranges):
             </div>
 """
         
+        # === NEW: Compute worthiness, martin level analysis, copy trade suggestion ===
+        raw_trades = data.get('raw_trades', [])
+        worthiness = compute_worthiness(raw_trades) if raw_trades else None
+        martin_lvl = compute_martin_level_analysis(raw_trades) if raw_trades else None
+        copy_suggestion = compute_copy_trade_suggestion(raw_trades, worthiness, martin_lvl, levels) if raw_trades else None
+        
+        # === NEW MODULE 1: Copy Trade Suggestion ===
+        if copy_suggestion:
+            cs = copy_suggestion
+            conf_bg = {'high': '#e8f5e9', 'medium': '#fff8e1', 'low': '#ffebee'}
+            conf_border = {'high': '#4CAF50', 'medium': '#FFC107', 'low': '#FF5722'}
+            html += f"""
+            <div style="margin: 8px; border: 2px solid {conf_border[cs['confidence_class']]}; border-radius: 6px; overflow: hidden;">
+                <div style="background: {conf_bg[cs['confidence_class']]}; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #e0e0e0;">
+                    🎯 Copy Trade 建議
+                </div>
+                <div style="padding: 10px 12px; font-size: 11px; line-height: 1.8;">
+                    <div><strong>建議：</strong>{cs['recommendation']}</div>
+                    <div><strong>信心度：</strong>{cs['confidence']}</div>
+"""
+            if cs['strategy'] != 'N/A':
+                html += f"""
+                    <div><strong>策略：</strong>{cs['strategy']} · Wait <strong>{cs['wait_pips']} pips</strong></div>
+                    <div><strong>建議 TP/SL：</strong>TP = {cs['tp']} / SL = {cs['sl']} (R:R = {cs['rr_display']})</div>
+"""
+            html += f"""
+                    <div><strong>理由：</strong>{cs['reason']}</div>
+                    <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd; font-size: 9px; color: #666;"><strong>背景數據：</strong>期望值 {cs['expectancy']:.3f}R · 勝率 {cs['win_rate']:.1f}% · 盈虧比 {cs['rr_ratio']:.2f} · 馬丁依賴 {cs['martin_dep']:.1f}% · 最佳 CoP {cs['best_cop_score']:.1f} · 最佳 CoL {cs['best_col_score']:.1f}</div>
+                </div>
+            </div>
+"""
+        
+        # === NEW MODULE 2: Worthiness Analysis ===
+        if worthiness:
+            html += """
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #e3f2fd; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #1976d2; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #1976d2;">
+                    📈 值博率分析 (Expectancy + Kelly + Safety Margin)
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #e8eaf6;">
+                            <th>層級</th><th>Trades</th><th>勝率%</th><th>盈虧比 R</th><th>期望值 E</th>
+                            <th>Kelly%</th><th>1/4 Kelly</th><th>BE勝率</th><th>安全邊際</th><th>等級</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+            for lv_name in ['L1', 'L2', 'L3', 'L4+', 'Overall']:
+                lv = worthiness.get(lv_name)
+                if not lv:
+                    continue
+                row_bg = 'background: #f0f4ff;' if lv_name == 'Overall' else ''
+                # Color for expectancy
+                e_color = '#2e7d32' if lv['expectancy'] > 0 else '#c62828'
+                html += f"""
+                        <tr style="{row_bg}">
+                            <td><strong>{lv_name}</strong></td>
+                            <td>{lv['trades']}</td>
+                            <td>{lv['win_rate']:.1f}%</td>
+                            <td>{lv['rr_ratio']:.2f}</td>
+                            <td style="color: {e_color}; font-weight: bold;">{lv['expectancy']:.3f}R</td>
+                            <td>{lv['kelly']:.1f}%</td>
+                            <td>{lv['kelly_quarter']:.1f}%</td>
+                            <td>{lv['breakeven_wr']:.1f}%</td>
+                            <td>{lv['safety_grade']} {lv['safety_margin']:.1f}%</td>
+                            <td style="font-size: 9px;">{lv['safety_label']}</td>
+                        </tr>
+"""
+            html += """
+                    </tbody>
+                </table>
+"""
+            # Safety margin explanation
+            ov = worthiness.get('Overall')
+            if ov:
+                html += f"""
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>值博率解讀：</strong>期望值 {ov['expectancy']:.3f}R（每冒 1R 風險期望回報 {ov['expectancy']:.3f}R）。即使勝率跌至 {ov['breakeven_wr']:.1f}% 或盈虧比跌至 {(1-ov['win_rate']/100)/(ov['win_rate']/100):.2f} 仍可打和。安全邊際 {ov['safety_grade']} {ov['safety_margin']:.1f}%（{ov['safety_label']}）。
+                </div>
+"""
+            html += "</div>\n"
+        
+        # === NEW MODULE 3: Martin Level Depth Analysis ===
+        if martin_lvl:
+            ml = martin_lvl
+            html += f"""
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #fff3e0; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #e65100; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #ff9800;">
+                    🎰 馬丁層級深度分析
+                </div>
+                <div style="padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #eee;">
+                    <strong>馬丁盈利依賴度：</strong><span style="color: {'#c62828' if ml['overall_dependency'] > 50 else '#f57c00' if ml['overall_dependency'] > 20 else '#2e7d32'}; font-weight: bold;">{ml['overall_dependency']:.1f}%</span>
+                    &nbsp;|&nbsp; 馬丁交易數：{ml['overall_martin_count']} 筆
+                    &nbsp;|&nbsp; 總盈利 ${ml['overall_total_profit']:.2f} 中 ${ml['overall_martin_profit']:.2f} 來自馬丁
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #fff8e1;">
+                            <th>層級</th><th>Trades</th><th>馬丁數</th><th>觸發率</th><th>平均深度(pips)</th>
+                            <th>最大深度(pips)</th><th>平均DD($)</th><th>最大DD($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+            for lv_name in ['L1', 'L2', 'L3', 'L4+']:
+                lv_data = ml['levels'].get(lv_name)
+                if not lv_data or lv_data['trades'] == 0:
+                    continue
+                html += f"""
+                        <tr>
+                            <td><strong>{lv_name}</strong></td>
+                            <td>{lv_data['trades']}</td>
+                            <td>{lv_data['martin_count']}</td>
+                            <td style="color: {lv_data['trigger_color']}; font-weight: bold;">{lv_data['trigger_rate']:.1f}%</td>
+                            <td>{lv_data['avg_depth_pips']:.1f}</td>
+                            <td>{lv_data['max_depth_pips']:.1f}</td>
+                            <td>${lv_data['avg_dd']:.2f}</td>
+                            <td>${lv_data['max_dd']:.2f}</td>
+                        </tr>
+"""
+            html += """
+                    </tbody>
+                </table>
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>觸發率</strong> = Classic Martin 數 / 該層總交易數。紅色 >10%，橙色 >3%，綠色 ≤3%。<br>
+                    <strong>平均深度</strong> = 馬丁交易的平均 Max Loss Pips，反映觸發後要扛幾深。
+                </div>
+            </div>
+"""
+        
         # Martin Detection Section
         martin = stats.get('martin', None)
         if martin and martin['has_martin']:
@@ -1594,7 +2029,8 @@ def main():
         
         all_currency_data[currency] = {
             'stats': stats,
-            'levels': levels
+            'levels': levels,
+            'raw_trades': currency_trades
         }
     
     print(f"✅ Processed {len(all_currency_data)} currency pairs")

@@ -180,26 +180,40 @@ def main():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Signal Ranking - DDE v4 (5 Dimensions)</title>
+<title>🏆 Signal 排名</title>
 <style>
+/* === Unified Theme System === */
+:root{{--font-main:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px;--shadow:0 2px 8px rgba(0,0,0,0.12)}}
+[data-theme="dark"]{{--bg:#0a0e17;--bg-card:#111520;--bg-hover:#1a1f2e;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--orange:#fd7e14;--border:#1e2433;--th-bg:#111520;--nav-bg:transparent;--grade-a:#4CAF50;--grade-b:#FFC107;--grade-c:#fd7e14;--grade-d:#FF5722;--header-from:#1a1f2e;--header-to:#0a0e17}}
+[data-theme="light"]{{--bg:#f5f7fa;--bg-card:#ffffff;--bg-hover:#eef2f7;--text:#333;--text2:#666;--primary:#0f3460;--accent:#e94560;--green:#28a745;--red:#dc3545;--yellow:#ffc107;--orange:#fd7e14;--border:#ddd;--th-bg:#eef2f7;--nav-bg:rgba(0,0,0,0.03);--grade-a:#28a745;--grade-b:#ffc107;--grade-c:#fd7e14;--grade-d:#dc3545;--header-from:#0f3460;--header-to:#16213e}}
+*{{transition:background-color .25s ease,color .25s ease,border-color .25s ease}}
+.theme-toggle{{width:36px;height:36px;border:1px solid var(--border);border-radius:50%;background:var(--bg-card);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);line-height:1;padding:0;flex-shrink:0}}.theme-toggle:hover{{background:var(--bg-hover);transform:scale(1.1)}}
+/* Topnav */
+.topnav{{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border);margin-bottom:16px;position:sticky;top:0;z-index:100}}
+.topnav-logo{{font-weight:700;font-size:1em;color:var(--primary);text-decoration:none;margin-right:auto}}
+.topnav-links{{display:flex;gap:10px;flex-wrap:wrap}}
+.topnav-link{{color:var(--text2);text-decoration:none;font-size:.88em;font-weight:600;padding:4px 10px;border-radius:6px;transition:all .2s}}
+.topnav-link:hover{{color:var(--primary);background:var(--bg-hover)}}
+.topnav-link.active{{color:var(--primary);background:var(--bg-hover)}}
+/* Page styles */
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0e17;color:#d0d0d0;padding:12px;font-size:13px}}
-h1{{font-size:1.2em;margin-bottom:2px;color:#FFD700}}
-.sub{{color:#666;font-size:0.85em;margin-bottom:12px}}
-.sum{{background:#111520;border:1px solid #1e2433;border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:20px}}
-.sum .v{{font-size:1.3em;font-weight:bold;color:#FFD700}}
-.sum .l{{font-size:0.7em;color:#666}}
+body{{font-family:var(--font-main);background:var(--bg);color:var(--text);padding:16px;font-size:13px}}
+h1{{font-size:1.3em;margin-bottom:4px;color:var(--primary)}}
+.info-tip:hover .info-tip-text{{display:block}}
+.sum{{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:20px}}
+.sum .v{{font-size:1.3em;font-weight:bold;color:var(--primary)}}
+.sum .l{{font-size:0.7em;color:var(--text2)}}
 table{{width:100%;min-width:900px;border-collapse:collapse}}
-th{{background:#111520;padding:6px 8px;text-align:left;border-bottom:2px solid #FFD700;color:#FFD700;font-size:0.8em;white-space:nowrap}}
-td{{padding:5px 8px;text-align:left;border-bottom:1px solid #1a1f2e}}
-tr:hover{{background:#111520}}
+th{{background:var(--th-bg);padding:6px 8px;text-align:left;border-bottom:2px solid var(--primary);color:var(--primary);font-size:0.8em;white-space:nowrap}}
+td{{padding:5px 8px;text-align:left;border-bottom:1px solid var(--border)}}
+tr:hover{{background:var(--bg-hover)}}
 tr.top3{{background:rgba(255,215,0,0.03)}}
-.sig{{color:#64b5f6;font-weight:bold}}
-.s90{{color:#4CAF50;font-weight:bold}}.s85{{color:#8BC34A;font-weight:bold}}.s75{{color:#FFC107;font-weight:bold}}.s0{{color:#FF5722;font-weight:bold}}
-.p4{{color:#4CAF50}}
-.g{{color:#4CAF50}}.r{{color:#FF5722}}
+.sig{{color:var(--accent);font-weight:bold}}
+.s90{{color:var(--green);font-weight:bold}}.s85{{color:#8BC34A;font-weight:bold}}.s75{{color:var(--yellow);font-weight:bold}}.s0{{color:var(--red);font-weight:bold}}
+.p4{{color:var(--green)}}
+.g{{color:var(--green)}}.r{{color:var(--red)}}
 .m{{font-family:'SF Mono',Consolas,monospace;font-size:0.9em}}
-.tf{{display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.8em;background:#1a237e;color:#90caf9}}
+.tf{{display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.8em;background:var(--bg-hover);color:var(--accent)}}
 .ea-tag{{display:inline-block;padding:1px 5px;border-radius:3px;font-size:0.72em;font-weight:bold}}
 .ea-DW{{background:#4a148c;color:#ce93d8}}
 .ea-SMA{{background:#1b5e20;color:#a5d6a7}}
@@ -209,24 +223,33 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 .ea-GEM{{background:#37474f;color:#b0bec5}}
 .ea-STB{{background:#37474f;color:#b0bec5}}
 .ea-UNK{{background:#37474f;color:#b0bec5}}
-.dd-g{{color:#4CAF50}}.dd-y{{color:#FFC107}}.dd-r{{color:#FF5722}}
+.dd-g{{color:var(--green)}}.dd-y{{color:var(--yellow)}}.dd-r{{color:var(--red)}}
 @media(max-width:768px){{body{{font-size:11px}}th,td{{padding:3px 5px}}}}
 </style>
 </head>
 <body>
-<h1>📊 Signal Ranking — DDE v4 (5 Dimensions)</h1>
-<div class="sub">WR 20% + HT 5% + TC 15% + ML 25% + RR 35% | {total_signals} signals | {datetime.now().strftime('%Y-%m-%d')} | <a href="https://alvin-forex.github.io/trade-strategy-analyzer/ccy_timeframe_volatility.html" style="color:#64b5f6">📊 CCY波幅表</a></div>
+<div class="topnav">
+  <a href="./index.html" class="topnav-logo">🦀 TSA</a>
+  <div class="topnav-links">
+    <a href="./signal_ranking_dde_v4.html" class="topnav-link active">🏆 Signal 排名</a>
+    <a href="./reports/ranking_ccy.html" class="topnav-link">💱 CCY 排名</a>
+    <a href="./ccy_timeframe_volatility.html" class="topnav-link">📊 波幅表</a>
+  </div>
+  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">🌙</button>
+</div>
+<h1>🏆 Signal 排名</h1>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:0.82em;color:var(--text2)"><span>{total_signals} signals · {datetime.now().strftime('%Y-%m-%d')}</span><span class="info-tip" style="position:relative;display:inline-flex;cursor:pointer"><span style="width:18px;height:18px;border-radius:50%;background:var(--bg-hover);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-style:italic;color:var(--text2)">i</span><span class="info-tip-text" style="display:none;position:absolute;top:24px;left:0;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.82em;line-height:1.6;z-index:50;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.3);color:var(--text)">DDE v4 五維評分權重：<b style="color:var(--primary)">WR</b> 20% · <b style="color:var(--primary)">HT</b> 5% · <b style="color:var(--primary)">TC</b> 15% · <b style="color:var(--primary)">ML</b> 25% · <b style="color:var(--primary)">RR</b> 35%</span></span></div>
 <div class="sum">
 <div><div class="v">{total_signals}</div><div class="l">Signals</div></div>
 <div><div class="v">{avg_score:.1f}</div><div class="l">Avg Score</div></div>
 <div><div class="v">{best_score:.1f}</div><div class="l">Best</div></div>
 <div><div class="v">{worst_score:.1f}</div><div class="l">Worst</div></div>
-<div><div class="v">{avg_clean_pct:.0f}%</div><div class="l">Avg Clean%</div></div>
+<div><div class="v">{avg_clean_pct:.0f}%</div><div class="l">Avg CB</div></div>
 </div>
 <div style="overflow-x:auto;width:100%"><table><thead><tr>
-<th>#</th><th>Signal</th><th>DDE v4</th><th>Clean</th><th>Clean%</th>
-<th>Trades</th><th>Win%</th><th>PF</th><th>Total Profit</th><th>TF</th><th>Cmp</th> 
-<th>EA</th><th>LV</th><th>Eq Max DD</th>
+<th>#</th><th>Signal</th><th>CCY</th><th>DDE v4</th><th>CB</th>
+<th>Win%</th><th>Trades</th><th>Total Profit</th><th>Eq Max DD</th><th>PF</th>
+<th>TF</th><th>LV</th><th>EA</th>
 </tr></thead><tbody>
 '''
     
@@ -252,25 +275,29 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
         pf = r['profit_factor']
         pf_str = 'Inf' if pf > 999 else f'{pf:.1f}'
         
+        signal_id = r['signal_id']
+        report_url = f'./detailed_comparison_all_levels_{signal_id}.html'
+        signal_page_url = f'https://forex-forest.com/signals/{signal_id}'
         html += f'''<tr{row_class}>
 <td>{rank}</td>
-<td class="sig">{r['signal_id']}</td>
-<td class="{score_cls}">{r['avg_score']}</td>
-<td class="p4">{r['clean_symbols']}</td>
-<td class="p4">{r['clean_pct']}%</td>
-<td>{r['total_trades']:,}</td>
-<td>{r['win_rate']:.1f}%</td>
-<td>{pf_str}</td>
-<td class="g">{r['total_profit']:,.0f} pips</td>
-<td><span class="tf">{r['timeframe']}</span></td>
+<td class="sig"><a href="{signal_page_url}" target="_blank" style="color:var(--accent);font-weight:bold;text-decoration:none">{signal_id}</a> <a href="{report_url}" target="_blank" title="Open Detailed Report" style="text-decoration:none;font-size:14px">📊</a></td>
 <td>{r['total_symbols']}</td>
-<td><span class="ea-tag {ea_cls}">{r['ea_type']}</span></td>
-<td class="m">{r['layer_info']}</td>
+<td class="{score_cls}">{r['avg_score']}</td>
+<td class="p4">{r['clean_pct']}%</td>
+<td>{r['win_rate']:.1f}%</td>
+<td>{r['total_trades']:,}</td>
+<td class="g">{r['total_profit']:,.0f} pips</td>
 <td class="m {dd_cls}">{r['max_dd']:,.0f} pips</td>
+<td>{pf_str}</td>
+<td><span class="tf">{r['timeframe']}</span></td>
+<td class="m">{r['layer_info']}</td>
+<td><span class="ea-tag {ea_cls}">{r['ea_type']}</span></td>
 </tr>
 '''
     
-    html += '</tbody></table></div></body></html>'
+    html += '</tbody></table></div>'
+    html += '<script>function toggleTheme(){var t=document.documentElement.getAttribute("data-theme");var n=t==="light"?"dark":"light";document.documentElement.setAttribute("data-theme",n);localStorage.setItem("tsa-theme",n);var b=document.getElementById("theme-toggle");b.textContent=n==="dark"?"🌙":"☀️"}(function(){var s=localStorage.getItem("tsa-theme")||"dark";document.documentElement.setAttribute("data-theme",s);var b=document.getElementById("theme-toggle");if(b)b.textContent=s==="dark"?"🌙":"☀️"})();</script>'
+    html += '</body></html>'
     
     output_path = OUTPUT_DIR / 'signal_ranking_dde_v4.html'
     with open(output_path, 'w', encoding='utf-8') as f:
