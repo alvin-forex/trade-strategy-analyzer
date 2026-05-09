@@ -20,11 +20,18 @@ BASE_DIR = Path(__file__).parent
 SAMPLES_DIR = BASE_DIR / 'samples'
 OUTPUT_DIR = BASE_DIR / 'output'
 
+# Level ranges no longer used for lot-based detection (kept for reference)
+# Lot-based levels are computed from signal_lot_mapping.json via dde_v4_scorer.py
 LEVEL_RANGES = {
     'L1': (0, 50),
     'L2': (50, 100),
     'L3': (100, 150),
-    'L4+': (150, float('inf'))
+    'L4': (150, 200),
+    'L5': (200, 250),
+    'L6': (250, 300),
+    'L7': (300, 350),
+    'L8': (350, 400),
+    'L9+': (400, float('inf'))
 }
 
 # EA type mapping

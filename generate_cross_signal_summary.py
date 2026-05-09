@@ -12,7 +12,7 @@ import json
 OUTPUT_DIR = Path("output")
 
 # Level ranges
-LEVEL_RANGES = ['L1', 'L2', 'L3', 'L4+']
+LEVEL_RANGES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9+']
 
 # Wait times for Copy on Profit
 PROFIT_WAIT_TIMES = [5, 10, 15, 20]
@@ -574,7 +574,7 @@ def generate_html_report(signals_data, summary, output_path):
     for level in LEVEL_RANGES:
         html += f"""
             <div class="level-section">
-                <h3>{level} (${level.replace('L', '').replace('+', '$') if level == 'L4+' else level.replace('L', '$')})</h3>
+                <h3>{level} (${level.replace('L', '').replace('+', '$') if level == 'L9+' else level.replace('L', '$')})</h3>
                 <table>
                     <thead>
                         <tr>
