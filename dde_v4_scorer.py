@@ -70,15 +70,25 @@ def read_csv_trades(csv_path):
 
 
 def compute_layer_net_profit(profit):
-    """Return layer name for a given net profit."""
+    """Return layer name for a given net profit (fallback when no SET)."""
     if profit < 50:
         return 'L1'
     elif profit < 100:
         return 'L2'
     elif profit < 150:
         return 'L3'
+    elif profit < 200:
+        return 'L4'
+    elif profit < 250:
+        return 'L5'
+    elif profit < 300:
+        return 'L6'
+    elif profit < 350:
+        return 'L7'
+    elif profit < 400:
+        return 'L8'
     else:
-        return 'L4+'
+        return 'L9+'
 
 
 def load_lot_mapping():
@@ -101,14 +111,9 @@ def compute_layer_lot(trade_lot, lot_layers):
         if diff < best_diff:
             best_diff = diff
             best_level = level
-    if best_level <= 1:
-        return 'L1'
-    elif best_level == 2:
-        return 'L2'
-    elif best_level == 3:
-        return 'L3'
-    else:
-        return 'L4+'
+    if best_level >= 9:
+        return 'L9+'
+    return f'L{best_level}'
 
 
 def score_v4(trades_for_symbol, lot_layers=None):
@@ -128,8 +133,7 @@ def score_v4(trades_for_symbol, lot_layers=None):
     avg_hold = sum(t['holding_hours'] for t in trades_for_symbol) / n
     max_loss_pip = max((t['max_loss_pips'] for t in trades_for_symbol), default=0)
     
-    # Martin layers: weighted average layer
-    # Use lot-based layers if available, else fall back to net-profit based
+    # Martin layers: weighted average layer (lot-based)
     layer_counts = defaultdict(int)
     for t in trades_for_symbol:
         if lot_layers:
@@ -137,8 +141,12 @@ def score_v4(trades_for_symbol, lot_layers=None):
         else:
             lv = compute_layer_net_profit(t['net_profit'])
         layer_counts[lv] += 1
-    wal = sum(cnt * {'L1': 1, 'L2': 2, 'L3': 3, 'L4+': 4}[lv] 
-              for lv, cnt in layer_counts.items()) / n
+    # Convert level name to numeric: L1→1, L2→2, ..., L9+→9
+    def lv_to_num(lv_name):
+        if lv_name == 'L9+': return 9
+        try: return int(lv_name[1:])
+        except: return 1
+    wal = sum(cnt * lv_to_num(lv) for lv, cnt in layer_counts.items()) / n
     
     # --- Red card rules ---
     red_card = False
@@ -281,7 +289,7 @@ if __name__ == '__main__':
                 if cum - peak < max_dd: max_dd = cum - peak
             
             layer_names = []
-            for ln in ['L1', 'L2', 'L3', 'L4+']:
+            for ln in sorted(set(result['layers'].keys()), key=lambda x: (99 if x == 'L9+' else int(x[1:]))):
                 if result['layers'].get(ln, 0) > 0:
                     layer_names.append(ln)
             
