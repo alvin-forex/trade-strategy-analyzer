@@ -465,9 +465,9 @@ def generate_symbol_table(sym, rankings):
     html = f'''<div class="sym-section" data-symbol="{sym}">
 <div class="sym-header">💱 {sym} <span class="sym-count">({cnt} signals | avg {avg_sc})</span></div>
 <div style="overflow-x:auto;width:100%"><table><thead><tr>
-<th>#</th><th>Signal</th><th>Symbol</th><th>Avg Score</th><th>⭐⭐⭐⭐</th><th>⭐⭐⭐⭐%</th>
-<th>Trades</th><th>Win%</th><th>PF</th><th>Profit</th><th>TF</th>
-<th>EA</th><th>LV</th><th>Eq Max DD</th>
+<th>#</th><th>Signal</th><th>Symbol</th><th>Avg</th><th>⭐⭐⭐⭐</th><th>⭐⭐⭐⭐%</th>
+<th>#</th><th>Win%</th><th>PF</th><th>P&L</th><th>TF</th>
+<th>EA</th><th>LV</th><th>DD</th>
 </tr></thead><tbody>
 '''
 

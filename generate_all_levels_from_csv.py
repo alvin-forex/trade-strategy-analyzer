@@ -1505,6 +1505,13 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
             font-size: 10px;
             background: white;
             border: 1px solid #e0e0e0;
+            table-layout: auto;
+        }}
+        
+        .table-wrap {{
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }}
         
         .comparison-table th {{
@@ -1632,16 +1639,16 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
         
         <div class="summary-section" style="margin-bottom: 20px;">
             <h2 style="font-size: 13px; margin-bottom: 10px; color: #1976d2;">📋 Analysis Summary</h2>
-            <table class="comparison-table">
+            <div class="table-wrap"><table class="comparison-table">
                 <thead>
                     <tr>
                         <th>Currency</th>"""
     for lv in achieved_levels:
         html += f"""
-                        <th>{lv} Trades</th>"""
+                        <th>{lv}</th>"""
     html += """
-                        <th>Total Trades</th>
-                        <th>Overall Win Rate</th>
+                        <th>Total</th>
+                        <th>Win%</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1674,6 +1681,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
     html += """
                 </tbody>
             </table>
+            </div>
         </div>
 """
     
@@ -1763,8 +1771,8 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
                 <table class="comparison-table" style="font-size: 10px;">
                     <thead>
                         <tr style="background: #e8eaf6;">
-                            <th>層級</th><th>Trades</th><th>勝率%</th><th>盈虧比 R</th><th>期望值 E</th>
-                            <th>Kelly%</th><th>1/4 Kelly</th><th>BE勝率</th><th>安全邊際</th><th>等級</th>
+                            <th>層級</th><th>#</th><th>勝率</th><th>R</th><th>E</th>
+                            <th>Kelly</th><th>¼Kelly</th><th>BE</th><th>安全</th><th>等級</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1821,8 +1829,8 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
                 <table class="comparison-table" style="font-size: 10px;">
                     <thead>
                         <tr style="background: #fff8e1;">
-                            <th>層級</th><th>Trades</th><th>馬丁數</th><th>觸發率</th><th>平均深度(pips)</th>
-                            <th>最大深度(pips)</th><th>平均DD($)</th><th>最大DD($)</th>
+                            <th>層級</th><th>#</th><th>馬丁數</th><th>觸發</th><th>均深(pips)</th>
+                            <th>最深(pips)</th><th>均DD($)</th><th>最DD($)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1981,12 +1989,12 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
             html += """
                 <div class="strategy-section">
                     <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
-                    <table class="comparison-table">
+                    <div class="table-wrap"><table class="comparison-table">
                         <thead>
                             <tr>
                                 <th>Wait</th>
-                                <th>Trigger Rate</th>
-                                <th>Avg After</th>
+                                <th>Trig%</th>
+                                <th>Avg</th>
                                 <th>DDE</th>
                                 <th>Score</th>
                                 <th>Rating</th>
@@ -2017,6 +2025,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
             html += """
                         </tbody>
                     </table>
+                    </div>
                 </div>
 """
             
@@ -2025,13 +2034,13 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
             html += """
                 <div class="strategy-section">
                     <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
-                    <table class="comparison-table">
+                    <div class="table-wrap"><table class="comparison-table">
                         <thead>
                             <tr>
                                 <th>Wait</th>
-                                <th>Trigger Rate*</th>
-                                <th>Recovery Rate</th>
-                                <th>Avg After</th>
+                                <th>Trig%*</th>
+                                <th>Recov%</th>
+                                <th>Avg</th>
                                 <th>Score</th>
                                 <th>Rating</th>
                                 <th>ℹ️</th>
@@ -2060,6 +2069,7 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
             html += """
                         </tbody>
                     </table>
+                    </div>
                 </div>
 """
             
