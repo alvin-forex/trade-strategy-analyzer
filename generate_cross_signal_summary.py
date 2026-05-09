@@ -493,12 +493,12 @@ def generate_html_report(signals_data, summary, output_path):
                         <th>Rank</th>
                         <th>Signal</th>
                         <th>Pair</th>
-                        <th>Level</th>
+                        <th>LV</th>
                         <th>Wait</th>
                         <th>Score</th>
-                        <th>Trigger Rate</th>
-                        <th>Avg Profit</th>
-                        <th>Win Rate</th>
+                        <th>Trig%</th>
+                        <th>Avg P&L</th>
+                        <th>Win%</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -534,12 +534,12 @@ def generate_html_report(signals_data, summary, output_path):
                         <th>Rank</th>
                         <th>Signal</th>
                         <th>Pair</th>
-                        <th>Level</th>
+                        <th>LV</th>
                         <th>Wait</th>
                         <th>Score</th>
-                        <th>Recovery Rate</th>
-                        <th>Recovery Profit</th>
-                        <th>Trigger Rate</th>
+                        <th>Recov%</th>
+                        <th>Recov P&L</th>
+                        <th>Trig%</th>
                     </tr>
                 </thead>
                 <tbody>
