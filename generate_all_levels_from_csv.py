@@ -1603,6 +1603,13 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
         th.sort-asc::after {{ content: ' ↑'; opacity: 1; color: #1976d2; }}
         th.sort-desc::after {{ content: ' ↓'; opacity: 1; color: #1976d2; }}
         
+        /* Formula tooltip on table headers */
+        th.formula-tip {{ cursor: help; position: relative; }}
+        th.formula-tip .formula {{ display: none; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); background: #263238; color: #e0f7fa; padding: 8px 12px; border-radius: 6px; font-size: 10px; font-weight: normal; white-space: nowrap; z-index: 200; box-shadow: 0 4px 12px rgba(0,0,0,0.3); line-height: 1.6; margin-top: 2px; }}
+        th.formula-tip .formula::before {{ content: ''; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-bottom-color: #263238; }}
+        th.formula-tip:hover .formula {{ display: block; }}
+        th.formula-tip:hover {{ background: #c5cae9; }}
+        
         .best-score {{
             background: #e8f5e9;
             font-weight: bold;
@@ -1993,10 +2000,10 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
                         <thead>
                             <tr>
                                 <th>Wait</th>
-                                <th>Trig%</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
                                 <th>Avg</th>
-                                <th>DDE</th>
-                                <th>Score</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
                                 <th>Rating</th>
                                 <th>ℹ️</th>
                             </tr>
@@ -2038,10 +2045,10 @@ def generate_html_report(csv_file, all_currency_data, level_ranges=None):
                         <thead>
                             <tr>
                                 <th>Wait</th>
-                                <th>Trig%*</th>
-                                <th>Recov%</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
                                 <th>Avg</th>
-                                <th>Score</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
                                 <th>Rating</th>
                                 <th>ℹ️</th>
                             </tr>

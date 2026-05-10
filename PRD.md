@@ -1,7 +1,7 @@
 # PRD：交易策略分析系統（Trade Strategy Analyzer）
 
-> **版本：** v0.5（DDE v3 Copy Strategy 整合版）
-> **日期：** 2026-05-02
+> **版本：** v0.7（Lot-Based 層級偵測 + 三合一整合 + Batch Regenerate）
+> **日期：** 2026-05-10
 > **作者：** 丁蟹 + Alvin
 > **狀態：** 已實作，持續迭代中
 
@@ -34,6 +34,8 @@ Alvin 在 AlgoForest（Forex Forest）平台管理多個信號頁（如 #14581�
 - 用統一嘅 DDE v3 公式對所有信號進行跨策略比較
 - 產生排名總表，識別最佳 Copy 信號
 - 為每個貨幣對、每個層數提供精細化建議
+- **Lot-Based 層級偵測**：用 lot 數量判斷層數（取代舊 pip-based），與 EA 實際馬丁層級一致
+- **三合一模組整合**：`generate_all_levels_from_csv.py` 整合 CSV 下載、層級偵測、DDE v3 評分、HTML 報告生成
 
 ---
 
@@ -153,7 +155,7 @@ Alpha Capture Score = score × 0.4
 **百分位計算：**
 - `compute_signal_percentiles()` — 計算信號級別嘅 P25/P50/P75
 - `get_effective_percentiles()` — 小樣本回退（n < 30 時自動混和 global percentiles）
-- Global percentiles 基於所有 57 個信號嘅綜合數據
+- Global percentiles 基於所有 69 個信號嘅綜合數據
 
 #### 指標 3：DDE（Drawdown Efficiency，回撤效率）— 權重 20%
 
@@ -166,7 +168,7 @@ avg_dd_ratio = mean(dd_ratios)            # 該組合平均
 DDE Score = max(0, 100 - 50 × avg_dd_ratio) × 0.2
 ```
 
-**DDE 分佈實況（57 signals）：**
+**DDE 分佈實況（69 signals）：**
 - 中位數：76.0 分
 - P25-P75：62.5 - 87.5
 - 範圍：0 - 100
@@ -200,14 +202,12 @@ DDE Score = max(0, 100 - 50 × avg_dd_ratio) × 0.2
 
 ### 3.4 LEVEL_RANGES（層數分組）
 
-基於 CSV 數據嘅 `Net Pips`（或 `Max Pips`）絕對值：
-
-| 層數 | Pips 範圍 | 含義 |
-|------|-----------|------|
-| L1 | 0 - 50 | 淺層交易 |
-| L2 | 50 - 100 | 中層交易 |
-| L3 | 100 - 150 | 深層交易 |
-| L4+ | 150+ | 極深層交易 |
+> **v0.7 已更新為 Lot-Based 層級偵測**，見 Section 13。
+>
+> 舊版 pip-based 分組（已廢棄）：
+> L1: 0-50 pips, L2: 50-100, L3: 100-150, L4+: 150+
+>
+> 現在用 lot 數量 + SET lot mapping 判斷層數（L1-L9+），與 EA 實際馬丁層級一致。
 
 ### 3.5 Copy on Profit vs Copy on Lose
 
@@ -245,7 +245,7 @@ DDE Score = max(0, 100 - 50 × avg_dd_ratio) × 0.2
 
 ### 4.2 統計
 
-- **51/57 個信號（89%）有馬丁特徵**
+- **51/69 個信號（74%）有馬丁特徵**
 - **112 個 Classic Martin 貨幣對**被偵測到
 - 偵測結果顯示在每份 Detailed Report 嘅 Martin Detection 區塊
 
@@ -273,7 +273,7 @@ DDE Score = max(0, 100 - 50 × avg_dd_ratio) × 0.2
 - 當數據充足（≥ 30）→ 使用信號自身嘅 percentiles
 - P85 本身已排除 top 15% 極端值，無需額外 trim
 
-### 5.3 統計實況（57 signals）
+### 5.3 統計實況（69 signals）
 
 | 指標 | 數值 |
 |------|------|
@@ -351,7 +351,7 @@ DDE Score = max(0, 100 - 50 × avg_dd_ratio) × 0.2
 - 置左對齊
 - 橫向捲動（mobile-friendly）
 - Highlight 頭 10 名
-- 顯示所有 57 個信號（唔只頭 10）
+- 顯示所有 69 個信號（唔只頭 10）
 
 ### 6.2 Detailed Comparison Report（個別信號詳細報告）
 
@@ -398,7 +398,7 @@ Scraper 下載：/home/alvin/.openclaw/workspace/trade_strategy_analyzer/samples
 ### 7.2 報告生成流程
 
 ```bash
-# 1. 生成個別信號詳細報告（57份）
+# 1. 生成個別信號詳細報告（69份）
 python3 generate_all_levels_from_csv.py --signal {signal_id} --csv samples/{signal_id}.csv
 
 # 2. 生成 Signal Ranking 總表
@@ -409,7 +409,7 @@ python3 generate_signal_ranking.py
 
 | 腳本 | 用途 | 大小 |
 |------|------|------|
-| `generate_all_levels_from_csv.py` | 主 scoring engine（DDE v3、Alpha Capture、Martin Detection、TP/SL） | 52KB / 1356 行 |
+| `generate_all_levels_from_csv.py` | 三合一模組：CSV 下載 + 層級偵測 + DDE v3 評分 + HTML 報告生成 | 52KB / 1356 行 |
 | `generate_signal_ranking.py` | 從 detailed HTML 提取分數，生成排名總表 | ~10KB / 294 行 |
 | `batch_detailed_all.py` | 批量下載 CSV + 生成報告 | 6.7KB |
 | `batch_analyze.py` | 批量基礎分析 | 30KB |
@@ -443,10 +443,10 @@ trade_strategy_analyzer/
 ├── generate_cross_signal_summary.py    # 跨信號摘要
 ├── generate_detailed_comparison.py     # 個別詳細對比
 ├── generate_8325_report.py             # 特定信號報告
-├── samples/                            # 57 個 CSV 數據檔
+├── samples/                            # 69 個 CSV 數據檔
 ├── output/                             # 所有生成嘅 HTML 報告
 │   ├── signal_ranking_dde_v3.html      # 排名總表
-│   ├── detailed_comparison_all_levels_*.html  # 57 份詳細報告
+│   ├── detailed_comparison_all_levels_*.html  # 69 份詳細報告
 │   ├── full_cross_reference.html       # .set vs 交易表現對照
 │   ├── dd_control_analysis.html        # DD 控制分析
 │   ├── cross_signal_summary.html       # 跨信號摘要
@@ -480,7 +480,7 @@ trade_strategy_analyzer/
 | 3 | balance/credit 過濾 | 必須排除 Type=balance/credit | 2026-05-02 |
 | 4 | 小樣本回退 | n < 30 自動混和 global percentiles | 2026-05-02 |
 | 5 | 總表欄位 | 不顯示 Bar/Grid/DD Ctrl/TP/SL命中率/EA Family/Parameter Impact | 2026-05-02 |
-| 6 | Martin LV | 由 .set 計算，顯示喺總表 | 2026-05-02 |
+| 6 | Martin LV | 由 .set lot mapping 計算（lot-based），顯示喺總表 | 2026-05-10 |
 | 7 | TP/SL 公式 | P85 of Max Pips / Max Loss Pips，固定值 | 2026-05-02 |
 | 8 | TP/SL 位置 | 只喺 CoP 部分，每貨幣對每層數 | 2026-05-02 |
 | 9 | CoL TP/SL | 不顯示（recovery 策略邏輯唔同） | 2026-05-02 |
@@ -522,11 +522,11 @@ trade_strategy_analyzer/
 | 9 | 2351 | 89.4 | SMA | H4 | — |
 | 10 | 13863 | 89.8 | SMA | D1+ | — |
 
-**總計：57 signals, avg score 85.8, best 93.3 (22200), worst 67.3 (34259)**
+**總計：69 signals, avg score 85.8, best 93.3 (22200), worst 67.3 (34259)**
 
 ---
 
-*此 PRD v0.5 已整合 DDE v3 Copy Strategy 系統。下次大改時同步更新 FEATURE_ARCHITECTURE.md 和 CHANGELOG.md。*
+*此 PRD v0.7 已整合 Lot-Based 層級偵測、三合一模組、69 signals batch regenerate。下次大改時同步更新 FEATURE_ARCHITECTURE.md 和 CHANGELOG.md。*
 
 ---
 
@@ -564,7 +564,7 @@ trade_strategy_analyzer/
 | 新增函數 | `compute_worthiness()`, `compute_martin_level_analysis()`, `compute_copy_trade_suggestion()` |
 | 修改函數 | `generate_html_report()`, `generate_signal_ranking.py` |
 | 數據流 | `raw_trades` 加入 `all_currency_data` 供新模組使用 |
-| 層級定義 | 使用 Max Pips 絕對值：L1: 0-50, L2: 50-100, L3: 100-150, L4+: 150+ |
+| 層級定義 | v0.6 用 Max Pips 絕對值；v0.7 改用 Lot-Based（見 Section 13） |
 
 ### 12.4 Copy Trade 建議決策規則
 
@@ -577,7 +577,18 @@ trade_strategy_analyzer/
 
 ---
 
-## 13. v0.7 更新：Lot-Based 層級重構 + UI 改進（2026-05-09）
+## 13. v0.7 更新：Lot-Based 層級重構 + Batch Regenerate + UI 改進（2026-05-09 → 2026-05-10）
+
+### 13.0 Batch Regenerate 完成（2026-05-10）
+
+- **69 個 signals** 全部用 lot-based 重新生成 detailed reports
+- 已部署到 GitHub Pages（https://alvin-forex.github.io/trade-strategy-analyzer/）
+- Signal Ranking 總表已同步更新
+
+### 13.0.1 TSA 系統指南
+
+- Quant Agent 已加入 TSA 完整指南（Section 9）
+- 涵蓋：分析流程、評分系統、報告解讀、操作指引
 
 ### 13.1 核心重構：Pip-Based → Lot-Based 層級偵測
 
@@ -593,7 +604,7 @@ trade_strategy_analyzer/
 
 **層級顯示**：L1 到 L9+（統一截斷）
 
-**新 Global Baselines**（基於 lot-based，55 signals）：
+**新 Global Baselines**（基於 lot-based，69 signals）：
 
 | 層級 | 交易數 | 勝率 | TP(P85) | SL(P85) |
 |---|---|---|---|---|
