@@ -146,4 +146,39 @@ bash /home/alvin/.openclaw/workspace/skills/analyze-signal/scripts/analyze_signa
 
 ---
 
-_此文檔由丁蟹自動生成，最後更新：2026-05-05_
+## 八、馬丁剖析法 V3
+
+### 功能
+
+分析馬丁格爾策略嘅交易歷史，生成 6 部分完整剖析報告。
+
+### 腳本位置
+
+```
+trade_strategy_analyzer/
+├── generate_martin_autopsy_v3.py   # 主分析腳本（1326 行）
+├── reports/                        # HTML 報告輸出
+│   └── martin_autopsy_v3_{ID}.html
+└── downloads/                      # CSV 數據
+```
+
+### 使用方法
+
+```bash
+python generate_martin_autopsy_v3.py <csv_path> [--output OUTPUT_PATH]
+```
+
+### 分析模組
+
+| Part | 模組 | 核心指標 |
+|------|------|----------|
+| 1 | CCY×Direction 總覽 | EV$、Odds$、MFE/MAE（絕對數據）|
+| 2 | MFE/MAE 散點圖 | 每層交易嘅最大偏移可視化 |
+| 3 | TP/SL 混合方案 | Soft SL = MAE×1.2, Hard SL = MaxMAE×1.3 |
+| 4 | 排行榜 | Rating + EV$ 排序 |
+| 5 | 黑名單 | Danger Score（5因子）|
+| 6 | 恢復力 | 最深層虧損 / 最佳 EV |
+
+---
+
+_此文檔由丁蟹自動生成，最後更新：2026-05-13_
