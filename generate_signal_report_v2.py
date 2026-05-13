@@ -980,7 +980,17 @@ function drawCCYCharts(idx){{
         ctx.fillStyle=p.is_win?'rgba(40,167,69,0.4)':'rgba(220,53,69,0.4)';ctx.fill();
       }});
       ctx.fillStyle='#0f3460';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
-      ctx.fillText(sc.id.replace('sc_',''),pad.l,12);
+      var lvName=lv.replace(/[^L\d+]/g,'')||lv;
+      ctx.fillText(lvName+' (n='+pts.length+')',pad.l,12);
+      // X axis labels
+      ctx.fillStyle='#999';ctx.font='9px sans-serif';ctx.textAlign='center';
+      ctx.fillText('-'+rng.toFixed(0),pad.l,pad.t+ph+12);
+      ctx.fillText('0',pad.l+pw/2,pad.t+ph+12);
+      ctx.fillText('+'+rng.toFixed(0),pad.l+pw,pad.t+ph+12);
+      // Y axis labels  
+      ctx.textAlign='right';
+      ctx.fillText('+'+rngY.toFixed(0),pad.l-2,pad.t+8);
+      ctx.fillText('-'+rngY.toFixed(0),pad.l-2,pad.t+ph);
     }});
   }}
 }}
