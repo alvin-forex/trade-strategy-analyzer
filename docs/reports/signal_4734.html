@@ -61,7 +61,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
 
 <div class="header">
   <h1>🔬 Signal #4734 V3 分析報告</h1>
-  <div class="sub">Martin V3 + Quant 圖表 · 4 CCY×Direction · 157 trades · 2026-05-13 23:28</div>
+  <div class="sub">Martin V3 + Quant 圖表 · 4 CCY×Direction · 157 trades · 2026-05-13 23:31</div>
   <div class="cards">
     <div class="card"><div class="v">157</div><div class="l">總交易</div></div>
     <div class="card"><div class="v pos">$+3,551</div><div class="l">總盈虧</div></div>
@@ -1279,7 +1279,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
           <td><b>1</b></td></tr></tbody></table></div>
 </div>
 
-<div class="footer">Signal #4734 · Martin V3 + Quant · 2026-05-13 23:28</div>
+<div class="footer">Signal #4734 · Martin V3 + Quant · 2026-05-13 23:31</div>
 </div>
 
 <script>
@@ -1305,18 +1305,88 @@ function toggleCCY(el){
 }
 
 function drawCCYCharts(idx){
-  // Draw TP/SL chart
+  // Draw TP/SL chart for this CCY index
   var data = tpslData[idx];
   if(data && data.length){
     var c = document.getElementById('tpsl_'+idx);
-    if(c) drawOneTpsl(c, data);
+    if(c){
+      var ctx=c.getContext('2d');
+      var dpr=window.devicePixelRatio||1;
+      var p=c.parentElement;
+      var w=p?(p.offsetWidth-24):600;
+      w=Math.max(w,300);
+      var h=Math.max(200,data.length*40);
+      c.width=w*dpr;c.height=h*dpr;
+      c.style.width=w+'px';c.style.height=h+'px';
+      ctx.scale(dpr,dpr);
+      var pad={t:25,r:20,b:30,l:100};
+      var pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+      ctx.fillStyle='#f8f9fa';ctx.fillRect(0,0,w,h);
+      var maxPip=1;
+      data.forEach(function(d){maxPip=Math.max(maxPip,d.tp,d.soft_sl,d.hard_sl)});
+      maxPip*=1.1;
+      var barH=Math.max(4,ph/data.length*0.25);
+      var rowH=ph/data.length;
+      ctx.strokeStyle='#0f3460';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(pad.l+pw/2,pad.t);ctx.lineTo(pad.l+pw/2,pad.t+ph);ctx.stroke();
+      var colors={S:'#28a745',A:'#28a745',B:'#ffc107',C:'#fd7e14',D:'#dc3545'};
+      data.forEach(function(d,i){
+        var y=pad.t+rowH*i+rowH/2;
+        var x0=pad.l+pw/2;
+        var tpW=d.tp/maxPip*(pw/2);
+        ctx.fillStyle=d.rating==='D'?'#dc3545':'#28a745';
+        ctx.fillRect(x0,y-barH/2,tpW,barH);
+        ctx.fillStyle='#fd7e14';
+        ctx.fillRect(x0,y-barH/2-1,d.soft_sl/maxPip*(pw/2)*(-1),barH);
+        ctx.fillStyle='rgba(220,53,69,0.3)';
+        ctx.fillRect(x0,y-barH/2-1,d.hard_sl/maxPip*(pw/2)*(-1),barH+2);
+        ctx.fillStyle='#333';ctx.font='bold 11px sans-serif';ctx.textAlign='right';
+        ctx.fillText(d.label,pad.l-4,y+4);
+        var rc=colors[d.rating]||'#666';
+        ctx.fillStyle=rc;ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+        ctx.fillText(d.rating,x0+tpW+4,y+4);
+      });
+    }
   }
-  // Draw scatter plots
+  // Draw scatter plots for this CCY index
   var sd = scatterData[idx];
   if(sd){
     Object.keys(sd).forEach(function(lv){
-      var sc = document.getElementById('sc_'+idx+'_'+lv);
-      if(sc) drawOneScatter(sc, sd[lv]);
+      var sc=document.getElementById('sc_'+idx+'_'+lv);
+      if(!sc)return;
+      var pts=sd[lv];if(!pts||!pts.length)return;
+      var ctx=sc.getContext('2d');
+      var dpr=window.devicePixelRatio||1;
+      var p=sc.parentElement;
+      var w=p?(p.offsetWidth-16):240;
+      w=Math.max(w,200);
+      var h=150;
+      sc.width=w*dpr;sc.height=h*dpr;
+      sc.style.width=w+'px';sc.style.height=h+'px';
+      ctx.scale(dpr,dpr);
+      ctx.fillStyle='#f8f9fa';ctx.fillRect(0,0,w,h);
+      var pad={t:18,r:8,b:18,l:28};
+      var pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+      ctx.strokeStyle='#ccc';ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(pad.l,pad.t+ph/2);ctx.lineTo(pad.l+pw,pad.t+ph/2);ctx.stroke();
+      var minX=0,maxX=0,minY=0,maxY=0;
+      pts.forEach(function(p){
+        minX=Math.min(minX,p.np);maxX=Math.max(maxX,p.np);
+        minY=Math.min(minY,p.mfe,p.mae);maxY=Math.max(maxY,p.mfe,p.mae);
+      });
+      var rng=Math.max(Math.abs(minX),Math.abs(maxX),1);
+      var rngY=Math.max(Math.abs(minY),Math.abs(maxY),1);
+      pts.forEach(function(p){
+        var x=pad.l+(p.np/rng*0.45+0.5)*pw;
+        var yMfe=pad.t+(1-p.mfe/rngY*0.45-0.5)*ph;
+        var yMae=pad.t+(1+p.mae/rngY*0.45-0.5)*ph;
+        ctx.beginPath();ctx.arc(x,Math.min(pad.t+ph,Math.max(pad.t,yMfe)),2.5,0,Math.PI*2);
+        ctx.fillStyle=p.win?'#28a745':'#dc3545';ctx.fill();
+        ctx.beginPath();ctx.arc(x,Math.min(pad.t+ph,Math.max(pad.t,yMae)),2.5,0,Math.PI*2);
+        ctx.fillStyle=p.win?'rgba(40,167,69,0.4)':'rgba(220,53,69,0.4)';ctx.fill();
+      });
+      ctx.fillStyle='#0f3460';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+      ctx.fillText(sc.id.replace('sc_',''),pad.l,12);
     });
   }
 }
