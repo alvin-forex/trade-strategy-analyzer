@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signal #22200 V3 分析報告</title>
+<style>
+:root{--bg:#0a0e17;--card:#111520;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--orange:#fd7e14;--border:#1e2433;--radius:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;background:var(--bg);color:var(--text);padding:12px;font-size:13px;line-height:1.5}
+.container{max-width:1400px;margin:0 auto}
+.header{background:linear-gradient(135deg,#1a1a3e 0%,#2d1b69 50%,#1a1a3e 100%);border:1px solid #4a3f8a;border-radius:12px;padding:20px;margin-bottom:16px}
+.header h1{font-size:22px;color:#FFD700;margin-bottom:4px}
+.header .sub{font-size:11px;color:#888}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:16px;margin-top:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;text-align:center}
+.card .v{font-size:18px;font-weight:700;color:var(--primary)}
+.card .v.pos{color:var(--green)}.card .v.neg{color:var(--red)}
+.card .l{font-size:9px;color:var(--text2);margin-top:2px;text-transform:uppercase}
+.tabs{display:flex;gap:0;margin-bottom:0;flex-wrap:wrap}
+.tab{padding:10px 18px;background:var(--card);border:1px solid var(--border);color:var(--text2);cursor:pointer;border-radius:8px 8px 0 0;font-size:12px;white-space:nowrap}
+.tab.active{background:var(--bg);color:var(--primary);border-bottom-color:var(--bg);font-weight:700}
+.tab:hover{color:var(--primary)}
+.panel{background:var(--bg);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:16px;margin-bottom:20px}
+.panel.hidden{display:none}
+.sec{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.sec-h{background:linear-gradient(90deg,#1a1a3e,#2d1b69);padding:10px 14px;font-size:12px;font-weight:bold;color:#fff;border-bottom:1px solid #3a3a6a}
+.sec-b{padding:10px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:11px;min-width:600px}
+th{background:#1a1a3e;color:#bbb;padding:6px;text-align:left;font-size:9px;text-transform:uppercase;border-bottom:1px solid #3a3a6a;white-space:nowrap;cursor:pointer}
+th:hover{color:#FFD700}
+td{padding:5px 6px;border-bottom:1px solid #1a1a2a;white-space:nowrap}
+tr:hover{background:rgba(255,215,0,0.03)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.rtg{display:inline-block;padding:1px 8px;border-radius:4px;font-size:10px;font-weight:700;min-width:24px;text-align:center}
+.lbl{font-size:9px;color:var(--text2);text-transform:uppercase}
+.legend{display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--text2)}
+.legend span::before{content:'';display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.l-green::before{background:var(--green)}.l-orange::before{background:var(--orange)}.l-red::before{background:var(--red)}
+.ccy-section{margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.ccy-header{padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#131335;font-size:13px}
+.ccy-header:hover{background:#1a1a4a}
+.ccy-header .arrow{transition:transform .2s;font-size:12px}
+.ccy-header.open .arrow{transform:rotate(90deg)}
+.ccy-body{display:none;padding:12px}
+.ccy-body.open{display:block}
+.sug-card{border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;background:rgba(255,255,255,0.02)}
+.sug-card.high{border-color:var(--green)}.sug-card.medium{border-color:var(--yellow)}.sug-card.low{border-color:var(--red)}
+.sug-title{font-size:14px;font-weight:700;margin-bottom:8px}
+.sug-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px}
+.sug-reason{margin-top:8px;font-size:11px;color:var(--text2)}
+.scatter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.scatter-card{background:#0a0a18;border:1px solid var(--border);border-radius:8px;padding:8px}
+.scatter-card .title{font-size:11px;color:var(--primary);margin-bottom:4px}
+.footer{text-align:center;padding:16px;color:#555;font-size:10px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>🔬 Signal #22200 V3 分析報告</h1>
+  <div class="sub">Martin V3 + Quant 圖表 · 8 CCY×Direction · 130 trades · 2026-05-13 21:28</div>
+  <div class="cards">
+    <div class="card"><div class="v">130</div><div class="l">總交易</div></div>
+    <div class="card"><div class="v pos">$+77,470</div><div class="l">總盈虧</div></div>
+    <div class="card"><div class="v pos">80.8%</div><div class="l">勝率</div></div>
+    <div class="card"><div class="v">6.78</div><div class="l">Profit Factor</div></div>
+    <div class="card"><div class="v neg">$7,235</div><div class="l">Max DD</div></div>
+    <div class="card"><div class="v">231.7h</div><div class="l">Avg Hold</div></div>
+    <div class="card"><div class="v" style="color:var(--accent)">8</div><div class="l">CCY×Dir</div></div>
+    <div class="card"><div class="v neg">6</div><div class="l">黑名單</div></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="sw('p1')">📊 CCY 詳情</div>
+  <div class="tab" onclick="sw('p2')">💀 黑名單</div>
+  <div class="tab" onclick="sw('p3')">💪 恢復力</div>
+</div>
+
+<div class="panel" id="p1">
+
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>AUDCAD</b> BUY — 8 trades · $+2,628.86 · WR 100.0% · EV $+328.61</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">8</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">100.0%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+2,629</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">1</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+328.61</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">999.00x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sug-card high">
+              <div class="sug-title">✅ 建議 CoP (Copy on Profit)</div>
+              <div class="sug-grid">
+                <div><span class="lbl">策略</span><br>CoP</div>
+                <div><span class="lbl">Wait Pips</span><br>5</div>
+                <div><span class="lbl">信心度</span><br>🟢 高</div>
+                <div><span class="lbl">期望值</span><br>999.000R</div>
+                <div><span class="lbl">勝率</span><br>100.0%</div>
+                <div><span class="lbl">馬丁依賴</span><br>0.0%</div>
+                <div><span class="lbl">Best CoP</span><br>106.1 (L1)</div>
+                <div><span class="lbl">Best CoL</span><br>110.0 (L1)</div>
+              </div>
+              <div class="sug-reason">馬丁依賴度低 (0.0%)、勝率 100.0%</div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">值博率分析</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Trades</th><th>WR%</th><th>AvgW$</th><th>AvgL$</th><th>R:R</th><th>E(R)</th><th>Kelly%</th><th>安全邊際</th><th>Total$</th></tr></thead>
+                <tbody><tr>
+                  <td>8</td><td>100.0%</td>
+                  <td class="pos">$328.61</td><td class="neg">$0</td>
+                  <td>999</td><td class="pos">999.0</td>
+                  <td>100.0%</td><td>🟢 穩健</td>
+                  <td class="pos">$+2,628.86</td>
+                </tr></tbody></table></div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>8</td><td>100.0%</td>
+              <td class="pos">$+2,628.86</td>
+              <td class="pos">$+328.61</td>
+              <td>999x</td>
+              <td class="pos">46.8</td><td class="neg">0</td>
+              <td class="pos">48.9</td><td class="neg">9.1</td><td class="neg">17.9</td>
+              <td>63.5h</td>
+              <td><span class="rtg" style="background:#FFD700;color:#000">S+</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_0" style="width:100%;height:200px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=8) WR:100.0%</div>
+                <canvas id="sc_0_L1" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.0%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>8</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>8/8</td><td>100%</td>
+                  <td>$328.61</td><td><b>106.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>8/8</td><td>100%</td>
+                  <td>$328.61</td><td><b>106.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>8/8</td><td>100%</td>
+                  <td>$328.61</td><td><b>106.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>8/8</td><td>100%</td>
+                  <td>$328.61</td><td><b>106.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>3</td><td>100%</td>
+                  <td>$309.47</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>1</td><td>100%</td>
+                  <td>$274.68</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h" style="background:linear-gradient(90deg,#3e1a1a,#692d2d)">⚠️ Danger Score</div>
+              <div class="sec-b">
+                <div style="font-size:14px;margin-bottom:6px">⚠️ WARNING</div>
+                <div>Danger: <b>3</b> | WR: 100.0% | Odds: 0</div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L1</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$80.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L1 ($+328.61)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>11天</div>
+                </div>
+              </div>
+            </div></div></div>
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>AUDNZD</b> BUY — 5 trades · $+1,898.72 · WR 100.0% · EV $+582.68</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">5</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">100.0%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+1,899</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">2</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+582.68</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">999.00x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sug-card high">
+              <div class="sug-title">✅ 建議 CoP (Copy on Profit)</div>
+              <div class="sug-grid">
+                <div><span class="lbl">策略</span><br>CoP</div>
+                <div><span class="lbl">Wait Pips</span><br>5</div>
+                <div><span class="lbl">信心度</span><br>🟢 高</div>
+                <div><span class="lbl">期望值</span><br>999.000R</div>
+                <div><span class="lbl">勝率</span><br>100.0%</div>
+                <div><span class="lbl">馬丁依賴</span><br>0.0%</div>
+                <div><span class="lbl">Best CoP</span><br>108.0 (L2)</div>
+                <div><span class="lbl">Best CoL</span><br>110.0 (L1)</div>
+              </div>
+              <div class="sug-reason">馬丁依賴度低 (0.0%)、勝率 100.0%</div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">值博率分析</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Trades</th><th>WR%</th><th>AvgW$</th><th>AvgL$</th><th>R:R</th><th>E(R)</th><th>Kelly%</th><th>安全邊際</th><th>Total$</th></tr></thead>
+                <tbody><tr>
+                  <td>5</td><td>100.0%</td>
+                  <td class="pos">$379.74</td><td class="neg">$0</td>
+                  <td>999</td><td class="pos">999.0</td>
+                  <td>100.0%</td><td>🟢 穩健</td>
+                  <td class="pos">$+1,898.72</td>
+                </tr></tbody></table></div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>4</td><td>100.0%</td>
+              <td class="pos">$+977.80</td>
+              <td class="pos">$+244.45</td>
+              <td>999x</td>
+              <td class="pos">42.5</td><td class="neg">0</td>
+              <td class="pos">42.5</td><td class="neg">19.1</td><td class="neg">37.9</td>
+              <td>40.4h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr><tr>
+              <td><b>L2</b></td><td>1</td><td>100.0%</td>
+              <td class="pos">$+920.92</td>
+              <td class="pos">$+920.92</td>
+              <td>999x</td>
+              <td class="pos">63.7</td><td class="neg">0</td>
+              <td class="pos">63.7</td><td class="neg">0.0</td><td class="neg">0.0</td>
+              <td>38.5h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_1" style="width:100%;height:200px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=4) WR:100.0%</div>
+                <canvas id="sc_1_L1" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L2 (n=1) WR:100.0%</div>
+                <canvas id="sc_1_L2" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.0%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>4</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L2</td><td>1</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>4/4</td><td>100%</td>
+                  <td>$244.45</td><td><b>98.9</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>4/4</td><td>100%</td>
+                  <td>$244.45</td><td><b>98.9</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>3/4</td><td>75%</td>
+                  <td>$298.52</td><td><b>92.6</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>3/4</td><td>75%</td>
+                  <td>$298.52</td><td><b>92.6</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$107.84</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$107.84</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$107.84</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$107.84</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>1/1</td><td>100%</td>
+                  <td>$920.92</td><td><b>108.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>1/1</td><td>100%</td>
+                  <td>$920.92</td><td><b>108.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>1/1</td><td>100%</td>
+                  <td>$920.92</td><td><b>108.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>1/1</td><td>100%</td>
+                  <td>$920.92</td><td><b>108.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h" style="background:linear-gradient(90deg,#3e1a1a,#692d2d)">⚠️ Danger Score</div>
+              <div class="sec-b">
+                <div style="font-size:14px;margin-bottom:6px">⚠️ WARNING</div>
+                <div>Danger: <b>3</b> | WR: 100.0% | Odds: 0</div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L2</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$10.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L2 ($+920.92)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>18天</div>
+                </div>
+              </div>
+            </div></div></div>
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>EURCHF</b> BUY — 30 trades · $+19,385.61 · WR 76.7% · EV $+1376.39</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">30</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">76.7%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+19,386</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">3</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+1376.39</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">335.33x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sug-card medium">
+              <div class="sug-title">✅ 建議 CoP (Copy on Profit)</div>
+              <div class="sug-grid">
+                <div><span class="lbl">策略</span><br>CoP</div>
+                <div><span class="lbl">Wait Pips</span><br>5</div>
+                <div><span class="lbl">信心度</span><br>🟡 中</div>
+                <div><span class="lbl">期望值</span><br>2.877R</div>
+                <div><span class="lbl">勝率</span><br>76.7%</div>
+                <div><span class="lbl">馬丁依賴</span><br>0.0%</div>
+                <div><span class="lbl">Best CoP</span><br>104.1 (L3)</div>
+                <div><span class="lbl">Best CoL</span><br>110.0 (L3)</div>
+              </div>
+              <div class="sug-reason">馬丁依賴度低 (0.0%)、勝率 76.7%</div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">值博率分析</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Trades</th><th>WR%</th><th>AvgW$</th><th>AvgL$</th><th>R:R</th><th>E(R)</th><th>Kelly%</th><th>安全邊際</th><th>Total$</th></tr></thead>
+                <tbody><tr>
+                  <td>30</td><td>76.7%</td>
+                  <td class="pos">$911.21</td><td class="neg">$224.61</td>
+                  <td>4.06</td><td class="pos">2.877</td>
+                  <td>70.9%</td><td>🟢 穩健</td>
+                  <td class="pos">$+19,385.61</td>
+                </tr></tbody></table></div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>19</td><td>73.7%</td>
+              <td class="pos">$+3,971.85</td>
+              <td class="pos">$+209.04</td>
+              <td>1.55x</td>
+              <td class="pos">28.8</td><td class="neg">21.1</td>
+              <td class="pos">30.1</td><td class="neg">33.7</td><td class="neg">87.6</td>
+              <td>182.5h</td>
+              <td><span class="rtg" style="background:#3498db;color:#000">A</span></td>
+            </tr><tr>
+              <td><b>L2</b></td><td>8</td><td>75.0%</td>
+              <td class="pos">$+5,845.40</td>
+              <td class="pos">$+730.67</td>
+              <td>5.43x</td>
+              <td class="pos">32.1</td><td class="neg">7.7</td>
+              <td class="pos">32.1</td><td class="neg">33.7</td><td class="neg">66.7</td>
+              <td>233.1h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr><tr>
+              <td><b>L3</b></td><td>3</td><td>100.0%</td>
+              <td class="pos">$+9,568.36</td>
+              <td class="pos">$+3189.45</td>
+              <td>999x</td>
+              <td class="pos">39.6</td><td class="neg">0</td>
+              <td class="pos">39.9</td><td class="neg">14.2</td><td class="neg">17.7</td>
+              <td>210.6h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_2" style="width:100%;height:200px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=19) WR:73.7%</div>
+                <canvas id="sc_2_L1" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L2 (n=8) WR:75.0%</div>
+                <canvas id="sc_2_L2" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L3 (n=3) WR:100.0%</div>
+                <canvas id="sc_2_L3" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.0%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>19</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L2</td><td>8</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L3</td><td>3</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>14/14</td><td>100%</td>
+                  <td>$368.72</td><td><b>102.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>12/14</td><td>86%</td>
+                  <td>$412.89</td><td><b>98.6</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>12/14</td><td>86%</td>
+                  <td>$412.89</td><td><b>98.6</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>12/14</td><td>86%</td>
+                  <td>$412.89</td><td><b>98.6</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>13</td><td>62%</td>
+                  <td>$306.25</td><td><b>90.5</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>13</td><td>62%</td>
+                  <td>$306.25</td><td><b>90.5</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>9</td><td>44%</td>
+                  <td>$217.70</td><td><b>76.3</b></td><td>⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>9</td><td>44%</td>
+                  <td>$217.70</td><td><b>76.3</b></td><td>⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>6/6</td><td>100%</td>
+                  <td>$1037.91</td><td><b>99.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>5/6</td><td>83%</td>
+                  <td>$1192.59</td><td><b>94.6</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>4/6</td><td>67%</td>
+                  <td>$1391.93</td><td><b>91.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>4/6</td><td>67%</td>
+                  <td>$1391.93</td><td><b>91.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>7</td><td>71%</td>
+                  <td>$933.41</td><td><b>95.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>7</td><td>71%</td>
+                  <td>$933.41</td><td><b>95.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>4</td><td>50%</td>
+                  <td>$329.86</td><td><b>85.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>4</td><td>50%</td>
+                  <td>$329.86</td><td><b>85.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>3/3</td><td>100%</td>
+                  <td>$3189.45</td><td><b>104.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>3/3</td><td>100%</td>
+                  <td>$3189.45</td><td><b>104.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>3/3</td><td>100%</td>
+                  <td>$3189.45</td><td><b>104.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>3/3</td><td>100%</td>
+                  <td>$3189.45</td><td><b>104.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$2861.55</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$2861.55</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L3</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$30.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L3 ($+3189.45)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>3天</div>
+                </div>
+              </div>
+            </div></div></div>
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>EURJPY</b> BUY — 2 trades · $+1,818.37 · WR 100.0% · EV $+909.18</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">2</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">100.0%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+1,818</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">1</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+909.18</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">999.00x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>2</td><td>100.0%</td>
+              <td class="pos">$+1,818.37</td>
+              <td class="pos">$+909.18</td>
+              <td>999x</td>
+              <td class="pos">136.8</td><td class="neg">0</td>
+              <td class="pos">137.3</td><td class="neg">52.1</td><td class="neg">59.3</td>
+              <td>80.7h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_3" style="width:100%;height:200px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=2) WR:100.0%</div>
+                <canvas id="sc_3_L1" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.0%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>2</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$909.18</td><td><b>97.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$909.18</td><td><b>97.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$909.18</td><td><b>97.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$909.18</td><td><b>97.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$909.18</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$909.18</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$909.18</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$909.18</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h" style="background:linear-gradient(90deg,#3e1a1a,#692d2d)">⚠️ Danger Score</div>
+              <div class="sec-b">
+                <div style="font-size:14px;margin-bottom:6px">⚠️ WARNING</div>
+                <div>Danger: <b>3</b> | WR: 100.0% | Odds: 0</div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L1</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$20.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L1 ($+909.18)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>45天</div>
+                </div>
+              </div>
+            </div></div></div>
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>GBPCAD</b> BUY — 12 trades · $+8,258.77 · WR 100.0% · EV $+688.23</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">12</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">100.0%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+8,259</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">1</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+688.23</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">999.00x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sug-card high">
+              <div class="sug-title">✅ 建議 CoP (Copy on Profit)</div>
+              <div class="sug-grid">
+                <div><span class="lbl">策略</span><br>CoP</div>
+                <div><span class="lbl">Wait Pips</span><br>5</div>
+                <div><span class="lbl">信心度</span><br>🟢 高</div>
+                <div><span class="lbl">期望值</span><br>999.000R</div>
+                <div><span class="lbl">勝率</span><br>100.0%</div>
+                <div><span class="lbl">馬丁依賴</span><br>0.0%</div>
+                <div><span class="lbl">Best CoP</span><br>101.0 (L1)</div>
+                <div><span class="lbl">Best CoL</span><br>110.0 (L1)</div>
+              </div>
+              <div class="sug-reason">馬丁依賴度低 (0.0%)、勝率 100.0%</div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">值博率分析</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Trades</th><th>WR%</th><th>AvgW$</th><th>AvgL$</th><th>R:R</th><th>E(R)</th><th>Kelly%</th><th>安全邊際</th><th>Total$</th></tr></thead>
+                <tbody><tr>
+                  <td>12</td><td>100.0%</td>
+                  <td class="pos">$688.23</td><td class="neg">$0</td>
+                  <td>999</td><td class="pos">999.0</td>
+                  <td>100.0%</td><td>🟢 穩健</td>
+                  <td class="pos">$+8,258.77</td>
+                </tr></tbody></table></div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>12</td><td>100.0%</td>
+              <td class="pos">$+8,258.77</td>
+              <td class="pos">$+688.23</td>
+              <td>999x</td>
+              <td class="pos">95.3</td><td class="neg">0</td>
+              <td class="pos">109.5</td><td class="neg">70.2</td><td class="neg">93.2</td>
+              <td>219.8h</td>
+              <td><span class="rtg" style="background:#FFD700;color:#000">S+</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_4" style="width:100%;height:200px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=12) WR:100.0%</div>
+                <canvas id="sc_4_L1" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.0%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>12</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>12/12</td><td>100%</td>
+                  <td>$688.23</td><td><b>101.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>12/12</td><td>100%</td>
+                  <td>$688.23</td><td><b>101.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>12/12</td><td>100%</td>
+                  <td>$688.23</td><td><b>101.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>12/12</td><td>100%</td>
+                  <td>$688.23</td><td><b>101.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>11</td><td>100%</td>
+                  <td>$674.55</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>11</td><td>100%</td>
+                  <td>$674.55</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>11</td><td>100%</td>
+                  <td>$674.55</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>11</td><td>100%</td>
+                  <td>$674.55</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h" style="background:linear-gradient(90deg,#3e1a1a,#692d2d)">⚠️ Danger Score</div>
+              <div class="sec-b">
+                <div style="font-size:14px;margin-bottom:6px">⚠️ WARNING</div>
+                <div>Danger: <b>3</b> | WR: 100.0% | Odds: 0</div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L1</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$120.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L1 ($+688.23)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>8天</div>
+                </div>
+              </div>
+            </div></div></div>
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>GBPCHF</b> BUY — 32 trades · $+27,384.80 · WR 100.0% · EV $+1209.25</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">32</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">100.0%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+27,385</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">2</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+1209.25</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">999.00x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sug-card high">
+              <div class="sug-title">✅ 建議 CoP (Copy on Profit)</div>
+              <div class="sug-grid">
+                <div><span class="lbl">策略</span><br>CoP</div>
+                <div><span class="lbl">Wait Pips</span><br>5</div>
+                <div><span class="lbl">信心度</span><br>🟢 高</div>
+                <div><span class="lbl">期望值</span><br>999.000R</div>
+                <div><span class="lbl">勝率</span><br>100.0%</div>
+                <div><span class="lbl">馬丁依賴</span><br>0.7%</div>
+                <div><span class="lbl">Best CoP</span><br>99.7 (L2)</div>
+                <div><span class="lbl">Best CoL</span><br>110.0 (L2)</div>
+              </div>
+              <div class="sug-reason">馬丁依賴度低 (0.7%)、勝率 100.0%</div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">值博率分析</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Trades</th><th>WR%</th><th>AvgW$</th><th>AvgL$</th><th>R:R</th><th>E(R)</th><th>Kelly%</th><th>安全邊際</th><th>Total$</th></tr></thead>
+                <tbody><tr>
+                  <td>32</td><td>100.0%</td>
+                  <td class="pos">$855.77</td><td class="neg">$0</td>
+                  <td>999</td><td class="pos">999.0</td>
+                  <td>100.0%</td><td>🟢 穩健</td>
+                  <td class="pos">$+27,384.80</td>
+                </tr></tbody></table></div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>27</td><td>100.0%</td>
+              <td class="pos">$+18,767.92</td>
+              <td class="pos">$+695.11</td>
+              <td>999x</td>
+              <td class="pos">52.0</td><td class="neg">0</td>
+              <td class="pos">62.9</td><td class="neg">54.1</td><td class="neg">100.4</td>
+              <td>139.6h</td>
+              <td><span class="rtg" style="background:#FFD700;color:#000">S+</span></td>
+            </tr><tr>
+              <td><b>L2</b></td><td>5</td><td>100.0%</td>
+              <td class="pos">$+8,616.88</td>
+              <td class="pos">$+1723.38</td>
+              <td>999x</td>
+              <td class="pos">51.6</td><td class="neg">0</td>
+              <td class="pos">52.0</td><td class="neg">42.0</td><td class="neg">48.0</td>
+              <td>127.8h</td>
+              <td><span class="rtg" style="background:#FFD700;color:#000">S+</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_5" style="width:100%;height:200px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=27) WR:100.0%</div>
+                <canvas id="sc_5_L1" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L2 (n=5) WR:100.0%</div>
+                <canvas id="sc_5_L2" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.7%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>27</td><td>2</td>
+                  <td>7.4%</td>
+                  <td>88.4</td><td>90.1</td>
+                </tr><tr>
+                  <td>L2</td><td>5</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>27/27</td><td>100%</td>
+                  <td>$695.11</td><td><b>83.4</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>27/27</td><td>100%</td>
+                  <td>$695.11</td><td><b>83.4</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>27/27</td><td>100%</td>
+                  <td>$695.11</td><td><b>83.4</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>27/27</td><td>100%</td>
+                  <td>$695.11</td><td><b>83.4</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>26</td><td>100%</td>
+                  <td>$671.88</td><td><b>93.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>24</td><td>100%</td>
+                  <td>$690.35</td><td><b>94.9</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>23</td><td>100%</td>
+                  <td>$660.34</td><td><b>93.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>22</td><td>100%</td>
+                  <td>$644.08</td><td><b>92.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$1723.38</td><td><b>99.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$1723.38</td><td><b>99.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$1723.38</td><td><b>99.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$1723.38</td><td><b>99.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>5</td><td>100%</td>
+                  <td>$1723.38</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>5</td><td>100%</td>
+                  <td>$1723.38</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>5</td><td>100%</td>
+                  <td>$1723.38</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>5</td><td>100%</td>
+                  <td>$1723.38</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h" style="background:linear-gradient(90deg,#3e1a1a,#692d2d)">⚠️ Danger Score</div>
+              <div class="sec-b">
+                <div style="font-size:14px;margin-bottom:6px">⚠️ WARNING</div>
+                <div>Danger: <b>3</b> | WR: 100.0% | Odds: 0</div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L2</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$50.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L2 ($+1723.38)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>3天</div>
+                </div>
+              </div>
+            </div></div></div>
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>GBPUSD</b> SELL — 6 trades · $+4,213.68 · WR 66.7% · EV $+954.48</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">6</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">66.7%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+4,214</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">2</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+954.48</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">500.71x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sug-card medium">
+              <div class="sug-title">✅ 建議 CoP (Copy on Profit)</div>
+              <div class="sug-grid">
+                <div><span class="lbl">策略</span><br>CoP</div>
+                <div><span class="lbl">Wait Pips</span><br>5</div>
+                <div><span class="lbl">信心度</span><br>🟡 中</div>
+                <div><span class="lbl">期望值</span><br>2.517R</div>
+                <div><span class="lbl">勝率</span><br>66.7%</div>
+                <div><span class="lbl">馬丁依賴</span><br>0.0%</div>
+                <div><span class="lbl">Best CoP</span><br>103.3 (L2)</div>
+                <div><span class="lbl">Best CoL</span><br>110.0 (L2)</div>
+              </div>
+              <div class="sug-reason">馬丁依賴度低 (0.0%)、勝率 66.7%</div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">值博率分析</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Trades</th><th>WR%</th><th>AvgW$</th><th>AvgL$</th><th>R:R</th><th>E(R)</th><th>Kelly%</th><th>安全邊際</th><th>Total$</th></tr></thead>
+                <tbody><tr>
+                  <td>6</td><td>66.7%</td>
+                  <td class="pos">$1192.9</td><td class="neg">$278.96</td>
+                  <td>4.28</td><td class="pos">2.517</td>
+                  <td>58.9%</td><td>🟢 穩健</td>
+                  <td class="pos">$+4,213.68</td>
+                </tr></tbody></table></div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>4</td><td>50.0%</td>
+              <td class="pos">$+791.48</td>
+              <td class="pos">$+197.87</td>
+              <td>2.42x</td>
+              <td class="pos">70.0</td><td class="neg">23.7</td>
+              <td class="pos">60.5</td><td class="neg">88.0</td><td class="neg">138.5</td>
+              <td>272.9h</td>
+              <td><span class="rtg" style="background:#3498db;color:#000">A</span></td>
+            </tr><tr>
+              <td><b>L2</b></td><td>2</td><td>100.0%</td>
+              <td class="pos">$+3,422.20</td>
+              <td class="pos">$+1711.10</td>
+              <td>999x</td>
+              <td class="pos">70.0</td><td class="neg">0</td>
+              <td class="pos">75.3</td><td class="neg">32.3</td><td class="neg">44.5</td>
+              <td>136.0h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_6" style="width:100%;height:200px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=4) WR:50.0%</div>
+                <canvas id="sc_6_L1" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L2 (n=2) WR:100.0%</div>
+                <canvas id="sc_6_L2" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.0%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>4</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L2</td><td>2</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$674.70</td><td><b>101.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$674.70</td><td><b>101.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$674.70</td><td><b>101.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$674.70</td><td><b>101.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>4</td><td>50%</td>
+                  <td>$674.70</td><td><b>85.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>4</td><td>50%</td>
+                  <td>$674.70</td><td><b>85.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>4</td><td>50%</td>
+                  <td>$674.70</td><td><b>85.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>3</td><td>33%</td>
+                  <td>$495.96</td><td><b>76.7</b></td><td>⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$1711.10</td><td><b>103.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$1711.10</td><td><b>103.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$1711.10</td><td><b>103.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$1711.10</td><td><b>103.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$1711.10</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$1711.10</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$1711.10</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>1</td><td>100%</td>
+                  <td>$1423.60</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L2</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$20.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L2 ($+1711.10)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>15天</div>
+                </div>
+              </div>
+            </div></div></div>
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>USDCAD</b> BUY — 35 trades · $+11,881.50 · WR 54.3% · EV $+880.31</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">35</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">54.3%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+11,882</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">3</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+880.31</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">333.58x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sug-card medium">
+              <div class="sug-title">⚠️ 可嘗試 CoP</div>
+              <div class="sug-grid">
+                <div><span class="lbl">策略</span><br>CoP</div>
+                <div><span class="lbl">Wait Pips</span><br>5</div>
+                <div><span class="lbl">信心度</span><br>🟡 中</div>
+                <div><span class="lbl">期望值</span><br>0.481R</div>
+                <div><span class="lbl">勝率</span><br>54.3%</div>
+                <div><span class="lbl">馬丁依賴</span><br>0.1%</div>
+                <div><span class="lbl">Best CoP</span><br>104.3 (L3)</div>
+                <div><span class="lbl">Best CoL</span><br>110.0 (L3)</div>
+              </div>
+              <div class="sug-reason">期望值 0.481R、勝率 54.3%</div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">值博率分析</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Trades</th><th>WR%</th><th>AvgW$</th><th>AvgL$</th><th>R:R</th><th>E(R)</th><th>Kelly%</th><th>安全邊際</th><th>Total$</th></tr></thead>
+                <tbody><tr>
+                  <td>35</td><td>54.3%</td>
+                  <td class="pos">$1219.11</td><td class="neg">$705.11</td>
+                  <td>1.73</td><td class="pos">0.481</td>
+                  <td>27.8%</td><td>🟢 穩健</td>
+                  <td class="pos">$+11,881.50</td>
+                </tr></tbody></table></div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>18</td><td>38.9%</td>
+              <td class="neg">$-4,559.98</td>
+              <td class="neg">$-253.33</td>
+              <td>0.49x</td>
+              <td class="pos">36.6</td><td class="neg">92.3</td>
+              <td class="pos">26.1</td><td class="neg">155.1</td><td class="neg">230.9</td>
+              <td>499.1h</td>
+              <td><span class="rtg" style="background:#e74c3c;color:#000">D</span></td>
+            </tr><tr>
+              <td><b>L2</b></td><td>12</td><td>58.3%</td>
+              <td class="pos">$+3,377.42</td>
+              <td class="pos">$+281.45</td>
+              <td>1.24x</td>
+              <td class="pos">57.2</td><td class="neg">58.1</td>
+              <td class="pos">44.1</td><td class="neg">107.9</td><td class="neg">155.1</td>
+              <td>437.7h</td>
+              <td><span class="rtg" style="background:#9b59b6;color:#000">B</span></td>
+            </tr><tr>
+              <td><b>L3</b></td><td>5</td><td>100.0%</td>
+              <td class="pos">$+13,064.06</td>
+              <td class="pos">$+2612.81</td>
+              <td>999x</td>
+              <td class="pos">56.5</td><td class="neg">0</td>
+              <td class="pos">56.7</td><td class="neg">18.3</td><td class="neg">42.4</td>
+              <td>127.4h</td>
+              <td><span class="rtg" style="background:#FFD700;color:#000">S+</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_7" style="width:100%;height:200px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=18) WR:38.9%</div>
+                <canvas id="sc_7_L1" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L2 (n=12) WR:58.3%</div>
+                <canvas id="sc_7_L2" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L3 (n=5) WR:100.0%</div>
+                <canvas id="sc_7_L3" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.1%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>18</td><td>3</td>
+                  <td>16.7%</td>
+                  <td>128.0</td><td>134.6</td>
+                </tr><tr>
+                  <td>L2</td><td>12</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L3</td><td>5</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>7/7</td><td>100%</td>
+                  <td>$298.56</td><td><b>96.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>7/7</td><td>100%</td>
+                  <td>$298.56</td><td><b>96.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>7/7</td><td>100%</td>
+                  <td>$298.56</td><td><b>96.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>7/7</td><td>100%</td>
+                  <td>$298.56</td><td><b>96.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>15</td><td>27%</td>
+                  <td>$77.88</td><td><b>73.3</b></td><td>⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>15</td><td>27%</td>
+                  <td>$77.88</td><td><b>73.3</b></td><td>⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>15</td><td>27%</td>
+                  <td>$77.88</td><td><b>73.3</b></td><td>⭐⭐⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>15</td><td>27%</td>
+                  <td>$77.88</td><td><b>73.3</b></td><td>⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>7/7</td><td>100%</td>
+                  <td>$1144.17</td><td><b>94.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>7/7</td><td>100%</td>
+                  <td>$1144.17</td><td><b>94.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>7/7</td><td>100%</td>
+                  <td>$1144.17</td><td><b>94.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>7/7</td><td>100%</td>
+                  <td>$1144.17</td><td><b>94.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>12</td><td>58%</td>
+                  <td>$1144.17</td><td><b>89.2</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>11</td><td>55%</td>
+                  <td>$871.01</td><td><b>86.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>11</td><td>55%</td>
+                  <td>$871.01</td><td><b>86.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>11</td><td>55%</td>
+                  <td>$871.01</td><td><b>86.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$2612.81</td><td><b>104.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$2612.81</td><td><b>104.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$2612.81</td><td><b>104.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$2612.81</td><td><b>104.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>5</td><td>100%</td>
+                  <td>$2612.81</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$2029.02</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>1</td><td>100%</td>
+                  <td>$2004.71</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>1</td><td>100%</td>
+                  <td>$2004.71</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h" style="background:linear-gradient(90deg,#3e1a1a,#692d2d)">⚠️ Danger Score</div>
+              <div class="sec-b">
+                <div style="font-size:14px;margin-bottom:6px">⚠️ WARNING</div>
+                <div>Danger: <b>5</b> | WR: 54.3% | Odds: 0.86</div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L3</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$50.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L3 ($+2612.81)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>3天</div>
+                </div>
+              </div>
+            </div></div></div>
+</div>
+
+<div class="panel hidden" id="p2">
+  <h3 style="color:var(--primary);margin-bottom:12px">💀 黑名單 — 5因子 Danger Score</h3>
+  <div style="font-size:10px;color:var(--text2);margin-bottom:8px">因子：虧損金額、賠率&lt;1、WR&lt;50%、EV&lt;0、最差層EV</div>
+  <div class="tw"><table><thead><tr><th>危險度</th><th>Danger</th><th>CCY</th><th>Dir</th><th>Total$</th><th>WR%</th><th>Odds</th></tr></thead><tbody><tr><td>⚠️ WARNING</td><td><b>5</b></td><td><b>USDCAD</b></td><td>buy</td>
+              <td class="pos">$+11,881.50</td><td>54.3%</td><td>0.86</td></tr><tr><td>⚠️ WARNING</td><td><b>3</b></td><td><b>AUDCAD</b></td><td>buy</td>
+              <td class="pos">$+2,628.86</td><td>100.0%</td><td>0</td></tr><tr><td>⚠️ WARNING</td><td><b>3</b></td><td><b>AUDNZD</b></td><td>buy</td>
+              <td class="pos">$+1,898.72</td><td>100.0%</td><td>0</td></tr><tr><td>⚠️ WARNING</td><td><b>3</b></td><td><b>EURJPY</b></td><td>buy</td>
+              <td class="pos">$+1,818.37</td><td>100.0%</td><td>0</td></tr><tr><td>⚠️ WARNING</td><td><b>3</b></td><td><b>GBPCAD</b></td><td>buy</td>
+              <td class="pos">$+8,258.77</td><td>100.0%</td><td>0</td></tr><tr><td>⚠️ WARNING</td><td><b>3</b></td><td><b>GBPCHF</b></td><td>buy</td>
+              <td class="pos">$+27,384.80</td><td>100.0%</td><td>0</td></tr></tbody></table></div>
+</div>
+
+<div class="panel hidden" id="p3">
+  <h3 style="color:var(--primary);margin-bottom:12px">💪 恢復力 — 最深層止損 vs 最佳EV恢復</h3>
+  <div class="tw"><table><thead><tr><th>狀態</th><th>CCY</th><th>Dir</th><th>最深層</th><th>最差損失</th><th>Best EV層</th><th>Best EV</th><th>恢復次數</th></tr></thead><tbody><tr><td>🟢</td><td><b>AUDCAD</b></td><td>buy</td>
+          <td>L1</td><td class="neg">$80.00</td>
+          <td>L1</td><td class="pos">$+328.61</td>
+          <td><b>1</b></td></tr><tr><td>🟢</td><td><b>AUDNZD</b></td><td>buy</td>
+          <td>L2</td><td class="neg">$10.00</td>
+          <td>L2</td><td class="pos">$+920.92</td>
+          <td><b>1</b></td></tr><tr><td>🟢</td><td><b>EURCHF</b></td><td>buy</td>
+          <td>L3</td><td class="neg">$30.00</td>
+          <td>L3</td><td class="pos">$+3189.45</td>
+          <td><b>1</b></td></tr><tr><td>🟢</td><td><b>EURJPY</b></td><td>buy</td>
+          <td>L1</td><td class="neg">$20.00</td>
+          <td>L1</td><td class="pos">$+909.18</td>
+          <td><b>1</b></td></tr><tr><td>🟢</td><td><b>GBPCAD</b></td><td>buy</td>
+          <td>L1</td><td class="neg">$120.00</td>
+          <td>L1</td><td class="pos">$+688.23</td>
+          <td><b>1</b></td></tr><tr><td>🟢</td><td><b>GBPCHF</b></td><td>buy</td>
+          <td>L2</td><td class="neg">$50.00</td>
+          <td>L2</td><td class="pos">$+1723.38</td>
+          <td><b>1</b></td></tr><tr><td>🟢</td><td><b>GBPUSD</b></td><td>sell</td>
+          <td>L2</td><td class="neg">$20.00</td>
+          <td>L2</td><td class="pos">$+1711.10</td>
+          <td><b>1</b></td></tr><tr><td>🟢</td><td><b>USDCAD</b></td><td>buy</td>
+          <td>L3</td><td class="neg">$50.00</td>
+          <td>L3</td><td class="pos">$+2612.81</td>
+          <td><b>1</b></td></tr></tbody></table></div>
+</div>
+
+<div class="footer">Signal #22200 · Martin V3 + Quant · 2026-05-13 21:28</div>
+</div>
+
+<script>
+// Tab switching
+function sw(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.add('hidden'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.remove('hidden');
+  event.target.classList.add('active');
+  if(id==='p1') drawAllCharts();
+}
+
+// CCY expand/collapse
+function toggleCCY(el){
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+// Data
+var tpslData = {"0": [{"level": "L1", "count": 8, "wr": 100.0, "rating": "S+", "tp": 48.9, "soft_sl": 10.9, "hard_sl": 23.3}], "1": [{"level": "L1", "count": 4, "wr": 100.0, "rating": "S", "tp": 42.5, "soft_sl": 22.9, "hard_sl": 49.3}, {"level": "L2", "count": 1, "wr": 100.0, "rating": "S", "tp": 63.7, "soft_sl": 0.0, "hard_sl": 49.3}], "2": [{"level": "L1", "count": 19, "wr": 73.7, "rating": "A", "tp": 30.1, "soft_sl": 40.4, "hard_sl": 113.9}, {"level": "L2", "count": 8, "wr": 75.0, "rating": "S", "tp": 32.1, "soft_sl": 40.4, "hard_sl": 113.9}, {"level": "L3", "count": 3, "wr": 100.0, "rating": "S", "tp": 39.9, "soft_sl": 17.0, "hard_sl": 113.9}], "3": [{"level": "L1", "count": 2, "wr": 100.0, "rating": "S", "tp": 137.3, "soft_sl": 62.5, "hard_sl": 77.1}], "4": [{"level": "L1", "count": 12, "wr": 100.0, "rating": "S+", "tp": 109.5, "soft_sl": 84.2, "hard_sl": 121.2}], "5": [{"level": "L1", "count": 27, "wr": 100.0, "rating": "S+", "tp": 62.9, "soft_sl": 64.9, "hard_sl": 130.5}, {"level": "L2", "count": 5, "wr": 100.0, "rating": "S+", "tp": 52.0, "soft_sl": 50.4, "hard_sl": 130.5}], "6": [{"level": "L1", "count": 4, "wr": 50.0, "rating": "A", "tp": 60.5, "soft_sl": 105.6, "hard_sl": 180.1}, {"level": "L2", "count": 2, "wr": 100.0, "rating": "S", "tp": 75.3, "soft_sl": 38.8, "hard_sl": 180.1}], "7": [{"level": "L1", "count": 18, "wr": 38.9, "rating": "D", "tp": 26.1, "soft_sl": 186.1, "hard_sl": 300.2}, {"level": "L2", "count": 12, "wr": 58.3, "rating": "B", "tp": 44.1, "soft_sl": 129.5, "hard_sl": 300.2}, {"level": "L3", "count": 5, "wr": 100.0, "rating": "S+", "tp": 56.7, "soft_sl": 22.0, "hard_sl": 300.2}]};
+var scatterData = {"0": {"L1": {"points": [{"net_pips": 51.7, "mfe": 52.9, "mae": 6.4, "is_win": true}, {"net_pips": 48.9, "mfe": 50.1, "mae": 12.3, "is_win": true}, {"net_pips": 44.6, "mfe": 44.6, "mae": 12.4, "is_win": true}, {"net_pips": 39.1, "mfe": 53.4, "mae": 17.9, "is_win": true}, {"net_pips": 50.5, "mfe": 50.5, "mae": 5.5, "is_win": true}, {"net_pips": 49.7, "mfe": 49.7, "mae": 6.1, "is_win": true}, {"net_pips": 46.7, "mfe": 46.7, "mae": 5.6, "is_win": true}, {"net_pips": 42.9, "mfe": 42.9, "mae": 6.4, "is_win": true}], "count": 8, "wr": 100.0}}, "1": {"L1": {"points": [{"net_pips": 71.0, "mfe": 71.0, "mae": 0.8, "is_win": true}, {"net_pips": 23.5, "mfe": 23.5, "mae": 37.9, "is_win": true}, {"net_pips": 60.8, "mfe": 60.8, "mae": 0.1, "is_win": true}, {"net_pips": 14.9, "mfe": 14.9, "mae": 37.8, "is_win": true}], "count": 4, "wr": 100.0}, "L2": {"points": [{"net_pips": 63.7, "mfe": 63.7, "mae": 0.0, "is_win": true}], "count": 1, "wr": 100.0}}, "2": {"L1": {"points": [{"net_pips": 36.9, "mfe": 36.9, "mae": 4.2, "is_win": true}, {"net_pips": 69.5, "mfe": 69.5, "mae": 6.6, "is_win": true}, {"net_pips": 45.2, "mfe": 45.2, "mae": 31.0, "is_win": true}, {"net_pips": 8.5, "mfe": 8.5, "mae": 47.6, "is_win": true}, {"net_pips": -14.8, "mfe": 8.7, "mae": 68.6, "is_win": false}, {"net_pips": 51.3, "mfe": 51.5, "mae": 17.0, "is_win": true}, {"net_pips": 6.1, "mfe": 36.9, "mae": 54.3, "is_win": true}, {"net_pips": -5.7, "mfe": 28.1, "mae": 63.1, "is_win": false}, {"net_pips": 6.3, "mfe": 7.6, "mae": 49.5, "is_win": true}, {"net_pips": -18.1, "mfe": 23.9, "mae": 74.6, "is_win": false}, {"net_pips": -29.2, "mfe": 31.2, "mae": 87.6, "is_win": false}, {"net_pips": 30.8, "mfe": 32.1, "mae": 17.1, "is_win": true}, {"net_pips": -37.8, "mfe": 20.3, "mae": 85.0, "is_win": false}, {"net_pips": 21.7, "mfe": 29.3, "mae": 16.7, "is_win": true}, {"net_pips": 17.7, "mfe": 29.0, "mae": 17.0, "is_win": true}, {"net_pips": 28.8, "mfe": 29.0, "mae": 0.0, "is_win": true}, {"net_pips": 27.7, "mfe": 28.8, "mae": 0.0, "is_win": true}, {"net_pips": 27.5, "mfe": 28.8, "mae": 0.0, "is_win": true}, {"net_pips": 25.2, "mfe": 26.1, "mae": 0.0, "is_win": true}], "count": 19, "wr": 73.7}, "L2": {"points": [{"net_pips": 49.7, "mfe": 49.7, "mae": 6.5, "is_win": true}, {"net_pips": 12.4, "mfe": 12.4, "mae": 42.4, "is_win": true}, {"net_pips": 43.2, "mfe": 43.8, "mae": 17.2, "is_win": true}, {"net_pips": 40.9, "mfe": 41.2, "mae": 16.7, "is_win": true}, {"net_pips": 39.0, "mfe": 40.3, "mae": 16.8, "is_win": true}, {"net_pips": 7.3, "mfe": 7.9, "mae": 49.2, "is_win": true}, {"net_pips": -8.3, "mfe": 24.5, "mae": 66.7, "is_win": false}, {"net_pips": -7.1, "mfe": 36.9, "mae": 54.3, "is_win": false}], "count": 8, "wr": 75.0}, "L3": {"points": [{"net_pips": 48.1, "mfe": 49.0, "mae": 8.1, "is_win": true}, {"net_pips": 40.6, "mfe": 40.6, "mae": 17.7, "is_win": true}, {"net_pips": 30.1, "mfe": 30.1, "mae": 16.9, "is_win": true}], "count": 3, "wr": 100.0}}, "3": {"L1": {"points": [{"net_pips": 242.8, "mfe": 242.8, "mae": 44.9, "is_win": true}, {"net_pips": 30.7, "mfe": 31.9, "mae": 59.3, "is_win": true}], "count": 2, "wr": 100.0}}, "4": {"L1": {"points": [{"net_pips": 76.0, "mfe": 115.5, "mae": 93.2, "is_win": true}, {"net_pips": 130.8, "mfe": 151.1, "mae": 57.6, "is_win": true}, {"net_pips": 118.6, "mfe": 151.1, "mae": 57.6, "is_win": true}, {"net_pips": 113.9, "mfe": 114.8, "mae": 92.3, "is_win": true}, {"net_pips": 109.9, "mfe": 113.4, "mae": 92.0, "is_win": true}, {"net_pips": 86.0, "mfe": 86.0, "mae": 91.5, "is_win": true}, {"net_pips": 85.1, "mfe": 85.1, "mae": 92.3, "is_win": true}, {"net_pips": 63.5, "mfe": 64.7, "mae": 92.2, "is_win": true}, {"net_pips": 79.8, "mfe": 107.2, "mae": 49.7, "is_win": true}, {"net_pips": 60.9, "mfe": 99.1, "mae": 57.8, "is_win": true}, {"net_pips": 100.6, "mfe": 100.6, "mae": 57.9, "is_win": true}, {"net_pips": 118.2, "mfe": 125.1, "mae": 8.5, "is_win": true}], "count": 12, "wr": 100.0}}, "5": {"L1": {"points": [{"net_pips": 77.8, "mfe": 77.8, "mae": 23.0, "is_win": true}, {"net_pips": 56.9, "mfe": 57.1, "mae": 40.3, "is_win": true}, {"net_pips": 53.8, "mfe": 53.8, "mae": 40.5, "is_win": true}, {"net_pips": 46.6, "mfe": 46.6, "mae": 40.4, "is_win": true}, {"net_pips": 30.7, "mfe": 30.7, "mae": 32.7, "is_win": true}, {"net_pips": 124.6, "mfe": 125.1, "mae": 73.2, "is_win": true}, {"net_pips": 78.9, "mfe": 84.2, "mae": 99.9, "is_win": true}, {"net_pips": 101.9, "mfe": 101.9, "mae": 41.4, "is_win": true}, {"net_pips": 95.7, "mfe": 95.7, "mae": 47.6, "is_win": true}, {"net_pips": 69.8, "mfe": 69.8, "mae": 73.4, "is_win": true}, {"net_pips": 69.8, "mfe": 69.8, "mae": 73.4, "is_win": true}, {"net_pips": 109.1, "mfe": 109.1, "mae": 17.9, "is_win": true}, {"net_pips": 70.1, "mfe": 70.1, "mae": 73.1, "is_win": true}, {"net_pips": 46.2, "mfe": 54.4, "mae": 73.4, "is_win": true}, {"net_pips": 48.1, "mfe": 51.6, "mae": 73.3, "is_win": true}, {"net_pips": 13.2, "mfe": 21.9, "mae": 100.4, "is_win": true}, {"net_pips": 101.1, "mfe": 101.1, "mae": 9.1, "is_win": true}, {"net_pips": 60.7, "mfe": 61.4, "mae": 40.9, "is_win": true}, {"net_pips": 11.3, "mfe": 67.1, "mae": 88.1, "is_win": true}, {"net_pips": 0.2, "mfe": 67.0, "mae": 88.2, "is_win": true}, {"net_pips": -1.5, "mfe": 65.1, "mae": 90.1, "is_win": true}, {"net_pips": -8.5, "mfe": 68.5, "mae": 86.7, "is_win": true}, {"net_pips": 25.5, "mfe": 25.5, "mae": 40.6, "is_win": true}, {"net_pips": 25.5, "mfe": 25.5, "mae": 40.6, "is_win": true}, {"net_pips": 38.4, "mfe": 38.4, "mae": 12.6, "is_win": true}, {"net_pips": 32.5, "mfe": 33.1, "mae": 12.6, "is_win": true}, {"net_pips": 25.6, "mfe": 26.9, "mae": 26.0, "is_win": true}], "count": 27, "wr": 100.0}, "L2": {"points": [{"net_pips": 65.6, "mfe": 65.6, "mae": 48.0, "is_win": true}, {"net_pips": 58.6, "mfe": 58.6, "mae": 40.7, "is_win": true}, {"net_pips": 48.0, "mfe": 48.9, "mae": 40.6, "is_win": true}, {"net_pips": 47.9, "mfe": 48.8, "mae": 40.7, "is_win": true}, {"net_pips": 38.0, "mfe": 38.1, "mae": 40.2, "is_win": true}], "count": 5, "wr": 100.0}}, "6": {"L1": {"points": [{"net_pips": 53.0, "mfe": 79.9, "mae": 82.2, "is_win": true}, {"net_pips": -9.7, "mfe": 50.9, "mae": 111.2, "is_win": false}, {"net_pips": -37.7, "mfe": 23.6, "mae": 138.5, "is_win": false}, {"net_pips": 86.9, "mfe": 87.4, "mae": 20.2, "is_win": true}], "count": 4, "wr": 50.0}, "L2": {"points": [{"net_pips": 81.5, "mfe": 87.5, "mae": 20.1, "is_win": true}, {"net_pips": 58.5, "mfe": 63.1, "mae": 44.5, "is_win": true}], "count": 2, "wr": 100.0}}, "7": {"L1": {"points": [{"net_pips": -68.6, "mfe": 7.0, "mae": 230.0, "is_win": false}, {"net_pips": -60.8, "mfe": 6.2, "mae": 230.8, "is_win": false}, {"net_pips": -62.6, "mfe": 6.3, "mae": 230.7, "is_win": false}, {"net_pips": -45.7, "mfe": 13.6, "mae": 212.0, "is_win": false}, {"net_pips": 30.0, "mfe": 30.0, "mae": 134.7, "is_win": true}, {"net_pips": -16.3, "mfe": 22.8, "mae": 155.1, "is_win": false}, {"net_pips": -6.3, "mfe": 25.7, "mae": 134.6, "is_win": true}, {"net_pips": -8.9, "mfe": 26.1, "mae": 134.2, "is_win": true}, {"net_pips": -8.1, "mfe": 45.1, "mae": 115.2, "is_win": true}, {"net_pips": -145.9, "mfe": 6.2, "mae": 230.8, "is_win": false}, {"net_pips": -147.7, "mfe": 6.2, "mae": 230.8, "is_win": false}, {"net_pips": -150.5, "mfe": 6.1, "mae": 230.9, "is_win": false}, {"net_pips": -166.5, "mfe": 6.1, "mae": 230.9, "is_win": false}, {"net_pips": -80.6, "mfe": 6.2, "mae": 142.7, "is_win": false}, {"net_pips": -70.1, "mfe": 5.8, "mae": 130.9, "is_win": false}, {"net_pips": 88.0, "mfe": 88.0, "mae": 5.7, "is_win": true}, {"net_pips": 83.2, "mfe": 83.3, "mae": 5.6, "is_win": true}, {"net_pips": 78.3, "mfe": 78.3, "mae": 5.7, "is_win": true}], "count": 18, "wr": 38.9}, "L2": {"points": [{"net_pips": 14.6, "mfe": 31.2, "mae": 146.7, "is_win": true}, {"net_pips": 35.5, "mfe": 35.5, "mae": 134.5, "is_win": true}, {"net_pips": 34.9, "mfe": 34.9, "mae": 134.0, "is_win": true}, {"net_pips": 31.8, "mfe": 31.8, "mae": 134.6, "is_win": true}, {"net_pips": 152.2, "mfe": 152.2, "mae": 11.3, "is_win": true}, {"net_pips": 96.4, "mfe": 98.1, "mae": 42.4, "is_win": true}, {"net_pips": -61.7, "mfe": 31.2, "mae": 146.7, "is_win": false}, {"net_pips": -72.0, "mfe": 22.8, "mae": 155.1, "is_win": false}, {"net_pips": -74.0, "mfe": 23.4, "mae": 154.5, "is_win": false}, {"net_pips": -69.9, "mfe": 26.0, "mae": 134.3, "is_win": false}, {"net_pips": 34.9, "mfe": 36.9, "mae": 27.0, "is_win": true}, {"net_pips": -13.1, "mfe": 5.4, "mae": 73.9, "is_win": false}], "count": 12, "wr": 58.3}, "L3": {"points": [{"net_pips": 42.9, "mfe": 42.9, "mae": 42.4, "is_win": true}, {"net_pips": 71.7, "mfe": 71.7, "mae": 11.3, "is_win": true}, {"net_pips": 69.1, "mfe": 69.1, "mae": 11.3, "is_win": true}, {"net_pips": 53.5, "mfe": 54.6, "mae": 11.3, "is_win": true}, {"net_pips": 45.3, "mfe": 45.3, "mae": 15.1, "is_win": true}], "count": 5, "wr": 100.0}}};
+var chartMap = {"0": {"sym": "AUDCAD", "dir": "buy"}, "1": {"sym": "AUDNZD", "dir": "buy"}, "2": {"sym": "EURCHF", "dir": "buy"}, "3": {"sym": "EURJPY", "dir": "buy"}, "4": {"sym": "GBPCAD", "dir": "buy"}, "5": {"sym": "GBPCHF", "dir": "buy"}, "6": {"sym": "GBPUSD", "dir": "sell"}, "7": {"sym": "USDCAD", "dir": "buy"}};
+
+// Sort tables
+document.querySelectorAll('table').forEach(tbl=>{
+  var ths=tbl.querySelectorAll('thead th');
+  ths.forEach((th,col)=>{
+    th.addEventListener('click',()=>{
+      var tbody=tbl.querySelector('tbody');
+      if(!tbody)return;
+      var rows=Array.from(tbody.querySelectorAll('tr'));
+      var asc=th.dataset.sort!=='asc';
+      ths.forEach(t=>{t.classList.remove('sort-asc','sort-desc');delete t.dataset.sort});
+      th.dataset.sort=asc?'asc':'desc';
+      th.classList.add(asc?'sort-asc':'sort-desc');
+      rows.sort((a,b)=>{
+        var va=a.cells[col]?a.cells[col].textContent.trim():'';
+        var vb=b.cells[col]?b.cells[col].textContent.trim():'';
+        var na=parseFloat(va.replace(/[^0-9.-]/g,''));
+        var nb=parseFloat(vb.replace(/[^0-9.-]/g,''));
+        if(!isNaN(na)&&!isNaN(nb))return asc?na-nb:nb-na;
+        return asc?va.localeCompare(vb):vb.localeCompare(va);
+      });
+      rows.forEach(r=>tbody.appendChild(r));
+    });
+  });
+});
+
+function drawAllCharts(){
+  drawTpslCharts();
+  drawScatterPlots();
+}
+
+function drawTpslCharts(){
+  for(var ci=0;ci<Object.keys(tpslData).length;ci++){
+    var data=tpslData[ci];
+    if(!data||!data.length)continue;
+    var c=document.getElementById('tpsl_'+ci);
+    if(!c)continue;
+    var ctx=c.getContext('2d');
+    var dpr=window.devicePixelRatio||1;
+    var w=c.offsetWidth;
+    var h=Math.max(200,data.length*40);
+    c.width=w*dpr;c.height=h*dpr;
+    c.style.height=h+'px';
+    ctx.scale(dpr,dpr);
+    var pad={t:25,r:20,b:30,l:100};
+    var pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+    ctx.fillStyle='#111520';ctx.fillRect(0,0,w,h);
+
+    var maxPip=1;
+    data.forEach(function(d){maxPip=Math.max(maxPip,d.tp,d.soft_sl,d.hard_sl)});
+    maxPip*=1.1;
+    var barH=Math.max(4,ph/data.length*0.25);
+    var rowH=ph/data.length;
+
+    // Zero line
+    ctx.strokeStyle='#FFD700';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,h-pad.b);ctx.stroke();
+
+    data.forEach(function(d,i){
+      var y=pad.t+i*rowH;
+      var label=d.level;
+      ctx.fillStyle='#aaa';ctx.font='11px sans-serif';ctx.textAlign='right';
+      ctx.fillText(label,pad.l-8,y+rowH/2+4);
+
+      // TP (green, right)
+      var tw=d.tp/maxPip*pw;
+      ctx.fillStyle='#4CAF50';ctx.fillRect(pad.l,y+rowH/2-barH*1.5,Math.max(1,tw),barH);
+      // Soft SL (orange, left)
+      var sw=d.soft_sl/maxPip*pw;
+      ctx.fillStyle='#fd7e14';ctx.fillRect(pad.l-sw,y+rowH/2-barH*0.5,Math.max(1,sw),barH);
+      // Hard SL (red, left)
+      var hw=d.hard_sl/maxPip*pw;
+      ctx.fillStyle='#FF5722';ctx.fillRect(pad.l-hw,y+rowH/2+barH*0.5,Math.max(1,hw),barH);
+
+      // Rating label
+      ctx.fillStyle='#FFD700';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+      ctx.fillText(d.rating+' '+d.tp+'/'+d.soft_sl,pad.l+tw+6,y+rowH/2+4);
+    });
+  }
+}
+
+function drawScatterPlots(){
+  for(var ci=0;ci<Object.keys(scatterData).length;ci++){
+    var levels=scatterData[ci];
+    if(!levels)continue;
+    for(var lv in levels){
+      var c=document.getElementById('sc_'+ci+'_'+lv);
+      if(!c)continue;
+      var data=levels[lv].points;
+      if(!data||!data.length)continue;
+      var ctx=c.getContext('2d');
+      var dpr=window.devicePixelRatio||1;
+      var w=c.offsetWidth;
+      c.width=w*dpr;c.height=160*dpr;
+      ctx.scale(dpr,dpr);
+      var h=160;
+      var pad={t:12,r:6,b:20,l:30};
+      var pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+      ctx.fillStyle='#111520';ctx.fillRect(0,0,w,h);
+      ctx.strokeStyle='#333';ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,pad.t+ph);ctx.lineTo(pad.l+pw,pad.t+ph);ctx.stroke();
+
+      var mx=1;
+      data.forEach(function(d){
+        mx=Math.max(mx,Math.abs(d.mfe),Math.abs(d.mae));
+      });
+
+      // Grid lines
+      for(var g=0;g<=2;g++){
+        var gy=pad.t+ph*g/2;
+        ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(pad.l+pw,gy);ctx.stroke();
+        ctx.fillStyle='#666';ctx.font='8px sans-serif';ctx.textAlign='right';
+        ctx.fillText((mx*(2-g)/2).toFixed(0),pad.l-4,gy+3);
+      }
+
+      data.forEach(function(d){
+        var x=pad.l+(d.mae/mx)*pw;
+        var y=pad.t+ph*(1-d.mfe/mx);
+        x=Math.max(pad.l,Math.min(pad.l+pw,x));
+        y=Math.max(pad.t,Math.min(pad.t+ph,y));
+        ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);
+        ctx.fillStyle=d.is_win?'#4CAF50':'#FF5722';ctx.fill();
+      });
+    }
+  }
+}
+
+// Initial draw
+setTimeout(drawAllCharts, 100);
+window.addEventListener('resize',function(){setTimeout(drawAllCharts,50)});
+</script>
+</body></html>
