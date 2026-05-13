@@ -61,7 +61,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
 
 <div class="header">
   <h1>🔬 Signal #4734 V3 分析報告</h1>
-  <div class="sub">Martin V3 + Quant 圖表 · 4 CCY×Direction · 157 trades · 2026-05-13 22:37</div>
+  <div class="sub">Martin V3 + Quant 圖表 · 4 CCY×Direction · 157 trades · 2026-05-13 23:28</div>
   <div class="cards">
     <div class="card"><div class="v">157</div><div class="l">總交易</div></div>
     <div class="card"><div class="v pos">$+3,551</div><div class="l">總盈虧</div></div>
@@ -83,7 +83,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
 <div class="panel" id="p1">
 
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="0" onclick="toggleCCY(this)">
             <span><b>EURAUD</b> BUY — 47 trades · $+873.66 · WR 87.2% · EV $+22.29</span>
             <span class="arrow">▶</span>
           </div>
@@ -397,7 +397,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
               </div>
             </div></div></div>
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="1" onclick="toggleCCY(this)">
             <span><b>EURAUD</b> SELL — 36 trades · $+854.64 · WR 77.8% · EV $+32.20</span>
             <span class="arrow">▶</span>
           </div>
@@ -704,7 +704,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
               </div>
             </div></div></div>
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="2" onclick="toggleCCY(this)">
             <span><b>GBPJPY</b> BUY — 41 trades · $+1,106.99 · WR 85.4% · EV $+48.19</span>
             <span class="arrow">▶</span>
           </div>
@@ -979,7 +979,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
               </div>
             </div></div></div>
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="3" onclick="toggleCCY(this)">
             <span><b>GBPJPY</b> SELL — 33 trades · $+716.00 · WR 69.7% · EV $+35.28</span>
             <span class="arrow">▶</span>
           </div>
@@ -1279,7 +1279,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
           <td><b>1</b></td></tr></tbody></table></div>
 </div>
 
-<div class="footer">Signal #4734 · Martin V3 + Quant · 2026-05-13 22:37</div>
+<div class="footer">Signal #4734 · Martin V3 + Quant · 2026-05-13 23:28</div>
 </div>
 
 <script>
@@ -1293,9 +1293,32 @@ function sw(id){
 }
 
 // CCY expand/collapse
+var drawnCCY = {};
 function toggleCCY(el){
   el.classList.toggle('open');
-  el.nextElementSibling.classList.toggle('open');
+  var body = el.nextElementSibling;
+  body.classList.toggle('open');
+  if(body.classList.contains('open') && !drawnCCY[el.dataset.idx]){
+    drawnCCY[el.dataset.idx] = true;
+    drawCCYCharts(parseInt(el.dataset.idx));
+  }
+}
+
+function drawCCYCharts(idx){
+  // Draw TP/SL chart
+  var data = tpslData[idx];
+  if(data && data.length){
+    var c = document.getElementById('tpsl_'+idx);
+    if(c) drawOneTpsl(c, data);
+  }
+  // Draw scatter plots
+  var sd = scatterData[idx];
+  if(sd){
+    Object.keys(sd).forEach(function(lv){
+      var sc = document.getElementById('sc_'+idx+'_'+lv);
+      if(sc) drawOneScatter(sc, sd[lv]);
+    });
+  }
 }
 
 // Data
@@ -1329,8 +1352,7 @@ document.querySelectorAll('table').forEach(tbl=>{
 });
 
 function drawAllCharts(){
-  drawTpslCharts();
-  drawScatterPlots();
+  // Charts drawn lazily on CCY expand
 }
 
 function drawTpslCharts(){
@@ -1341,7 +1363,7 @@ function drawTpslCharts(){
     if(!c)continue;
     var ctx=c.getContext('2d');
     var dpr=window.devicePixelRatio||1;
-    var w=c.offsetWidth;
+    var w=c.offsetWidth||0;if(w<50){var p=c.parentElement;w=p?(p.offsetWidth-24):600;}
     var h=Math.max(200,data.length*40);
     c.width=w*dpr;c.height=h*dpr;
     c.style.height=h+'px';
@@ -1394,7 +1416,7 @@ function drawScatterPlots(){
       if(!data||!data.length)continue;
       var ctx=c.getContext('2d');
       var dpr=window.devicePixelRatio||1;
-      var w=c.offsetWidth;
+      var w=c.offsetWidth||0;if(w<50){var p=c.parentElement;w=p?(p.offsetWidth-24):600;}
       c.width=w*dpr;c.height=160*dpr;
       ctx.scale(dpr,dpr);
       var h=160;

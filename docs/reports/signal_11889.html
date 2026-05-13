@@ -61,7 +61,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
 
 <div class="header">
   <h1>🔬 Signal #11889 V3 分析報告</h1>
-  <div class="sub">Martin V3 + Quant 圖表 · 6 CCY×Direction · 277 trades · 2026-05-13 22:37</div>
+  <div class="sub">Martin V3 + Quant 圖表 · 6 CCY×Direction · 277 trades · 2026-05-13 23:28</div>
   <div class="cards">
     <div class="card"><div class="v">277</div><div class="l">總交易</div></div>
     <div class="card"><div class="v pos">$+6,522</div><div class="l">總盈虧</div></div>
@@ -83,7 +83,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
 <div class="panel" id="p1">
 
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="0" onclick="toggleCCY(this)">
             <span><b>AUDUSD</b> BUY — 135 trades · $+3,843.52 · WR 75.6% · EV $+86.90</span>
             <span class="arrow">▶</span>
           </div>
@@ -454,7 +454,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
               </div>
             </div></div></div>
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="1" onclick="toggleCCY(this)">
             <span><b>AUDUSD</b> SELL — 31 trades · $+833.67 · WR 74.2% · EV $+67.55</span>
             <span class="arrow">▶</span>
           </div>
@@ -793,7 +793,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
               </div>
             </div></div></div>
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="2" onclick="toggleCCY(this)">
             <span><b>CADJPY</b> BUY — 26 trades · $-657.13 · WR 57.7% · EV $-35.81</span>
             <span class="arrow">▶</span>
           </div>
@@ -1171,7 +1171,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
               </div>
             </div></div></div>
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="3" onclick="toggleCCY(this)">
             <span><b>CADJPY</b> SELL — 4 trades · $+37.57 · WR 75.0% · EV $+9.39</span>
             <span class="arrow">▶</span>
           </div>
@@ -1363,7 +1363,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
               </div>
             </div></div></div>
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="4" onclick="toggleCCY(this)">
             <span><b>EURGBP</b> BUY — 11 trades · $+102.89 · WR 100.0% · EV $+13.50</span>
             <span class="arrow">▶</span>
           </div>
@@ -1549,7 +1549,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
               </div>
             </div></div></div>
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="5" onclick="toggleCCY(this)">
             <span><b>EURGBP</b> SELL — 70 trades · $+2,361.85 · WR 68.6% · EV $+89.56</span>
             <span class="arrow">▶</span>
           </div>
@@ -1953,7 +1953,7 @@ tr:hover{background:rgba(15,52,96,0.04)}
           <td><b>7</b></td></tr></tbody></table></div>
 </div>
 
-<div class="footer">Signal #11889 · Martin V3 + Quant · 2026-05-13 22:37</div>
+<div class="footer">Signal #11889 · Martin V3 + Quant · 2026-05-13 23:28</div>
 </div>
 
 <script>
@@ -1967,9 +1967,32 @@ function sw(id){
 }
 
 // CCY expand/collapse
+var drawnCCY = {};
 function toggleCCY(el){
   el.classList.toggle('open');
-  el.nextElementSibling.classList.toggle('open');
+  var body = el.nextElementSibling;
+  body.classList.toggle('open');
+  if(body.classList.contains('open') && !drawnCCY[el.dataset.idx]){
+    drawnCCY[el.dataset.idx] = true;
+    drawCCYCharts(parseInt(el.dataset.idx));
+  }
+}
+
+function drawCCYCharts(idx){
+  // Draw TP/SL chart
+  var data = tpslData[idx];
+  if(data && data.length){
+    var c = document.getElementById('tpsl_'+idx);
+    if(c) drawOneTpsl(c, data);
+  }
+  // Draw scatter plots
+  var sd = scatterData[idx];
+  if(sd){
+    Object.keys(sd).forEach(function(lv){
+      var sc = document.getElementById('sc_'+idx+'_'+lv);
+      if(sc) drawOneScatter(sc, sd[lv]);
+    });
+  }
 }
 
 // Data
@@ -2003,8 +2026,7 @@ document.querySelectorAll('table').forEach(tbl=>{
 });
 
 function drawAllCharts(){
-  drawTpslCharts();
-  drawScatterPlots();
+  // Charts drawn lazily on CCY expand
 }
 
 function drawTpslCharts(){
@@ -2015,7 +2037,7 @@ function drawTpslCharts(){
     if(!c)continue;
     var ctx=c.getContext('2d');
     var dpr=window.devicePixelRatio||1;
-    var w=c.offsetWidth;
+    var w=c.offsetWidth||0;if(w<50){var p=c.parentElement;w=p?(p.offsetWidth-24):600;}
     var h=Math.max(200,data.length*40);
     c.width=w*dpr;c.height=h*dpr;
     c.style.height=h+'px';
@@ -2068,7 +2090,7 @@ function drawScatterPlots(){
       if(!data||!data.length)continue;
       var ctx=c.getContext('2d');
       var dpr=window.devicePixelRatio||1;
-      var w=c.offsetWidth;
+      var w=c.offsetWidth||0;if(w<50){var p=c.parentElement;w=p?(p.offsetWidth-24):600;}
       c.width=w*dpr;c.height=160*dpr;
       ctx.scale(dpr,dpr);
       var h=160;

@@ -586,7 +586,7 @@ def generate_report(signal_id, csv_path, output_path):
         # A. Summary Card
         section = f'''
         <div class="ccy-section">
-          <div class="ccy-header" onclick="toggleCCY(this)">
+          <div class="ccy-header" data-idx="{ci}" onclick="toggleCCY(this)">
             <span><b>{sym}</b> {d.upper()} — {total_trades_cd} trades · ${total_pnl_cd:+,.2f} · WR {wr_cd:.1f}% · EV ${avg_ev_cd:+.2f}</span>
             <span class="arrow">▶</span>
           </div>
@@ -887,9 +887,32 @@ function sw(id){{
 }}
 
 // CCY expand/collapse
+var drawnCCY = {{}};
 function toggleCCY(el){{
   el.classList.toggle('open');
-  el.nextElementSibling.classList.toggle('open');
+  var body = el.nextElementSibling;
+  body.classList.toggle('open');
+  if(body.classList.contains('open') && !drawnCCY[el.dataset.idx]){{
+    drawnCCY[el.dataset.idx] = true;
+    drawCCYCharts(parseInt(el.dataset.idx));
+  }}
+}}
+
+function drawCCYCharts(idx){{
+  // Draw TP/SL chart
+  var data = tpslData[idx];
+  if(data && data.length){{
+    var c = document.getElementById('tpsl_'+idx);
+    if(c) drawOneTpsl(c, data);
+  }}
+  // Draw scatter plots
+  var sd = scatterData[idx];
+  if(sd){{
+    Object.keys(sd).forEach(function(lv){{
+      var sc = document.getElementById('sc_'+idx+'_'+lv);
+      if(sc) drawOneScatter(sc, sd[lv]);
+    }});
+  }}
 }}
 
 // Data
@@ -923,8 +946,7 @@ document.querySelectorAll('table').forEach(tbl=>{{
 }});
 
 function drawAllCharts(){{
-  drawTpslCharts();
-  drawScatterPlots();
+  // Charts drawn lazily on CCY expand
 }}
 
 function drawTpslCharts(){{
@@ -935,7 +957,7 @@ function drawTpslCharts(){{
     if(!c)continue;
     var ctx=c.getContext('2d');
     var dpr=window.devicePixelRatio||1;
-    var w=c.offsetWidth;
+    var w=c.offsetWidth||0;if(w<50){{var p=c.parentElement;w=p?(p.offsetWidth-24):600;}}
     var h=Math.max(200,data.length*40);
     c.width=w*dpr;c.height=h*dpr;
     c.style.height=h+'px';
@@ -988,7 +1010,7 @@ function drawScatterPlots(){{
       if(!data||!data.length)continue;
       var ctx=c.getContext('2d');
       var dpr=window.devicePixelRatio||1;
-      var w=c.offsetWidth;
+      var w=c.offsetWidth||0;if(w<50){{var p=c.parentElement;w=p?(p.offsetWidth-24):600;}}
       c.width=w*dpr;c.height=160*dpr;
       ctx.scale(dpr,dpr);
       var h=160;
