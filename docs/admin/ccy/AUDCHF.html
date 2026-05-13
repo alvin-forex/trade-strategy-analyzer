@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💱 AUDCHF 深度分析 | TSA</title>
+<style>
+:root{--font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;--bg:#0a0e17;--card:#111520;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--orange:#fd7e14;--border:#1e2433;--radius:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);padding:16px;font-size:13px}
+.topnav{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px}
+.topnav a{color:var(--accent);text-decoration:none;font-weight:700;font-size:0.9em}
+.topnav .back{margin-right:auto}
+h1{font-size:1.4em;color:var(--primary);margin-bottom:4px}
+.sub{color:var(--text2);font-size:0.85em;margin-bottom:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center}
+.card .v{font-size:1.4em;font-weight:700;color:var(--primary)}
+.card .v.pos{color:var(--green)}.card .v.neg{color:var(--red)}
+.card .l{font-size:0.72em;color:var(--text2);margin-top:2px}
+.tabs{display:flex;gap:0;margin-bottom:0}
+.tab{padding:10px 20px;background:var(--card);border:1px solid var(--border);color:var(--text2);cursor:pointer;border-radius:8px 8px 0 0;font-size:0.9em}
+.tab.active{background:var(--bg);color:var(--primary);border-bottom-color:var(--bg);font-weight:700}
+.tab:hover{color:var(--primary)}
+.panel{background:var(--bg);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:16px;margin-bottom:20px}
+.panel.hidden{display:none}
+table{width:100%;border-collapse:collapse;min-width:600px}
+th{background:var(--card);padding:8px;text-align:left;border-bottom:2px solid var(--primary);color:var(--primary);font-size:0.8em;white-space:nowrap;cursor:pointer}
+th:hover{background:#1a1f2e}
+td{padding:6px 8px;border-bottom:1px solid var(--border);font-size:0.85em}
+tr:hover{background:rgba(255,215,0,0.03)}
+.g{color:var(--green)}.r{color:var(--red)}.y{color:var(--yellow)}
+.rating{display:inline-block;padding:1px 8px;border-radius:4px;font-size:0.78em;font-weight:700}
+.rating-sp{background:#FFD700;color:#000}.rating-s{background:var(--green);color:#fff}.rating-a{background:var(--accent);color:#000}
+.chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.chart-wrap h3{color:var(--primary);font-size:0.95em;margin-bottom:12px}
+canvas{width:100%;height:300px}
+.legend{display:flex;gap:16px;margin-top:8px;font-size:0.82em;color:var(--text2)}
+.legend span::before{content:'';display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.legend .l-tp::before{background:var(--green)}
+.legend .l-ssl::before{background:var(--orange)}
+.legend .l-hsl::before{background:var(--red)}
+.legend .l-green::before{background:var(--green)}
+.legend .l-orange::before{background:var(--orange)}
+.legend .l-red::before{background:var(--red)}
+.bl-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:768px){.bl-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <a href="../ccy_ranking.html" class="back">← 返回 CCY 排名</a>
+  <a href="../index.html">🏠 Dashboard</a>
+</div>
+
+<h1>💱 AUDCHF 深度分析</h1>
+<div class="sub">跨 Signal 聚合數據 | 30 個 Signal | 2,436 筆交易</div>
+
+<div class="cards">
+  <div class="card"><div class="v">2,436</div><div class="l">總交易</div></div>
+  <div class="card"><div class="v pos">$32,931</div><div class="l">總盈虧</div></div>
+  <div class="card"><div class="v">74.4%</div><div class="l">勝率</div></div>
+  <div class="card"><div class="v">66.7h</div><div class="l">平均持倉</div></div>
+  <div class="card"><div class="v pos">$21,956</div><div class="l">Buy PnL (76%)</div></div>
+  <div class="card"><div class="v pos">$10,975</div><div class="l">Sell PnL (73%)</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="sw('p1')">📊 數據總表</div>
+  <div class="tab" onclick="sw('p2')">📈 TP/SL 圖表</div>
+  <div class="tab" onclick="sw('p3')">🏆 排行榜</div>
+  <div class="tab" onclick="sw('p4')">💀 黑名單</div>
+  <div class="tab" onclick="sw('p5')">💪 恢復力</div>
+  <div class="tab" onclick="sw('p6')">🔬 MFE/MAE</div>
+</div>
+
+<!-- Part 1: Data Table -->
+<div class="panel" id="p1">
+<h3 style="color:var(--primary);margin-bottom:12px">📊 AUDCHF × Direction × Layer 完整數據</h3>
+<div style="overflow-x:auto">
+<table id="t1">
+<thead><tr>
+<th>Dir</th><th>Layer</th><th>Trades</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>OddsPip</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Signals</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>BUY</td>
+<td>L1</td>
+<td>379</td>
+<td>73.1%</td>
+<td class="g">$1,712</td>
+<td class="g">$4.52</td>
+<td>2.5x</td>
+<td>0.9x</td>
+<td>16.5</td>
+<td>18.7</td>
+<td>14.7</td>
+<td>20.1</td>
+<td class="r">430.3</td>
+<td>38.1h</td>
+<td>6</td>
+</tr>
+<tr>
+<td>BUY</td>
+<td>L2</td>
+<td>451</td>
+<td>76.1%</td>
+<td class="g">$306</td>
+<td class="g">$0.68</td>
+<td>0.5x</td>
+<td>0.4x</td>
+<td>11.2</td>
+<td>26.8</td>
+<td>11.6</td>
+<td>25.4</td>
+<td class="r">420.2</td>
+<td>55.7h</td>
+<td>13</td>
+</tr>
+<tr>
+<td>BUY</td>
+<td>L3</td>
+<td>57</td>
+<td>91.2%</td>
+<td class="g">$1,793</td>
+<td class="g">$31.45</td>
+<td>1.3x</td>
+<td>0.4x</td>
+<td>36.0</td>
+<td>82.9</td>
+<td>36.4</td>
+<td>34.4</td>
+<td class="r">389.7</td>
+<td>108.7h</td>
+<td>9</td>
+</tr>
+<tr>
+<td>BUY</td>
+<td>L4</td>
+<td>20</td>
+<td>70.0%</td>
+<td class="g">$106</td>
+<td class="g">$5.28</td>
+<td>1.1x</td>
+<td>0.9x</td>
+<td>22.6</td>
+<td>24.2</td>
+<td>20.4</td>
+<td>45.1</td>
+<td class="r">151.2</td>
+<td>135.6h</td>
+<td>3</td>
+</tr>
+<tr>
+<td>BUY</td>
+<td>L5</td>
+<td>94</td>
+<td>70.2%</td>
+<td class="g">$320</td>
+<td class="g">$3.40</td>
+<td>0.7x</td>
+<td>0.6x</td>
+<td>19.1</td>
+<td>29.6</td>
+<td>16.1</td>
+<td>29.1</td>
+<td class="r">375.9</td>
+<td>80.2h</td>
+<td>11</td>
+</tr>
+<tr>
+<td>BUY</td>
+<td>L6</td>
+<td>9</td>
+<td>88.9%</td>
+<td class="g">$160</td>
+<td class="g">$17.77</td>
+<td>0.7x</td>
+<td>0.6x</td>
+<td>29.9</td>
+<td>53.1</td>
+<td>33.1</td>
+<td>40.8</td>
+<td class="r">117.6</td>
+<td>164.1h</td>
+<td>1</td>
+</tr>
+<tr>
+<td>BUY</td>
+<td>L7</td>
+<td>6</td>
+<td>100.0%</td>
+<td class="g">$287</td>
+<td class="g">$47.79</td>
+<td>999.0x</td>
+<td>999.0x</td>
+<td>49.8</td>
+<td>0.0</td>
+<td>59.8</td>
+<td>35.4</td>
+<td class="r">65.8</td>
+<td>288.7h</td>
+<td>3</td>
+</tr>
+<tr>
+<td>BUY</td>
+<td>L8</td>
+<td>4</td>
+<td>75.0%</td>
+<td class="r">$-237</td>
+<td class="r">$-59.22</td>
+<td>0.1x</td>
+<td>0.1x</td>
+<td>26.4</td>
+<td>347.0</td>
+<td>32.3</td>
+<td>90.7</td>
+<td class="r">347.0</td>
+<td>244.5h</td>
+<td>3</td>
+</tr>
+<tr>
+<td>BUY</td>
+<td>L9+</td>
+<td>303</td>
+<td>75.9%</td>
+<td class="g">$17,510</td>
+<td class="g">$57.79</td>
+<td>1.3x</td>
+<td>0.8x</td>
+<td>22.3</td>
+<td>26.3</td>
+<td>20.7</td>
+<td>23.5</td>
+<td class="r">148.3</td>
+<td>62.2h</td>
+<td>17</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L1</td>
+<td>328</td>
+<td>72.9%</td>
+<td class="g">$617</td>
+<td class="g">$1.88</td>
+<td>1.1x</td>
+<td>0.8x</td>
+<td>14.3</td>
+<td>17.2</td>
+<td>12.0</td>
+<td>17.3</td>
+<td class="r">144.0</td>
+<td>39.3h</td>
+<td>7</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L2</td>
+<td>448</td>
+<td>74.8%</td>
+<td class="g">$616</td>
+<td class="g">$1.37</td>
+<td>0.6x</td>
+<td>0.7x</td>
+<td>15.5</td>
+<td>21.3</td>
+<td>14.4</td>
+<td>20.0</td>
+<td class="r">196.7</td>
+<td>48.2h</td>
+<td>16</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L3</td>
+<td>55</td>
+<td>61.8%</td>
+<td class="g">$214</td>
+<td class="g">$3.89</td>
+<td>1.1x</td>
+<td>0.9x</td>
+<td>25.5</td>
+<td>29.7</td>
+<td>18.1</td>
+<td>29.8</td>
+<td class="r">168.8</td>
+<td>119.0h</td>
+<td>9</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L4</td>
+<td>28</td>
+<td>60.7%</td>
+<td class="g">$60</td>
+<td class="g">$2.14</td>
+<td>0.9x</td>
+<td>1.4x</td>
+<td>28.1</td>
+<td>20.4</td>
+<td>20.1</td>
+<td>35.2</td>
+<td class="r">137.5</td>
+<td>156.5h</td>
+<td>3</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L5</td>
+<td>76</td>
+<td>69.7%</td>
+<td class="r">$-9</td>
+<td class="r">$-0.12</td>
+<td>0.4x</td>
+<td>0.6x</td>
+<td>15.4</td>
+<td>24.4</td>
+<td>14.7</td>
+<td>28.4</td>
+<td class="r">148.8</td>
+<td>94.9h</td>
+<td>11</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L6</td>
+<td>11</td>
+<td>63.6%</td>
+<td class="g">$71</td>
+<td class="g">$6.45</td>
+<td>1.1x</td>
+<td>2.6x</td>
+<td>32.9</td>
+<td>12.9</td>
+<td>30.3</td>
+<td>42.6</td>
+<td class="r">110.0</td>
+<td>243.8h</td>
+<td>3</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L7</td>
+<td>11</td>
+<td>45.5%</td>
+<td class="r">$-160</td>
+<td class="r">$-14.53</td>
+<td>0.4x</td>
+<td>0.8x</td>
+<td>22.4</td>
+<td>29.3</td>
+<td>21.5</td>
+<td>71.7</td>
+<td class="r">133.6</td>
+<td>309.5h</td>
+<td>3</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L8</td>
+<td>6</td>
+<td>83.3%</td>
+<td class="g">$73</td>
+<td class="g">$12.13</td>
+<td>0.5x</td>
+<td>0.6x</td>
+<td>26.3</td>
+<td>46.3</td>
+<td>26.0</td>
+<td>15.9</td>
+<td class="r">46.3</td>
+<td>88.0h</td>
+<td>3</td>
+</tr>
+<tr>
+<td>SELL</td>
+<td>L9+</td>
+<td>150</td>
+<td>79.3%</td>
+<td class="g">$9,493</td>
+<td class="g">$63.29</td>
+<td>1.0x</td>
+<td>1.7x</td>
+<td>37.3</td>
+<td>22.5</td>
+<td>38.7</td>
+<td>30.1</td>
+<td class="r">154.5</td>
+<td>161.4h</td>
+<td>14</td>
+</tr>
+</tbody></table></div>
+</div>
+
+<!-- Part 2: TP/SL Chart -->
+<div class="panel hidden" id="p2">
+<h3 style="color:var(--primary);margin-bottom:12px">📈 TP/SL 橫向條形圖</h3>
+<div class="chart-wrap">
+  <canvas id="chartTpsl"></canvas>
+  <div class="legend">
+    <span class="l-tp">TP (Avg MFE)</span>
+    <span class="l-ssl">Soft SL (MAE×1.2)</span>
+    <span class="l-hsl">Hard SL (MaxMAE×1.3)</span>
+  </div>
+</div>
+<div style="overflow-x:auto">
+<table id="tTpsl">
+<thead><tr><th>Rating</th><th>Dir</th><th>Layer</th><th>Trades</th><th>WR%</th><th>EV$</th><th>TP(pip)</th><th>SoftSL</th><th>HardSL</th><th>R:R</th><th>Total$</th></tr></thead>
+<tbody>
+<tr>
+<td><span class="rating rating-sp">S+</span></td>
+<td>BUY</td>
+<td>L7</td>
+<td>6</td>
+<td>100.0%</td>
+<td class="g">$47.79</td>
+<td class="g">59.8</td>
+<td class="y">42.5</td>
+<td class="r">559.4</td>
+<td>1.41x</td>
+<td class="g">$287</td>
+</tr>
+<tr>
+<td><span class="rating rating-s">S</span></td>
+<td>SELL</td>
+<td>L9+</td>
+<td>150</td>
+<td>79.3%</td>
+<td class="g">$63.29</td>
+<td class="g">38.7</td>
+<td class="y">36.1</td>
+<td class="r">255.7</td>
+<td>1.07x</td>
+<td class="g">$9,493</td>
+</tr>
+<tr>
+<td><span class="rating rating-s">S</span></td>
+<td>BUY</td>
+<td>L9+</td>
+<td>303</td>
+<td>75.9%</td>
+<td class="g">$57.79</td>
+<td class="g">20.7</td>
+<td class="y">28.2</td>
+<td class="r">559.4</td>
+<td>0.73x</td>
+<td class="g">$17,510</td>
+</tr>
+<tr>
+<td><span class="rating rating-s">S</span></td>
+<td>BUY</td>
+<td>L3</td>
+<td>57</td>
+<td>91.2%</td>
+<td class="g">$31.45</td>
+<td class="g">36.4</td>
+<td class="y">41.3</td>
+<td class="r">559.4</td>
+<td>0.88x</td>
+<td class="g">$1,793</td>
+</tr>
+<tr>
+<td><span class="rating rating-a">A</span></td>
+<td>BUY</td>
+<td>L6</td>
+<td>9</td>
+<td>88.9%</td>
+<td class="g">$17.77</td>
+<td class="g">33.1</td>
+<td class="y">49.0</td>
+<td class="r">559.4</td>
+<td>0.68x</td>
+<td class="g">$160</td>
+</tr>
+<tr>
+<td><span class="rating rating-a">A</span></td>
+<td>SELL</td>
+<td>L8</td>
+<td>6</td>
+<td>83.3%</td>
+<td class="g">$12.13</td>
+<td class="g">26.0</td>
+<td class="y">19.1</td>
+<td class="r">255.7</td>
+<td>1.36x</td>
+<td class="g">$73</td>
+</tr>
+</tbody></table></div>
+</div>
+
+<!-- Part 3: Ranking -->
+<div class="panel hidden" id="p3">
+<h3 style="color:var(--primary);margin-bottom:12px">🏆 A級以上排行榜</h3>
+<div style="overflow-x:auto">
+<table id="tRank">
+<thead><tr><th>#</th><th>Rating</th><th>Dir</th><th>Layer</th><th>Trades</th><th>WR%</th><th>EV$</th><th>Odds$</th><th>OddsPip</th><th>TP</th><th>SoftSL</th><th>HardSL</th><th>Total$</th><th>AvgHold</th></tr></thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><span class="rating rating-sp">S+</span></td>
+<td>BUY</td>
+<td>L7</td>
+<td>6</td>
+<td>100.0%</td>
+<td class="g">$47.79</td>
+<td>999.0x</td>
+<td>999.0x</td>
+<td class="g">59.8</td>
+<td class="y">42.5</td>
+<td class="r">559.4</td>
+<td class="g">$287</td>
+<td>288.7h</td>
+</tr>
+<tr>
+<td>2</td>
+<td><span class="rating rating-s">S</span></td>
+<td>SELL</td>
+<td>L9+</td>
+<td>150</td>
+<td>79.3%</td>
+<td class="g">$63.29</td>
+<td>1.0x</td>
+<td>1.7x</td>
+<td class="g">38.7</td>
+<td class="y">36.1</td>
+<td class="r">255.7</td>
+<td class="g">$9,493</td>
+<td>161.4h</td>
+</tr>
+<tr>
+<td>3</td>
+<td><span class="rating rating-s">S</span></td>
+<td>BUY</td>
+<td>L9+</td>
+<td>303</td>
+<td>75.9%</td>
+<td class="g">$57.79</td>
+<td>1.3x</td>
+<td>0.8x</td>
+<td class="g">20.7</td>
+<td class="y">28.2</td>
+<td class="r">559.4</td>
+<td class="g">$17,510</td>
+<td>62.2h</td>
+</tr>
+<tr>
+<td>4</td>
+<td><span class="rating rating-s">S</span></td>
+<td>BUY</td>
+<td>L3</td>
+<td>57</td>
+<td>91.2%</td>
+<td class="g">$31.45</td>
+<td>1.3x</td>
+<td>0.4x</td>
+<td class="g">36.4</td>
+<td class="y">41.3</td>
+<td class="r">559.4</td>
+<td class="g">$1,793</td>
+<td>108.7h</td>
+</tr>
+<tr>
+<td>5</td>
+<td><span class="rating rating-a">A</span></td>
+<td>BUY</td>
+<td>L6</td>
+<td>9</td>
+<td>88.9%</td>
+<td class="g">$17.77</td>
+<td>0.7x</td>
+<td>0.6x</td>
+<td class="g">33.1</td>
+<td class="y">49.0</td>
+<td class="r">559.4</td>
+<td class="g">$160</td>
+<td>164.1h</td>
+</tr>
+<tr>
+<td>6</td>
+<td><span class="rating rating-a">A</span></td>
+<td>SELL</td>
+<td>L8</td>
+<td>6</td>
+<td>83.3%</td>
+<td class="g">$12.13</td>
+<td>0.5x</td>
+<td>0.6x</td>
+<td class="g">26.0</td>
+<td class="y">19.1</td>
+<td class="r">255.7</td>
+<td class="g">$73</td>
+<td>88.0h</td>
+</tr>
+</tbody></table></div>
+</div>
+
+<!-- Part 4: Blacklist -->
+<div class="panel hidden" id="p4">
+<h3 style="color:var(--primary);margin-bottom:12px">💀 黑名單</h3>
+<div class="chart-wrap"><canvas id="chartBl"></canvas>
+<div class="legend"><span class="l-orange">⚠️ WARNING</span><span class="l-red">💀 DEADLY</span></div></div>
+<div style="overflow-x:auto"><table><thead><tr><th>Dir</th><th>PnL</th><th>WR%</th><th>Odds</th><th>Avg EV</th><th>Worst EV</th><th>Danger</th><th>Level</th></tr></thead><tbody>
+<tr><td>BUY</td><td class="g">$21,956</td><td>75.5%</td><td>111.5x</td><td class="g">$12.16</td><td class="r">$-59.22</td><td><strong>2.0</strong></td><td>⚠️ WARNING</td></tr>
+</tbody></table></div></div>
+
+<!-- Part 5: Recovery -->
+<div class="panel hidden" id="p5">
+<h3 style="color:var(--primary);margin-bottom:12px">💪 恢復力分析</h3>
+<div class="chart-wrap"><canvas id="chartRv"></canvas><div class="legend"><span class="l-green">🟢 &lt;5次</span><span class="l-orange">🟡 5-20次</span><span class="l-red">🔴 &gt;20次</span></div></div><div style="overflow-x:auto"><table><thead><tr><th>Dir</th><th>Deepest</th><th>Worst Loss</th><th>Best EV Layer</th><th>Best EV</th><th>Recovery</th><th>Days</th><th>Status</th></tr></thead><tbody><tr><td>SELL</td><td>L9+</td><td class="r">$102</td><td>L9+</td><td class="g">$63.29</td><td>2</td><td>0</td><td>🟢 安全 (2次)</td></tr>
+<tr><td>BUY</td><td>L9+</td><td class="r">$80</td><td>L9+</td><td class="g">$57.79</td><td>2</td><td>0</td><td>🟢 安全 (2次)</td></tr>
+</tbody></table></div></div>
+
+<!-- Part 6: MFE/MAE Scatter -->
+<div class="panel hidden" id="p6">
+<h3 style="color:var(--primary);margin-bottom:12px">🔬 MFE/MAE 散點分析</h3>
+<div id="scatterGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
+</div>
+
+<script>
+const scatterData = {"sell_L9+": [{"net_pips": 39.7, "mfe": 39.7, "mae": 14.9, "is_win": true}, {"net_pips": 26.8, "mfe": 26.8, "mae": 10.7, "is_win": true}, {"net_pips": 34.2, "mfe": 35.1, "mae": 13.6, "is_win": true}, {"net_pips": 30.1, "mfe": 30.7, "mae": 16.5, "is_win": true}, {"net_pips": 25.7, "mfe": 25.7, "mae": 16.3, "is_win": true}, {"net_pips": 24.8, "mfe": 24.8, "mae": 15.3, "is_win": true}, {"net_pips": 13.6, "mfe": 13.6, "mae": 26.2, "is_win": true}, {"net_pips": 25.6, "mfe": 25.6, "mae": 11.1, "is_win": true}, {"net_pips": 17.0, "mfe": 17.0, "mae": 16.3, "is_win": true}, {"net_pips": 9.8, "mfe": 10.6, "mae": 4.8, "is_win": true}, {"net_pips": 24.0, "mfe": 43.0, "mae": 16.4, "is_win": true}, {"net_pips": 18.2, "mfe": 39.6, "mae": 19.8, "is_win": true}, {"net_pips": 24.9, "mfe": 39.8, "mae": 19.6, "is_win": true}, {"net_pips": 29.5, "mfe": 37.6, "mae": 21.8, "is_win": true}, {"net_pips": 32.8, "mfe": 37.7, "mae": 21.7, "is_win": true}, {"net_pips": 3.1, "mfe": 20.5, "mae": 38.9, "is_win": false}, {"net_pips": 2.4, "mfe": 20.5, "mae": 38.9, "is_win": false}, {"net_pips": -8.1, "mfe": 10.9, "mae": 48.5, "is_win": false}, {"net_pips": -10.7, "mfe": 10.7, "mae": 48.7, "is_win": false}, {"net_pips": -9.2, "mfe": 5.7, "mae": 53.7, "is_win": false}, {"net_pips": 17.7, "mfe": 37.4, "mae": 22.0, "is_win": true}, {"net_pips": 27.8, "mfe": 37.4, "mae": 16.5, "is_win": true}, {"net_pips": 28.0, "mfe": 39.0, "mae": 14.9, "is_win": true}, {"net_pips": 38.6, "mfe": 38.6, "mae": 15.2, "is_win": true}, {"net_pips": 52.8, "mfe": 52.8, "mae": 20.1, "is_win": true}, {"net_pips": 29.4, "mfe": 29.4, "mae": 43.8, "is_win": true}, {"net_pips": 49.2, "mfe": 60.9, "mae": 27.3, "is_win": true}, {"net_pips": 46.0, "mfe": 46.0, "mae": 13.2, "is_win": true}, {"net_pips": 51.1, "mfe": 51.1, "mae": 4.0, "is_win": true}, {"net_pips": -2.2, "mfe": 16.5, "mae": 2.2, "is_win": false}, {"net_pips": 31.0, "mfe": 31.0, "mae": 74.2, "is_win": true}, {"net_pips": 78.4, "mfe": 78.4, "mae": 26.7, "is_win": true}, {"net_pips": 1.6, "mfe": 7.3, "mae": 80.4, "is_win": false}, {"net_pips": 32.7, "mfe": 35.8, "mae": 49.3, "is_win": true}, {"net_pips": 75.8, "mfe": 76.6, "mae": 5.0, "is_win": true}, {"net_pips": 31.2, "mfe": 31.7, "mae": 37.4, "is_win": true}, {"net_pips": 55.2, "mfe": 55.8, "mae": 13.3, "is_win": true}, {"net_pips": 18.4, "mfe": 48.7, "mae": 9.2, "is_win": true}, {"net_pips": 2.1, "mfe": 33.2, "mae": 24.7, "is_win": false}, {"net_pips": -2.9, "mfe": 28.2, "mae": 29.7, "is_win": false}, {"net_pips": -2.3, "mfe": 1.4, "mae": 16.4, "is_win": false}, {"net_pips": -17.9, "mfe": 0.0, "mae": 32.0, "is_win": false}, {"net_pips": 7.7, "mfe": 9.2, "mae": 6.4, "is_win": true}, {"net_pips": 57.5, "mfe": 67.0, "mae": 3.8, "is_win": true}, {"net_pips": 12.4, "mfe": 21.9, "mae": 48.9, "is_win": true}, {"net_pips": 34.6, "mfe": 44.1, "mae": 26.7, "is_win": true}, {"net_pips": 5.0, "mfe": 14.6, "mae": 56.2, "is_win": false}, {"net_pips": 5.1, "mfe": 0.0, "mae": 0.0, "is_win": true}, {"net_pips": 10.1, "mfe": 0.0, "mae": 0.0, "is_win": true}, {"net_pips": 17.0, "mfe": 22.2, "mae": 4.9, "is_win": true}, {"net_pips": 18.3, "mfe": 21.0, "mae": 3.9, "is_win": true}, {"net_pips": 4.2, "mfe": 15.2, "mae": 58.0, "is_win": false}, {"net_pips": 38.2, "mfe": 38.2, "mae": 22.4, "is_win": true}, {"net_pips": -21.3, "mfe": 11.3, "mae": 97.3, "is_win": false}, {"net_pips": 47.3, "mfe": 51.1, "mae": 28.8, "is_win": true}, {"net_pips": 15.3, "mfe": 17.1, "mae": 9.1, "is_win": true}, {"net_pips": 27.4, "mfe": 30.6, "mae": 14.2, "is_win": true}, {"net_pips": 18.0, "mfe": 20.7, "mae": 5.3, "is_win": true}, {"net_pips": 37.9, "mfe": 37.9, "mae": 7.3, "is_win": true}, {"net_pips": -33.2, "mfe": 19.2, "mae": 91.9, "is_win": false}, {"net_pips": -4.0, "mfe": 2.0, "mae": 62.6, "is_win": false}, {"net_pips": 48.1, "mfe": 48.9, "mae": 6.7, "is_win": true}, {"net_pips": 0.0, "mfe": 6.0, "mae": 61.2, "is_win": false}, {"net_pips": 27.3, "mfe": 33.5, "mae": 33.7, "is_win": true}, {"net_pips": 27.2, "mfe": 32.9, "mae": 20.0, "is_win": true}, {"net_pips": 9.2, "mfe": 23.8, "mae": 0.9, "is_win": true}, {"net_pips": 62.5, "mfe": 82.8, "mae": 7.5, "is_win": true}, {"net_pips": -39.1, "mfe": 16.0, "mae": 109.1, "is_win": false}, {"net_pips": 0.5, "mfe": 20.7, "mae": 69.6, "is_win": false}, {"net_pips": -84.5, "mfe": 0.0, "mae": 154.5, "is_win": false}, {"net_pips": 40.8, "mfe": 40.8, "mae": 7.2, "is_win": true}, {"net_pips": 7.0, "mfe": 13.7, "mae": 33.7, "is_win": true}, {"net_pips": 78.6, "mfe": 78.6, "mae": 27.6, "is_win": true}, {"net_pips": 26.3, "mfe": 26.3, "mae": 79.9, "is_win": true}, {"net_pips": 44.0, "mfe": 44.0, "mae": 13.6, "is_win": true}, {"net_pips": 69.4, "mfe": 69.4, "mae": 38.9, "is_win": true}, {"net_pips": 108.8, "mfe": 108.8, "mae": 0.0, "is_win": true}, {"net_pips": 33.4, "mfe": 33.4, "mae": 75.0, "is_win": true}, {"net_pips": 83.5, "mfe": 83.5, "mae": 23.6, "is_win": true}, {"net_pips": 47.7, "mfe": 47.7, "mae": 60.0, "is_win": true}, {"net_pips": -62.9, "mfe": 56.2, "mae": 62.9, "is_win": false}, {"net_pips": -31.9, "mfe": 65.3, "mae": 31.9, "is_win": false}, {"net_pips": -93.2, "mfe": 26.1, "mae": 93.2, "is_win": false}, {"net_pips": -16.6, "mfe": 80.2, "mae": 16.6, "is_win": false}, {"net_pips": -47.6, "mfe": 71.4, "mae": 47.6, "is_win": false}, {"net_pips": -77.7, "mfe": 41.0, "mae": 77.7, "is_win": false}, {"net_pips": -107.8, "mfe": 11.7, "mae": 107.8, "is_win": false}, {"net_pips": 80.7, "mfe": 88.7, "mae": 31.2, "is_win": true}, {"net_pips": 42.6, "mfe": 50.7, "mae": 69.2, "is_win": true}, {"net_pips": 99.6, "mfe": 107.4, "mae": 12.5, "is_win": true}, {"net_pips": 65.8, "mfe": 73.6, "mae": 46.3, "is_win": true}, {"net_pips": 20.9, "mfe": 28.8, "mae": 91.1, "is_win": true}, {"net_pips": 86.5, "mfe": 138.9, "mae": 14.3, "is_win": true}, {"net_pips": 17.9, "mfe": 70.1, "mae": 83.1, "is_win": true}, {"net_pips": -17.2, "mfe": 35.0, "mae": 118.2, "is_win": false}, {"net_pips": 65.4, "mfe": 117.8, "mae": 35.4, "is_win": true}, {"net_pips": -2.3, "mfe": 50.1, "mae": 103.1, "is_win": false}, {"net_pips": 38.8, "mfe": 38.8, "mae": 13.2, "is_win": true}, {"net_pips": 28.0, "mfe": 28.0, "mae": 10.4, "is_win": true}, {"net_pips": 28.1, "mfe": 37.7, "mae": 19.0, "is_win": true}, {"net_pips": 29.6, "mfe": 36.3, "mae": 20.4, "is_win": true}, {"net_pips": 22.9, "mfe": 37.7, "mae": 19.0, "is_win": true}, {"net_pips": 20.2, "mfe": 38.9, "mae": 17.8, "is_win": true}, {"net_pips": 44.0, "mfe": 44.4, "mae": 10.2, "is_win": true}, {"net_pips": 35.8, "mfe": 67.0, "mae": 1.6, "is_win": true}, {"net_pips": 63.8, "mfe": 66.7, "mae": 1.9, "is_win": true}, {"net_pips": 52.5, "mfe": 57.1, "mae": 1.6, "is_win": true}, {"net_pips": 56.4, "mfe": 56.4, "mae": 9.1, "is_win": true}, {"net_pips": 54.9, "mfe": 54.9, "mae": 8.9, "is_win": true}, {"net_pips": 17.1, "mfe": 17.4, "mae": 32.9, "is_win": true}, {"net_pips": 7.4, "mfe": 7.4, "mae": 41.3, "is_win": true}, {"net_pips": 38.5, "mfe": 38.5, "mae": 0.8, "is_win": true}, {"net_pips": 28.7, "mfe": 29.0, "mae": 2.4, "is_win": true}, {"net_pips": 19.2, "mfe": 19.2, "mae": 11.7, "is_win": true}, {"net_pips": 37.5, "mfe": 0.0, "mae": 0.0, "is_win": true}, {"net_pips": 35.2, "mfe": 0.0, "mae": 0.0, "is_win": true}, {"net_pips": 24.0, "mfe": 0.0, "mae": 0.0, "is_win": true}, {"net_pips": 42.4, "mfe": 42.4, "mae": 0.5, "is_win": true}, {"net_pips": 27.2, "mfe": 27.2, "mae": 15.9, "is_win": true}, {"net_pips": 14.0, "mfe": 14.0, "mae": 39.5, "is_win": true}, {"net_pips": 48.8, "mfe": 48.8, "mae": 5.0, "is_win": true}, {"net_pips": 32.1, "mfe": 32.1, "mae": 21.5, "is_win": true}, {"net_pips": -28.5, "mfe": 17.5, "mae": 28.5, "is_win": false}, {"net_pips": 16.4, "mfe": 16.4, "mae": 4.1, "is_win": true}, {"net_pips": 40.8, "mfe": 58.9, "mae": 14.3, "is_win": true}, {"net_pips": 23.2, "mfe": 40.9, "mae": 32.3, "is_win": true}, {"net_pips": 4.4, "mfe": 22.2, "mae": 51.0, "is_win": false}, {"net_pips": 50.6, "mfe": 60.0, "mae": 9.0, "is_win": true}, {"net_pips": 35.7, "mfe": 44.9, "mae": 24.1, "is_win": true}, {"net_pips": 40.3, "mfe": 47.5, "mae": 27.9, "is_win": true}, {"net_pips": 56.3, "mfe": 64.0, "mae": 11.4, "is_win": true}, {"net_pips": 25.1, "mfe": 32.6, "mae": 42.8, "is_win": true}, {"net_pips": 85.7, "mfe": 93.2, "mae": 35.2, "is_win": true}, {"net_pips": 36.9, "mfe": 44.4, "mae": 84.0, "is_win": true}, {"net_pips": 105.1, "mfe": 112.7, "mae": 15.7, "is_win": true}, {"net_pips": 57.2, "mfe": 64.8, "mae": 63.6, "is_win": true}, {"net_pips": 16.6, "mfe": 24.3, "mae": 104.1, "is_win": true}, {"net_pips": 38.4, "mfe": 38.4, "mae": 13.8, "is_win": true}, {"net_pips": 27.9, "mfe": 27.9, "mae": 11.0, "is_win": true}, {"net_pips": 29.0, "mfe": 38.8, "mae": 20.8, "is_win": true}, {"net_pips": 31.1, "mfe": 38.0, "mae": 21.6, "is_win": true}, {"net_pips": 23.6, "mfe": 38.5, "mae": 21.1, "is_win": true}, {"net_pips": 18.2, "mfe": 37.1, "mae": 22.5, "is_win": true}, {"net_pips": 38.5, "mfe": 38.5, "mae": 8.8, "is_win": true}, {"net_pips": 27.6, "mfe": 27.6, "mae": 4.2, "is_win": true}, {"net_pips": 46.3, "mfe": 46.3, "mae": 13.0, "is_win": true}, {"net_pips": 43.5, "mfe": 43.5, "mae": 15.8, "is_win": true}, {"net_pips": 41.0, "mfe": 41.0, "mae": 18.3, "is_win": true}, {"net_pips": 41.5, "mfe": 41.5, "mae": 17.8, "is_win": true}, {"net_pips": 20.9, "mfe": 39.3, "mae": 15.4, "is_win": true}], "buy_L9+": [{"net_pips": 8.1, "mfe": 20.0, "mae": 3.9, "is_win": true}, {"net_pips": 19.2, "mfe": 21.2, "mae": 31.9, "is_win": true}, {"net_pips": -15.8, "mfe": 3.9, "mae": 59.5, "is_win": false}, {"net_pips": 20.8, "mfe": 40.5, "mae": 22.9, "is_win": true}, {"net_pips": 15.1, "mfe": 17.5, "mae": 5.8, "is_win": true}, {"net_pips": 43.9, "mfe": 43.9, "mae": 11.2, "is_win": true}, {"net_pips": 20.2, "mfe": 20.2, "mae": 27.4, "is_win": true}, {"net_pips": -0.7, "mfe": 2.0, "mae": 48.3, "is_win": false}, {"net_pips": 34.8, "mfe": 34.8, "mae": 7.7, "is_win": true}, {"net_pips": 17.0, "mfe": 17.0, "mae": 24.4, "is_win": true}, {"net_pips": 10.0, "mfe": 10.0, "mae": 27.5, "is_win": true}, {"net_pips": -10.2, "mfe": 2.6, "mae": 47.7, "is_win": false}, {"net_pips": 0.1, "mfe": 18.2, "mae": 20.9, "is_win": true}, {"net_pips": 12.1, "mfe": 12.1, "mae": 11.1, "is_win": true}, {"net_pips": -4.4, "mfe": 11.6, "mae": 27.6, "is_win": false}, {"net_pips": 47.4, "mfe": 47.4, "mae": 16.5, "is_win": true}, {"net_pips": 52.9, "mfe": 52.9, "mae": 8.8, "is_win": true}, {"net_pips": 73.7, "mfe": 73.7, "mae": 42.2, "is_win": true}, {"net_pips": 63.0, "mfe": 63.0, "mae": 42.2, "is_win": true}, {"net_pips": 64.4, "mfe": 64.4, "mae": 36.4, "is_win": true}, {"net_pips": 57.6, "mfe": 61.1, "mae": 36.1, "is_win": true}, {"net_pips": 59.6, "mfe": 60.7, "mae": 36.1, "is_win": true}, {"net_pips": 53.9, "mfe": 55.6, "mae": 35.9, "is_win": true}, {"net_pips": 54.5, "mfe": 54.5, "mae": 31.7, "is_win": true}, {"net_pips": 55.4, "mfe": 62.7, "mae": 23.3, "is_win": true}, {"net_pips": 39.5, "mfe": 39.5, "mae": 23.4, "is_win": true}, {"net_pips": 47.2, "mfe": 47.2, "mae": 2.1, "is_win": true}, {"net_pips": -55.0, "mfe": 29.9, "mae": 55.0, "is_win": false}, {"net_pips": -55.0, "mfe": 29.9, "mae": 55.0, "is_win": false}, {"net_pips": -55.0, "mfe": 29.8, "mae": 55.0, "is_win": false}, {"net_pips": -55.0, "mfe": 29.0, "mae": 55.0, "is_win": false}, {"net_pips": -55.0, "mfe": 29.2, "mae": 55.0, "is_win": false}, {"net_pips": 20.3, "mfe": 20.3, "mae": 2.3, "is_win": true}, {"net_pips": 6.5, "mfe": 6.5, "mae": 17.1, "is_win": true}, {"net_pips": 6.8, "mfe": 6.8, "mae": 9.6, "is_win": true}, {"net_pips": 55.7, "mfe": 56.4, "mae": 14.9, "is_win": true}, {"net_pips": 38.5, "mfe": 38.9, "mae": 18.8, "is_win": true}, {"net_pips": -9.9, "mfe": 42.4, "mae": 74.3, "is_win": false}, {"net_pips": 26.1, "mfe": 26.3, "mae": 38.3, "is_win": true}, {"net_pips": 56.4, "mfe": 56.6, "mae": 4.4, "is_win": true}, {"net_pips": -1.6, "mfe": 0.0, "mae": 1.6, "is_win": false}, {"net_pips": -141.1, "mfe": 6.8, "mae": 143.2, "is_win": false}, {"net_pips": -146.2, "mfe": 20.0, "mae": 148.3, "is_win": false}, {"net_pips": -57.3, "mfe": 55.4, "mae": 59.4, "is_win": false}, {"net_pips": -77.8, "mfe": 34.9, "mae": 79.9, "is_win": false}, {"net_pips": -95.7, "mfe": 17.0, "mae": 97.8, "is_win": false}, {"net_pips": 0.8, "mfe": 8.3, "mae": 1.3, "is_win": true}, {"net_pips": -31.2, "mfe": 26.0, "mae": 33.3, "is_win": false}, {"net_pips": 6.5, "mfe": 29.6, "mae": 10.9, "is_win": true}, {"net_pips": 0.0, "mfe": 23.1, "mae": 17.4, "is_win": true}, {"net_pips": -64.4, "mfe": 0.0, "mae": 0.0, "is_win": false}, {"net_pips": -116.5, "mfe": 0.0, "mae": 0.0, "is_win": false}, {"net_pips": -127.1, "mfe": 0.0, "mae": 0.0, "is_win": false}, {"net_pips": -142.4, "mfe": 0.0, "mae": 0.0, "is_win": false}, {"net_pips": -43.7, "mfe": 0.0, "mae": 0.0, "is_win": false}, {"net_pips": -15.7, "mfe": 0.0, "mae": 0.0, "is_win": false}, {"net_pips": 10.1, "mfe": 11.5, "mae": 23.1, "is_win": true}, {"net_pips": 22.7, "mfe": 28.8, "mae": 6.7, "is_win": true}, {"net_pips": 14.9, "mfe": 18.2, "mae": 2.1, "is_win": true}, {"net_pips": 19.8, "mfe": 22.1, "mae": 14.5, "is_win": true}, {"net_pips": 18.2, "mfe": 21.1, "mae": 13.5, "is_win": true}, {"net_pips": 22.3, "mfe": 28.1, "mae": 3.2, "is_win": true}, {"net_pips": 19.9, "mfe": 33.9, "mae": 5.8, "is_win": true}, {"net_pips": 21.2, "mfe": 27.8, "mae": 21.3, "is_win": true}, {"net_pips": -15.6, "mfe": 7.5, "mae": 58.0, "is_win": false}, {"net_pips": 13.5, "mfe": 29.3, "mae": 9.7, "is_win": true}, {"net_pips": -2.5, "mfe": 8.5, "mae": 53.6, "is_win": false}, {"net_pips": 32.7, "mfe": 43.9, "mae": 18.2, "is_win": true}, {"net_pips": -50.8, "mfe": 7.5, "mae": 101.8, "is_win": false}, {"net_pips": 21.6, "mfe": 34.7, "mae": 31.9, "is_win": true}, {"net_pips": -22.7, "mfe": 0.0, "mae": 76.0, "is_win": false}, {"net_pips": 3.5, "mfe": 16.9, "mae": 40.3, "is_win": true}, {"net_pips": -6.9, "mfe": 12.3, "mae": 43.7, "is_win": false}, {"net_pips": 34.0, "mfe": 53.3, "mae": 2.7, "is_win": true}, {"net_pips": -54.9, "mfe": 2.9, "mae": 91.6, "is_win": false}, {"net_pips": 25.5, "mfe": 37.0, "mae": 54.2, "is_win": true}, {"net_pips": -10.7, "mfe": 10.4, "mae": 90.4, "is_win": false}, {"net_pips": -43.0, "mfe": 0.0, "mae": 122.7, "is_win": false}, {"net_pips": 6.2, "mfe": 6.2, "mae": 12.2, "is_win": true}, {"net_pips": 8.3, "mfe": 8.3, "mae": 6.2, "is_win": true}, {"net_pips": -4.5, "mfe": 0.3, "mae": 27.4, "is_win": false}, {"net_pips": -4.9, "mfe": 0.0, "mae": 27.7, "is_win": false}, {"net_pips": 7.3, "mfe": 7.3, "mae": 7.0, "is_win": true}, {"net_pips": 8.9, "mfe": 8.9, "mae": 16.0, "is_win": true}, {"net_pips": 9.8, "mfe": 9.8, "mae": 16.8, "is_win": true}, {"net_pips": 10.6, "mfe": 10.6, "mae": 16.8, "is_win": true}, {"net_pips": 11.7, "mfe": 11.7, "mae": 11.4, "is_win": true}, {"net_pips": -1.6, "mfe": 4.1, "mae": 24.8, "is_win": false}, {"net_pips": -9.9, "mfe": 10.9, "mae": 33.1, "is_win": false}, {"net_pips": 16.5, "mfe": 16.5, "mae": 7.3, "is_win": true}, {"net_pips": -2.2, "mfe": 3.7, "mae": 25.2, "is_win": false}, {"net_pips": 13.9, "mfe": 13.9, "mae": 9.4, "is_win": true}, {"net_pips": -4.8, "mfe": 1.9, "mae": 26.8, "is_win": false}, {"net_pips": -14.3, "mfe": 7.5, "mae": 36.3, "is_win": false}, {"net_pips": 9.7, "mfe": 9.7, "mae": 5.8, "is_win": true}, {"net_pips": 9.5, "mfe": 9.5, "mae": 7.1, "is_win": true}, {"net_pips": 2.5, "mfe": 2.5, "mae": 14.0, "is_win": true}, {"net_pips": 12.0, "mfe": 12.0, "mae": 3.9, "is_win": true}, {"net_pips": 2.4, "mfe": 2.4, "mae": 13.8, "is_win": true}, {"net_pips": 8.4, "mfe": 8.4, "mae": 3.3, "is_win": true}, {"net_pips": -2.9, "mfe": 0.0, "mae": 14.7, "is_win": false}, {"net_pips": 9.7, "mfe": 10.2, "mae": 11.7, "is_win": true}, {"net_pips": 8.3, "mfe": 9.3, "mae": 10.7, "is_win": true}, {"net_pips": 8.4, "mfe": 8.4, "mae": 13.8, "is_win": true}, {"net_pips": 10.8, "mfe": 10.8, "mae": 6.1, "is_win": true}, {"net_pips": 9.7, "mfe": 9.7, "mae": 7.2, "is_win": true}, {"net_pips": 10.9, "mfe": 10.9, "mae": 10.2, "is_win": true}, {"net_pips": -2.4, "mfe": 0.0, "mae": 42.3, "is_win": false}, {"net_pips": -16.4, "mfe": 0.0, "mae": 56.3, "is_win": false}, {"net_pips": 6.7, "mfe": 6.7, "mae": 5.0, "is_win": true}, {"net_pips": 11.6, "mfe": 11.6, "mae": 7.5, "is_win": true}, {"net_pips": 90.2, "mfe": 100.3, "mae": 19.6, "is_win": true}, {"net_pips": 73.5, "mfe": 83.7, "mae": 36.2, "is_win": true}, {"net_pips": 76.0, "mfe": 83.9, "mae": 5.5, "is_win": true}, {"net_pips": 62.3, "mfe": 69.4, "mae": 36.0, "is_win": true}, {"net_pips": 78.7, "mfe": 85.8, "mae": 19.6, "is_win": true}, {"net_pips": 85.9, "mfe": 85.9, "mae": 35.7, "is_win": true}, {"net_pips": 78.2, "mfe": 80.2, "mae": 35.9, "is_win": true}, {"net_pips": 74.1, "mfe": 74.3, "mae": 41.8, "is_win": true}, {"net_pips": 76.4, "mfe": 76.4, "mae": 42.1, "is_win": true}, {"net_pips": 74.4, "mfe": 74.4, "mae": 41.7, "is_win": true}, {"net_pips": 74.5, "mfe": 74.5, "mae": 41.7, "is_win": true}, {"net_pips": 68.4, "mfe": 68.4, "mae": 42.2, "is_win": true}, {"net_pips": 62.1, "mfe": 62.1, "mae": 41.7, "is_win": true}, {"net_pips": 61.7, "mfe": 61.7, "mae": 42.2, "is_win": true}, {"net_pips": 57.8, "mfe": 61.7, "mae": 35.9, "is_win": true}, {"net_pips": 58.7, "mfe": 61.9, "mae": 35.7, "is_win": true}, {"net_pips": 57.2, "mfe": 59.3, "mae": 32.4, "is_win": true}, {"net_pips": 21.7, "mfe": 28.7, "mae": 57.5, "is_win": true}, {"net_pips": 28.3, "mfe": 28.8, "mae": 57.4, "is_win": true}, {"net_pips": 29.2, "mfe": 29.2, "mae": 58.3, "is_win": true}, {"net_pips": 36.0, "mfe": 37.2, "mae": 19.4, "is_win": true}, {"net_pips": 31.8, "mfe": 32.8, "mae": 18.5, "is_win": true}, {"net_pips": 9.9, "mfe": 11.6, "mae": 35.8, "is_win": true}, {"net_pips": 27.9, "mfe": 27.9, "mae": 18.2, "is_win": true}, {"net_pips": 1.0, "mfe": 1.0, "mae": 13.2, "is_win": true}, {"net_pips": 4.3, "mfe": 5.1, "mae": 49.3, "is_win": true}, {"net_pips": 5.0, "mfe": 5.8, "mae": 1.2, "is_win": true}, {"net_pips": 5.6, "mfe": 7.1, "mae": 4.6, "is_win": true}, {"net_pips": 7.5, "mfe": 9.4, "mae": 36.7, "is_win": true}, {"net_pips": 6.1, "mfe": 7.4, "mae": 5.7, "is_win": true}, {"net_pips": 6.1, "mfe": 7.7, "mae": 5.1, "is_win": true}, {"net_pips": 4.3, "mfe": 5.9, "mae": 10.2, "is_win": true}, {"net_pips": 14.3, "mfe": 17.8, "mae": 15.6, "is_win": true}, {"net_pips": -10.6, "mfe": 3.4, "mae": 40.5, "is_win": false}, {"net_pips": 5.5, "mfe": 7.1, "mae": 1.6, "is_win": true}, {"net_pips": 15.9, "mfe": 15.9, "mae": 9.6, "is_win": true}, {"net_pips": 4.5, "mfe": 5.6, "mae": 6.8, "is_win": true}, {"net_pips": -17.4, "mfe": 3.0, "mae": 49.2, "is_win": false}, {"net_pips": -7.3, "mfe": 5.8, "mae": 39.2, "is_win": false}, {"net_pips": 12.6, "mfe": 14.1, "mae": 19.2, "is_win": true}, {"net_pips": -26.6, "mfe": 2.6, "mae": 44.9, "is_win": false}, {"net_pips": -6.2, "mfe": 0.0, "mae": 24.5, "is_win": false}, {"net_pips": 13.7, "mfe": 15.4, "mae": 3.4, "is_win": true}, {"net_pips": 12.1, "mfe": 12.1, "mae": 4.2, "is_win": true}, {"net_pips": 1.8, "mfe": 2.9, "mae": 6.2, "is_win": true}, {"net_pips": -12.9, "mfe": 0.0, "mae": 32.5, "is_win": false}, {"net_pips": -2.6, "mfe": 0.0, "mae": 22.3, "is_win": false}, {"net_pips": 18.0, "mfe": 18.0, "mae": 1.6, "is_win": true}, {"net_pips": 4.1, "mfe": 4.1, "mae": 7.8, "is_win": true}, {"net_pips": 12.2, "mfe": 12.2, "mae": 4.2, "is_win": true}, {"net_pips": 3.1, "mfe": 4.5, "mae": 5.6, "is_win": true}, {"net_pips": 5.7, "mfe": 7.8, "mae": 7.3, "is_win": true}, {"net_pips": -4.0, "mfe": 0.0, "mae": 16.8, "is_win": false}, {"net_pips": 6.2, "mfe": 7.8, "mae": 6.6, "is_win": true}, {"net_pips": 2.1, "mfe": 3.5, "mae": 7.3, "is_win": true}, {"net_pips": 5.2, "mfe": 6.1, "mae": 3.3, "is_win": true}, {"net_pips": -6.7, "mfe": 6.9, "mae": 27.7, "is_win": false}, {"net_pips": 3.4, "mfe": 4.6, "mae": 17.5, "is_win": true}, {"net_pips": -1.4, "mfe": 1.5, "mae": 20.6, "is_win": false}, {"net_pips": 8.9, "mfe": 11.8, "mae": 10.3, "is_win": true}, {"net_pips": 2.0, "mfe": 2.0, "mae": 14.6, "is_win": true}, {"net_pips": 12.9, "mfe": 12.9, "mae": 3.9, "is_win": true}, {"net_pips": -10.2, "mfe": 0.0, "mae": 23.2, "is_win": false}, {"net_pips": 0.8, "mfe": 4.1, "mae": 12.3, "is_win": true}, {"net_pips": 0.5, "mfe": 1.5, "mae": 15.0, "is_win": true}, {"net_pips": 0.3, "mfe": 0.3, "mae": 6.4, "is_win": true}, {"net_pips": 2.2, "mfe": 2.7, "mae": 9.8, "is_win": true}, {"net_pips": -21.8, "mfe": 0.0, "mae": 35.8, "is_win": false}, {"net_pips": -11.3, "mfe": 3.9, "mae": 25.3, "is_win": false}, {"net_pips": 9.5, "mfe": 11.5, "mae": 4.5, "is_win": true}, {"net_pips": 6.9, "mfe": 10.2, "mae": 3.9, "is_win": true}, {"net_pips": 5.6, "mfe": 6.1, "mae": 2.2, "is_win": true}, {"net_pips": 1.8, "mfe": 6.5, "mae": 5.0, "is_win": true}, {"net_pips": 3.0, "mfe": 3.0, "mae": 13.5, "is_win": true}, {"net_pips": 14.2, "mfe": 14.2, "mae": 2.3, "is_win": true}, {"net_pips": 2.8, "mfe": 5.9, "mae": 3.8, "is_win": true}, {"net_pips": -9.7, "mfe": 0.0, "mae": 21.2, "is_win": false}, {"net_pips": 5.0, "mfe": 8.6, "mae": 6.5, "is_win": true}, {"net_pips": 11.4, "mfe": 11.4, "mae": 7.6, "is_win": true}, {"net_pips": -4.9, "mfe": 0.0, "mae": 23.8, "is_win": false}, {"net_pips": 6.7, "mfe": 7.1, "mae": 12.4, "is_win": true}, {"net_pips": 5.3, "mfe": 6.4, "mae": 2.6, "is_win": true}, {"net_pips": -5.8, "mfe": 0.0, "mae": 14.8, "is_win": false}, {"net_pips": -36.8, "mfe": 0.0, "mae": 80.8, "is_win": false}, {"net_pips": -2.4, "mfe": 7.5, "mae": 46.6, "is_win": false}, {"net_pips": -25.4, "mfe": 0.0, "mae": 69.6, "is_win": false}, {"net_pips": 24.2, "mfe": 24.2, "mae": 19.8, "is_win": true}, {"net_pips": -1.4, "mfe": 0.0, "mae": 18.7, "is_win": false}, {"net_pips": 14.1, "mfe": 14.1, "mae": 0.0, "is_win": true}], "sell_L1": [{"net_pips": 21.4, "mfe": 21.4, "mae": 31.8, "is_win": true}, {"net_pips": 12.5, "mfe": 12.5, "mae": 39.5, "is_win": true}, {"net_pips": 0.5, "mfe": 4.9, "mae": 9.7, "is_win": true}, {"net_pips": 42.2, "mfe": 46.2, "mae": 3.8, "is_win": true}, {"net_pips": 2.9, "mfe": 44.6, "mae": 26.8, "is_win": true}, {"net_pips": -11.3, "mfe": 6.3, "mae": 42.8, "is_win": false}, {"net_pips": 9.6, "mfe": 14.3, "mae": 21.9, "is_win": true}, {"net_pips": -15.5, "mfe": 1.7, "mae": 49.7, "is_win": false}, {"net_pips": 4.4, "mfe": 5.6, "mae": 14.3, "is_win": true}, {"net_pips": -7.9, "mfe": 0.0, "mae": 15.9, "is_win": false}, {"net_pips": -6.6, "mfe": 2.3, "mae": 20.1, "is_win": false}, {"net_pips": -16.6, "mfe": 0.0, "mae": 33.1, "is_win": false}, {"net_pips": 2.4, "mfe": 2.4, "mae": 28.4, "is_win": true}, {"net_pips": 8.7, "mfe": 10.3, "mae": 4.0, "is_win": true}, {"net_pips": 10.9, "mfe": 10.9, "mae": 7.7, "is_win": true}, {"net_pips": 3.8, "mfe": 5.3, "mae": 10.8, "is_win": true}, {"net_pips": 5.5, "mfe": 5.9, "mae": 4.0, "is_win": true}, {"net_pips": 6.2, "mfe": 6.2, "mae": 15.1, "is_win": true}, {"net_pips": 4.6, "mfe": 4.6, "mae": 7.4, "is_win": true}, {"net_pips": 8.1, "mfe": 9.2, "mae": 5.5, "is_win": true}, {"net_pips": -13.2, "mfe": 0.0, "mae": 35.9, "is_win": false}, {"net_pips": -25.5, "mfe": 0.2, "mae": 63.9, "is_win": false}, {"net_pips": 14.4, "mfe": 14.4, "mae": 3.9, "is_win": true}, {"net_pips": 3.9, "mfe": 4.2, "mae": 8.1, "is_win": true}, {"net_pips": 2.8, "mfe": 3.2, "mae": 0.8, "is_win": true}, {"net_pips": -12.3, "mfe": 0.2, "mae": 32.6, "is_win": false}, {"net_pips": -17.6, "mfe": 0.0, "mae": 38.3, "is_win": false}, {"net_pips": 10.0, "mfe": 13.6, "mae": 5.5, "is_win": true}, {"net_pips": 3.8, "mfe": 4.1, "mae": 1.8, "is_win": true}, {"net_pips": 2.3, "mfe": 4.5, "mae": 1.6, "is_win": true}, {"net_pips": 6.8, "mfe": 7.8, "mae": 0.3, "is_win": true}, {"net_pips": 3.4, "mfe": 3.4, "mae": 3.8, "is_win": true}, {"net_pips": -68.4, "mfe": 2.6, "mae": 68.4, "is_win": false}, {"net_pips": -7.0, "mfe": 0.7, "mae": 7.0, "is_win": false}, {"net_pips": 1.9, "mfe": 1.9, "mae": 10.7, "is_win": true}, {"net_pips": 4.2, "mfe": 4.2, "mae": 1.4, "is_win": true}, {"net_pips": -5.1, "mfe": 0.0, "mae": 5.1, "is_win": false}, {"net_pips": 4.7, "mfe": 4.7, "mae": 1.6, "is_win": true}, {"net_pips": -11.2, "mfe": 0.0, "mae": 11.2, "is_win": false}, {"net_pips": 6.3, "mfe": 6.3, "mae": 2.7, "is_win": true}, {"net_pips": 4.4, "mfe": 4.4, "mae": 1.8, "is_win": true}, {"net_pips": -6.9, "mfe": 0.0, "mae": 6.9, "is_win": false}, {"net_pips": 4.9, "mfe": 4.9, "mae": 3.0, "is_win": true}, {"net_pips": -6.8, "mfe": 0.0, "mae": 6.8, "is_win": false}, {"net_pips": -7.3, "mfe": 0.5, "mae": 7.3, "is_win": false}, {"net_pips": -6.5, "mfe": 0.0, "mae": 6.5, "is_win": false}, {"net_pips": 5.9, "mfe": 5.9, "mae": 12.2, "is_win": true}, {"net_pips": 5.4, "mfe": 5.4, "mae": 1.5, "is_win": true}, {"net_pips": 3.9, "mfe": 3.9, "mae": 10.0, "is_win": true}, {"net_pips": -18.8, "mfe": 0.0, "mae": 18.8, "is_win": false}, {"net_pips": 19.5, "mfe": 19.5, "mae": 7.7, "is_win": true}, {"net_pips": 31.0, "mfe": 31.0, "mae": 38.5, "is_win": true}, {"net_pips": -144.0, "mfe": 0.3, "mae": 144.0, "is_win": false}, {"net_pips": 2.4, "mfe": 4.7, "mae": 11.0, "is_win": true}, {"net_pips": 6.0, "mfe": 6.6, "mae": 1.6, "is_win": true}, {"net_pips": 6.1, "mfe": 7.1, "mae": 15.6, "is_win": true}, {"net_pips": 4.5, "mfe": 10.3, "mae": 10.6, "is_win": true}, {"net_pips": 4.2, "mfe": 5.0, "mae": 2.9, "is_win": true}, {"net_pips": -15.8, "mfe": 1.7, "mae": 40.0, "is_win": false}, {"net_pips": 3.3, "mfe": 3.7, "mae": 0.0, "is_win": true}, {"net_pips": 19.6, "mfe": 19.6, "mae": 16.9, "is_win": true}, {"net_pips": 14.7, "mfe": 17.2, "mae": 1.6, "is_win": true}, {"net_pips": 4.2, "mfe": 5.2, "mae": 10.2, "is_win": true}, {"net_pips": 17.1, "mfe": 17.3, "mae": 3.7, "is_win": true}, {"net_pips": 5.9, "mfe": 6.8, "mae": 2.8, "is_win": true}, {"net_pips": -35.4, "mfe": 14.4, "mae": 35.4, "is_win": false}, {"net_pips": 5.7, "mfe": 7.4, "mae": 11.3, "is_win": true}, {"net_pips": -4.8, "mfe": 1.6, "mae": 25.4, "is_win": false}, {"net_pips": 3.6, "mfe": 4.5, "mae": 2.0, "is_win": true}, {"net_pips": -6.1, "mfe": 1.6, "mae": 15.9, "is_win": false}, {"net_pips": 3.9, "mfe": 3.9, "mae": 3.2, "is_win": true}, {"net_pips": 7.2, "mfe": 8.6, "mae": 2.2, "is_win": true}, {"net_pips": 7.2, "mfe": 7.9, "mae": 3.4, "is_win": true}, {"net_pips": 2.1, "mfe": 6.7, "mae": 13.7, "is_win": true}, {"net_pips": 4.1, "mfe": 4.5, "mae": 1.5, "is_win": true}, {"net_pips": -10.1, "mfe": 26.6, "mae": 80.8, "is_win": false}, {"net_pips": 27.4, "mfe": 29.6, "mae": 36.0, "is_win": true}, {"net_pips": 1.6, "mfe": 5.1, "mae": 53.1, "is_win": false}, {"net_pips": -16.8, "mfe": 0.2, "mae": 58.0, "is_win": false}, {"net_pips": -17.0, "mfe": 0.0, "mae": 58.4, "is_win": false}, {"net_pips": -13.1, "mfe": 5.3, "mae": 52.9, "is_win": false}, {"net_pips": -28.5, "mfe": 0.0, "mae": 65.1, "is_win": false}, {"net_pips": 18.7, "mfe": 18.7, "mae": 3.7, "is_win": true}, {"net_pips": 6.6, "mfe": 6.6, "mae": 12.1, "is_win": true}, {"net_pips": -10.4, "mfe": 1.2, "mae": 28.5, "is_win": false}, {"net_pips": 18.3, "mfe": 18.3, "mae": 31.0, "is_win": true}, {"net_pips": 34.5, "mfe": 34.5, "mae": 14.8, "is_win": true}, {"net_pips": 34.1, "mfe": 34.1, "mae": 15.2, "is_win": true}, {"net_pips": 5.5, "mfe": 5.5, "mae": 43.8, "is_win": true}, {"net_pips": -48.5, "mfe": 0.0, "mae": 48.5, "is_win": false}, {"net_pips": -11.8, "mfe": 0.0, "mae": 11.8, "is_win": false}, {"net_pips": 54.2, "mfe": 54.2, "mae": 18.3, "is_win": true}, {"net_pips": 7.0, "mfe": 7.0, "mae": 65.6, "is_win": true}, {"net_pips": -22.2, "mfe": 3.2, "mae": 22.2, "is_win": false}, {"net_pips": 51.0, "mfe": 51.0, "mae": 18.8, "is_win": true}, {"net_pips": -24.7, "mfe": 3.0, "mae": 24.7, "is_win": false}, {"net_pips": 3.1, "mfe": 3.1, "mae": 0.0, "is_win": true}, {"net_pips": 4.7, "mfe": 4.7, "mae": 19.2, "is_win": true}, {"net_pips": -7.4, "mfe": 1.9, "mae": 7.4, "is_win": false}, {"net_pips": -19.9, "mfe": 1.8, "mae": 19.9, "is_win": false}, {"net_pips": 3.5, "mfe": 3.5, "mae": 12.0, "is_win": true}, {"net_pips": 9.1, "mfe": 9.1, "mae": 5.9, "is_win": true}, {"net_pips": 0.4, "mfe": 0.4, "mae": 3.4, "is_win": true}, {"net_pips": 0.4, "mfe": 0.4, "mae": 11.8, "is_win": false}, {"net_pips": 18.4, "mfe": 18.4, "mae": 8.2, "is_win": true}, {"net_pips": 20.1, "mfe": 20.1, "mae": 0.0, "is_win": true}, {"net_pips": 6.4, "mfe": 6.4, "mae": 1.4, "is_win": true}, {"net_pips": 5.0, "mfe": 5.0, "mae": 1.6, "is_win": true}, {"net_pips": -19.3, "mfe": 6.8, "mae": 19.3, "is_win": false}, {"net_pips": -20.4, "mfe": 6.9, "mae": 20.4, "is_win": false}, {"net_pips": -30.9, "mfe": 7.1, "mae": 30.9, "is_win": false}, {"net_pips": 24.0, "mfe": 24.0, "mae": 11.2, "is_win": true}, {"net_pips": 22.7, "mfe": 22.7, "mae": 1.8, "is_win": true}, {"net_pips": 4.0, "mfe": 4.0, "mae": 10.4, "is_win": true}, {"net_pips": 0.4, "mfe": 0.4, "mae": 10.2, "is_win": true}, {"net_pips": 25.7, "mfe": 25.7, "mae": 5.2, "is_win": true}, {"net_pips": 6.0, "mfe": 6.0, "mae": 5.4, "is_win": true}, {"net_pips": 19.1, "mfe": 19.1, "mae": 4.3, "is_win": true}, {"net_pips": 19.2, "mfe": 19.2, "mae": 2.4, "is_win": true}, {"net_pips": 16.1, "mfe": 16.1, "mae": 5.6, "is_win": true}, {"net_pips": -6.4, "mfe": 5.5, "mae": 6.4, "is_win": false}, {"net_pips": -14.7, "mfe": 6.9, "mae": 14.7, "is_win": false}, {"net_pips": -21.1, "mfe": 6.5, "mae": 21.1, "is_win": false}, {"net_pips": -38.7, "mfe": 1.3, "mae": 38.7, "is_win": false}, {"net_pips": -44.2, "mfe": 1.1, "mae": 44.2, "is_win": false}, {"net_pips": 6.1, "mfe": 6.1, "mae": 3.7, "is_win": true}, {"net_pips": 3.5, "mfe": 3.5, "mae": 21.9, "is_win": true}, {"net_pips": 25.4, "mfe": 25.4, "mae": 44.3, "is_win": true}, {"net_pips": 19.6, "mfe": 19.6, "mae": 45.0, "is_win": true}, {"net_pips": 19.7, "mfe": 19.7, "mae": 43.0, "is_win": true}, {"net_pips": 11.2, "mfe": 11.2, "mae": 42.7, "is_win": true}, {"net_pips": 8.0, "mfe": 8.0, "mae": 42.9, "is_win": true}, {"net_pips": 4.9, "mfe": 4.9, "mae": 34.6, "is_win": true}, {"net_pips": -9.9, "mfe": 3.0, "mae": 42.4, "is_win": false}, {"net_pips": 34.6, "mfe": 34.6, "mae": 13.9, "is_win": true}, {"net_pips": 16.0, "mfe": 16.0, "mae": 29.0, "is_win": true}, {"net_pips": 11.8, "mfe": 11.8, "mae": 26.8, "is_win": true}, {"net_pips": 5.3, "mfe": 5.3, "mae": 29.0, "is_win": true}, {"net_pips": 4.9, "mfe": 4.9, "mae": 29.1, "is_win": true}, {"net_pips": -0.2, "mfe": 4.1, "mae": 29.0, "is_win": false}, {"net_pips": -9.0, "mfe": 2.4, "mae": 23.4, "is_win": false}, {"net_pips": -13.7, "mfe": 0.0, "mae": 32.8, "is_win": false}, {"net_pips": 26.0, "mfe": 26.0, "mae": 15.4, "is_win": true}, {"net_pips": 23.9, "mfe": 23.9, "mae": 7.3, "is_win": true}, {"net_pips": 27.3, "mfe": 27.3, "mae": 0.9, "is_win": true}, {"net_pips": 21.7, "mfe": 21.7, "mae": 1.2, "is_win": true}, {"net_pips": 0.4, "mfe": 0.4, "mae": 10.7, "is_win": true}, {"net_pips": 14.5, "mfe": 14.5, "mae": 25.8, "is_win": true}, {"net_pips": 10.4, "mfe": 10.4, "mae": 15.3, "is_win": true}, {"net_pips": -3.0, "mfe": 6.6, "mae": 3.0, "is_win": false}, {"net_pips": 5.7, "mfe": 5.7, "mae": 12.6, "is_win": true}, {"net_pips": 7.9, "mfe": 7.9, "mae": 14.6, "is_win": true}, {"net_pips": 9.2, "mfe": 9.2, "mae": 1.7, "is_win": true}, {"net_pips": 7.8, "mfe": 7.8, "mae": 1.5, "is_win": true}, {"net_pips": 4.2, "mfe": 4.2, "mae": 0.0, "is_win": true}, {"net_pips": 8.8, "mfe": 8.8, "mae": 4.1, "is_win": true}, {"net_pips": 6.9, "mfe": 6.9, "mae": 4.0, "is_win": true}, {"net_pips": 6.3, "mfe": 6.3, "mae": 3.3, "is_win": true}, {"net_pips": -2.6, "mfe": 0.0, "mae": 2.6, "is_win": false}, {"net_pips": 12.0, "mfe": 12.0, "mae": 2.1, "is_win": true}, {"net_pips": 4.7, "mfe": 4.7, "mae": 6.9, "is_win": true}, {"net_pips": 58.6, "mfe": 58.6, "mae": 21.8, "is_win": true}, {"net_pips": 39.7, "mfe": 39.7, "mae": 21.6, "is_win": true}, {"net_pips": 33.3, "mfe": 33.3, "mae": 21.4, "is_win": true}, {"net_pips": 1.3, "mfe": 1.3, "mae": 48.0, "is_win": false}, {"net_pips": 24.0, "mfe": 24.0, "mae": 20.9, "is_win": true}, {"net_pips": 10.2, "mfe": 10.2, "mae": 21.7, "is_win": true}, {"net_pips": -20.3, "mfe": 3.6, "mae": 20.3, "is_win": false}, {"net_pips": 2.7, "mfe": 2.7, "mae": 1.1, "is_win": true}, {"net_pips": 21.7, "mfe": 21.7, "mae": 4.9, "is_win": true}, {"net_pips": 10.3, "mfe": 10.3, "mae": 15.0, "is_win": true}, {"net_pips": 51.4, "mfe": 51.4, "mae": 2.2, "is_win": true}, {"net_pips": 44.2, "mfe": 44.2, "mae": 2.5, "is_win": true}, {"net_pips": 36.5, "mfe": 36.5, "mae": 2.3, "is_win": true}, {"net_pips": 21.1, "mfe": 21.1, "mae": 2.8, "is_win": true}, {"net_pips": 3.7, "mfe": 3.7, "mae": 20.7, "is_win": true}, {"net_pips": 6.5, "mfe": 6.5, "mae": 65.8, "is_win": true}, {"net_pips": 13.3, "mfe": 13.3, "mae": 56.3, "is_win": true}, {"net_pips": -4.6, "mfe": 0.7, "mae": 4.6, "is_win": false}, {"net_pips": -8.1, "mfe": 0.6, "mae": 8.1, "is_win": false}, {"net_pips": 1.5, "mfe": 1.5, "mae": 56.5, "is_win": false}, {"net_pips": -10.3, "mfe": 5.1, "mae": 10.3, "is_win": false}, {"net_pips": -35.0, "mfe": 4.2, "mae": 35.0, "is_win": false}, {"net_pips": 12.4, "mfe": 12.4, "mae": 7.0, "is_win": true}, {"net_pips": 26.5, "mfe": 26.5, "mae": 24.6, "is_win": true}, {"net_pips": 23.0, "mfe": 23.0, "mae": 26.6, "is_win": true}, {"net_pips": 30.3, "mfe": 30.3, "mae": 14.0, "is_win": true}, {"net_pips": 14.4, "mfe": 14.4, "mae": 26.7, "is_win": true}, {"net_pips": 31.2, "mfe": 31.2, "mae": 5.6, "is_win": true}, {"net_pips": 20.0, "mfe": 20.0, "mae": 14.1, "is_win": true}, {"net_pips": 13.2, "mfe": 13.2, "mae": 13.2, "is_win": true}, {"net_pips": -6.2, "mfe": 1.0, "mae": 6.2, "is_win": false}, {"net_pips": 12.5, "mfe": 12.5, "mae": 0.0, "is_win": true}, {"net_pips": 26.5, "mfe": 26.5, "mae": 28.0, "is_win": true}, {"net_pips": 7.4, "mfe": 7.4, "mae": 44.4, "is_win": true}, {"net_pips": -9.6, "mfe": 17.6, "mae": 9.6, "is_win": false}, {"net_pips": 12.7, "mfe": 12.7, "mae": 28.1, "is_win": true}, {"net_pips": -20.3, "mfe": 8.1, "mae": 20.3, "is_win": false}, {"net_pips": -7.0, "mfe": 2.7, "mae": 7.0, "is_win": false}, {"net_pips": -20.0, "mfe": 18.2, "mae": 20.0, "is_win": false}], "buy_L1": [{"net_pips": 50.6, "mfe": 50.6, "mae": 11.1, "is_win": true}, {"net_pips": 50.6, "mfe": 50.6, "mae": 11.1, "is_win": true}, {"net_pips": 50.6, "mfe": 50.6, "mae": 11.1, "is_win": true}, {"net_pips": 37.1, "mfe": 37.1, "mae": 11.1, "is_win": true}, {"net_pips": 37.1, "mfe": 37.1, "mae": 11.1, "is_win": true}, {"net_pips": 37.1, "mfe": 37.1, "mae": 11.1, "is_win": true}, {"net_pips": 18.9, "mfe": 18.9, "mae": 11.1, "is_win": true}, {"net_pips": 18.9, "mfe": 18.9, "mae": 11.1, "is_win": true}, {"net_pips": 18.9, "mfe": 18.9, "mae": 11.1, "is_win": true}, {"net_pips": -12.7, "mfe": 1.8, "mae": 12.9, "is_win": false}, {"net_pips": -12.7, "mfe": 1.8, "mae": 12.9, "is_win": false}, {"net_pips": -34.2, "mfe": 7.8, "mae": 107.9, "is_win": false}, {"net_pips": 14.6, "mfe": 18.3, "mae": 0.8, "is_win": true}, {"net_pips": 5.7, "mfe": 9.6, "mae": 0.0, "is_win": true}, {"net_pips": 0.1, "mfe": 9.5, "mae": 12.5, "is_win": true}, {"net_pips": 4.0, "mfe": 4.0, "mae": 9.2, "is_win": true}, {"net_pips": 5.7, "mfe": 9.2, "mae": 7.9, "is_win": true}, {"net_pips": 3.3, "mfe": 6.3, "mae": 6.0, "is_win": true}, {"net_pips": 5.9, "mfe": 6.9, "mae": 19.9, "is_win": true}, {"net_pips": 3.6, "mfe": 3.6, "mae": 0.7, "is_win": true}, {"net_pips": -16.9, "mfe": 0.0, "mae": 40.0, "is_win": false}, {"net_pips": -13.6, "mfe": 0.0, "mae": 34.2, "is_win": false}, {"net_pips": 3.3, "mfe": 3.3, "mae": 7.3, "is_win": true}, {"net_pips": 2.8, "mfe": 3.0, "mae": 18.7, "is_win": true}, {"net_pips": 5.7, "mfe": 6.5, "mae": 1.1, "is_win": true}, {"net_pips": 3.2, "mfe": 3.4, "mae": 24.5, "is_win": true}, {"net_pips": 3.1, "mfe": 3.1, "mae": 1.9, "is_win": true}, {"net_pips": 4.2, "mfe": 6.1, "mae": 11.2, "is_win": true}, {"net_pips": 3.4, "mfe": 3.4, "mae": 10.4, "is_win": true}, {"net_pips": -6.9, "mfe": 3.2, "mae": 20.8, "is_win": false}, {"net_pips": -13.9, "mfe": 1.1, "mae": 42.5, "is_win": false}, {"net_pips": 3.4, "mfe": 3.4, "mae": 6.1, "is_win": true}, {"net_pips": 3.8, "mfe": 4.8, "mae": 7.6, "is_win": true}, {"net_pips": 5.0, "mfe": 8.5, "mae": 1.3, "is_win": true}, {"net_pips": -7.3, "mfe": 0.0, "mae": 33.7, "is_win": false}, {"net_pips": 3.6, "mfe": 3.7, "mae": 10.6, "is_win": true}, {"net_pips": 4.0, "mfe": 4.0, "mae": 1.4, "is_win": true}, {"net_pips": -8.6, "mfe": 1.6, "mae": 23.2, "is_win": false}, {"net_pips": 9.5, "mfe": 11.6, "mae": 1.4, "is_win": true}, {"net_pips": 3.3, "mfe": 3.8, "mae": 0.6, "is_win": true}, {"net_pips": -6.7, "mfe": 0.0, "mae": 26.9, "is_win": false}, {"net_pips": 3.7, "mfe": 5.3, "mae": 4.0, "is_win": true}, {"net_pips": -5.3, "mfe": 0.5, "mae": 22.5, "is_win": false}, {"net_pips": 2.8, "mfe": 3.8, "mae": 8.3, "is_win": true}, {"net_pips": 2.1, "mfe": 5.2, "mae": 27.1, "is_win": true}, {"net_pips": 3.1, "mfe": 3.6, "mae": 1.7, "is_win": true}, {"net_pips": 5.1, "mfe": 5.1, "mae": 0.0, "is_win": true}, {"net_pips": 2.8, "mfe": 3.5, "mae": 10.3, "is_win": true}, {"net_pips": 3.2, "mfe": 3.2, "mae": 5.0, "is_win": true}, {"net_pips": -50.2, "mfe": 2.9, "mae": 90.7, "is_win": false}, {"net_pips": 2.1, "mfe": 9.1, "mae": 7.5, "is_win": true}, {"net_pips": 2.3, "mfe": 2.3, "mae": 10.6, "is_win": true}, {"net_pips": 4.0, "mfe": 4.0, "mae": 1.2, "is_win": true}, {"net_pips": -40.3, "mfe": 0.0, "mae": 109.2, "is_win": false}, {"net_pips": 5.7, "mfe": 6.8, "mae": 1.7, "is_win": true}, {"net_pips": 17.9, "mfe": 18.2, "mae": 2.8, "is_win": true}, {"net_pips": 3.1, "mfe": 8.1, "mae": 9.7, "is_win": true}, {"net_pips": -16.8, "mfe": 1.7, "mae": 39.6, "is_win": false}, {"net_pips": 6.6, "mfe": 7.5, "mae": 1.3, "is_win": true}, {"net_pips": 10.1, "mfe": 10.1, "mae": 14.2, "is_win": true}, {"net_pips": 7.0, "mfe": 7.6, "mae": 2.9, "is_win": true}, {"net_pips": -7.5, "mfe": 0.7, "mae": 25.9, "is_win": false}, {"net_pips": 3.9, "mfe": 3.9, "mae": 12.4, "is_win": true}, {"net_pips": 3.5, "mfe": 4.2, "mae": 4.4, "is_win": true}, {"net_pips": -40.9, "mfe": 0.0, "mae": 76.2, "is_win": false}, {"net_pips": 3.1, "mfe": 4.4, "mae": 7.0, "is_win": true}, {"net_pips": 2.9, "mfe": 2.9, "mae": 0.9, "is_win": true}, {"net_pips": 20.3, "mfe": 23.6, "mae": 4.5, "is_win": true}, {"net_pips": 6.2, "mfe": 6.6, "mae": 0.9, "is_win": true}, {"net_pips": -7.8, "mfe": 0.0, "mae": 22.0, "is_win": false}, {"net_pips": 8.0, "mfe": 13.8, "mae": 2.6, "is_win": true}, {"net_pips": -19.3, "mfe": 0.0, "mae": 79.4, "is_win": false}, {"net_pips": -5.6, "mfe": 9.4, "mae": 11.3, "is_win": false}, {"net_pips": 30.1, "mfe": 50.8, "mae": 11.7, "is_win": true}, {"net_pips": 7.1, "mfe": 7.1, "mae": 1.6, "is_win": true}, {"net_pips": 2.4, "mfe": 2.4, "mae": 1.8, "is_win": true}, {"net_pips": 4.3, "mfe": 5.0, "mae": 6.1, "is_win": true}, {"net_pips": 4.2, "mfe": 5.5, "mae": 0.0, "is_win": true}, {"net_pips": -20.4, "mfe": 3.0, "mae": 20.4, "is_win": false}, {"net_pips": 3.7, "mfe": 3.7, "mae": 9.6, "is_win": true}, {"net_pips": 2.4, "mfe": 2.4, "mae": 4.2, "is_win": true}, {"net_pips": -15.9, "mfe": 0.0, "mae": 15.9, "is_win": false}, {"net_pips": 4.5, "mfe": 4.5, "mae": 7.3, "is_win": true}, {"net_pips": 4.0, "mfe": 4.0, "mae": 1.2, "is_win": true}, {"net_pips": -16.1, "mfe": 0.0, "mae": 16.1, "is_win": false}, {"net_pips": 3.8, "mfe": 3.8, "mae": 14.2, "is_win": true}, {"net_pips": 3.8, "mfe": 3.8, "mae": 1.0, "is_win": true}, {"net_pips": 4.6, "mfe": 4.6, "mae": 2.8, "is_win": true}, {"net_pips": 3.9, "mfe": 3.9, "mae": 8.5, "is_win": true}, {"net_pips": 4.6, "mfe": 4.6, "mae": 11.7, "is_win": true}, {"net_pips": 8.1, "mfe": 8.1, "mae": 1.2, "is_win": true}, {"net_pips": 3.3, "mfe": 3.3, "mae": 2.1, "is_win": true}, {"net_pips": 3.4, "mfe": 3.4, "mae": 1.4, "is_win": true}, {"net_pips": 3.1, "mfe": 3.1, "mae": 0.3, "is_win": true}, {"net_pips": 6.1, "mfe": 6.1, "mae": 6.4, "is_win": true}, {"net_pips": 4.5, "mfe": 4.5, "mae": 8.9, "is_win": true}, {"net_pips": 2.6, "mfe": 2.6, "mae": 10.6, "is_win": true}, {"net_pips": -18.2, "mfe": 0.0, "mae": 18.2, "is_win": false}, {"net_pips": 3.5, "mfe": 3.5, "mae": 14.5, "is_win": true}, {"net_pips": 4.2, "mfe": 4.2, "mae": 1.9, "is_win": true}, {"net_pips": -5.5, "mfe": 0.0, "mae": 5.5, "is_win": false}, {"net_pips": 6.9, "mfe": 6.9, "mae": 8.5, "is_win": true}, {"net_pips": 6.4, "mfe": 6.4, "mae": 3.7, "is_win": true}, {"net_pips": 3.2, "mfe": 3.2, "mae": 13.4, "is_win": true}, {"net_pips": -1.3, "mfe": 7.0, "mae": 1.3, "is_win": false}, {"net_pips": 3.1, "mfe": 4.2, "mae": 6.2, "is_win": true}, {"net_pips": 6.1, "mfe": 7.4, "mae": 7.3, "is_win": true}, {"net_pips": 0.3, "mfe": 5.7, "mae": 10.3, "is_win": true}, {"net_pips": 8.0, "mfe": 8.4, "mae": 15.0, "is_win": true}, {"net_pips": -6.5, "mfe": 0.5, "mae": 43.6, "is_win": false}, {"net_pips": -52.3, "mfe": 2.7, "mae": 92.0, "is_win": false}, {"net_pips": -5.1, "mfe": 0.0, "mae": 27.4, "is_win": false}, {"net_pips": 7.5, "mfe": 7.8, "mae": 4.9, "is_win": true}, {"net_pips": 3.7, "mfe": 4.5, "mae": 3.3, "is_win": true}, {"net_pips": 2.5, "mfe": 4.1, "mae": 9.8, "is_win": true}, {"net_pips": -8.1, "mfe": 0.0, "mae": 28.2, "is_win": false}, {"net_pips": 3.8, "mfe": 6.1, "mae": 13.8, "is_win": true}, {"net_pips": 2.1, "mfe": 2.1, "mae": 14.0, "is_win": true}, {"net_pips": 9.9, "mfe": 10.7, "mae": 1.3, "is_win": true}, {"net_pips": -7.1, "mfe": 0.0, "mae": 22.2, "is_win": false}, {"net_pips": 8.8, "mfe": 13.2, "mae": 11.7, "is_win": true}, {"net_pips": 4.0, "mfe": 4.0, "mae": 15.2, "is_win": true}, {"net_pips": 3.7, "mfe": 4.5, "mae": 3.5, "is_win": true}, {"net_pips": 3.3, "mfe": 3.5, "mae": 5.3, "is_win": true}, {"net_pips": 3.2, "mfe": 3.7, "mae": 2.2, "is_win": true}, {"net_pips": 3.7, "mfe": 3.9, "mae": 9.6, "is_win": true}, {"net_pips": -10.1, "mfe": 2.3, "mae": 36.0, "is_win": false}, {"net_pips": 12.1, "mfe": 12.1, "mae": 12.9, "is_win": true}, {"net_pips": 18.3, "mfe": 18.3, "mae": 1.1, "is_win": true}, {"net_pips": 16.9, "mfe": 26.4, "mae": 14.2, "is_win": true}, {"net_pips": 12.3, "mfe": 12.3, "mae": 15.6, "is_win": true}, {"net_pips": 30.6, "mfe": 30.6, "mae": 19.6, "is_win": true}, {"net_pips": 29.1, "mfe": 29.1, "mae": 19.6, "is_win": true}, {"net_pips": 24.5, "mfe": 24.5, "mae": 19.6, "is_win": true}, {"net_pips": 44.4, "mfe": 44.4, "mae": 19.8, "is_win": true}, {"net_pips": 26.9, "mfe": 26.9, "mae": 29.6, "is_win": true}, {"net_pips": 32.9, "mfe": 32.9, "mae": 24.1, "is_win": true}, {"net_pips": -24.0, "mfe": 21.6, "mae": 24.0, "is_win": false}, {"net_pips": -22.5, "mfe": 23.5, "mae": 22.5, "is_win": false}, {"net_pips": 6.3, "mfe": 6.3, "mae": 3.0, "is_win": true}, {"net_pips": 14.1, "mfe": 14.1, "mae": 11.0, "is_win": true}, {"net_pips": 3.1, "mfe": 3.1, "mae": 17.7, "is_win": true}, {"net_pips": 3.4, "mfe": 3.4, "mae": 8.8, "is_win": true}, {"net_pips": 55.3, "mfe": 55.3, "mae": 8.1, "is_win": true}, {"net_pips": 15.6, "mfe": 15.6, "mae": 47.3, "is_win": true}, {"net_pips": -13.8, "mfe": 2.0, "mae": 13.8, "is_win": false}, {"net_pips": 7.2, "mfe": 7.2, "mae": 47.2, "is_win": true}, {"net_pips": -30.6, "mfe": 2.3, "mae": 30.6, "is_win": false}, {"net_pips": 6.7, "mfe": 6.7, "mae": 0.0, "is_win": true}, {"net_pips": 11.1, "mfe": 11.1, "mae": 3.1, "is_win": true}, {"net_pips": -4.1, "mfe": 7.6, "mae": 4.1, "is_win": false}, {"net_pips": 29.5, "mfe": 29.5, "mae": 17.5, "is_win": true}, {"net_pips": 26.0, "mfe": 26.0, "mae": 24.6, "is_win": true}, {"net_pips": 16.7, "mfe": 16.7, "mae": 23.2, "is_win": true}, {"net_pips": 9.3, "mfe": 9.3, "mae": 23.6, "is_win": true}, {"net_pips": 27.8, "mfe": 27.8, "mae": 3.2, "is_win": true}, {"net_pips": 9.4, "mfe": 9.4, "mae": 14.3, "is_win": true}, {"net_pips": 74.3, "mfe": 74.3, "mae": 0.0, "is_win": true}, {"net_pips": 61.9, "mfe": 66.2, "mae": 0.0, "is_win": true}, {"net_pips": 22.7, "mfe": 23.1, "mae": 3.7, "is_win": true}, {"net_pips": 13.3, "mfe": 13.3, "mae": 13.6, "is_win": true}, {"net_pips": 61.8, "mfe": 61.8, "mae": 0.0, "is_win": true}, {"net_pips": 60.4, "mfe": 60.4, "mae": 0.0, "is_win": true}, {"net_pips": 59.6, "mfe": 59.6, "mae": 0.0, "is_win": true}, {"net_pips": -9.7, "mfe": 3.4, "mae": 40.9, "is_win": false}, {"net_pips": 57.6, "mfe": 57.6, "mae": 0.0, "is_win": true}, {"net_pips": 38.1, "mfe": 38.1, "mae": 0.0, "is_win": true}, {"net_pips": -6.7, "mfe": 0.0, "mae": 22.5, "is_win": false}, {"net_pips": 13.5, "mfe": 13.5, "mae": 1.3, "is_win": true}, {"net_pips": 6.2, "mfe": 6.2, "mae": 9.3, "is_win": true}, {"net_pips": 13.2, "mfe": 13.2, "mae": 0.0, "is_win": true}, {"net_pips": 15.6, "mfe": 15.6, "mae": 0.0, "is_win": true}, {"net_pips": 1.1, "mfe": 1.1, "mae": 17.3, "is_win": true}, {"net_pips": 40.7, "mfe": 40.7, "mae": 13.6, "is_win": true}, {"net_pips": 38.9, "mfe": 38.9, "mae": 13.6, "is_win": true}, {"net_pips": 28.3, "mfe": 28.3, "mae": 13.4, "is_win": true}, {"net_pips": 10.7, "mfe": 10.7, "mae": 4.2, "is_win": true}, {"net_pips": 4.9, "mfe": 4.9, "mae": 10.1, "is_win": true}, {"net_pips": 14.9, "mfe": 14.9, "mae": 0.8, "is_win": true}, {"net_pips": 12.3, "mfe": 12.3, "mae": 1.8, "is_win": true}, {"net_pips": 1.6, "mfe": 1.6, "mae": 21.4, "is_win": true}, {"net_pips": 0.9, "mfe": 0.9, "mae": 15.3, "is_win": true}, {"net_pips": 8.7, "mfe": 8.7, "mae": 12.1, "is_win": true}, {"net_pips": 29.7, "mfe": 29.7, "mae": 8.7, "is_win": true}, {"net_pips": 19.1, "mfe": 19.1, "mae": 20.2, "is_win": true}, {"net_pips": 16.7, "mfe": 16.7, "mae": 18.5, "is_win": true}, {"net_pips": 7.0, "mfe": 7.0, "mae": 18.9, "is_win": true}, {"net_pips": 2.1, "mfe": 2.1, "mae": 18.7, "is_win": true}, {"net_pips": 17.9, "mfe": 17.9, "mae": 2.4, "is_win": true}, {"net_pips": 18.0, "mfe": 18.0, "mae": 2.3, "is_win": true}, {"net_pips": 10.3, "mfe": 10.3, "mae": 5.7, "is_win": true}, {"net_pips": -13.2, "mfe": 11.3, "mae": 13.2, "is_win": false}, {"net_pips": 1.8, "mfe": 1.8, "mae": 26.6, "is_win": true}, {"net_pips": -22.7, "mfe": 17.3, "mae": 22.7, "is_win": false}, {"net_pips": 7.1, "mfe": 7.1, "mae": 3.1, "is_win": true}, {"net_pips": 7.0, "mfe": 7.0, "mae": 1.8, "is_win": true}, {"net_pips": -37.3, "mfe": 3.6, "mae": 37.3, "is_win": false}, {"net_pips": 5.4, "mfe": 5.4, "mae": 0.5, "is_win": true}, {"net_pips": 12.7, "mfe": 12.7, "mae": 1.5, "is_win": true}, {"net_pips": 3.1, "mfe": 3.1, "mae": 9.1, "is_win": true}], "sell_L6": [{"net_pips": 4.9, "mfe": 11.9, "mae": 68.3, "is_win": false}, {"net_pips": 21.2, "mfe": 33.5, "mae": 54.7, "is_win": true}, {"net_pips": 19.4, "mfe": 19.4, "mae": 41.1, "is_win": true}, {"net_pips": 12.0, "mfe": 12.0, "mae": 40.4, "is_win": true}, {"net_pips": -29.5, "mfe": 20.5, "mae": 29.5, "is_win": false}, {"net_pips": -27.9, "mfe": 9.6, "mae": 110.0, "is_win": false}, {"net_pips": 40.5, "mfe": 40.9, "mae": 19.5, "is_win": true}, {"net_pips": 1.0, "mfe": 15.0, "mae": 67.6, "is_win": false}, {"net_pips": 5.3, "mfe": 22.2, "mae": 13.3, "is_win": true}, {"net_pips": 66.0, "mfe": 74.3, "mae": 12.1, "is_win": true}, {"net_pips": 66.0, "mfe": 74.3, "mae": 12.1, "is_win": true}], "sell_L4": [{"net_pips": -23.8, "mfe": 8.3, "mae": 96.7, "is_win": false}, {"net_pips": 22.3, "mfe": 22.3, "mae": 5.1, "is_win": true}, {"net_pips": -3.1, "mfe": 12.9, "mae": 79.1, "is_win": false}, {"net_pips": -9.7, "mfe": 0.6, "mae": 70.1, "is_win": false}, {"net_pips": 21.8, "mfe": 21.8, "mae": 5.4, "is_win": true}, {"net_pips": -27.0, "mfe": 1.1, "mae": 27.0, "is_win": false}, {"net_pips": 21.3, "mfe": 21.3, "mae": 4.0, "is_win": true}, {"net_pips": 24.1, "mfe": 24.1, "mae": 14.7, "is_win": true}, {"net_pips": 21.1, "mfe": 21.1, "mae": 2.8, "is_win": true}, {"net_pips": 28.6, "mfe": 28.6, "mae": 3.6, "is_win": true}, {"net_pips": 27.2, "mfe": 27.2, "mae": 7.9, "is_win": true}, {"net_pips": -57.0, "mfe": 2.2, "mae": 57.0, "is_win": false}, {"net_pips": 26.1, "mfe": 26.1, "mae": 0.3, "is_win": true}, {"net_pips": 20.9, "mfe": 20.9, "mae": 21.8, "is_win": true}, {"net_pips": 22.6, "mfe": 22.6, "mae": 21.7, "is_win": true}, {"net_pips": -55.4, "mfe": 3.7, "mae": 137.5, "is_win": false}, {"net_pips": 25.8, "mfe": 26.1, "mae": 17.9, "is_win": true}, {"net_pips": -0.2, "mfe": 4.8, "mae": 60.2, "is_win": false}, {"net_pips": 23.2, "mfe": 23.3, "mae": 4.1, "is_win": true}, {"net_pips": -32.3, "mfe": 1.9, "mae": 100.9, "is_win": false}, {"net_pips": 53.5, "mfe": 53.5, "mae": 2.8, "is_win": true}, {"net_pips": -22.4, "mfe": 8.3, "mae": 41.0, "is_win": false}, {"net_pips": 29.7, "mfe": 29.7, "mae": 0.0, "is_win": true}, {"net_pips": 21.3, "mfe": 21.3, "mae": 0.0, "is_win": true}, {"net_pips": 43.9, "mfe": 50.9, "mae": 26.8, "is_win": true}, {"net_pips": 3.4, "mfe": 13.8, "mae": 74.7, "is_win": false}, {"net_pips": 43.9, "mfe": 50.9, "mae": 26.8, "is_win": true}, {"net_pips": 3.4, "mfe": 13.8, "mae": 74.7, "is_win": false}], "buy_L4": [{"net_pips": 27.7, "mfe": 27.9, "mae": 56.1, "is_win": true}, {"net_pips": 20.3, "mfe": 20.3, "mae": 18.3, "is_win": true}, {"net_pips": -4.2, "mfe": 12.6, "mae": 62.5, "is_win": false}, {"net_pips": -22.1, "mfe": 7.9, "mae": 92.2, "is_win": false}, {"net_pips": -13.0, "mfe": 9.6, "mae": 13.0, "is_win": false}, {"net_pips": 1.7, "mfe": 1.7, "mae": 73.8, "is_win": true}, {"net_pips": 20.4, "mfe": 20.4, "mae": 13.5, "is_win": true}, {"net_pips": 4.9, "mfe": 4.9, "mae": 53.9, "is_win": true}, {"net_pips": 20.5, "mfe": 20.5, "mae": 19.8, "is_win": true}, {"net_pips": 18.5, "mfe": 19.4, "mae": 26.1, "is_win": true}, {"net_pips": 21.2, "mfe": 21.8, "mae": 8.0, "is_win": true}, {"net_pips": -10.3, "mfe": 3.8, "mae": 44.9, "is_win": false}, {"net_pips": -8.9, "mfe": 4.7, "mae": 66.2, "is_win": false}, {"net_pips": -86.7, "mfe": 6.5, "mae": 151.2, "is_win": false}, {"net_pips": 19.5, "mfe": 27.7, "mae": 39.7, "is_win": true}, {"net_pips": 25.4, "mfe": 25.4, "mae": 0.0, "is_win": true}, {"net_pips": 30.0, "mfe": 36.4, "mae": 33.7, "is_win": true}, {"net_pips": 38.0, "mfe": 50.3, "mae": 47.6, "is_win": true}, {"net_pips": 30.0, "mfe": 36.4, "mae": 33.7, "is_win": true}, {"net_pips": 38.0, "mfe": 50.3, "mae": 47.6, "is_win": true}], "buy_L6": [{"net_pips": 50.2, "mfe": 50.4, "mae": 18.9, "is_win": true}, {"net_pips": 38.7, "mfe": 39.1, "mae": 19.7, "is_win": true}, {"net_pips": 0.5, "mfe": 30.0, "mae": 70.1, "is_win": true}, {"net_pips": 46.4, "mfe": 46.4, "mae": 18.1, "is_win": true}, {"net_pips": 36.0, "mfe": 36.0, "mae": 39.7, "is_win": true}, {"net_pips": 38.5, "mfe": 38.5, "mae": 20.2, "is_win": true}, {"net_pips": 15.8, "mfe": 19.3, "mae": 18.7, "is_win": true}, {"net_pips": 13.4, "mfe": 18.6, "mae": 43.9, "is_win": true}, {"net_pips": -53.1, "mfe": 19.5, "mae": 117.6, "is_win": false}], "buy_L2": [{"net_pips": 3.1, "mfe": 8.8, "mae": 4.2, "is_win": true}, {"net_pips": 2.5, "mfe": 6.3, "mae": 4.2, "is_win": true}, {"net_pips": -25.9, "mfe": 0.8, "mae": 80.4, "is_win": false}, {"net_pips": 22.0, "mfe": 22.0, "mae": 0.1, "is_win": true}, {"net_pips": 14.3, "mfe": 18.8, "mae": 30.1, "is_win": true}, {"net_pips": 3.9, "mfe": 7.5, "mae": 7.9, "is_win": true}, {"net_pips": 28.5, "mfe": 34.9, "mae": 0.0, "is_win": true}, {"net_pips": 8.8, "mfe": 10.3, "mae": 3.0, "is_win": true}, {"net_pips": -11.5, "mfe": 2.7, "mae": 40.4, "is_win": false}, {"net_pips": 15.3, "mfe": 17.5, "mae": 4.9, "is_win": true}, {"net_pips": -35.1, "mfe": 0.5, "mae": 84.6, "is_win": false}, {"net_pips": 16.4, "mfe": 18.5, "mae": 0.0, "is_win": true}, {"net_pips": 11.4, "mfe": 12.1, "mae": 0.0, "is_win": true}, {"net_pips": 9.9, "mfe": 11.8, "mae": 0.8, "is_win": true}, {"net_pips": 9.5, "mfe": 13.4, "mae": 10.8, "is_win": true}, {"net_pips": 2.7, "mfe": 5.9, "mae": 0.0, "is_win": true}, {"net_pips": 2.8, "mfe": 7.4, "mae": 1.7, "is_win": true}, {"net_pips": -6.9, "mfe": 2.2, "mae": 25.8, "is_win": false}, {"net_pips": 2.9, "mfe": 7.8, "mae": 22.7, "is_win": true}, {"net_pips": 11.7, "mfe": 17.2, "mae": 4.4, "is_win": true}, {"net_pips": 2.7, "mfe": 2.7, "mae": 0.0, "is_win": true}, {"net_pips": 1.7, "mfe": 5.3, "mae": 4.3, "is_win": true}, {"net_pips": 11.3, "mfe": 15.7, "mae": 39.0, "is_win": true}, {"net_pips": 6.7, "mfe": 10.5, "mae": 0.0, "is_win": true}, {"net_pips": 9.9, "mfe": 10.6, "mae": 0.0, "is_win": true}, {"net_pips": 8.3, "mfe": 9.5, "mae": 0.0, "is_win": true}, {"net_pips": 2.8, "mfe": 6.0, "mae": 13.1, "is_win": true}, {"net_pips": 6.7, "mfe": 9.5, "mae": 5.5, "is_win": true}, {"net_pips": 5.3, "mfe": 6.5, "mae": 0.5, "is_win": true}, {"net_pips": 1.7, "mfe": 4.6, "mae": 2.4, "is_win": true}, {"net_pips": 2.8, "mfe": 7.0, "mae": 15.4, "is_win": true}, {"net_pips": 3.8, "mfe": 5.1, "mae": 10.0, "is_win": true}, {"net_pips": 1.0, "mfe": 4.3, "mae": 2.5, "is_win": true}, {"net_pips": 5.6, "mfe": 6.8, "mae": 5.3, "is_win": true}, {"net_pips": 9.0, "mfe": 11.2, "mae": 1.8, "is_win": true}, {"net_pips": 13.0, "mfe": 18.8, "mae": 0.0, "is_win": true}, {"net_pips": 1.8, "mfe": 7.5, "mae": 16.3, "is_win": true}, {"net_pips": 0.7, "mfe": 4.0, "mae": 10.4, "is_win": true}, {"net_pips": 1.2, "mfe": 3.4, "mae": 7.3, "is_win": true}, {"net_pips": 15.8, "mfe": 20.3, "mae": 5.4, "is_win": true}, {"net_pips": -6.9, "mfe": 1.3, "mae": 38.8, "is_win": false}, {"net_pips": 3.0, "mfe": 6.3, "mae": 12.7, "is_win": true}, {"net_pips": 4.7, "mfe": 7.6, "mae": 22.5, "is_win": true}, {"net_pips": 5.2, "mfe": 7.9, "mae": 2.4, "is_win": true}, {"net_pips": -31.5, "mfe": 2.7, "mae": 56.1, "is_win": false}, {"net_pips": -10.4, "mfe": 0.1, "mae": 43.3, "is_win": false}, {"net_pips": -3.8, "mfe": 0.0, "mae": 28.7, "is_win": false}, {"net_pips": 21.0, "mfe": 33.8, "mae": 12.5, "is_win": true}, {"net_pips": 6.5, "mfe": 9.4, "mae": 1.4, "is_win": true}, {"net_pips": 5.7, "mfe": 9.1, "mae": 1.4, "is_win": true}, {"net_pips": 3.2, "mfe": 7.7, "mae": 3.3, "is_win": true}, {"net_pips": 1.1, "mfe": 5.0, "mae": 0.6, "is_win": true}, {"net_pips": 11.5, "mfe": 16.1, "mae": 0.0, "is_win": true}, {"net_pips": 1.4, "mfe": 5.1, "mae": 24.3, "is_win": true}, {"net_pips": -32.6, "mfe": 0.4, "mae": 111.8, "is_win": false}, {"net_pips": 6.9, "mfe": 11.1, "mae": 0.0, "is_win": true}, {"net_pips": 11.6, "mfe": 24.2, "mae": 32.5, "is_win": true}, {"net_pips": 0.7, "mfe": 2.0, "mae": 2.9, "is_win": true}, {"net_pips": 13.6, "mfe": 16.4, "mae": 11.8, "is_win": true}, {"net_pips": 4.4, "mfe": 7.1, "mae": 2.7, "is_win": true}, {"net_pips": 2.9, "mfe": 6.0, "mae": 2.5, "is_win": true}, {"net_pips": 2.0, "mfe": 2.3, "mae": 1.1, "is_win": true}, {"net_pips": 2.7, "mfe": 5.6, "mae": 0.7, "is_win": true}, {"net_pips": 3.6, "mfe": 6.7, "mae": 1.3, "is_win": true}, {"net_pips": 2.1, "mfe": 4.8, "mae": 0.4, "is_win": true}, {"net_pips": 1.3, "mfe": 5.8, "mae": 0.9, "is_win": true}, {"net_pips": -39.3, "mfe": 0.6, "mae": 73.7, "is_win": false}, {"net_pips": 1.4, "mfe": 3.5, "mae": 0.1, "is_win": true}, {"net_pips": 1.8, "mfe": 2.5, "mae": 6.4, "is_win": true}, {"net_pips": 0.7, "mfe": 3.4, "mae": 1.7, "is_win": true}, {"net_pips": 5.3, "mfe": 5.4, "mae": 1.4, "is_win": true}, {"net_pips": 15.1, "mfe": 22.6, "mae": 2.5, "is_win": true}, {"net_pips": 0.7, "mfe": 3.5, "mae": 2.0, "is_win": true}, {"net_pips": 1.7, "mfe": 2.8, "mae": 1.8, "is_win": true}, {"net_pips": 1.6, "mfe": 2.0, "mae": 2.8, "is_win": true}, {"net_pips": 3.1, "mfe": 6.2, "mae": 13.6, "is_win": true}, {"net_pips": 3.1, "mfe": 5.8, "mae": 9.4, "is_win": true}, {"net_pips": -4.6, "mfe": 2.3, "mae": 18.1, "is_win": false}, {"net_pips": 2.9, "mfe": 4.5, "mae": 20.0, "is_win": true}, {"net_pips": 10.8, "mfe": 12.4, "mae": 0.1, "is_win": true}, {"net_pips": 4.3, "mfe": 6.8, "mae": 6.5, "is_win": true}, {"net_pips": 1.5, "mfe": 4.5, "mae": 3.8, "is_win": true}, {"net_pips": 14.8, "mfe": 22.4, "mae": 51.5, "is_win": true}, {"net_pips": 15.2, "mfe": 23.3, "mae": 6.4, "is_win": true}, {"net_pips": -28.8, "mfe": 4.3, "mae": 92.4, "is_win": false}, {"net_pips": 18.0, "mfe": 26.8, "mae": 1.2, "is_win": true}, {"net_pips": 7.2, "mfe": 16.7, "mae": 13.3, "is_win": true}, {"net_pips": 8.7, "mfe": 20.3, "mae": 2.7, "is_win": true}, {"net_pips": 10.2, "mfe": 18.8, "mae": 26.4, "is_win": true}, {"net_pips": -38.8, "mfe": 2.6, "mae": 124.5, "is_win": false}, {"net_pips": 6.4, "mfe": 17.1, "mae": 28.8, "is_win": true}, {"net_pips": 11.1, "mfe": 21.4, "mae": 7.2, "is_win": true}, {"net_pips": 13.7, "mfe": 20.3, "mae": 59.9, "is_win": true}, {"net_pips": 8.0, "mfe": 15.8, "mae": 2.1, "is_win": true}, {"net_pips": 4.2, "mfe": 19.1, "mae": 1.9, "is_win": true}, {"net_pips": 1.3, "mfe": 4.7, "mae": 4.5, "is_win": true}, {"net_pips": 3.4, "mfe": 4.2, "mae": 2.4, "is_win": true}, {"net_pips": -11.4, "mfe": 0.0, "mae": 32.8, "is_win": false}, {"net_pips": 4.8, "mfe": 6.8, "mae": 1.7, "is_win": true}, {"net_pips": 14.7, "mfe": 20.7, "mae": 2.3, "is_win": true}, {"net_pips": -14.2, "mfe": 1.9, "mae": 35.5, "is_win": false}, {"net_pips": 0.2, "mfe": 3.7, "mae": 13.5, "is_win": true}, {"net_pips": -12.7, "mfe": 1.1, "mae": 27.2, "is_win": false}, {"net_pips": 7.5, "mfe": 7.5, "mae": 4.8, "is_win": true}, {"net_pips": 13.1, "mfe": 19.0, "mae": 5.0, "is_win": true}, {"net_pips": 15.6, "mfe": 25.2, "mae": 9.6, "is_win": true}, {"net_pips": 7.4, "mfe": 8.6, "mae": 12.4, "is_win": true}, {"net_pips": 1.0, "mfe": 2.8, "mae": 7.8, "is_win": true}, {"net_pips": 12.6, "mfe": 15.7, "mae": 3.1, "is_win": true}, {"net_pips": -1.3, "mfe": 5.2, "mae": 1.4, "is_win": false}, {"net_pips": 2.9, "mfe": 5.1, "mae": 3.4, "is_win": true}, {"net_pips": 4.9, "mfe": 8.1, "mae": 5.8, "is_win": true}, {"net_pips": 10.8, "mfe": 13.4, "mae": 0.5, "is_win": true}, {"net_pips": 3.1, "mfe": 9.5, "mae": 19.8, "is_win": true}, {"net_pips": -13.5, "mfe": 0.0, "mae": 43.3, "is_win": false}, {"net_pips": 9.9, "mfe": 14.0, "mae": 48.6, "is_win": true}, {"net_pips": 2.0, "mfe": 5.8, "mae": 2.8, "is_win": true}, {"net_pips": 4.9, "mfe": 6.9, "mae": 5.8, "is_win": true}, {"net_pips": 4.4, "mfe": 5.1, "mae": 3.9, "is_win": true}, {"net_pips": -9.8, "mfe": 1.1, "mae": 42.1, "is_win": false}, {"net_pips": 1.3, "mfe": 5.9, "mae": 1.9, "is_win": true}, {"net_pips": 9.8, "mfe": 16.1, "mae": 0.2, "is_win": true}, {"net_pips": 9.5, "mfe": 12.6, "mae": 14.4, "is_win": true}, {"net_pips": 6.4, "mfe": 6.8, "mae": 8.7, "is_win": true}, {"net_pips": -9.4, "mfe": 1.8, "mae": 27.3, "is_win": false}, {"net_pips": 1.6, "mfe": 4.7, "mae": 8.3, "is_win": true}, {"net_pips": 1.5, "mfe": 5.2, "mae": 0.8, "is_win": true}, {"net_pips": 2.3, "mfe": 6.1, "mae": 7.9, "is_win": true}, {"net_pips": 11.0, "mfe": 17.9, "mae": 0.2, "is_win": true}, {"net_pips": 2.2, "mfe": 7.3, "mae": 8.1, "is_win": true}, {"net_pips": -1.0, "mfe": 5.5, "mae": 17.7, "is_win": false}, {"net_pips": 3.5, "mfe": 5.5, "mae": 2.8, "is_win": true}, {"net_pips": 4.1, "mfe": 6.0, "mae": 31.0, "is_win": true}, {"net_pips": 2.1, "mfe": 4.2, "mae": 4.4, "is_win": true}, {"net_pips": 3.5, "mfe": 6.6, "mae": 20.5, "is_win": true}, {"net_pips": 2.9, "mfe": 4.0, "mae": 1.8, "is_win": true}, {"net_pips": 7.3, "mfe": 7.8, "mae": 3.6, "is_win": true}, {"net_pips": 2.4, "mfe": 4.2, "mae": 12.8, "is_win": true}, {"net_pips": 2.3, "mfe": 3.9, "mae": 4.6, "is_win": true}, {"net_pips": 2.8, "mfe": 5.5, "mae": 5.4, "is_win": true}, {"net_pips": -6.1, "mfe": 0.0, "mae": 29.5, "is_win": false}, {"net_pips": -19.4, "mfe": 0.0, "mae": 31.0, "is_win": false}, {"net_pips": 32.1, "mfe": 32.4, "mae": 3.9, "is_win": true}, {"net_pips": 6.2, "mfe": 14.5, "mae": 0.0, "is_win": true}, {"net_pips": -8.5, "mfe": 0.0, "mae": 64.1, "is_win": false}, {"net_pips": 7.8, "mfe": 13.7, "mae": 12.3, "is_win": true}, {"net_pips": 6.9, "mfe": 18.1, "mae": 25.7, "is_win": true}, {"net_pips": -0.9, "mfe": 3.3, "mae": 9.8, "is_win": false}, {"net_pips": 3.9, "mfe": 4.8, "mae": 19.4, "is_win": true}, {"net_pips": -40.8, "mfe": 0.0, "mae": 72.5, "is_win": false}, {"net_pips": 2.7, "mfe": 6.5, "mae": 2.1, "is_win": true}, {"net_pips": -0.1, "mfe": 2.1, "mae": 15.9, "is_win": false}, {"net_pips": -0.3, "mfe": 2.8, "mae": 38.0, "is_win": true}, {"net_pips": 4.9, "mfe": 6.6, "mae": 8.6, "is_win": true}, {"net_pips": 4.3, "mfe": 4.3, "mae": 3.6, "is_win": true}, {"net_pips": 12.4, "mfe": 16.0, "mae": 3.3, "is_win": true}, {"net_pips": 18.8, "mfe": 27.0, "mae": 14.2, "is_win": true}, {"net_pips": 21.4, "mfe": 32.8, "mae": 8.4, "is_win": true}, {"net_pips": 29.1, "mfe": 33.0, "mae": 2.4, "is_win": true}, {"net_pips": 48.7, "mfe": 48.7, "mae": 9.2, "is_win": true}, {"net_pips": 21.1, "mfe": 21.1, "mae": 10.0, "is_win": true}, {"net_pips": 3.1, "mfe": 3.1, "mae": 0.4, "is_win": true}, {"net_pips": 10.8, "mfe": 10.8, "mae": 0.6, "is_win": true}, {"net_pips": 4.3, "mfe": 4.3, "mae": 8.4, "is_win": true}, {"net_pips": 1.5, "mfe": 1.8, "mae": 9.6, "is_win": true}, {"net_pips": 39.9, "mfe": 39.9, "mae": 28.5, "is_win": true}, {"net_pips": 35.1, "mfe": 35.1, "mae": 32.5, "is_win": true}, {"net_pips": 29.7, "mfe": 31.8, "mae": 30.6, "is_win": true}, {"net_pips": 42.0, "mfe": 46.0, "mae": 16.4, "is_win": true}, {"net_pips": 27.5, "mfe": 34.4, "mae": 28.0, "is_win": true}, {"net_pips": 39.9, "mfe": 39.9, "mae": 13.6, "is_win": true}, {"net_pips": 33.1, "mfe": 33.1, "mae": 12.7, "is_win": true}, {"net_pips": -10.1, "mfe": 7.2, "mae": 133.3, "is_win": false}, {"net_pips": 42.8, "mfe": 44.5, "mae": 24.3, "is_win": true}, {"net_pips": 58.9, "mfe": 60.7, "mae": 8.1, "is_win": true}, {"net_pips": 30.1, "mfe": 30.1, "mae": 24.6, "is_win": true}, {"net_pips": -18.0, "mfe": 1.3, "mae": 44.9, "is_win": false}, {"net_pips": 10.0, "mfe": 14.4, "mae": 9.0, "is_win": true}, {"net_pips": -27.0, "mfe": 0.0, "mae": 49.9, "is_win": false}, {"net_pips": -26.0, "mfe": 0.0, "mae": 48.8, "is_win": false}, {"net_pips": -9.4, "mfe": 0.0, "mae": 34.0, "is_win": false}, {"net_pips": -19.5, "mfe": 1.9, "mae": 44.3, "is_win": false}, {"net_pips": -13.4, "mfe": 0.0, "mae": 38.4, "is_win": false}, {"net_pips": 20.2, "mfe": 20.4, "mae": 16.3, "is_win": true}, {"net_pips": 18.0, "mfe": 18.0, "mae": 4.5, "is_win": true}, {"net_pips": -26.6, "mfe": 0.0, "mae": 93.1, "is_win": false}, {"net_pips": -14.6, "mfe": 0.0, "mae": 82.2, "is_win": false}, {"net_pips": -29.6, "mfe": 0.0, "mae": 93.6, "is_win": false}, {"net_pips": -22.2, "mfe": 0.0, "mae": 86.4, "is_win": false}, {"net_pips": 10.1, "mfe": 10.1, "mae": 18.8, "is_win": true}, {"net_pips": 5.2, "mfe": 5.8, "mae": 20.4, "is_win": true}, {"net_pips": 2.7, "mfe": 6.4, "mae": 19.8, "is_win": true}, {"net_pips": -14.3, "mfe": 0.0, "mae": 68.4, "is_win": false}, {"net_pips": 1.9, "mfe": 6.6, "mae": 19.6, "is_win": true}, {"net_pips": -27.1, "mfe": 0.0, "mae": 81.4, "is_win": false}, {"net_pips": 3.8, "mfe": 3.8, "mae": 0.4, "is_win": true}, {"net_pips": 31.1, "mfe": 31.1, "mae": 18.1, "is_win": true}, {"net_pips": 6.9, "mfe": 6.9, "mae": 0.0, "is_win": true}, {"net_pips": 2.6, "mfe": 5.4, "mae": 15.6, "is_win": true}, {"net_pips": 1.9, "mfe": 4.8, "mae": 16.2, "is_win": true}], "sell_L2": [{"net_pips": 2.7, "mfe": 3.1, "mae": 4.3, "is_win": true}, {"net_pips": 0.5, "mfe": 7.5, "mae": 1.3, "is_win": true}, {"net_pips": 9.2, "mfe": 22.2, "mae": 5.7, "is_win": true}, {"net_pips": 8.2, "mfe": 11.3, "mae": 8.2, "is_win": true}, {"net_pips": 2.1, "mfe": 4.3, "mae": 0.5, "is_win": true}, {"net_pips": 8.6, "mfe": 13.1, "mae": 1.1, "is_win": true}, {"net_pips": -33.3, "mfe": 7.5, "mae": 55.1, "is_win": false}, {"net_pips": -11.9, "mfe": 0.1, "mae": 22.2, "is_win": false}, {"net_pips": 4.1, "mfe": 7.6, "mae": 7.4, "is_win": true}, {"net_pips": -8.7, "mfe": 1.5, "mae": 31.1, "is_win": false}, {"net_pips": 8.0, "mfe": 12.5, "mae": 3.2, "is_win": true}, {"net_pips": -7.8, "mfe": 2.7, "mae": 26.0, "is_win": false}, {"net_pips": 8.7, "mfe": 9.5, "mae": 5.3, "is_win": true}, {"net_pips": 2.4, "mfe": 9.6, "mae": 3.6, "is_win": true}, {"net_pips": -43.8, "mfe": 2.0, "mae": 68.3, "is_win": false}, {"net_pips": 2.6, "mfe": 9.5, "mae": 2.2, "is_win": true}, {"net_pips": 22.1, "mfe": 26.1, "mae": 2.7, "is_win": true}, {"net_pips": 1.5, "mfe": 7.1, "mae": 4.5, "is_win": true}, {"net_pips": -54.2, "mfe": 0.0, "mae": 113.3, "is_win": false}, {"net_pips": -2.9, "mfe": 0.7, "mae": 20.3, "is_win": false}, {"net_pips": 3.9, "mfe": 3.9, "mae": 5.7, "is_win": true}, {"net_pips": 5.9, "mfe": 10.3, "mae": 1.8, "is_win": true}, {"net_pips": -22.8, "mfe": 3.8, "mae": 63.5, "is_win": false}, {"net_pips": -9.8, "mfe": 0.0, "mae": 23.3, "is_win": false}, {"net_pips": 1.5, "mfe": 3.1, "mae": 9.8, "is_win": true}, {"net_pips": 14.7, "mfe": 19.4, "mae": 0.0, "is_win": true}, {"net_pips": -60.2, "mfe": 1.2, "mae": 136.2, "is_win": false}, {"net_pips": 3.0, "mfe": 5.3, "mae": 0.5, "is_win": true}, {"net_pips": 2.8, "mfe": 5.4, "mae": 5.9, "is_win": true}, {"net_pips": 12.7, "mfe": 16.9, "mae": 17.4, "is_win": true}, {"net_pips": 4.8, "mfe": 11.1, "mae": 0.2, "is_win": true}, {"net_pips": 4.1, "mfe": 4.6, "mae": 0.4, "is_win": true}, {"net_pips": -8.1, "mfe": 0.3, "mae": 22.4, "is_win": false}, {"net_pips": 8.3, "mfe": 11.7, "mae": 16.6, "is_win": true}, {"net_pips": 18.0, "mfe": 28.1, "mae": 0.1, "is_win": true}, {"net_pips": 10.8, "mfe": 16.1, "mae": 0.9, "is_win": true}, {"net_pips": 0.8, "mfe": 4.0, "mae": 0.0, "is_win": true}, {"net_pips": 6.4, "mfe": 10.5, "mae": 12.5, "is_win": true}, {"net_pips": 3.6, "mfe": 4.8, "mae": 3.8, "is_win": true}, {"net_pips": -12.3, "mfe": 1.1, "mae": 47.9, "is_win": false}, {"net_pips": 1.2, "mfe": 3.5, "mae": 8.3, "is_win": true}, {"net_pips": 13.8, "mfe": 19.1, "mae": 20.6, "is_win": true}, {"net_pips": -25.4, "mfe": 6.4, "mae": 49.9, "is_win": false}, {"net_pips": 7.3, "mfe": 11.1, "mae": 0.4, "is_win": true}, {"net_pips": -10.9, "mfe": 2.4, "mae": 27.6, "is_win": false}, {"net_pips": 2.7, "mfe": 5.3, "mae": 6.0, "is_win": true}, {"net_pips": 3.6, "mfe": 5.6, "mae": 0.2, "is_win": true}, {"net_pips": 0.1, "mfe": 7.0, "mae": 28.6, "is_win": false}, {"net_pips": -11.2, "mfe": 0.2, "mae": 38.8, "is_win": false}, {"net_pips": -13.7, "mfe": 0.1, "mae": 32.5, "is_win": false}, {"net_pips": 3.7, "mfe": 7.9, "mae": 4.2, "is_win": true}, {"net_pips": 5.0, "mfe": 7.0, "mae": 7.9, "is_win": true}, {"net_pips": 2.2, "mfe": 3.3, "mae": 2.1, "is_win": true}, {"net_pips": 2.8, "mfe": 3.5, "mae": 13.5, "is_win": true}, {"net_pips": 19.2, "mfe": 23.9, "mae": 10.6, "is_win": true}, {"net_pips": 7.2, "mfe": 10.1, "mae": 2.9, "is_win": true}, {"net_pips": 3.5, "mfe": 5.2, "mae": 7.2, "is_win": true}, {"net_pips": 2.6, "mfe": 4.8, "mae": 5.5, "is_win": true}, {"net_pips": 6.2, "mfe": 7.4, "mae": 14.3, "is_win": true}, {"net_pips": -10.6, "mfe": 0.0, "mae": 37.0, "is_win": false}, {"net_pips": 5.6, "mfe": 8.7, "mae": 7.9, "is_win": true}, {"net_pips": -11.3, "mfe": 0.0, "mae": 24.9, "is_win": false}, {"net_pips": 11.2, "mfe": 13.9, "mae": 1.0, "is_win": true}, {"net_pips": 3.3, "mfe": 6.4, "mae": 14.8, "is_win": true}, {"net_pips": 9.8, "mfe": 14.0, "mae": 0.4, "is_win": true}, {"net_pips": -27.1, "mfe": 0.0, "mae": 68.7, "is_win": false}, {"net_pips": -41.1, "mfe": 0.0, "mae": 111.3, "is_win": false}, {"net_pips": 16.5, "mfe": 26.1, "mae": 13.9, "is_win": true}, {"net_pips": 50.2, "mfe": 58.7, "mae": 25.0, "is_win": true}, {"net_pips": 5.1, "mfe": 17.5, "mae": 3.8, "is_win": true}, {"net_pips": 14.3, "mfe": 22.0, "mae": 54.9, "is_win": true}, {"net_pips": -62.4, "mfe": 0.7, "mae": 140.5, "is_win": false}, {"net_pips": -34.9, "mfe": 0.0, "mae": 58.2, "is_win": false}, {"net_pips": 1.4, "mfe": 3.5, "mae": 3.4, "is_win": true}, {"net_pips": 0.7, "mfe": 1.6, "mae": 4.0, "is_win": true}, {"net_pips": 0.7, "mfe": 1.0, "mae": 5.2, "is_win": true}, {"net_pips": 2.0, "mfe": 4.7, "mae": 2.2, "is_win": true}, {"net_pips": 0.1, "mfe": 6.7, "mae": 21.4, "is_win": false}, {"net_pips": 9.4, "mfe": 13.2, "mae": 10.1, "is_win": true}, {"net_pips": -9.6, "mfe": 0.7, "mae": 37.5, "is_win": false}, {"net_pips": 8.7, "mfe": 17.4, "mae": 7.2, "is_win": true}, {"net_pips": 14.7, "mfe": 20.3, "mae": 26.0, "is_win": true}, {"net_pips": 1.5, "mfe": 5.5, "mae": 3.2, "is_win": true}, {"net_pips": 1.0, "mfe": 5.1, "mae": 4.8, "is_win": true}, {"net_pips": 8.8, "mfe": 13.5, "mae": 3.5, "is_win": true}, {"net_pips": 12.0, "mfe": 20.7, "mae": 10.0, "is_win": true}, {"net_pips": 9.7, "mfe": 11.4, "mae": 7.9, "is_win": true}, {"net_pips": 4.3, "mfe": 10.4, "mae": 2.3, "is_win": true}, {"net_pips": 1.9, "mfe": 5.6, "mae": 1.6, "is_win": true}, {"net_pips": 1.0, "mfe": 6.6, "mae": 19.6, "is_win": true}, {"net_pips": 5.0, "mfe": 11.6, "mae": 7.3, "is_win": true}, {"net_pips": 8.0, "mfe": 12.3, "mae": 2.9, "is_win": true}, {"net_pips": 0.6, "mfe": 9.4, "mae": 47.5, "is_win": false}, {"net_pips": 7.2, "mfe": 11.9, "mae": 2.4, "is_win": true}, {"net_pips": 0.2, "mfe": 3.2, "mae": 6.2, "is_win": true}, {"net_pips": -20.8, "mfe": 0.4, "mae": 62.1, "is_win": false}, {"net_pips": -14.8, "mfe": 0.0, "mae": 30.1, "is_win": false}, {"net_pips": -10.4, "mfe": 1.7, "mae": 29.0, "is_win": false}, {"net_pips": 16.6, "mfe": 20.8, "mae": 5.5, "is_win": true}, {"net_pips": -12.3, "mfe": 0.0, "mae": 57.3, "is_win": false}, {"net_pips": 1.0, "mfe": 4.7, "mae": 4.5, "is_win": true}, {"net_pips": -38.2, "mfe": 1.9, "mae": 86.2, "is_win": false}, {"net_pips": -26.6, "mfe": 6.5, "mae": 63.0, "is_win": false}, {"net_pips": 2.3, "mfe": 6.8, "mae": 7.1, "is_win": true}, {"net_pips": -78.1, "mfe": 0.9, "mae": 136.8, "is_win": false}, {"net_pips": 1.8, "mfe": 3.8, "mae": 3.8, "is_win": true}, {"net_pips": 5.6, "mfe": 5.6, "mae": 13.3, "is_win": true}, {"net_pips": -45.5, "mfe": 3.6, "mae": 106.7, "is_win": false}, {"net_pips": 2.8, "mfe": 2.9, "mae": 17.6, "is_win": true}, {"net_pips": -0.2, "mfe": 4.0, "mae": 6.1, "is_win": false}, {"net_pips": 0.9, "mfe": 4.3, "mae": 0.4, "is_win": true}, {"net_pips": 12.2, "mfe": 16.9, "mae": 18.4, "is_win": true}, {"net_pips": 1.8, "mfe": 2.8, "mae": 3.4, "is_win": true}, {"net_pips": -52.0, "mfe": 0.0, "mae": 98.7, "is_win": false}, {"net_pips": 19.9, "mfe": 24.9, "mae": 1.1, "is_win": true}, {"net_pips": 0.9, "mfe": 5.5, "mae": 2.5, "is_win": true}, {"net_pips": 8.2, "mfe": 13.2, "mae": 3.6, "is_win": true}, {"net_pips": 7.9, "mfe": 8.3, "mae": 5.5, "is_win": true}, {"net_pips": 4.2, "mfe": 9.5, "mae": 13.2, "is_win": true}, {"net_pips": 4.8, "mfe": 7.5, "mae": 17.2, "is_win": true}, {"net_pips": -12.4, "mfe": 3.4, "mae": 33.4, "is_win": false}, {"net_pips": 13.3, "mfe": 13.3, "mae": 3.4, "is_win": true}, {"net_pips": 6.2, "mfe": 9.0, "mae": 1.8, "is_win": true}, {"net_pips": -0.3, "mfe": 3.1, "mae": 18.2, "is_win": false}, {"net_pips": 3.7, "mfe": 3.7, "mae": 7.4, "is_win": true}, {"net_pips": 1.7, "mfe": 4.5, "mae": 2.1, "is_win": true}, {"net_pips": -17.7, "mfe": 2.1, "mae": 39.2, "is_win": false}, {"net_pips": 22.1, "mfe": 27.2, "mae": 11.1, "is_win": true}, {"net_pips": -15.8, "mfe": 0.0, "mae": 33.5, "is_win": false}, {"net_pips": 26.6, "mfe": 35.8, "mae": 29.2, "is_win": true}, {"net_pips": 2.5, "mfe": 5.2, "mae": 3.5, "is_win": true}, {"net_pips": 10.9, "mfe": 14.5, "mae": 2.5, "is_win": true}, {"net_pips": -0.7, "mfe": 5.0, "mae": 1.3, "is_win": false}, {"net_pips": 3.1, "mfe": 5.1, "mae": 14.3, "is_win": true}, {"net_pips": 17.7, "mfe": 19.1, "mae": 12.4, "is_win": true}, {"net_pips": 7.9, "mfe": 15.9, "mae": 13.1, "is_win": true}, {"net_pips": 9.6, "mfe": 9.9, "mae": 2.1, "is_win": true}, {"net_pips": 1.8, "mfe": 4.3, "mae": 11.5, "is_win": true}, {"net_pips": 2.1, "mfe": 3.9, "mae": 11.5, "is_win": true}, {"net_pips": -0.5, "mfe": 0.4, "mae": 5.9, "is_win": false}, {"net_pips": 13.0, "mfe": 14.6, "mae": 0.0, "is_win": true}, {"net_pips": 3.5, "mfe": 6.9, "mae": 11.6, "is_win": true}, {"net_pips": 4.8, "mfe": 8.9, "mae": 22.0, "is_win": true}, {"net_pips": -0.7, "mfe": 5.1, "mae": 0.7, "is_win": false}, {"net_pips": 2.3, "mfe": 7.2, "mae": 9.1, "is_win": true}, {"net_pips": 20.0, "mfe": 23.0, "mae": 17.4, "is_win": true}, {"net_pips": -10.3, "mfe": 0.0, "mae": 21.4, "is_win": false}, {"net_pips": 6.2, "mfe": 34.2, "mae": 52.2, "is_win": true}, {"net_pips": 1.3, "mfe": 34.7, "mae": 51.7, "is_win": true}, {"net_pips": 3.9, "mfe": 34.4, "mae": 52.0, "is_win": true}, {"net_pips": 2.9, "mfe": 34.9, "mae": 28.6, "is_win": true}, {"net_pips": 29.6, "mfe": 29.6, "mae": 9.2, "is_win": true}, {"net_pips": 27.0, "mfe": 27.0, "mae": 9.6, "is_win": true}, {"net_pips": 26.6, "mfe": 26.6, "mae": 9.0, "is_win": true}, {"net_pips": 12.4, "mfe": 12.4, "mae": 9.2, "is_win": true}, {"net_pips": -7.4, "mfe": 0.0, "mae": 31.3, "is_win": false}, {"net_pips": 11.8, "mfe": 11.9, "mae": 2.4, "is_win": true}, {"net_pips": -7.5, "mfe": 2.6, "mae": 28.2, "is_win": false}, {"net_pips": 5.2, "mfe": 5.2, "mae": 13.3, "is_win": true}, {"net_pips": 7.3, "mfe": 7.3, "mae": 4.6, "is_win": true}, {"net_pips": 9.0, "mfe": 9.0, "mae": 5.5, "is_win": true}, {"net_pips": 1.2, "mfe": 1.2, "mae": 13.2, "is_win": true}, {"net_pips": 10.4, "mfe": 10.4, "mae": 1.7, "is_win": true}, {"net_pips": 8.2, "mfe": 8.2, "mae": 3.0, "is_win": true}, {"net_pips": 0.7, "mfe": 0.7, "mae": 3.8, "is_win": true}, {"net_pips": -11.2, "mfe": 0.0, "mae": 21.0, "is_win": false}, {"net_pips": 2.8, "mfe": 2.8, "mae": 7.0, "is_win": true}, {"net_pips": 41.0, "mfe": 41.0, "mae": 9.4, "is_win": true}, {"net_pips": 2.7, "mfe": 3.2, "mae": 47.3, "is_win": true}, {"net_pips": 38.4, "mfe": 38.4, "mae": 9.1, "is_win": true}, {"net_pips": 5.6, "mfe": 17.7, "mae": 32.8, "is_win": true}, {"net_pips": 4.8, "mfe": 7.1, "mae": 20.4, "is_win": true}, {"net_pips": -3.1, "mfe": 6.1, "mae": 21.4, "is_win": false}, {"net_pips": -4.0, "mfe": 4.4, "mae": 23.1, "is_win": false}, {"net_pips": 2.0, "mfe": 5.4, "mae": 22.1, "is_win": true}, {"net_pips": 9.5, "mfe": 9.5, "mae": 6.7, "is_win": true}, {"net_pips": 14.2, "mfe": 14.2, "mae": 2.3, "is_win": true}, {"net_pips": 12.1, "mfe": 12.1, "mae": 3.7, "is_win": true}, {"net_pips": 13.4, "mfe": 13.4, "mae": 1.9, "is_win": true}, {"net_pips": 7.5, "mfe": 7.5, "mae": 7.1, "is_win": true}, {"net_pips": 1.6, "mfe": 1.6, "mae": 16.3, "is_win": true}, {"net_pips": 3.0, "mfe": 3.0, "mae": 14.6, "is_win": true}, {"net_pips": 7.6, "mfe": 7.6, "mae": 10.8, "is_win": true}, {"net_pips": -4.3, "mfe": 1.4, "mae": 22.7, "is_win": false}, {"net_pips": 4.9, "mfe": 4.9, "mae": 13.4, "is_win": true}, {"net_pips": 3.0, "mfe": 3.0, "mae": 15.6, "is_win": true}, {"net_pips": -5.2, "mfe": 1.3, "mae": 22.8, "is_win": false}, {"net_pips": -5.0, "mfe": 3.4, "mae": 20.7, "is_win": false}, {"net_pips": 3.1, "mfe": 3.1, "mae": 13.1, "is_win": true}, {"net_pips": 1.7, "mfe": 2.6, "mae": 5.8, "is_win": true}, {"net_pips": 0.3, "mfe": 0.3, "mae": 4.5, "is_win": true}, {"net_pips": 11.6, "mfe": 11.6, "mae": 4.2, "is_win": true}, {"net_pips": 10.9, "mfe": 11.1, "mae": 4.6, "is_win": true}, {"net_pips": 7.9, "mfe": 7.9, "mae": 2.9, "is_win": true}, {"net_pips": 13.2, "mfe": 13.9, "mae": 1.8, "is_win": true}, {"net_pips": 1.6, "mfe": 1.6, "mae": 6.3, "is_win": true}, {"net_pips": 11.2, "mfe": 11.2, "mae": 1.9, "is_win": true}, {"net_pips": 5.4, "mfe": 5.4, "mae": 0.1, "is_win": true}, {"net_pips": 5.3, "mfe": 5.3, "mae": 1.1, "is_win": true}, {"net_pips": 9.7, "mfe": 9.7, "mae": 13.0, "is_win": true}], "buy_L5": [{"net_pips": -9.7, "mfe": 10.8, "mae": 64.1, "is_win": false}, {"net_pips": 15.1, "mfe": 16.3, "mae": 13.8, "is_win": true}, {"net_pips": -11.3, "mfe": 2.3, "mae": 60.7, "is_win": false}, {"net_pips": 14.4, "mfe": 19.8, "mae": 4.7, "is_win": true}, {"net_pips": 34.9, "mfe": 39.6, "mae": 15.1, "is_win": true}, {"net_pips": 25.0, "mfe": 31.3, "mae": 2.4, "is_win": true}, {"net_pips": 19.1, "mfe": 21.2, "mae": 5.4, "is_win": true}, {"net_pips": 9.8, "mfe": 12.0, "mae": 0.3, "is_win": true}, {"net_pips": 12.9, "mfe": 16.0, "mae": 11.9, "is_win": true}, {"net_pips": -6.4, "mfe": 0.0, "mae": 24.9, "is_win": false}, {"net_pips": -18.9, "mfe": 4.1, "mae": 53.2, "is_win": false}, {"net_pips": 10.4, "mfe": 10.4, "mae": 2.7, "is_win": true}, {"net_pips": 7.1, "mfe": 10.2, "mae": 13.1, "is_win": true}, {"net_pips": 7.1, "mfe": 12.2, "mae": 0.0, "is_win": true}, {"net_pips": 3.6, "mfe": 8.4, "mae": 6.4, "is_win": true}, {"net_pips": 4.2, "mfe": 8.0, "mae": 24.3, "is_win": true}, {"net_pips": 11.1, "mfe": 11.8, "mae": 21.0, "is_win": true}, {"net_pips": 10.4, "mfe": 12.5, "mae": 5.5, "is_win": true}, {"net_pips": 20.9, "mfe": 22.8, "mae": 4.9, "is_win": true}, {"net_pips": 15.3, "mfe": 16.6, "mae": 8.1, "is_win": true}, {"net_pips": 7.9, "mfe": 11.5, "mae": 3.7, "is_win": true}, {"net_pips": 17.6, "mfe": 18.7, "mae": 38.1, "is_win": true}, {"net_pips": -19.9, "mfe": 2.9, "mae": 51.6, "is_win": false}, {"net_pips": 8.4, "mfe": 8.8, "mae": 2.6, "is_win": true}, {"net_pips": 54.0, "mfe": 55.7, "mae": 13.1, "is_win": true}, {"net_pips": -6.6, "mfe": 0.0, "mae": 33.5, "is_win": false}, {"net_pips": -16.4, "mfe": 0.0, "mae": 39.3, "is_win": false}, {"net_pips": -17.9, "mfe": 0.0, "mae": 40.7, "is_win": false}, {"net_pips": 4.9, "mfe": 5.5, "mae": 0.0, "is_win": true}, {"net_pips": -8.8, "mfe": 0.0, "mae": 33.5, "is_win": false}, {"net_pips": 15.4, "mfe": 15.4, "mae": 9.6, "is_win": true}, {"net_pips": 13.2, "mfe": 13.2, "mae": 19.7, "is_win": true}, {"net_pips": 15.2, "mfe": 15.2, "mae": 18.9, "is_win": true}, {"net_pips": 13.2, "mfe": 13.2, "mae": 5.0, "is_win": true}, {"net_pips": 11.9, "mfe": 11.9, "mae": 18.7, "is_win": true}, {"net_pips": 7.2, "mfe": 7.2, "mae": 0.7, "is_win": true}, {"net_pips": 37.0, "mfe": 37.0, "mae": 17.3, "is_win": true}, {"net_pips": 7.1, "mfe": 7.5, "mae": 48.1, "is_win": true}, {"net_pips": 8.0, "mfe": 8.0, "mae": 44.0, "is_win": true}, {"net_pips": 11.3, "mfe": 11.3, "mae": 41.6, "is_win": true}, {"net_pips": 1.6, "mfe": 1.7, "mae": 1.6, "is_win": true}, {"net_pips": -10.3, "mfe": 7.1, "mae": 36.9, "is_win": false}, {"net_pips": -8.6, "mfe": 8.0, "mae": 36.0, "is_win": false}, {"net_pips": -44.9, "mfe": 0.0, "mae": 68.1, "is_win": false}, {"net_pips": -11.7, "mfe": 8.5, "mae": 35.5, "is_win": false}, {"net_pips": -16.2, "mfe": 4.8, "mae": 39.2, "is_win": false}, {"net_pips": -43.3, "mfe": 1.7, "mae": 65.5, "is_win": false}, {"net_pips": 10.0, "mfe": 10.0, "mae": 21.2, "is_win": true}, {"net_pips": 8.7, "mfe": 8.7, "mae": 20.0, "is_win": true}, {"net_pips": -23.1, "mfe": 0.0, "mae": 39.6, "is_win": false}, {"net_pips": -28.7, "mfe": 0.0, "mae": 44.9, "is_win": false}, {"net_pips": -29.4, "mfe": 0.9, "mae": 41.1, "is_win": false}, {"net_pips": 3.5, "mfe": 4.0, "mae": 9.6, "is_win": true}, {"net_pips": -13.9, "mfe": 0.0, "mae": 60.2, "is_win": false}, {"net_pips": -8.4, "mfe": 1.5, "mae": 52.2, "is_win": false}, {"net_pips": -12.8, "mfe": 1.1, "mae": 54.5, "is_win": false}, {"net_pips": -13.6, "mfe": 0.3, "mae": 55.3, "is_win": false}, {"net_pips": -13.7, "mfe": 0.2, "mae": 55.4, "is_win": false}, {"net_pips": 5.7, "mfe": 5.7, "mae": 11.9, "is_win": true}, {"net_pips": 7.7, "mfe": 7.7, "mae": 1.8, "is_win": true}, {"net_pips": 7.6, "mfe": 7.8, "mae": 13.6, "is_win": true}, {"net_pips": -14.1, "mfe": 0.9, "mae": 54.7, "is_win": false}, {"net_pips": -24.5, "mfe": 1.6, "mae": 64.4, "is_win": false}, {"net_pips": -15.9, "mfe": 1.1, "mae": 54.5, "is_win": false}, {"net_pips": 6.2, "mfe": 6.5, "mae": 3.6, "is_win": true}, {"net_pips": 0.6, "mfe": 3.9, "mae": 5.8, "is_win": true}, {"net_pips": 4.1, "mfe": 4.1, "mae": 9.1, "is_win": true}, {"net_pips": 9.8, "mfe": 9.8, "mae": 0.6, "is_win": true}, {"net_pips": 3.4, "mfe": 3.4, "mae": 5.6, "is_win": true}, {"net_pips": 14.9, "mfe": 14.9, "mae": 2.6, "is_win": true}, {"net_pips": 2.1, "mfe": 2.1, "mae": 12.2, "is_win": true}, {"net_pips": 4.8, "mfe": 5.1, "mae": 8.2, "is_win": true}, {"net_pips": 28.8, "mfe": 39.0, "mae": 80.9, "is_win": true}, {"net_pips": 74.6, "mfe": 85.0, "mae": 38.3, "is_win": true}, {"net_pips": 42.3, "mfe": 61.3, "mae": 38.2, "is_win": true}, {"net_pips": 80.1, "mfe": 91.1, "mae": 11.3, "is_win": true}, {"net_pips": 29.6, "mfe": 37.4, "mae": 52.0, "is_win": true}, {"net_pips": 29.8, "mfe": 37.0, "mae": 68.4, "is_win": true}, {"net_pips": 25.2, "mfe": 25.2, "mae": 16.2, "is_win": true}, {"net_pips": 8.9, "mfe": 12.6, "mae": 31.0, "is_win": true}, {"net_pips": 35.3, "mfe": 42.2, "mae": 39.5, "is_win": true}, {"net_pips": 36.1, "mfe": 43.4, "mae": 10.0, "is_win": true}, {"net_pips": 13.5, "mfe": 25.7, "mae": 53.3, "is_win": true}, {"net_pips": 44.0, "mfe": 52.8, "mae": 17.4, "is_win": true}, {"net_pips": 29.1, "mfe": 29.1, "mae": 9.8, "is_win": true}, {"net_pips": 9.5, "mfe": 9.5, "mae": 21.5, "is_win": true}, {"net_pips": 16.6, "mfe": 16.6, "mae": 0.0, "is_win": true}, {"net_pips": -4.0, "mfe": 0.0, "mae": 4.0, "is_win": false}, {"net_pips": 17.6, "mfe": 17.6, "mae": 35.1, "is_win": true}, {"net_pips": 55.5, "mfe": 56.0, "mae": 14.4, "is_win": true}, {"net_pips": 63.9, "mfe": 66.8, "mae": 12.8, "is_win": true}, {"net_pips": -375.9, "mfe": 24.4, "mae": 375.9, "is_win": false}, {"net_pips": 56.5, "mfe": 58.1, "mae": 0.0, "is_win": true}, {"net_pips": 18.7, "mfe": 18.7, "mae": 0.0, "is_win": true}], "sell_L5": [{"net_pips": -9.4, "mfe": 0.0, "mae": 31.1, "is_win": false}, {"net_pips": 6.5, "mfe": 8.1, "mae": 2.8, "is_win": true}, {"net_pips": 9.1, "mfe": 11.6, "mae": 13.3, "is_win": true}, {"net_pips": 12.8, "mfe": 12.9, "mae": 5.5, "is_win": true}, {"net_pips": -12.3, "mfe": 0.0, "mae": 36.6, "is_win": false}, {"net_pips": -23.1, "mfe": 7.2, "mae": 83.4, "is_win": false}, {"net_pips": 13.4, "mfe": 17.0, "mae": 2.1, "is_win": true}, {"net_pips": 17.1, "mfe": 20.8, "mae": 23.5, "is_win": true}, {"net_pips": 7.2, "mfe": 9.0, "mae": 6.2, "is_win": true}, {"net_pips": -43.1, "mfe": 2.5, "mae": 119.1, "is_win": false}, {"net_pips": 8.8, "mfe": 10.4, "mae": 0.3, "is_win": true}, {"net_pips": 9.6, "mfe": 10.2, "mae": 26.2, "is_win": true}, {"net_pips": -9.3, "mfe": 0.0, "mae": 33.7, "is_win": false}, {"net_pips": 6.1, "mfe": 7.8, "mae": 10.6, "is_win": true}, {"net_pips": 16.0, "mfe": 22.6, "mae": 13.0, "is_win": true}, {"net_pips": 13.6, "mfe": 15.6, "mae": 14.0, "is_win": true}, {"net_pips": 8.4, "mfe": 8.9, "mae": 10.3, "is_win": true}, {"net_pips": 13.6, "mfe": 15.2, "mae": 12.8, "is_win": true}, {"net_pips": 6.7, "mfe": 10.6, "mae": 3.3, "is_win": true}, {"net_pips": 0.1, "mfe": 3.3, "mae": 41.5, "is_win": false}, {"net_pips": -5.8, "mfe": 1.2, "mae": 28.9, "is_win": false}, {"net_pips": 8.5, "mfe": 11.5, "mae": 19.0, "is_win": true}, {"net_pips": 24.1, "mfe": 32.8, "mae": 24.1, "is_win": true}, {"net_pips": 17.3, "mfe": 28.4, "mae": 25.3, "is_win": true}, {"net_pips": 5.6, "mfe": 7.5, "mae": 2.0, "is_win": true}, {"net_pips": 7.3, "mfe": 9.4, "mae": 8.3, "is_win": true}, {"net_pips": 19.2, "mfe": 19.2, "mae": 25.7, "is_win": true}, {"net_pips": -18.3, "mfe": 0.0, "mae": 66.5, "is_win": false}, {"net_pips": 14.4, "mfe": 25.3, "mae": 22.0, "is_win": true}, {"net_pips": -57.4, "mfe": 9.2, "mae": 116.2, "is_win": false}, {"net_pips": -23.0, "mfe": 0.0, "mae": 84.2, "is_win": false}, {"net_pips": -2.7, "mfe": 9.5, "mae": 49.6, "is_win": false}, {"net_pips": 14.5, "mfe": 18.8, "mae": 2.2, "is_win": true}, {"net_pips": 9.4, "mfe": 12.8, "mae": 11.6, "is_win": true}, {"net_pips": 7.1, "mfe": 9.4, "mae": 10.7, "is_win": true}, {"net_pips": 47.3, "mfe": 56.5, "mae": 7.9, "is_win": true}, {"net_pips": 5.9, "mfe": 7.9, "mae": 2.3, "is_win": true}, {"net_pips": 2.9, "mfe": 2.9, "mae": 21.1, "is_win": true}, {"net_pips": 4.4, "mfe": 4.4, "mae": 16.3, "is_win": true}, {"net_pips": 6.9, "mfe": 6.9, "mae": 1.8, "is_win": true}, {"net_pips": 21.5, "mfe": 21.5, "mae": 3.7, "is_win": true}, {"net_pips": 11.8, "mfe": 18.2, "mae": 6.6, "is_win": true}, {"net_pips": 15.3, "mfe": 21.0, "mae": 3.8, "is_win": true}, {"net_pips": 22.6, "mfe": 22.6, "mae": 1.5, "is_win": true}, {"net_pips": 4.2, "mfe": 4.2, "mae": 14.2, "is_win": true}, {"net_pips": 6.7, "mfe": 6.7, "mae": 10.9, "is_win": true}, {"net_pips": 4.6, "mfe": 4.6, "mae": 11.1, "is_win": true}, {"net_pips": 7.0, "mfe": 7.0, "mae": 16.1, "is_win": true}, {"net_pips": 8.1, "mfe": 8.1, "mae": 6.9, "is_win": true}, {"net_pips": -0.4, "mfe": 13.9, "mae": 0.4, "is_win": false}, {"net_pips": -141.4, "mfe": 14.4, "mae": 141.4, "is_win": false}, {"net_pips": -22.8, "mfe": 36.1, "mae": 134.8, "is_win": false}, {"net_pips": -47.8, "mfe": 21.9, "mae": 148.8, "is_win": false}, {"net_pips": -3.8, "mfe": 4.5, "mae": 3.8, "is_win": false}, {"net_pips": -61.6, "mfe": 24.3, "mae": 61.6, "is_win": false}, {"net_pips": 21.4, "mfe": 21.4, "mae": 15.4, "is_win": true}, {"net_pips": -1.2, "mfe": 0.0, "mae": 1.2, "is_win": false}, {"net_pips": 32.6, "mfe": 32.6, "mae": 27.1, "is_win": true}, {"net_pips": -2.1, "mfe": 2.0, "mae": 2.1, "is_win": false}, {"net_pips": 20.1, "mfe": 20.1, "mae": 33.1, "is_win": true}, {"net_pips": 16.5, "mfe": 16.5, "mae": 27.1, "is_win": true}, {"net_pips": -14.1, "mfe": 0.8, "mae": 14.1, "is_win": false}, {"net_pips": 10.4, "mfe": 10.4, "mae": 21.4, "is_win": true}, {"net_pips": 24.4, "mfe": 24.4, "mae": 9.2, "is_win": true}, {"net_pips": -39.5, "mfe": 30.7, "mae": 94.6, "is_win": false}, {"net_pips": 29.6, "mfe": 30.2, "mae": 15.1, "is_win": true}, {"net_pips": 3.0, "mfe": 12.5, "mae": 56.5, "is_win": true}, {"net_pips": -7.9, "mfe": 11.5, "mae": 75.4, "is_win": false}, {"net_pips": 52.3, "mfe": 59.2, "mae": 15.6, "is_win": true}, {"net_pips": -13.8, "mfe": 22.4, "mae": 134.5, "is_win": false}, {"net_pips": 38.1, "mfe": 0.0, "mae": 0.0, "is_win": true}, {"net_pips": 31.2, "mfe": 31.2, "mae": 0.0, "is_win": true}, {"net_pips": 16.9, "mfe": 16.9, "mae": 0.0, "is_win": true}, {"net_pips": 10.0, "mfe": 10.0, "mae": 0.0, "is_win": true}, {"net_pips": 12.6, "mfe": 12.6, "mae": 12.6, "is_win": true}, {"net_pips": 52.5, "mfe": 52.5, "mae": 0.0, "is_win": true}], "buy_L3": [{"net_pips": 60.6, "mfe": 64.6, "mae": 24.7, "is_win": true}, {"net_pips": 80.7, "mfe": 91.5, "mae": 27.2, "is_win": true}, {"net_pips": 12.5, "mfe": 26.6, "mae": 97.2, "is_win": true}, {"net_pips": 56.3, "mfe": 66.9, "mae": 56.4, "is_win": true}, {"net_pips": 17.0, "mfe": 36.2, "mae": 63.3, "is_win": true}, {"net_pips": 57.0, "mfe": 71.0, "mae": 31.4, "is_win": true}, {"net_pips": 4.4, "mfe": 18.1, "mae": 76.8, "is_win": true}, {"net_pips": 63.4, "mfe": 71.3, "mae": 21.9, "is_win": true}, {"net_pips": 14.4, "mfe": 21.7, "mae": 83.7, "is_win": true}, {"net_pips": 8.9, "mfe": 8.9, "mae": 32.1, "is_win": true}, {"net_pips": 33.8, "mfe": 35.6, "mae": 4.9, "is_win": true}, {"net_pips": 23.5, "mfe": 26.5, "mae": 11.7, "is_win": true}, {"net_pips": 50.1, "mfe": 50.1, "mae": 10.1, "is_win": true}, {"net_pips": -6.5, "mfe": 2.2, "mae": 46.3, "is_win": false}, {"net_pips": 39.9, "mfe": 39.9, "mae": 1.3, "is_win": true}, {"net_pips": 21.4, "mfe": 21.4, "mae": 19.3, "is_win": true}, {"net_pips": -6.0, "mfe": 3.8, "mae": 36.0, "is_win": false}, {"net_pips": 19.1, "mfe": 19.1, "mae": 16.4, "is_win": true}, {"net_pips": 23.7, "mfe": 27.1, "mae": 59.8, "is_win": true}, {"net_pips": 19.6, "mfe": 19.6, "mae": 56.0, "is_win": true}, {"net_pips": 60.8, "mfe": 60.8, "mae": 3.0, "is_win": true}, {"net_pips": 2.0, "mfe": 2.0, "mae": 0.0, "is_win": true}, {"net_pips": 30.2, "mfe": 30.2, "mae": 26.8, "is_win": true}, {"net_pips": 19.5, "mfe": 19.5, "mae": 0.8, "is_win": true}, {"net_pips": 23.9, "mfe": 23.9, "mae": 6.7, "is_win": true}, {"net_pips": 35.9, "mfe": 35.9, "mae": 10.1, "is_win": true}, {"net_pips": 21.0, "mfe": 21.0, "mae": 7.2, "is_win": true}, {"net_pips": 79.5, "mfe": 79.5, "mae": 36.3, "is_win": true}, {"net_pips": 73.9, "mfe": 73.9, "mae": 36.3, "is_win": true}, {"net_pips": 82.5, "mfe": 82.5, "mae": 20.1, "is_win": true}, {"net_pips": 65.9, "mfe": 65.9, "mae": 20.7, "is_win": true}, {"net_pips": 30.3, "mfe": 35.9, "mae": 13.8, "is_win": true}, {"net_pips": 19.1, "mfe": 25.9, "mae": 55.8, "is_win": true}, {"net_pips": 21.1, "mfe": 28.3, "mae": 25.1, "is_win": true}, {"net_pips": -2.5, "mfe": 26.8, "mae": 69.2, "is_win": false}, {"net_pips": 27.0, "mfe": 35.8, "mae": 34.4, "is_win": true}, {"net_pips": 34.4, "mfe": 34.4, "mae": 6.65, "is_win": true}, {"net_pips": 7.7, "mfe": 7.7, "mae": 24.75, "is_win": true}, {"net_pips": 66.2, "mfe": 66.2, "mae": 5.65, "is_win": true}, {"net_pips": 7.3, "mfe": 7.3, "mae": 17.65, "is_win": true}, {"net_pips": 70.7, "mfe": 70.7, "mae": 6.15, "is_win": true}, {"net_pips": 61.4, "mfe": 63.35, "mae": 6.25, "is_win": true}, {"net_pips": 35.0, "mfe": 48.75, "mae": 20.85, "is_win": true}, {"net_pips": 46.2, "mfe": 46.2, "mae": 20.95, "is_win": true}, {"net_pips": 41.9, "mfe": 42.35, "mae": 20.85, "is_win": true}, {"net_pips": 35.9, "mfe": 36.65, "mae": 20.85, "is_win": true}, {"net_pips": 32.7, "mfe": 34.05, "mae": 20.85, "is_win": true}, {"net_pips": 32.2, "mfe": 33.55, "mae": 20.85, "is_win": true}, {"net_pips": 12.5, "mfe": 12.5, "mae": 41.3, "is_win": true}, {"net_pips": 16.3, "mfe": 16.3, "mae": 37.5, "is_win": true}, {"net_pips": -10.0, "mfe": 0.0, "mae": 58.5, "is_win": false}, {"net_pips": 56.4, "mfe": 62.7, "mae": 9.3, "is_win": true}, {"net_pips": 34.2, "mfe": 35.0, "mae": 35.4, "is_win": true}, {"net_pips": 44.0, "mfe": 46.7, "mae": 32.9, "is_win": true}, {"net_pips": -389.7, "mfe": 2.4, "mae": 389.7, "is_win": false}, {"net_pips": 37.0, "mfe": 38.6, "mae": 17.2, "is_win": true}, {"net_pips": -1.1, "mfe": 0.0, "mae": 1.1, "is_win": true}], "buy_L7": [{"net_pips": 43.9, "mfe": 54.1, "mae": 65.8, "is_win": true}, {"net_pips": 67.9, "mfe": 87.3, "mae": 12.2, "is_win": true}, {"net_pips": 61.2, "mfe": 69.0, "mae": 20.4, "is_win": true}, {"net_pips": 45.2, "mfe": 52.4, "mae": 53.0, "is_win": true}, {"net_pips": 51.9, "mfe": 58.9, "mae": 22.8, "is_win": true}, {"net_pips": 28.4, "mfe": 37.0, "mae": 37.9, "is_win": true}], "sell_L7": [{"net_pips": 17.1, "mfe": 17.1, "mae": 91.6, "is_win": true}, {"net_pips": -125.9, "mfe": 30.1, "mae": 125.9, "is_win": false}, {"net_pips": 5.7, "mfe": 13.7, "mae": 106.2, "is_win": false}, {"net_pips": -32.6, "mfe": 22.0, "mae": 133.6, "is_win": false}, {"net_pips": 21.6, "mfe": 21.6, "mae": 33.2, "is_win": true}, {"net_pips": -1.2, "mfe": 3.4, "mae": 1.2, "is_win": false}, {"net_pips": -23.4, "mfe": 16.7, "mae": 78.4, "is_win": false}, {"net_pips": 44.8, "mfe": 45.9, "mae": 0.0, "is_win": true}, {"net_pips": 20.3, "mfe": 29.7, "mae": 39.3, "is_win": true}, {"net_pips": 8.1, "mfe": 15.2, "mae": 60.2, "is_win": true}, {"net_pips": 1.8, "mfe": 21.3, "mae": 119.1, "is_win": false}], "sell_L3": [{"net_pips": -25.4, "mfe": 1.5, "mae": 25.4, "is_win": false}, {"net_pips": -156.8, "mfe": 12.6, "mae": 156.8, "is_win": false}, {"net_pips": -56.9, "mfe": 24.1, "mae": 168.8, "is_win": false}, {"net_pips": -63.7, "mfe": 5.9, "mae": 164.8, "is_win": false}, {"net_pips": 72.6, "mfe": 84.1, "mae": 10.8, "is_win": true}, {"net_pips": 31.3, "mfe": 36.0, "mae": 8.8, "is_win": true}, {"net_pips": -22.3, "mfe": 6.1, "mae": 22.3, "is_win": false}, {"net_pips": -77.2, "mfe": 25.9, "mae": 77.2, "is_win": false}, {"net_pips": 10.8, "mfe": 10.8, "mae": 3.6, "is_win": true}, {"net_pips": 27.1, "mfe": 27.1, "mae": 13.9, "is_win": true}, {"net_pips": 37.4, "mfe": 42.6, "mae": 1.8, "is_win": true}, {"net_pips": 1.6, "mfe": 8.8, "mae": 44.8, "is_win": false}, {"net_pips": 14.0, "mfe": 15.7, "mae": 20.3, "is_win": true}, {"net_pips": 25.6, "mfe": 26.3, "mae": 0.2, "is_win": true}, {"net_pips": 2.5, "mfe": 5.5, "mae": 22.8, "is_win": false}, {"net_pips": 18.2, "mfe": 18.2, "mae": 1.6, "is_win": true}, {"net_pips": 25.3, "mfe": 29.2, "mae": 0.9, "is_win": true}, {"net_pips": 10.8, "mfe": 10.8, "mae": 5.8, "is_win": true}, {"net_pips": 1.0, "mfe": 2.8, "mae": 36.0, "is_win": false}, {"net_pips": -15.0, "mfe": 3.2, "mae": 15.0, "is_win": false}, {"net_pips": 56.4, "mfe": 56.4, "mae": 14.8, "is_win": true}, {"net_pips": 16.5, "mfe": 16.5, "mae": 2.6, "is_win": true}, {"net_pips": 14.9, "mfe": 14.9, "mae": 59.0, "is_win": true}, {"net_pips": -3.3, "mfe": 0.0, "mae": 3.3, "is_win": false}, {"net_pips": -20.5, "mfe": 3.0, "mae": 20.5, "is_win": false}, {"net_pips": -17.6, "mfe": 10.6, "mae": 17.6, "is_win": false}, {"net_pips": -4.9, "mfe": 1.2, "mae": 4.9, "is_win": false}, {"net_pips": -8.9, "mfe": 0.5, "mae": 8.9, "is_win": false}, {"net_pips": -27.4, "mfe": 0.1, "mae": 27.4, "is_win": false}, {"net_pips": 5.4, "mfe": 5.4, "mae": 9.1, "is_win": true}, {"net_pips": 9.1, "mfe": 9.1, "mae": 14.2, "is_win": true}, {"net_pips": 36.9, "mfe": 36.9, "mae": 17.3, "is_win": true}, {"net_pips": 4.8, "mfe": 4.8, "mae": 13.6, "is_win": true}, {"net_pips": 8.8, "mfe": 8.8, "mae": 5.8, "is_win": true}, {"net_pips": -55.2, "mfe": 15.1, "mae": 110.2, "is_win": false}, {"net_pips": 39.1, "mfe": 46.4, "mae": 9.1, "is_win": true}, {"net_pips": 16.6, "mfe": 17.0, "mae": 28.3, "is_win": true}, {"net_pips": -12.1, "mfe": 5.6, "mae": 71.6, "is_win": false}, {"net_pips": -22.3, "mfe": 0.0, "mae": 90.5, "is_win": false}, {"net_pips": 37.1, "mfe": 44.0, "mae": 30.8, "is_win": true}, {"net_pips": 41.0, "mfe": 45.0, "mae": 15.6, "is_win": true}, {"net_pips": -38.9, "mfe": 5.9, "mae": 159.8, "is_win": false}, {"net_pips": 22.8, "mfe": 0.0, "mae": 0.0, "is_win": true}, {"net_pips": 47.1, "mfe": 0.0, "mae": 0.0, "is_win": true}, {"net_pips": 31.3, "mfe": 31.3, "mae": 2.05, "is_win": true}, {"net_pips": 12.9, "mfe": 12.9, "mae": 20.15, "is_win": true}, {"net_pips": 14.1, "mfe": 14.55, "mae": 12.05, "is_win": true}, {"net_pips": 28.7, "mfe": 28.7, "mae": 1.75, "is_win": true}, {"net_pips": 7.7, "mfe": 12.25, "mae": 10.35, "is_win": true}, {"net_pips": -1.2, "mfe": 1.8, "mae": 26.7, "is_win": false}, {"net_pips": 31.8, "mfe": 31.8, "mae": 0.4, "is_win": true}, {"net_pips": 17.0, "mfe": 17.0, "mae": 12.7, "is_win": true}, {"net_pips": 8.9, "mfe": 8.9, "mae": 12.3, "is_win": true}, {"net_pips": 53.2, "mfe": 59.3, "mae": 1.9, "is_win": true}, {"net_pips": 32.7, "mfe": 32.7, "mae": 0.0, "is_win": true}], "sell_L8": [{"net_pips": 11.6, "mfe": 11.6, "mae": 31.0, "is_win": true}, {"net_pips": -46.3, "mfe": 24.9, "mae": 46.3, "is_win": false}, {"net_pips": 10.7, "mfe": 10.7, "mae": 9.6, "is_win": true}, {"net_pips": 23.4, "mfe": 23.4, "mae": 8.5, "is_win": true}, {"net_pips": 41.8, "mfe": 41.8, "mae": 0.0, "is_win": true}, {"net_pips": 43.9, "mfe": 43.9, "mae": 0.0, "is_win": true}], "buy_L8": [{"net_pips": 24.2, "mfe": 24.2, "mae": 15.6, "is_win": true}, {"net_pips": 10.8, "mfe": 10.8, "mae": 0.0, "is_win": true}, {"net_pips": -347.0, "mfe": 50.0, "mae": 347.0, "is_win": false}, {"net_pips": 44.1, "mfe": 44.1, "mae": 0.0, "is_win": true}]};
+
+function sw(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.add('hidden'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.remove('hidden');
+  event.target.classList.add('active');
+  if(id==='p2') drawTpsl();
+  if(id==='p4') drawBl();
+  if(id==='p5') drawRv();
+  if(id==='p6') drawScatter();
+}
+
+// Sort tables
+document.querySelectorAll('table[id]').forEach(tbl=>{
+  const tbody=tbl.querySelector('tbody');
+  const ths=tbl.querySelectorAll('thead th');
+  ths.forEach((th,col)=>{
+    th.addEventListener('click',()=>{
+      const rows=Array.from(tbody.querySelectorAll('tr'));
+      const asc=th.dataset.sort!=='asc';
+      ths.forEach(t=>{t.classList.remove('asc','desc');delete t.dataset.sort});
+      th.dataset.sort=asc?'asc':'desc';
+      rows.sort((a,b)=>{
+        let va=a.cells[col]?.textContent?.trim()||'';
+        let vb=b.cells[col]?.textContent?.trim()||'';
+        let na=parseFloat(va.replace(/[^0-9.-]/g,''));
+        let nb=parseFloat(vb.replace(/[^0-9.-]/g,''));
+        if(!isNaN(na)&&!isNaN(nb)) return asc?na-nb:nb-na;
+        return asc?va.localeCompare(vb):vb.localeCompare(va);
+      });
+      rows.forEach(r=>tbody.appendChild(r));
+    });
+  });
+});
+
+function drawTpsl(){
+  const c=document.getElementById('chartTpsl');
+  const data=[{"rating": "S+", "direction": "buy", "level": "L7", "count": 6, "wr": 100.0, "ev": 47.79, "odds_dollar": 999, "odds_pips": 999, "tp": 59.8, "soft_sl": 42.5, "hard_sl": 559.4, "rr": 1.41, "total_pnl": 286.73, "avg_hold": 288.7}, {"rating": "S", "direction": "sell", "level": "L9+", "count": 150, "wr": 79.3, "ev": 63.29, "odds_dollar": 1.04, "odds_pips": 1.66, "tp": 38.7, "soft_sl": 36.1, "hard_sl": 255.7, "rr": 1.07, "total_pnl": 9493.36, "avg_hold": 161.4}, {"rating": "S", "direction": "buy", "level": "L9+", "count": 303, "wr": 75.9, "ev": 57.79, "odds_dollar": 1.27, "odds_pips": 0.85, "tp": 20.7, "soft_sl": 28.2, "hard_sl": 559.4, "rr": 0.73, "total_pnl": 17510.18, "avg_hold": 62.2}, {"rating": "S", "direction": "buy", "level": "L3", "count": 57, "wr": 91.2, "ev": 31.45, "odds_dollar": 1.31, "odds_pips": 0.43, "tp": 36.4, "soft_sl": 41.3, "hard_sl": 559.4, "rr": 0.88, "total_pnl": 1792.77, "avg_hold": 108.7}, {"rating": "A", "direction": "buy", "level": "L6", "count": 9, "wr": 88.9, "ev": 17.77, "odds_dollar": 0.71, "odds_pips": 0.56, "tp": 33.1, "soft_sl": 49.0, "hard_sl": 559.4, "rr": 0.68, "total_pnl": 159.96, "avg_hold": 164.1}, {"rating": "A", "direction": "sell", "level": "L8", "count": 6, "wr": 83.3, "ev": 12.13, "odds_dollar": 0.47, "odds_pips": 0.57, "tp": 26.0, "soft_sl": 19.1, "hard_sl": 255.7, "rr": 1.36, "total_pnl": 72.8, "avg_hold": 88.0}];
+  if(!data.length)return;
+  const ctx=c.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  c.width=c.offsetWidth*dpr;c.height=Math.max(300,data.length*28)*dpr;
+  c.style.height=Math.max(300,data.length*28)+'px';
+  ctx.scale(dpr,dpr);
+  const w=c.offsetWidth,h=parseInt(c.style.height);
+  const pad={t:20,r:20,b:30,l:100};
+  const pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+  ctx.fillStyle='#111520';ctx.fillRect(0,0,w,h);
+  const maxPip=Math.max(...data.map(d=>d.tp),...data.map(d=>d.hard_sl),1);
+  const barH=Math.max(4,ph/data.length*0.3);
+  const rowH=ph/data.length;
+  data.forEach((d,i)=>{
+    const y=pad.t+i*rowH;
+    const label=d.direction.toUpperCase()+' '+d.level;
+    ctx.fillStyle='#888';ctx.font='10px sans-serif';ctx.textAlign='right';
+    ctx.fillText(label,pad.l-6,y+rowH/2+3);
+    // TP bar (green, right)
+    const tw=d.tp/maxPip*pw;
+    ctx.fillStyle='#4CAF50';ctx.fillRect(pad.l,y+rowH/2-barH*1.5,Math.max(1,tw),barH);
+    // Soft SL (orange, left)
+    const sw=d.soft_sl/maxPip*pw;
+    ctx.fillStyle='#FFC107';ctx.fillRect(pad.l-sw,y+rowH/2-barH*0.5,Math.max(1,sw),barH);
+    // Hard SL (red, left, thinner)
+    const hw=d.hard_sl/maxPip*pw;
+    ctx.fillStyle='#FF5722';ctx.fillRect(pad.l-hw,y+rowH/2+barH*0.5,Math.max(1,hw),barH);
+  });
+  // Zero line
+  ctx.strokeStyle='#FFD700';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,h-pad.b);ctx.stroke();
+}
+
+function drawBl(){
+  const data=[{"direction": "buy", "total_pnl": 21956.08, "wr": 75.5, "avg_odds": 111.53, "avg_ev": 12.16, "worst_ev": -59.22, "danger": 2, "level": "\u26a0\ufe0f WARNING"}];
+  if(!data.length)return;
+  const c=document.getElementById('chartBl');
+  const ctx=c.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  c.width=c.offsetWidth*dpr;c.height=Math.max(200,data.length*30)*dpr;
+  c.style.height=Math.max(200,data.length*30)+'px';
+  ctx.scale(dpr,dpr);
+  const w=c.offsetWidth,h=parseInt(c.style.height);
+  const pad={t:20,r:20,b:30,l:100};
+  const pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+  ctx.fillStyle='#111520';ctx.fillRect(0,0,w,h);
+  const maxAbs=Math.max(...data.map(d=>Math.abs(d.total_pnl)),100)*1.2;
+  const rowH=ph/data.length;
+  const barH=rowH*0.5;
+  data.forEach((d,i)=>{
+    const y=pad.t+i*rowH;
+    ctx.fillStyle='#888';ctx.font='10px sans-serif';ctx.textAlign='right';
+    ctx.fillText(d.direction.toUpperCase(),pad.l-6,y+rowH/2+3);
+    const bw=Math.abs(d.total_pnl)/maxAbs*pw;
+    const x=d.total_pnl>=0?pad.l:pad.l-bw;
+    ctx.fillStyle=d.danger>5?'#FF5722':'#FFC107';
+    ctx.fillRect(x,y+rowH/2-barH/2,Math.max(1,bw),barH);
+    ctx.fillStyle='#ddd';ctx.font='9px sans-serif';ctx.textAlign=d.total_pnl>=0?'left':'right';
+    ctx.fillText('$'+d.total_pnl.toLocaleString()+'|'+d.level,x+(d.total_pnl>=0?4:-4),y+rowH/2+3);
+  });
+  // Zero line
+  ctx.strokeStyle='#FFD700';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,h-pad.b);ctx.stroke();
+}
+
+function drawRv(){
+  const data=[{"direction": "sell", "deepest_level": "L9+", "worst_loss": 101.92, "best_ev_level": "L9+", "best_ev": 63.29, "recovery_trades": 2, "recovery_days": 0, "status": "\ud83d\udfe2", "status_text": "\u5b89\u5168 (2\u6b21)"}, {"direction": "buy", "deepest_level": "L9+", "worst_loss": 79.51, "best_ev_level": "L9+", "best_ev": 57.79, "recovery_trades": 2, "recovery_days": 0, "status": "\ud83d\udfe2", "status_text": "\u5b89\u5168 (2\u6b21)"}];
+  if(!data.length)return;
+  const c=document.getElementById('chartRv');
+  const ctx=c.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  c.width=c.offsetWidth*dpr;c.height=Math.max(200,data.length*30)*dpr;
+  c.style.height=Math.max(200,data.length*30)+'px';
+  ctx.scale(dpr,dpr);
+  const w=c.offsetWidth,h=parseInt(c.style.height);
+  const pad={t:20,r:20,b:30,l:120};
+  const pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+  ctx.fillStyle='#111520';ctx.fillRect(0,0,w,h);
+  const cap=40;
+  const rowH=ph/data.length;
+  const barH=rowH*0.5;
+  data.forEach((d,i)=>{
+    const y=pad.t+i*rowH;
+    const label=d.direction.toUpperCase()+' (depth '+d.deepest_level+')';
+    ctx.fillStyle='#888';ctx.font='9px sans-serif';ctx.textAlign='right';
+    ctx.fillText(label,pad.l-6,y+rowH/2+3);
+    const val=Math.min(d.recovery_trades,cap);
+    const bw=val/cap*pw;
+    ctx.fillStyle=d.recovery_trades>20?'#FF5722':d.recovery_trades>=5?'#FFC107':'#4CAF50';
+    ctx.fillRect(pad.l,y+rowH/2-barH/2,Math.max(1,bw),barH);
+    ctx.fillStyle='#ddd';ctx.font='9px sans-serif';ctx.textAlign='left';
+    ctx.fillText(d.recovery_trades+'次 ('+d.recovery_days+'天)',pad.l+bw+4,y+rowH/2+3);
+  });
+  // Reference lines
+  [5,20].forEach(v=>{
+    const x=pad.l+v/cap*pw;
+    ctx.strokeStyle=v===5?'#FFC107':'#FF5722';ctx.lineWidth=0.5;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,h-pad.b);ctx.stroke();
+    ctx.setLineDash([]);
+  });
+}
+
+function drawScatter(){
+  const grid=document.getElementById('scatterGrid');
+  grid.innerHTML='';
+  for(const[key,data]of Object.entries(scatterData)){
+    if(!data.length)continue;
+    const card=document.createElement('div');
+    card.style.cssText='background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px';
+    const parts=key.split('_');
+    card.innerHTML='<div style="font-size:0.8em;color:var(--primary);margin-bottom:4px">'+parts[0].toUpperCase()+' '+parts[1]+'</div><canvas id="sc_'+key+'" style="width:100%;height:160px"></canvas>';
+    grid.appendChild(card);
+    setTimeout(()=>{
+      const cv=document.getElementById('sc_'+key);
+      if(!cv)return;
+      const ctx=cv.getContext('2d');
+      const dpr=window.devicePixelRatio||1;
+      cv.width=cv.offsetWidth*dpr;cv.height=160*dpr;
+      ctx.scale(dpr,dpr);
+      const w=cv.offsetWidth,h=160;
+      const pad={t:12,r:6,b:20,l:30};
+      const pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+      ctx.fillStyle='#111520';ctx.fillRect(0,0,w,h);
+      const mx=Math.max(...data.map(d=>Math.abs(d.mfe)),...data.map(d=>Math.abs(d.mae)),1);
+      // Axes
+      ctx.strokeStyle='#333';ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,pad.t+ph);ctx.lineTo(pad.l+pw,pad.t+ph);ctx.stroke();
+      // Points
+      data.forEach(d=>{
+        const x=pad.l+(d.mae/mx)*pw;
+        const y=pad.t+ph*(1-d.mfe/mx);
+        ctx.beginPath();ctx.arc(Math.max(pad.l,Math.min(pad.l+pw,x)),Math.max(pad.t,Math.min(pad.t+ph,y)),2,0,Math.PI*2);
+        ctx.fillStyle=d.is_win?'#4CAF50':'#FF5722';ctx.fill();
+      });
+    },50);
+  }
+}
+</script>
+</body></html>
