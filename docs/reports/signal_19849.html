@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signal #19849 V3 分析報告</title>
+<style>
+:root{--bg:#0a0e17;--card:#111520;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--orange:#fd7e14;--border:#1e2433;--radius:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;background:var(--bg);color:var(--text);padding:12px;font-size:13px;line-height:1.5}
+.container{max-width:1400px;margin:0 auto}
+.header{background:linear-gradient(135deg,#1a1a3e 0%,#2d1b69 50%,#1a1a3e 100%);border:1px solid #4a3f8a;border-radius:12px;padding:20px;margin-bottom:16px}
+.header h1{font-size:22px;color:#FFD700;margin-bottom:4px}
+.header .sub{font-size:11px;color:#888}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:16px;margin-top:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;text-align:center}
+.card .v{font-size:18px;font-weight:700;color:var(--primary)}
+.card .v.pos{color:var(--green)}.card .v.neg{color:var(--red)}
+.card .l{font-size:9px;color:var(--text2);margin-top:2px;text-transform:uppercase}
+.tabs{display:flex;gap:0;margin-bottom:0;flex-wrap:wrap}
+.tab{padding:10px 18px;background:var(--card);border:1px solid var(--border);color:var(--text2);cursor:pointer;border-radius:8px 8px 0 0;font-size:12px;white-space:nowrap}
+.tab.active{background:var(--bg);color:var(--primary);border-bottom-color:var(--bg);font-weight:700}
+.tab:hover{color:var(--primary)}
+.panel{background:var(--bg);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:16px;margin-bottom:20px}
+.panel.hidden{display:none}
+.sec{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.sec-h{background:linear-gradient(90deg,#1a1a3e,#2d1b69);padding:10px 14px;font-size:12px;font-weight:bold;color:#fff;border-bottom:1px solid #3a3a6a}
+.sec-b{padding:10px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:11px;min-width:600px}
+th{background:#1a1a3e;color:#bbb;padding:6px;text-align:left;font-size:9px;text-transform:uppercase;border-bottom:1px solid #3a3a6a;white-space:nowrap;cursor:pointer}
+th:hover{color:#FFD700}
+td{padding:5px 6px;border-bottom:1px solid #1a1a2a;white-space:nowrap}
+tr:hover{background:rgba(255,215,0,0.03)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.rtg{display:inline-block;padding:1px 8px;border-radius:4px;font-size:10px;font-weight:700;min-width:24px;text-align:center}
+.lbl{font-size:9px;color:var(--text2);text-transform:uppercase}
+.legend{display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--text2)}
+.legend span::before{content:'';display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.l-green::before{background:var(--green)}.l-orange::before{background:var(--orange)}.l-red::before{background:var(--red)}
+.ccy-section{margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.ccy-header{padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#131335;font-size:13px}
+.ccy-header:hover{background:#1a1a4a}
+.ccy-header .arrow{transition:transform .2s;font-size:12px}
+.ccy-header.open .arrow{transform:rotate(90deg)}
+.ccy-body{display:none;padding:12px}
+.ccy-body.open{display:block}
+.sug-card{border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;background:rgba(255,255,255,0.02)}
+.sug-card.high{border-color:var(--green)}.sug-card.medium{border-color:var(--yellow)}.sug-card.low{border-color:var(--red)}
+.sug-title{font-size:14px;font-weight:700;margin-bottom:8px}
+.sug-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px}
+.sug-reason{margin-top:8px;font-size:11px;color:var(--text2)}
+.scatter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.scatter-card{background:#0a0a18;border:1px solid var(--border);border-radius:8px;padding:8px}
+.scatter-card .title{font-size:11px;color:var(--primary);margin-bottom:4px}
+.footer{text-align:center;padding:16px;color:#555;font-size:10px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>🔬 Signal #19849 V3 分析報告</h1>
+  <div class="sub">Martin V3 + Quant 圖表 · 1 CCY×Direction · 32 trades · 2026-05-13 21:29</div>
+  <div class="cards">
+    <div class="card"><div class="v">32</div><div class="l">總交易</div></div>
+    <div class="card"><div class="v pos">$+8,838</div><div class="l">總盈虧</div></div>
+    <div class="card"><div class="v pos">96.9%</div><div class="l">勝率</div></div>
+    <div class="card"><div class="v">5666.07</div><div class="l">Profit Factor</div></div>
+    <div class="card"><div class="v neg">$2</div><div class="l">Max DD</div></div>
+    <div class="card"><div class="v">0.4h</div><div class="l">Avg Hold</div></div>
+    <div class="card"><div class="v" style="color:var(--accent)">1</div><div class="l">CCY×Dir</div></div>
+    <div class="card"><div class="v neg">1</div><div class="l">黑名單</div></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="sw('p1')">📊 CCY 詳情</div>
+  <div class="tab" onclick="sw('p2')">💀 黑名單</div>
+  <div class="tab" onclick="sw('p3')">💪 恢復力</div>
+</div>
+
+<div class="panel" id="p1">
+
+        <div class="ccy-section">
+          <div class="ccy-header" onclick="toggleCCY(this)">
+            <span><b>XAUUSD</b> BUY — 32 trades · $+8,837.51 · WR 96.9% · EV $+204.04</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="ccy-body">
+            <div class="cards" style="margin-bottom:12px">
+              <div class="card"><div class="v">32</div><div class="l">Trades</div></div>
+              <div class="card"><div class="v">pos">96.9%</div><div class="l">WR%</div></div>
+              <div class="card"><div class="v pos">$+8,838</div><div class="l">Total$</div></div>
+              <div class="card"><div class="v">9</div><div class="l">Layers</div></div>
+              <div class="card"><div class="v pos">$+204.04</div><div class="l">EV$/L</div></div>
+              <div class="card"><div class="v">888.00x</div><div class="l">Avg Odds$</div></div>
+            </div>
+            <div class="sug-card high">
+              <div class="sug-title">✅ 建議 CoP (Copy on Profit)</div>
+              <div class="sug-grid">
+                <div><span class="lbl">策略</span><br>CoP</div>
+                <div><span class="lbl">Wait Pips</span><br>5</div>
+                <div><span class="lbl">信心度</span><br>🟢 高</div>
+                <div><span class="lbl">期望值</span><br>177.033R</div>
+                <div><span class="lbl">勝率</span><br>96.9%</div>
+                <div><span class="lbl">馬丁依賴</span><br>0.0%</div>
+                <div><span class="lbl">Best CoP</span><br>106.9 (L3)</div>
+                <div><span class="lbl">Best CoL</span><br>110.0 (L2)</div>
+              </div>
+              <div class="sug-reason">馬丁依賴度低 (0.0%)、勝率 96.9%</div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">值博率分析</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Trades</th><th>WR%</th><th>AvgW$</th><th>AvgL$</th><th>R:R</th><th>E(R)</th><th>Kelly%</th><th>安全邊際</th><th>Total$</th></tr></thead>
+                <tbody><tr>
+                  <td>32</td><td>96.9%</td>
+                  <td class="pos">$285.13</td><td class="neg">$1.56</td>
+                  <td>182.78</td><td class="pos">177.033</td>
+                  <td>96.9%</td><td>🟢 穩健</td>
+                  <td class="pos">$+8,837.51</td>
+                </tr></tbody></table></div></div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">各層級數據 (L1-L9+)</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Count</th><th>WR%</th><th>Total$</th><th>EV$</th><th>Odds$</th><th>AvgWin Pip</th><th>AvgLoss Pip</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>AvgHold</th><th>Rating</th></tr></thead>
+                <tbody><tr>
+              <td><b>L1</b></td><td>1</td><td>0.0%</td>
+              <td class="neg">$-1.56</td>
+              <td class="neg">$-1.56</td>
+              <td>0.0x</td>
+              <td class="pos">0</td><td class="neg">15.6</td>
+              <td class="pos">0.0</td><td class="neg">13.6</td><td class="neg">13.6</td>
+              <td>0.1h</td>
+              <td><span class="rtg" style="background:#e74c3c;color:#000">D</span></td>
+            </tr><tr>
+              <td><b>L2</b></td><td>3</td><td>100.0%</td>
+              <td class="pos">$+1,040.50</td>
+              <td class="pos">$+346.83</td>
+              <td>999x</td>
+              <td class="pos">69.4</td><td class="neg">0</td>
+              <td class="pos">69.4</td><td class="neg">38.9</td><td class="neg">61.6</td>
+              <td>1.7h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr><tr>
+              <td><b>L3</b></td><td>1</td><td>100.0%</td>
+              <td class="pos">$+401.74</td>
+              <td class="pos">$+401.74</td>
+              <td>999x</td>
+              <td class="pos">75.8</td><td class="neg">0</td>
+              <td class="pos">75.8</td><td class="neg">8.0</td><td class="neg">8.0</td>
+              <td>0.1h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr><tr>
+              <td><b>L4</b></td><td>5</td><td>100.0%</td>
+              <td class="pos">$+910.98</td>
+              <td class="pos">$+182.20</td>
+              <td>999x</td>
+              <td class="pos">33.7</td><td class="neg">0</td>
+              <td class="pos">42.8</td><td class="neg">16.0</td><td class="neg">35.6</td>
+              <td>0.5h</td>
+              <td><span class="rtg" style="background:#FFD700;color:#000">S+</span></td>
+            </tr><tr>
+              <td><b>L5</b></td><td>2</td><td>100.0%</td>
+              <td class="pos">$+40.47</td>
+              <td class="pos">$+20.23</td>
+              <td>999x</td>
+              <td class="pos">3.5</td><td class="neg">0</td>
+              <td class="pos">28.1</td><td class="neg">10.9</td><td class="neg">11.7</td>
+              <td>0.2h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr><tr>
+              <td><b>L6</b></td><td>6</td><td>100.0%</td>
+              <td class="pos">$+1,129.84</td>
+              <td class="pos">$+188.31</td>
+              <td>999x</td>
+              <td class="pos">32.5</td><td class="neg">0</td>
+              <td class="pos">38.1</td><td class="neg">10.6</td><td class="neg">48.6</td>
+              <td>0.2h</td>
+              <td><span class="rtg" style="background:#FFD700;color:#000">S+</span></td>
+            </tr><tr>
+              <td><b>L7</b></td><td>1</td><td>100.0%</td>
+              <td class="pos">$+5.04</td>
+              <td class="pos">$+5.04</td>
+              <td>999x</td>
+              <td class="pos">0.8</td><td class="neg">0</td>
+              <td class="pos">0.8</td><td class="neg">0.0</td><td class="neg">0.0</td>
+              <td>0.0h</td>
+              <td><span class="rtg" style="background:#3498db;color:#000">A</span></td>
+            </tr><tr>
+              <td><b>L8</b></td><td>2</td><td>100.0%</td>
+              <td class="pos">$+515.20</td>
+              <td class="pos">$+257.60</td>
+              <td>999x</td>
+              <td class="pos">40.2</td><td class="neg">0</td>
+              <td class="pos">59.2</td><td class="neg">12.8</td><td class="neg">14.4</td>
+              <td>0.1h</td>
+              <td><span class="rtg" style="background:#2ecc71;color:#000">S</span></td>
+            </tr><tr>
+              <td><b>L9+</b></td><td>11</td><td>100.0%</td>
+              <td class="pos">$+4,795.30</td>
+              <td class="pos">$+435.94</td>
+              <td>999x</td>
+              <td class="pos">38.1</td><td class="neg">0</td>
+              <td class="pos">39.3</td><td class="neg">14.9</td><td class="neg">54.3</td>
+              <td>0.2h</td>
+              <td><span class="rtg" style="background:#FFD700;color:#000">S+</span></td>
+            </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">TP/SL 條形圖</div>
+              <div class="sec-b">
+                <canvas id="tpsl_0" style="width:100%;height:360px"></canvas>
+                <div class="legend">
+                  <span class="l-green">TP (Avg MFE)</span>
+                  <span class="l-orange">Soft SL (MAE×1.2)</span>
+                  <span class="l-red">Hard SL (MaxMAE×1.3)</span>
+                </div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">MFE/MAE 散點圖</div>
+              <div class="sec-b">
+                <div class="scatter-grid"><div class="scatter-card">
+                <div class="title">L1 (n=1) WR:0.0%</div>
+                <canvas id="sc_0_L1" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L2 (n=3) WR:100.0%</div>
+                <canvas id="sc_0_L2" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L3 (n=1) WR:100.0%</div>
+                <canvas id="sc_0_L3" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L4 (n=5) WR:100.0%</div>
+                <canvas id="sc_0_L4" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L5 (n=2) WR:100.0%</div>
+                <canvas id="sc_0_L5" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L6 (n=6) WR:100.0%</div>
+                <canvas id="sc_0_L6" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L7 (n=1) WR:100.0%</div>
+                <canvas id="sc_0_L7" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L8 (n=2) WR:100.0%</div>
+                <canvas id="sc_0_L8" style="width:100%;height:160px"></canvas>
+              </div><div class="scatter-card">
+                <div class="title">L9+ (n=11) WR:100.0%</div>
+                <canvas id="sc_0_L9+" style="width:100%;height:160px"></canvas>
+              </div></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">馬丁層級深度 · 依賴度 0.0%</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Layer</th><th>Trades</th><th>Martin#</th><th>觸發率</th><th>Avg深度(pip)</th><th>Max深度(pip)</th></tr></thead>
+                <tbody><tr>
+                  <td>L1</td><td>1</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L2</td><td>3</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L3</td><td>1</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L4</td><td>5</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L5</td><td>2</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L6</td><td>6</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L7</td><td>1</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L8</td><td>2</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr><tr>
+                  <td>L9+</td><td>11</td><td>0</td>
+                  <td>0.0%</td>
+                  <td>0</td><td>0</td>
+                </tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">DDE CoP/CoL 評分</div>
+              <div class="sec-b"><div class="tw"><table>
+                <thead><tr><th>Level</th><th>Type</th><th>Wait</th><th>Triggered</th><th>Rate</th><th>Avg$</th><th>Score</th><th>Rating</th></tr></thead>
+                <tbody><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>0/0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>0/0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>0/0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L1</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>0/0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>1</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L1</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>3/3</td><td>100%</td>
+                  <td>$346.83</td><td><b>102.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>3/3</td><td>100%</td>
+                  <td>$346.83</td><td><b>102.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>3/3</td><td>100%</td>
+                  <td>$346.83</td><td><b>102.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>3/3</td><td>100%</td>
+                  <td>$346.83</td><td><b>102.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>3</td><td>100%</td>
+                  <td>$346.83</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$345.50</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$345.50</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L2</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$345.50</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>1/1</td><td>100%</td>
+                  <td>$401.74</td><td><b>106.9</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>1/1</td><td>100%</td>
+                  <td>$401.74</td><td><b>106.9</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>1/1</td><td>100%</td>
+                  <td>$401.74</td><td><b>106.9</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>1/1</td><td>100%</td>
+                  <td>$401.74</td><td><b>106.9</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L3</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L4</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$182.20</td><td><b>94.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L4</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>5/5</td><td>100%</td>
+                  <td>$182.20</td><td><b>94.8</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L4</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>4/5</td><td>80%</td>
+                  <td>$221.00</td><td><b>91.2</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L4</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>4/5</td><td>80%</td>
+                  <td>$221.00</td><td><b>91.2</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L4</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>3</td><td>100%</td>
+                  <td>$25.38</td><td><b>88.2</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L4</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>3</td><td>100%</td>
+                  <td>$25.38</td><td><b>88.2</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L4</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$24.30</td><td><b>87.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L4</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$24.30</td><td><b>87.7</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L5</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>1/2</td><td>50%</td>
+                  <td>$21.09</td><td><b>52.5</b></td><td>⭐⭐</td></tr><tr><td>L5</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>1/2</td><td>50%</td>
+                  <td>$21.09</td><td><b>52.5</b></td><td>⭐⭐</td></tr><tr><td>L5</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>1/2</td><td>50%</td>
+                  <td>$21.09</td><td><b>52.5</b></td><td>⭐⭐</td></tr><tr><td>L5</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>1/2</td><td>50%</td>
+                  <td>$21.09</td><td><b>52.5</b></td><td>⭐⭐</td></tr><tr><td>L5</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$20.23</td><td><b>68.1</b></td><td>⭐⭐⭐</td></tr><tr><td>L5</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L5</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L5</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L6</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>4/6</td><td>67%</td>
+                  <td>$272.17</td><td><b>89.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L6</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>4/6</td><td>67%</td>
+                  <td>$272.17</td><td><b>89.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L6</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>4/6</td><td>67%</td>
+                  <td>$272.17</td><td><b>89.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L6</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>3/6</td><td>50%</td>
+                  <td>$350.90</td><td><b>85.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L6</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$291.16</td><td><b>110.0</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L6</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>1</td><td>100%</td>
+                  <td>$22.04</td><td><b>63.2</b></td><td>⭐⭐⭐</td></tr><tr><td>L6</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>1</td><td>100%</td>
+                  <td>$22.04</td><td><b>63.2</b></td><td>⭐⭐⭐</td></tr><tr><td>L6</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>1</td><td>100%</td>
+                  <td>$22.04</td><td><b>63.2</b></td><td>⭐⭐⭐</td></tr><tr><td>L7</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>0/1</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L7</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>0/1</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L7</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>0/1</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L7</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>0/1</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L7</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L7</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L7</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L7</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L8</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$257.60</td><td><b>92.4</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L8</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$257.60</td><td><b>92.4</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L8</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$257.60</td><td><b>92.4</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L8</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>2/2</td><td>100%</td>
+                  <td>$257.60</td><td><b>92.4</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L8</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>2</td><td>100%</td>
+                  <td>$257.60</td><td><b>95.2</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L8</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L8</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L8</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>0</td><td>0%</td>
+                  <td>$0.00</td><td><b>0.0</b></td><td>⭐</td></tr><tr><td>L9+</td><td style="color:#4CAF50">CoP</td><td>5pip</td>
+                  <td>7/11</td><td>64%</td>
+                  <td>$669.01</td><td><b>76.6</b></td><td>⭐⭐⭐</td></tr><tr><td>L9+</td><td style="color:#4CAF50">CoP</td><td>10pip</td>
+                  <td>6/11</td><td>55%</td>
+                  <td>$768.75</td><td><b>76.7</b></td><td>⭐⭐⭐</td></tr><tr><td>L9+</td><td style="color:#4CAF50">CoP</td><td>15pip</td>
+                  <td>6/11</td><td>55%</td>
+                  <td>$768.75</td><td><b>76.7</b></td><td>⭐⭐⭐</td></tr><tr><td>L9+</td><td style="color:#4CAF50">CoP</td><td>20pip</td>
+                  <td>5/11</td><td>45%</td>
+                  <td>$914.35</td><td><b>77.2</b></td><td>⭐⭐⭐</td></tr><tr><td>L9+</td><td style="color:#f39c12">CoL</td><td>10pip</td>
+                  <td>6</td><td>100%</td>
+                  <td>$617.24</td><td><b>98.3</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L9+</td><td style="color:#f39c12">CoL</td><td>15pip</td>
+                  <td>5</td><td>100%</td>
+                  <td>$552.94</td><td><b>94.2</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L9+</td><td style="color:#f39c12">CoL</td><td>20pip</td>
+                  <td>3</td><td>100%</td>
+                  <td>$457.17</td><td><b>88.1</b></td><td>⭐⭐⭐⭐</td></tr><tr><td>L9+</td><td style="color:#f39c12">CoL</td><td>25pip</td>
+                  <td>3</td><td>100%</td>
+                  <td>$457.17</td><td><b>88.1</b></td><td>⭐⭐⭐⭐</td></tr></tbody></table></div></div></div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h" style="background:linear-gradient(90deg,#3e1a1a,#692d2d)">⚠️ Danger Score</div>
+              <div class="sec-b">
+                <div style="font-size:14px;margin-bottom:6px">⚠️ WARNING</div>
+                <div>Danger: <b>3</b> | WR: 96.9% | Odds: 0.0</div>
+              </div>
+            </div>
+            <div class="sec" style="margin-bottom:10px">
+              <div class="sec-h">恢復力分析</div>
+              <div class="sec-b">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;font-size:11px">
+                  <div><span class="lbl">狀態</span><br>🟢 安全 (1次)</div>
+                  <div><span class="lbl">最深層</span><br>L9+</div>
+                  <div><span class="lbl">最差損失</span><br class="neg">$110.00</div>
+                  <div><span class="lbl">最佳EV層</span><br>L9+ ($+435.94)</div>
+                  <div><span class="lbl">恢復次數</span><br><b>1</b></div>
+                  <div><span class="lbl">恢復天數</span><br>3天</div>
+                </div>
+              </div>
+            </div></div></div>
+</div>
+
+<div class="panel hidden" id="p2">
+  <h3 style="color:var(--primary);margin-bottom:12px">💀 黑名單 — 5因子 Danger Score</h3>
+  <div style="font-size:10px;color:var(--text2);margin-bottom:8px">因子：虧損金額、賠率&lt;1、WR&lt;50%、EV&lt;0、最差層EV</div>
+  <div class="tw"><table><thead><tr><th>危險度</th><th>Danger</th><th>CCY</th><th>Dir</th><th>Total$</th><th>WR%</th><th>Odds</th></tr></thead><tbody><tr><td>⚠️ WARNING</td><td><b>3</b></td><td><b>XAUUSD</b></td><td>buy</td>
+              <td class="pos">$+8,837.51</td><td>96.9%</td><td>0.0</td></tr></tbody></table></div>
+</div>
+
+<div class="panel hidden" id="p3">
+  <h3 style="color:var(--primary);margin-bottom:12px">💪 恢復力 — 最深層止損 vs 最佳EV恢復</h3>
+  <div class="tw"><table><thead><tr><th>狀態</th><th>CCY</th><th>Dir</th><th>最深層</th><th>最差損失</th><th>Best EV層</th><th>Best EV</th><th>恢復次數</th></tr></thead><tbody><tr><td>🟢</td><td><b>XAUUSD</b></td><td>buy</td>
+          <td>L9+</td><td class="neg">$110.00</td>
+          <td>L9+</td><td class="pos">$+435.94</td>
+          <td><b>1</b></td></tr></tbody></table></div>
+</div>
+
+<div class="footer">Signal #19849 · Martin V3 + Quant · 2026-05-13 21:29</div>
+</div>
+
+<script>
+// Tab switching
+function sw(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.add('hidden'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.remove('hidden');
+  event.target.classList.add('active');
+  if(id==='p1') drawAllCharts();
+}
+
+// CCY expand/collapse
+function toggleCCY(el){
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+// Data
+var tpslData = {"0": [{"level": "L1", "count": 1, "wr": 0.0, "rating": "D", "tp": 0.0, "soft_sl": 16.3, "hard_sl": 80.1}, {"level": "L2", "count": 3, "wr": 100.0, "rating": "S", "tp": 69.4, "soft_sl": 46.7, "hard_sl": 80.1}, {"level": "L3", "count": 1, "wr": 100.0, "rating": "S", "tp": 75.8, "soft_sl": 9.6, "hard_sl": 80.1}, {"level": "L4", "count": 5, "wr": 100.0, "rating": "S+", "tp": 42.8, "soft_sl": 19.2, "hard_sl": 80.1}, {"level": "L5", "count": 2, "wr": 100.0, "rating": "S", "tp": 28.1, "soft_sl": 13.1, "hard_sl": 80.1}, {"level": "L6", "count": 6, "wr": 100.0, "rating": "S+", "tp": 38.1, "soft_sl": 12.7, "hard_sl": 80.1}, {"level": "L7", "count": 1, "wr": 100.0, "rating": "A", "tp": 0.8, "soft_sl": 0.0, "hard_sl": 80.1}, {"level": "L8", "count": 2, "wr": 100.0, "rating": "S", "tp": 59.2, "soft_sl": 15.4, "hard_sl": 80.1}, {"level": "L9+", "count": 11, "wr": 100.0, "rating": "S+", "tp": 39.3, "soft_sl": 17.9, "hard_sl": 80.1}]};
+var scatterData = {"0": {"L1": {"points": [{"net_pips": -15.6, "mfe": 0.0, "mae": 13.6, "is_win": false}], "count": 1, "wr": 0.0}, "L2": {"points": [{"net_pips": 69.9, "mfe": 69.9, "mae": 12.9, "is_win": true}, {"net_pips": 63.9, "mfe": 63.9, "mae": 61.6, "is_win": true}, {"net_pips": 74.3, "mfe": 74.3, "mae": 42.3, "is_win": true}], "count": 3, "wr": 100.0}, "L3": {"points": [{"net_pips": 75.8, "mfe": 75.8, "mae": 8.0, "is_win": true}], "count": 1, "wr": 100.0}, "L4": {"points": [{"net_pips": 83.1, "mfe": 83.1, "mae": 0.0, "is_win": true}, {"net_pips": 71.5, "mfe": 71.5, "mae": 0.0, "is_win": true}, {"net_pips": 5.0, "mfe": 14.3, "mae": 26.9, "is_win": true}, {"net_pips": 5.1, "mfe": 24.3, "mae": 17.6, "is_win": true}, {"net_pips": 4.0, "mfe": 20.9, "mae": 35.6, "is_win": true}], "count": 5, "wr": 100.0}, "L5": {"points": [{"net_pips": 3.7, "mfe": 52.7, "mae": 10.1, "is_win": true}, {"net_pips": 3.4, "mfe": 3.4, "mae": 11.7, "is_win": true}], "count": 2, "wr": 100.0}, "L6": {"points": [{"net_pips": 75.2, "mfe": 75.2, "mae": 0.0, "is_win": true}, {"net_pips": 6.2, "mfe": 17.1, "mae": 0.0, "is_win": true}, {"net_pips": 9.7, "mfe": 26.3, "mae": 0.0, "is_win": true}, {"net_pips": 3.8, "mfe": 3.8, "mae": 48.6, "is_win": true}, {"net_pips": 3.3, "mfe": 3.3, "mae": 0.6, "is_win": true}, {"net_pips": 96.6, "mfe": 102.6, "mae": 14.2, "is_win": true}], "count": 6, "wr": 100.0}, "L7": {"points": [{"net_pips": 0.8, "mfe": 0.8, "mae": 0.0, "is_win": true}], "count": 1, "wr": 100.0}, "L8": {"points": [{"net_pips": 76.4, "mfe": 76.4, "mae": 11.2, "is_win": true}, {"net_pips": 4.1, "mfe": 42.1, "mae": 14.4, "is_win": true}], "count": 2, "wr": 100.0}, "L9+": {"points": [{"net_pips": 0.4, "mfe": 0.4, "mae": 0.0, "is_win": true}, {"net_pips": 2.1, "mfe": 15.7, "mae": 31.5, "is_win": true}, {"net_pips": 79.2, "mfe": 79.2, "mae": 17.6, "is_win": true}, {"net_pips": 2.5, "mfe": 2.5, "mae": 0.0, "is_win": true}, {"net_pips": 3.8, "mfe": 3.8, "mae": 0.0, "is_win": true}, {"net_pips": 67.1, "mfe": 67.1, "mae": 0.0, "is_win": true}, {"net_pips": 4.9, "mfe": 5.2, "mae": 19.4, "is_win": true}, {"net_pips": 74.5, "mfe": 74.5, "mae": 10.3, "is_win": true}, {"net_pips": 0.3, "mfe": 0.3, "mae": 0.0, "is_win": true}, {"net_pips": 103.1, "mfe": 103.1, "mae": 54.3, "is_win": true}, {"net_pips": 80.8, "mfe": 80.8, "mae": 30.8, "is_win": true}], "count": 11, "wr": 100.0}}};
+var chartMap = {"0": {"sym": "XAUUSD", "dir": "buy"}};
+
+// Sort tables
+document.querySelectorAll('table').forEach(tbl=>{
+  var ths=tbl.querySelectorAll('thead th');
+  ths.forEach((th,col)=>{
+    th.addEventListener('click',()=>{
+      var tbody=tbl.querySelector('tbody');
+      if(!tbody)return;
+      var rows=Array.from(tbody.querySelectorAll('tr'));
+      var asc=th.dataset.sort!=='asc';
+      ths.forEach(t=>{t.classList.remove('sort-asc','sort-desc');delete t.dataset.sort});
+      th.dataset.sort=asc?'asc':'desc';
+      th.classList.add(asc?'sort-asc':'sort-desc');
+      rows.sort((a,b)=>{
+        var va=a.cells[col]?a.cells[col].textContent.trim():'';
+        var vb=b.cells[col]?b.cells[col].textContent.trim():'';
+        var na=parseFloat(va.replace(/[^0-9.-]/g,''));
+        var nb=parseFloat(vb.replace(/[^0-9.-]/g,''));
+        if(!isNaN(na)&&!isNaN(nb))return asc?na-nb:nb-na;
+        return asc?va.localeCompare(vb):vb.localeCompare(va);
+      });
+      rows.forEach(r=>tbody.appendChild(r));
+    });
+  });
+});
+
+function drawAllCharts(){
+  drawTpslCharts();
+  drawScatterPlots();
+}
+
+function drawTpslCharts(){
+  for(var ci=0;ci<Object.keys(tpslData).length;ci++){
+    var data=tpslData[ci];
+    if(!data||!data.length)continue;
+    var c=document.getElementById('tpsl_'+ci);
+    if(!c)continue;
+    var ctx=c.getContext('2d');
+    var dpr=window.devicePixelRatio||1;
+    var w=c.offsetWidth;
+    var h=Math.max(200,data.length*40);
+    c.width=w*dpr;c.height=h*dpr;
+    c.style.height=h+'px';
+    ctx.scale(dpr,dpr);
+    var pad={t:25,r:20,b:30,l:100};
+    var pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+    ctx.fillStyle='#111520';ctx.fillRect(0,0,w,h);
+
+    var maxPip=1;
+    data.forEach(function(d){maxPip=Math.max(maxPip,d.tp,d.soft_sl,d.hard_sl)});
+    maxPip*=1.1;
+    var barH=Math.max(4,ph/data.length*0.25);
+    var rowH=ph/data.length;
+
+    // Zero line
+    ctx.strokeStyle='#FFD700';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,h-pad.b);ctx.stroke();
+
+    data.forEach(function(d,i){
+      var y=pad.t+i*rowH;
+      var label=d.level;
+      ctx.fillStyle='#aaa';ctx.font='11px sans-serif';ctx.textAlign='right';
+      ctx.fillText(label,pad.l-8,y+rowH/2+4);
+
+      // TP (green, right)
+      var tw=d.tp/maxPip*pw;
+      ctx.fillStyle='#4CAF50';ctx.fillRect(pad.l,y+rowH/2-barH*1.5,Math.max(1,tw),barH);
+      // Soft SL (orange, left)
+      var sw=d.soft_sl/maxPip*pw;
+      ctx.fillStyle='#fd7e14';ctx.fillRect(pad.l-sw,y+rowH/2-barH*0.5,Math.max(1,sw),barH);
+      // Hard SL (red, left)
+      var hw=d.hard_sl/maxPip*pw;
+      ctx.fillStyle='#FF5722';ctx.fillRect(pad.l-hw,y+rowH/2+barH*0.5,Math.max(1,hw),barH);
+
+      // Rating label
+      ctx.fillStyle='#FFD700';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+      ctx.fillText(d.rating+' '+d.tp+'/'+d.soft_sl,pad.l+tw+6,y+rowH/2+4);
+    });
+  }
+}
+
+function drawScatterPlots(){
+  for(var ci=0;ci<Object.keys(scatterData).length;ci++){
+    var levels=scatterData[ci];
+    if(!levels)continue;
+    for(var lv in levels){
+      var c=document.getElementById('sc_'+ci+'_'+lv);
+      if(!c)continue;
+      var data=levels[lv].points;
+      if(!data||!data.length)continue;
+      var ctx=c.getContext('2d');
+      var dpr=window.devicePixelRatio||1;
+      var w=c.offsetWidth;
+      c.width=w*dpr;c.height=160*dpr;
+      ctx.scale(dpr,dpr);
+      var h=160;
+      var pad={t:12,r:6,b:20,l:30};
+      var pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+      ctx.fillStyle='#111520';ctx.fillRect(0,0,w,h);
+      ctx.strokeStyle='#333';ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,pad.t+ph);ctx.lineTo(pad.l+pw,pad.t+ph);ctx.stroke();
+
+      var mx=1;
+      data.forEach(function(d){
+        mx=Math.max(mx,Math.abs(d.mfe),Math.abs(d.mae));
+      });
+
+      // Grid lines
+      for(var g=0;g<=2;g++){
+        var gy=pad.t+ph*g/2;
+        ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(pad.l+pw,gy);ctx.stroke();
+        ctx.fillStyle='#666';ctx.font='8px sans-serif';ctx.textAlign='right';
+        ctx.fillText((mx*(2-g)/2).toFixed(0),pad.l-4,gy+3);
+      }
+
+      data.forEach(function(d){
+        var x=pad.l+(d.mae/mx)*pw;
+        var y=pad.t+ph*(1-d.mfe/mx);
+        x=Math.max(pad.l,Math.min(pad.l+pw,x));
+        y=Math.max(pad.t,Math.min(pad.t+ph,y));
+        ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);
+        ctx.fillStyle=d.is_win?'#4CAF50':'#FF5722';ctx.fill();
+      });
+    }
+  }
+}
+
+// Initial draw
+setTimeout(drawAllCharts, 100);
+window.addEventListener('resize',function(){setTimeout(drawAllCharts,50)});
+</script>
+</body></html>
