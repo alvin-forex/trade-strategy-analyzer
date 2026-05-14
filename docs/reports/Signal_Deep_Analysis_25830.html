@@ -1,0 +1,2626 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copy Trade Analysis - Signal #25830 - All Levels</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #333;
+            background: #f5f5f5;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+        
+        h1 {
+            font-size: 16px;
+            margin-bottom: 5px;
+            color: #1976d2;
+        }
+        
+        .subtitle {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .currency-section {
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .currency-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 12px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .currency-stats {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+            font-size: 10px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 9px;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            font-size: 11px;
+            color: #333;
+        }
+        
+        .level-section {
+            margin: 8px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .level-header {
+            background: #e3f2fd;
+            padding: 6px 10px;
+            font-weight: bold;
+            font-size: 11px;
+            color: #1976d2;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .strategy-section {
+            margin: 6px;
+        }
+        
+        .strategy-header {
+            background: #f5f5f5;
+            padding: 5px 8px;
+            font-weight: bold;
+            font-size: 10px;
+            color: #333;
+            border-left: 3px solid #1976d2;
+            margin-bottom: 4px;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            table-layout: auto;
+        }
+        
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .comparison-table th {
+            background: #e8eaf6;
+            padding: 4px 6px;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 1px solid #e0e0e0;
+            white-space: nowrap;
+        }
+        
+        .comparison-table td {
+            padding: 3px 6px;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+        
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .score-cell {
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .rating-excellent {
+            color: #2e7d32;
+            background: #e8f5e9;
+        }
+        
+        .rating-good {
+            color: #f57c00;
+            background: #fff3e0;
+        }
+        
+        .rating-average {
+            color: #f9a825;
+            background: #fffde7;
+        }
+        
+        .rating-poor {
+            color: #c62828;
+            background: #ffebee;
+        }
+        
+        .score-details {
+            font-size: 8px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        /* Tooltip for score details */
+        .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: #666;
+            font-size: 10px;
+            font-style: italic;
+            cursor: help;
+            position: relative;
+        }
+        .info-icon .tip {
+            display: none;
+            position: absolute;
+            left: 20px;
+            top: -10px;
+            background: #333;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 9px;
+            white-space: nowrap;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            line-height: 1.5;
+        }
+        .info-icon:hover .tip { display: block; }
+        
+        /* Sortable table headers */
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { background: #c5cae9; }
+        th.sortable::after { content: ' ⇕'; font-size: 9px; opacity: 0.5; }
+        th.sort-asc::after { content: ' ↑'; opacity: 1; color: #1976d2; }
+        th.sort-desc::after { content: ' ↓'; opacity: 1; color: #1976d2; }
+        
+        /* Formula tooltip on table headers */
+        th.formula-tip { cursor: help; position: relative; }
+        th.formula-tip .formula { display: none; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); background: #263238; color: #e0f7fa; padding: 8px 12px; border-radius: 6px; font-size: 10px; font-weight: normal; white-space: nowrap; z-index: 200; box-shadow: 0 4px 12px rgba(0,0,0,0.3); line-height: 1.6; margin-top: 2px; }
+        th.formula-tip .formula::before { content: ''; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-bottom-color: #263238; }
+        th.formula-tip:hover .formula { display: block; }
+        th.formula-tip:hover { background: #c5cae9; }
+        
+        .best-score {
+            background: #e8f5e9;
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 9px;
+            color: #666;
+            text-align: center;
+        }
+        
+        @media print {
+            body {
+                font-size: 9px;
+            }
+            .currency-section {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Copy Trade Analysis - Signal #25830</h1>
+        <div class="subtitle">
+            Complete Analysis for ALL LEVELS (L1, L2, L3, L4+)<br>
+            Generated: 2026-05-14 22:07:29
+        </div>
+        
+        
+    <div class="info-card" style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+        <div style="background: linear-gradient(135deg, #4a148c, #4a148cdd); color: #ce93d8; padding: 10px 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    <span style="font-size: 14px; font-weight: bold;">📡 Signal #25830</span>
+                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px; font-size: 10px; margin-left: 8px;">DW</span>
+                </div>
+                <div style="font-size: 11px; text-align: right;">
+                    <div>Dragon Wave v2.10</div>
+                    <div style="font-size:10px;opacity:0.8">Version: 20250529</div>
+                </div>
+            </div>
+        </div>
+        <div style="padding: 10px 15px; background: #fafafa;">
+            <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 3px 8px; color: #666; width: 100px;">EA Family</td>
+                    <td style="padding: 3px 8px; font-weight: bold;">DW (Dragon Wave v2.10)</td>
+                    <td style="padding: 3px 8px; color: #666; width: 100px;">Martin LV</td>
+                    <td style="padding: 3px 8px; font-weight: bold;">8</td>
+                </tr>
+                <tr>
+                    <td style="padding: 3px 8px; color: #666;">貨幣對數量</td>
+                    <td style="padding: 3px 8px;">4 個 (EURUSD, GBPAUD, GBPCAD, USDCHF)</td>
+                    <td style="padding: 3px 8px; color: #666;">.set 檔案</td>
+                    <td style="padding: 3px 8px;">4 個（1 個日期版本）</td>
+                </tr>
+            </table>
+        </div>
+    
+
+        <div style="padding: 8px 15px; border-top: 1px solid #eee;">
+            <div style="font-size: 11px; font-weight: bold; margin-bottom: 6px; color: #555;">⚙️ 核心參數</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+        
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">初始手數: <b>0.05</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">加倉倍數: <b>3.5</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">網格倍數: <b>1.0</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">虛擬 SL: <b>0</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">使用虛擬TP: <b>1</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">使用虛擬SL: <b>1</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">日止損: <b>0.0</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">最大點差: <b>0</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">最大滑點: <b>0</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">強制保本: <b>0</b></span>
+<span style="background: #e8eaf6; padding: 2px 6px; border-radius: 3px; font-size: 10px;">開倉類型: <b>2</b></span>
+</div></div>
+</div>
+        
+        <div class="summary-section" style="margin-bottom: 20px;">
+            <h2 style="font-size: 13px; margin-bottom: 10px; color: #1976d2;">📋 Analysis Summary</h2>
+            <div class="table-wrap"><table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Currency</th>
+                        <th>L1</th>
+                        <th>L2</th>
+                        <th>L3</th>
+                        <th>L4</th>
+                        <th>Total</th>
+                        <th>Win%</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    <tr>
+                        <td><strong>EURUSD</strong></td>
+                        <td>20</td>
+                        <td>10</td>
+                        <td>2</td>
+                        <td>1</td>
+                        <td>33</td>
+                        <td class="score-cell rating-poor">66.67%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>GBPAUD</strong></td>
+                        <td>29</td>
+                        <td>5</td>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>34</td>
+                        <td class="score-cell rating-poor">85.29%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>GBPCAD</strong></td>
+                        <td>37</td>
+                        <td>26</td>
+                        <td>2</td>
+                        <td>0</td>
+                        <td>65</td>
+                        <td class="score-cell rating-poor">75.38%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>USDCHF</strong></td>
+                        <td>42</td>
+                        <td>7</td>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>49</td>
+                        <td class="score-cell rating-poor">93.88%</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <div class="currency-section">
+            <div class="currency-header">EURUSD</div>
+            
+            <div class="currency-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Total Trades</span>
+                    <span class="stat-value">33</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Win Rate</span>
+                    <span class="stat-value">66.67%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Profit</span>
+                    <span class="stat-value">$3353.06</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg Profit</span>
+                    <span class="stat-value">$101.61</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg TP</span>
+                    <span class="stat-value">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg SL</span>
+                    <span class="stat-value">$0.00</span>
+                </div>
+            </div>
+
+            <div style="margin: 8px; border: 2px solid #FFC107; border-radius: 6px; overflow: hidden;">
+                <div style="background: #fff8e1; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #e0e0e0;">
+                    🎯 Copy Trade 建議
+                </div>
+                <div style="padding: 10px 12px; font-size: 11px; line-height: 1.8;">
+                    <div><strong>建議：</strong>✅ 建議 CoP (Copy on Profit)</div>
+                    <div><strong>信心度：</strong>🟡 中</div>
+
+                    <div><strong>策略：</strong>CoP · Wait <strong>5 pips</strong></div>
+                    <div><strong>建議 TP/SL：</strong>TP = 109.3 pips / SL = 143.3 pips (R:R = ⚠️ 0.76)</div>
+
+                    <div><strong>理由：</strong>馬丁依賴度低 (0.0%)、勝率 66.7%、信號質素高</div>
+                    <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd; font-size: 9px; color: #666;"><strong>背景數據：</strong>期望值 3.756R · 勝率 66.7% · 盈虧比 6.13 · 馬丁依賴 0.0% · 最佳 CoP 106.8 · 最佳 CoL 110.0</div>
+                </div>
+            </div>
+
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #e3f2fd; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #1976d2; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #1976d2;">
+                    📈 值博率分析 (Expectancy + Kelly + Safety Margin)
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #e8eaf6;">
+                            <th>層級</th><th>#</th><th>勝率</th><th>R</th><th>E</th>
+                            <th>Kelly</th><th>¼Kelly</th><th>BE</th><th>安全</th><th>等級</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr style="">
+                            <td><strong>L1</strong></td>
+                            <td>20</td>
+                            <td>55.0%</td>
+                            <td>1.60</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.432R</td>
+                            <td>27.0%</td>
+                            <td>6.7%</td>
+                            <td>38.4%</td>
+                            <td>🟢 16.6%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                        <tr style="">
+                            <td><strong>L2</strong></td>
+                            <td>10</td>
+                            <td>80.0%</td>
+                            <td>2.18</td>
+                            <td style="color: #2e7d32; font-weight: bold;">1.544R</td>
+                            <td>70.8%</td>
+                            <td>17.7%</td>
+                            <td>31.4%</td>
+                            <td>🟢 48.6%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                        <tr style="background: #f0f4ff;">
+                            <td><strong>Overall</strong></td>
+                            <td>33</td>
+                            <td>66.7%</td>
+                            <td>6.13</td>
+                            <td style="color: #2e7d32; font-weight: bold;">3.756R</td>
+                            <td>61.2%</td>
+                            <td>15.3%</td>
+                            <td>14.0%</td>
+                            <td>🟢 52.7%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>值博率解讀：</strong>期望值 3.756R（每冒 1R 風險期望回報 3.756R）。即使勝率跌至 14.0% 或盈虧比跌至 0.50 仍可打和。安全邊際 🟢 52.7%（穩健）。
+                </div>
+</div>
+
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #fff3e0; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #e65100; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #ff9800;">
+                    🎰 馬丁層級深度分析
+                </div>
+                <div style="padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #eee;">
+                    <strong>馬丁盈利依賴度：</strong><span style="color: #2e7d32; font-weight: bold;">0.0%</span>
+                    &nbsp;|&nbsp; 馬丁交易數：0 筆
+                    &nbsp;|&nbsp; 總盈利 $3650.60 中 $0.00 來自馬丁
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #fff8e1;">
+                            <th>層級</th><th>#</th><th>馬丁數</th><th>觸發</th><th>均深(pips)</th>
+                            <th>最深(pips)</th><th>均DD($)</th><th>最DD($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td><strong>L1</strong></td>
+                            <td>20</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>L2</strong></td>
+                            <td>10</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>L3</strong></td>
+                            <td>2</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>觸發率</strong> = Classic Martin 數 / 該層總交易數。紅色 >10%，橙色 >3%，綠色 ≤3%。<br>
+                    <strong>平均深度</strong> = 馬丁交易的平均 Max Loss Pips，反映觸發後要扛幾深。
+                </div>
+            </div>
+
+            <div class="martin-section" style="margin: 6px 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #f5f5f5; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #666; border-bottom: 1px solid #e0e0e0;">
+                    🎰 Martin Strategy Detection — ⚪ NONE
+                </div>
+                <div style="padding: 8px 10px; font-size: 10px;">
+
+                    <div style="margin-bottom: 8px; padding: 6px; background: #fce4ec; border-left: 3px solid #e91e63; border-radius: 2px;">
+                        <strong>🔄 Reverse Martin (Profit < 0, Pips > 0): 1 trades (3.0%)</strong><br>
+                        <span style="color: #2e7d32;">📈 Pips Won: 8.8</span> | 
+                        <span style="color: #c62828;">💸 Cost Eaten: $4.54</span>
+                        <br><span style="font-size: 8px; color: #666;">Commission + Swap ate all profit. Direction was right, but holding costs killed it.</span>
+
+                        <table style="width: 100%; margin-top: 4px; font-size: 9px; border-collapse: collapse;">
+                            <tr style="background: #f5f5f5;"><th style="padding: 2px 4px; text-align: left;">Symbol</th><th>Type</th><th>Lots</th><th>Pips</th><th>Profit</th><th>Cost</th></tr>
+
+                            <tr><td style="padding: 2px 4px;">EURUSD</td><td>buy</td><td>0.05</td><td style="color: #2e7d32;">8.8</td><td style="color: #c62828;">$-0.14</td><td style="color: #c62828;">$4.54</td></tr>
+</table></div>
+                    <div style="margin-bottom: 8px; padding: 6px; background: #e8eaf6; border-left: 3px solid #3f51b5; border-radius: 2px;">
+                        <strong>💀 Cost Killed (Gross Profit > 0, Net < 0): 1 trades (3.0%)</strong><br>
+                        <span style="color: #c62828;">💸 Total Cost: $4.54</span>
+                        <br><span style="font-size: 8px; color: #666;">Trade direction was correct, but commission + swap exceeded the gross profit.</span>
+
+                        <table style="width: 100%; margin-top: 4px; font-size: 9px; border-collapse: collapse;">
+                            <tr style="background: #f5f5f5;"><th style="padding: 2px 4px; text-align: left;">Symbol</th><th>Pips</th><th>Net Profit</th><th>Commission</th><th>Swap</th><th>Total Cost</th></tr>
+
+                            <tr><td style="padding: 2px 4px;">EURUSD</td><td>8.8</td><td style="color: #c62828;">$-0.14</td><td>$0.00</td><td>$-4.54</td><td style="color: #c62828;">$4.54</td></tr>
+</table></div>
+                </div>
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L1 ($-41 - $53) - 20 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">48.0 pips</span> <span style="color: #888; font-size: 8px;">(global(n=11))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">76.4 pips</span> <span style="color: #888; font-size: 8px;">(global(n=20))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">🚩 0.63</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$31.74</td>
+                            <td>DD ratio: 0.73</td>
+                            <td class="score-cell rating-excellent">96.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$31.74 vs P50=$12.19, P75=$22.28 → 109.4 × 40% = 43.7<br>DD ratio: 0.73 → 63.4 × 20% = 12.7<br><strong>96.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$31.74</td>
+                            <td>DD ratio: 0.73</td>
+                            <td class="score-cell rating-excellent">96.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$31.74 vs P50=$12.19, P75=$22.28 → 109.4 × 40% = 43.7<br>DD ratio: 0.73 → 63.4 × 20% = 12.7<br><strong>96.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$31.74</td>
+                            <td>DD ratio: 0.73</td>
+                            <td class="score-cell rating-excellent">96.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$31.74 vs P50=$12.19, P75=$22.28 → 109.4 × 40% = 43.7<br>DD ratio: 0.73 → 63.4 × 20% = 12.7<br><strong>96.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$31.74</td>
+                            <td>DD ratio: 0.73</td>
+                            <td class="score-cell rating-excellent">96.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$31.74 vs P50=$12.19, P75=$22.28 → 109.4 × 40% = 43.7<br>DD ratio: 0.73 → 63.4 × 20% = 12.7<br><strong>96.4</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>90.00%*</td>
+                            <td>50.00%</td>
+                            <td>$27.90</td>
+                            <td class="score-cell rating-excellent">84.9</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">50.00% → 50.0 × 50% = 25.0<br>$27.90 vs P50=$9.84, P75=$15.92 → 119.7 × 50% = 59.9<br>90.00% (display only, not scored)<br><strong>84.9</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>15 pips</td>
+                            <td>85.00%*</td>
+                            <td>47.06%</td>
+                            <td>$28.15</td>
+                            <td class="score-cell rating-excellent">83.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">47.06% → 47.1 × 50% = 23.5<br>$28.15 vs P50=$9.84, P75=$15.92 → 120.0 × 50% = 60.0<br>85.00% (display only, not scored)<br><strong>83.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>20 pips</td>
+                            <td>85.00%*</td>
+                            <td>47.06%</td>
+                            <td>$28.15</td>
+                            <td class="score-cell rating-excellent">83.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">47.06% → 47.1 × 50% = 23.5<br>$28.15 vs P50=$9.84, P75=$15.92 → 120.0 × 50% = 60.0<br>85.00% (display only, not scored)<br><strong>83.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>25 pips</td>
+                            <td>85.00%*</td>
+                            <td>47.06%</td>
+                            <td>$28.15</td>
+                            <td class="score-cell rating-excellent">83.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">47.06% → 47.1 × 50% = 23.5<br>$28.15 vs P50=$9.84, P75=$15.92 → 120.0 × 50% = 60.0<br>85.00% (display only, not scored)<br><strong>83.5</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L2 ($-82 - $209) - 10 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">88.5 pips</span> <span style="color: #888; font-size: 8px;">(global(n=8))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">115.8 pips</span> <span style="color: #888; font-size: 8px;">(global(n=10))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">⚠️ 0.76</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$130.28</td>
+                            <td>DD ratio: 0.38</td>
+                            <td class="score-cell rating-excellent">101.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$130.28 vs P50=$40.97, P75=$79.30 → 113.3 × 40% = 45.3<br>DD ratio: 0.38 → 81.0 × 20% = 16.2<br><strong>101.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$130.28</td>
+                            <td>DD ratio: 0.38</td>
+                            <td class="score-cell rating-excellent">101.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$130.28 vs P50=$40.97, P75=$79.30 → 113.3 × 40% = 45.3<br>DD ratio: 0.38 → 81.0 × 20% = 16.2<br><strong>101.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$130.28</td>
+                            <td>DD ratio: 0.38</td>
+                            <td class="score-cell rating-excellent">101.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$130.28 vs P50=$40.97, P75=$79.30 → 113.3 × 40% = 45.3<br>DD ratio: 0.38 → 81.0 × 20% = 16.2<br><strong>101.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$130.28</td>
+                            <td>DD ratio: 0.38</td>
+                            <td class="score-cell rating-excellent">101.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$130.28 vs P50=$40.97, P75=$79.30 → 113.3 × 40% = 45.3<br>DD ratio: 0.38 → 81.0 × 20% = 16.2<br><strong>101.5</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>60.00%*</td>
+                            <td>66.67%</td>
+                            <td>$93.73</td>
+                            <td class="score-cell rating-excellent">93.3</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">66.67% → 66.7 × 50% = 33.3<br>$93.73 vs P50=$13.83, P75=$34.58 → 120.0 × 50% = 60.0<br>60.00% (display only, not scored)<br><strong>93.3</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>60.00%*</td>
+                            <td>66.67%</td>
+                            <td>$93.73</td>
+                            <td class="score-cell rating-excellent">93.3</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">66.67% → 66.7 × 50% = 33.3<br>$93.73 vs P50=$13.83, P75=$34.58 → 120.0 × 50% = 60.0<br>60.00% (display only, not scored)<br><strong>93.3</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>60.00%*</td>
+                            <td>66.67%</td>
+                            <td>$93.73</td>
+                            <td class="score-cell rating-excellent">93.3</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">66.67% → 66.7 × 50% = 33.3<br>$93.73 vs P50=$13.83, P75=$34.58 → 120.0 × 50% = 60.0<br>60.00% (display only, not scored)<br><strong>93.3</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>25 pips</td>
+                            <td>60.00%*</td>
+                            <td>66.67%</td>
+                            <td>$93.73</td>
+                            <td class="score-cell rating-excellent">93.3</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">66.67% → 66.7 × 50% = 33.3<br>$93.73 vs P50=$13.83, P75=$34.58 → 120.0 × 50% = 60.0<br>60.00% (display only, not scored)<br><strong>93.3</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L3 ($39 - $390) - 2 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">74.6 pips</span> <span style="color: #888; font-size: 8px;">(global(n=2))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">97.5 pips</span> <span style="color: #888; font-size: 8px;">(global(n=2))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">⚠️ 0.77</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$214.76</td>
+                            <td>DD ratio: 0.91</td>
+                            <td class="score-cell rating-excellent">98.9</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$214.76 vs P50=$6.32, P75=$18.22 → 120.0 × 40% = 48.0<br>DD ratio: 0.91 → 54.5 × 20% = 10.9<br><strong>98.9</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$214.76</td>
+                            <td>DD ratio: 0.91</td>
+                            <td class="score-cell rating-excellent">98.9</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$214.76 vs P50=$6.32, P75=$18.22 → 120.0 × 40% = 48.0<br>DD ratio: 0.91 → 54.5 × 20% = 10.9<br><strong>98.9</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$214.76</td>
+                            <td>DD ratio: 0.91</td>
+                            <td class="score-cell rating-excellent">98.9</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$214.76 vs P50=$6.32, P75=$18.22 → 120.0 × 40% = 48.0<br>DD ratio: 0.91 → 54.5 × 20% = 10.9<br><strong>98.9</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$214.76</td>
+                            <td>DD ratio: 0.91</td>
+                            <td class="score-cell rating-excellent">98.9</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$214.76 vs P50=$6.32, P75=$18.22 → 120.0 × 40% = 48.0<br>DD ratio: 0.91 → 54.5 × 20% = 10.9<br><strong>98.9</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$214.76</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$214.76 vs P50=$6.00, P75=$17.31 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$214.76</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$214.76 vs P50=$6.00, P75=$17.31 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$214.76</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$214.76 vs P50=$6.00, P75=$17.31 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>25 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$214.76</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$214.76 vs P50=$6.00, P75=$17.31 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L4 ($1830 - $1830) - 1 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">109.3 pips</span> <span style="color: #888; font-size: 8px;">(global(n=1))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">143.3 pips</span> <span style="color: #888; font-size: 8px;">(global(n=1))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">⚠️ 0.76</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$1829.70</td>
+                            <td>DD ratio: 0.12</td>
+                            <td class="score-cell rating-excellent">106.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$1829.70 vs P50=$19.79, P75=$52.01 → 120.0 × 40% = 48.0<br>DD ratio: 0.12 → 93.9 × 20% = 18.8<br><strong>106.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$1829.70</td>
+                            <td>DD ratio: 0.12</td>
+                            <td class="score-cell rating-excellent">106.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$1829.70 vs P50=$19.79, P75=$52.01 → 120.0 × 40% = 48.0<br>DD ratio: 0.12 → 93.9 × 20% = 18.8<br><strong>106.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$1829.70</td>
+                            <td>DD ratio: 0.12</td>
+                            <td class="score-cell rating-excellent">106.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$1829.70 vs P50=$19.79, P75=$52.01 → 120.0 × 40% = 48.0<br>DD ratio: 0.12 → 93.9 × 20% = 18.8<br><strong>106.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$1829.70</td>
+                            <td>DD ratio: 0.12</td>
+                            <td class="score-cell rating-excellent">106.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$1829.70 vs P50=$19.79, P75=$52.01 → 120.0 × 40% = 48.0<br>DD ratio: 0.12 → 93.9 × 20% = 18.8<br><strong>106.8</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$1829.70</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$1829.70 vs P50=$18.80, P75=$49.41 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>15 pips</td>
+                            <td>0.00%*</td>
+                            <td>0.00%</td>
+                            <td>$0.00</td>
+                            <td class="score-cell rating-poor">0.0</td>
+                            <td class="score-cell rating-poor">⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">0.00% → 0.0 × 50% = 0.0<br>$0.00 vs P50=$18.80, P75=$49.41 → 0.0 × 50% = 0.0<br>0.00% (display only, not scored)<br><strong>0.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>20 pips</td>
+                            <td>0.00%*</td>
+                            <td>0.00%</td>
+                            <td>$0.00</td>
+                            <td class="score-cell rating-poor">0.0</td>
+                            <td class="score-cell rating-poor">⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">0.00% → 0.0 × 50% = 0.0<br>$0.00 vs P50=$18.80, P75=$49.41 → 0.0 × 50% = 0.0<br>0.00% (display only, not scored)<br><strong>0.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>25 pips</td>
+                            <td>0.00%*</td>
+                            <td>0.00%</td>
+                            <td>$0.00</td>
+                            <td class="score-cell rating-poor">0.0</td>
+                            <td class="score-cell rating-poor">⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">0.00% → 0.0 × 50% = 0.0<br>$0.00 vs P50=$18.80, P75=$49.41 → 0.0 × 50% = 0.0<br>0.00% (display only, not scored)<br><strong>0.0</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="currency-section">
+            <div class="currency-header">GBPAUD</div>
+            
+            <div class="currency-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Total Trades</span>
+                    <span class="stat-value">34</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Win Rate</span>
+                    <span class="stat-value">85.29%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Profit</span>
+                    <span class="stat-value">$1086.12</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg Profit</span>
+                    <span class="stat-value">$31.94</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg TP</span>
+                    <span class="stat-value">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg SL</span>
+                    <span class="stat-value">$0.00</span>
+                </div>
+            </div>
+
+            <div style="margin: 8px; border: 2px solid #4CAF50; border-radius: 6px; overflow: hidden;">
+                <div style="background: #e8f5e9; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #e0e0e0;">
+                    🎯 Copy Trade 建議
+                </div>
+                <div style="padding: 10px 12px; font-size: 11px; line-height: 1.8;">
+                    <div><strong>建議：</strong>✅ 建議 CoP (Copy on Profit)</div>
+                    <div><strong>信心度：</strong>🟢 高</div>
+
+                    <div><strong>策略：</strong>CoP · Wait <strong>5 pips</strong></div>
+                    <div><strong>建議 TP/SL：</strong>TP = 88.5 pips / SL = 115.8 pips (R:R = ⚠️ 0.76)</div>
+
+                    <div><strong>理由：</strong>馬丁依賴度低 (0.0%)、勝率 85.3%、信號質素高</div>
+                    <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd; font-size: 9px; color: #666;"><strong>背景數據：</strong>期望值 1.355R · 勝率 85.3% · 盈虧比 1.76 · 馬丁依賴 0.0% · 最佳 CoP 90.3 · 最佳 CoL 100.5</div>
+                </div>
+            </div>
+
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #e3f2fd; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #1976d2; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #1976d2;">
+                    📈 值博率分析 (Expectancy + Kelly + Safety Margin)
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #e8eaf6;">
+                            <th>層級</th><th>#</th><th>勝率</th><th>R</th><th>E</th>
+                            <th>Kelly</th><th>¼Kelly</th><th>BE</th><th>安全</th><th>等級</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr style="">
+                            <td><strong>L1</strong></td>
+                            <td>29</td>
+                            <td>82.8%</td>
+                            <td>1.53</td>
+                            <td style="color: #2e7d32; font-weight: bold;">1.090R</td>
+                            <td>71.5%</td>
+                            <td>17.9%</td>
+                            <td>39.6%</td>
+                            <td>🟢 43.2%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                        <tr style="">
+                            <td><strong>L2</strong></td>
+                            <td>5</td>
+                            <td>100.0%</td>
+                            <td>999.00</td>
+                            <td style="color: #2e7d32; font-weight: bold;">999.000R</td>
+                            <td>100.0%</td>
+                            <td>25.0%</td>
+                            <td>0.1%</td>
+                            <td>🟢 99.9%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                        <tr style="background: #f0f4ff;">
+                            <td><strong>Overall</strong></td>
+                            <td>34</td>
+                            <td>85.3%</td>
+                            <td>1.76</td>
+                            <td style="color: #2e7d32; font-weight: bold;">1.355R</td>
+                            <td>76.9%</td>
+                            <td>19.2%</td>
+                            <td>36.2%</td>
+                            <td>🟢 49.1%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>值博率解讀：</strong>期望值 1.355R（每冒 1R 風險期望回報 1.355R）。即使勝率跌至 36.2% 或盈虧比跌至 0.17 仍可打和。安全邊際 🟢 49.1%（穩健）。
+                </div>
+</div>
+
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #fff3e0; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #e65100; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #ff9800;">
+                    🎰 馬丁層級深度分析
+                </div>
+                <div style="padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #eee;">
+                    <strong>馬丁盈利依賴度：</strong><span style="color: #2e7d32; font-weight: bold;">0.0%</span>
+                    &nbsp;|&nbsp; 馬丁交易數：0 筆
+                    &nbsp;|&nbsp; 總盈利 $1203.98 中 $0.00 來自馬丁
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #fff8e1;">
+                            <th>層級</th><th>#</th><th>馬丁數</th><th>觸發</th><th>均深(pips)</th>
+                            <th>最深(pips)</th><th>均DD($)</th><th>最DD($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td><strong>L1</strong></td>
+                            <td>29</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>L2</strong></td>
+                            <td>5</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>觸發率</strong> = Classic Martin 數 / 該層總交易數。紅色 >10%，橙色 >3%，綠色 ≤3%。<br>
+                    <strong>平均深度</strong> = 馬丁交易的平均 Max Loss Pips，反映觸發後要扛幾深。
+                </div>
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L1 ($-36 - $98) - 29 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">48.0 pips</span> <span style="color: #888; font-size: 8px;">(global(n=24))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">76.4 pips</span> <span style="color: #888; font-size: 8px;">(global(n=29))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">🚩 0.63</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$35.96</td>
+                            <td>DD ratio: 0.78</td>
+                            <td class="score-cell rating-excellent">86.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$35.96 vs P50=$25.62, P75=$45.78 → 85.4 × 40% = 34.2<br>DD ratio: 0.78 → 61.2 × 20% = 12.2<br><strong>86.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$35.96</td>
+                            <td>DD ratio: 0.78</td>
+                            <td class="score-cell rating-excellent">86.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$35.96 vs P50=$25.62, P75=$45.78 → 85.4 × 40% = 34.2<br>DD ratio: 0.78 → 61.2 × 20% = 12.2<br><strong>86.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$35.96</td>
+                            <td>DD ratio: 0.78</td>
+                            <td class="score-cell rating-excellent">86.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$35.96 vs P50=$25.62, P75=$45.78 → 85.4 × 40% = 34.2<br>DD ratio: 0.78 → 61.2 × 20% = 12.2<br><strong>86.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$35.96</td>
+                            <td>DD ratio: 0.78</td>
+                            <td class="score-cell rating-excellent">86.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$35.96 vs P50=$25.62, P75=$45.78 → 85.4 × 40% = 34.2<br>DD ratio: 0.78 → 61.2 × 20% = 12.2<br><strong>86.4</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>79.31%*</td>
+                            <td>78.26%</td>
+                            <td>$26.91</td>
+                            <td class="score-cell rating-excellent">88.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">78.26% → 78.3 × 50% = 39.1<br>$26.91 vs P50=$13.81, P75=$27.44 → 98.8 × 50% = 49.4<br>79.31% (display only, not scored)<br><strong>88.6</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>79.31%*</td>
+                            <td>78.26%</td>
+                            <td>$26.91</td>
+                            <td class="score-cell rating-excellent">88.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">78.26% → 78.3 × 50% = 39.1<br>$26.91 vs P50=$13.81, P75=$27.44 → 98.8 × 50% = 49.4<br>79.31% (display only, not scored)<br><strong>88.6</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>20 pips</td>
+                            <td>75.86%*</td>
+                            <td>77.27%</td>
+                            <td>$25.77</td>
+                            <td class="score-cell rating-excellent">86.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">77.27% → 77.3 × 50% = 38.6<br>$25.77 vs P50=$13.81, P75=$27.44 → 96.3 × 50% = 48.2<br>75.86% (display only, not scored)<br><strong>86.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>25 pips</td>
+                            <td>72.41%*</td>
+                            <td>76.19%</td>
+                            <td>$26.27</td>
+                            <td class="score-cell rating-excellent">86.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">76.19% → 76.2 × 50% = 38.1<br>$26.27 vs P50=$13.81, P75=$27.44 → 97.4 × 50% = 48.7<br>72.41% (display only, not scored)<br><strong>86.8</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L2 ($29 - $194) - 5 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">88.5 pips</span> <span style="color: #888; font-size: 8px;">(global(n=5))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">115.8 pips</span> <span style="color: #888; font-size: 8px;">(global(n=5))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">⚠️ 0.76</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$68.19</td>
+                            <td>DD ratio: 1.61</td>
+                            <td class="score-cell rating-excellent">90.3</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$68.19 vs P50=$18.69, P75=$37.64 → 116.1 × 40% = 46.4<br>DD ratio: 1.61 → 19.5 × 20% = 3.9<br><strong>90.3</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$68.19</td>
+                            <td>DD ratio: 1.61</td>
+                            <td class="score-cell rating-excellent">90.3</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$68.19 vs P50=$18.69, P75=$37.64 → 116.1 × 40% = 46.4<br>DD ratio: 1.61 → 19.5 × 20% = 3.9<br><strong>90.3</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$68.19</td>
+                            <td>DD ratio: 1.61</td>
+                            <td class="score-cell rating-excellent">90.3</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$68.19 vs P50=$18.69, P75=$37.64 → 116.1 × 40% = 46.4<br>DD ratio: 1.61 → 19.5 × 20% = 3.9<br><strong>90.3</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$68.19</td>
+                            <td>DD ratio: 1.61</td>
+                            <td class="score-cell rating-excellent">90.3</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$68.19 vs P50=$18.69, P75=$37.64 → 116.1 × 40% = 46.4<br>DD ratio: 1.61 → 19.5 × 20% = 3.9<br><strong>90.3</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>80.00%*</td>
+                            <td>100.00%</td>
+                            <td>$36.74</td>
+                            <td class="score-cell rating-excellent">100.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$36.74 vs P50=$13.83, P75=$34.58 → 101.0 × 50% = 50.5<br>80.00% (display only, not scored)<br><strong>100.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>80.00%*</td>
+                            <td>100.00%</td>
+                            <td>$36.74</td>
+                            <td class="score-cell rating-excellent">100.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$36.74 vs P50=$13.83, P75=$34.58 → 101.0 × 50% = 50.5<br>80.00% (display only, not scored)<br><strong>100.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>80.00%*</td>
+                            <td>100.00%</td>
+                            <td>$36.74</td>
+                            <td class="score-cell rating-excellent">100.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$36.74 vs P50=$13.83, P75=$34.58 → 101.0 × 50% = 50.5<br>80.00% (display only, not scored)<br><strong>100.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>25 pips</td>
+                            <td>80.00%*</td>
+                            <td>100.00%</td>
+                            <td>$36.74</td>
+                            <td class="score-cell rating-excellent">100.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$36.74 vs P50=$13.83, P75=$34.58 → 101.0 × 50% = 50.5<br>80.00% (display only, not scored)<br><strong>100.5</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="currency-section">
+            <div class="currency-header">GBPCAD</div>
+            
+            <div class="currency-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Total Trades</span>
+                    <span class="stat-value">65</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Win Rate</span>
+                    <span class="stat-value">75.38%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Profit</span>
+                    <span class="stat-value">$3434.50</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg Profit</span>
+                    <span class="stat-value">$52.84</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg TP</span>
+                    <span class="stat-value">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg SL</span>
+                    <span class="stat-value">$0.00</span>
+                </div>
+            </div>
+
+            <div style="margin: 8px; border: 2px solid #FFC107; border-radius: 6px; overflow: hidden;">
+                <div style="background: #fff8e1; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #e0e0e0;">
+                    🎯 Copy Trade 建議
+                </div>
+                <div style="padding: 10px 12px; font-size: 11px; line-height: 1.8;">
+                    <div><strong>建議：</strong>✅ 建議 CoP (Copy on Profit)</div>
+                    <div><strong>信心度：</strong>🟡 中</div>
+
+                    <div><strong>策略：</strong>CoP · Wait <strong>5 pips</strong></div>
+                    <div><strong>建議 TP/SL：</strong>TP = 74.6 pips / SL = 97.5 pips (R:R = ⚠️ 0.77)</div>
+
+                    <div><strong>理由：</strong>馬丁依賴度低 (0.0%)、勝率 75.4%、信號質素高</div>
+                    <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd; font-size: 9px; color: #666;"><strong>背景數據：</strong>期望值 3.681R · 勝率 75.4% · 盈虧比 5.21 · 馬丁依賴 0.0% · 最佳 CoP 95.4 · 最佳 CoL 110.0</div>
+                </div>
+            </div>
+
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #e3f2fd; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #1976d2; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #1976d2;">
+                    📈 值博率分析 (Expectancy + Kelly + Safety Margin)
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #e8eaf6;">
+                            <th>層級</th><th>#</th><th>勝率</th><th>R</th><th>E</th>
+                            <th>Kelly</th><th>¼Kelly</th><th>BE</th><th>安全</th><th>等級</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr style="">
+                            <td><strong>L1</strong></td>
+                            <td>37</td>
+                            <td>59.5%</td>
+                            <td>1.93</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.743R</td>
+                            <td>38.5%</td>
+                            <td>9.6%</td>
+                            <td>34.1%</td>
+                            <td>🟢 25.3%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                        <tr style="">
+                            <td><strong>L2</strong></td>
+                            <td>26</td>
+                            <td>96.2%</td>
+                            <td>1.61</td>
+                            <td style="color: #2e7d32; font-weight: bold;">1.513R</td>
+                            <td>93.8%</td>
+                            <td>23.4%</td>
+                            <td>38.3%</td>
+                            <td>🟢 57.9%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                        <tr style="background: #f0f4ff;">
+                            <td><strong>Overall</strong></td>
+                            <td>65</td>
+                            <td>75.4%</td>
+                            <td>5.21</td>
+                            <td style="color: #2e7d32; font-weight: bold;">3.681R</td>
+                            <td>70.7%</td>
+                            <td>17.7%</td>
+                            <td>16.1%</td>
+                            <td>🟢 59.3%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>值博率解讀：</strong>期望值 3.681R（每冒 1R 風險期望回報 3.681R）。即使勝率跌至 16.1% 或盈虧比跌至 0.33 仍可打和。安全邊際 🟢 59.3%（穩健）。
+                </div>
+</div>
+
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #fff3e0; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #e65100; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #ff9800;">
+                    🎰 馬丁層級深度分析
+                </div>
+                <div style="padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #eee;">
+                    <strong>馬丁盈利依賴度：</strong><span style="color: #2e7d32; font-weight: bold;">0.0%</span>
+                    &nbsp;|&nbsp; 馬丁交易數：1 筆
+                    &nbsp;|&nbsp; 總盈利 $3664.17 中 $0.43 來自馬丁
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #fff8e1;">
+                            <th>層級</th><th>#</th><th>馬丁數</th><th>觸發</th><th>均深(pips)</th>
+                            <th>最深(pips)</th><th>均DD($)</th><th>最DD($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td><strong>L1</strong></td>
+                            <td>37</td>
+                            <td>1</td>
+                            <td style="color: #2e7d32; font-weight: bold;">2.7%</td>
+                            <td>232.0</td>
+                            <td>232.0</td>
+                            <td>$85.11</td>
+                            <td>$85.11</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>L2</strong></td>
+                            <td>26</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>L3</strong></td>
+                            <td>2</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>觸發率</strong> = Classic Martin 數 / 該層總交易數。紅色 >10%，橙色 >3%，綠色 ≤3%。<br>
+                    <strong>平均深度</strong> = 馬丁交易的平均 Max Loss Pips，反映觸發後要扛幾深。
+                </div>
+            </div>
+
+            <div class="martin-section" style="margin: 6px 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #fff3e0; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #f57c00; border-bottom: 1px solid #e0e0e0;">
+                    🎰 Martin Strategy Detection — 🟡 MEDIUM
+                </div>
+                <div style="padding: 8px 10px; font-size: 10px;">
+
+                    <div style="margin-bottom: 8px; padding: 6px; background: #fff8e1; border-left: 3px solid #ff9800; border-radius: 2px;">
+                        <strong>⚠️ Classic Martin (Profit > 0, Pips < 0): 1 trades (1.5%)</strong><br>
+                        <span style="color: #2e7d32;">💰 Total Profit: $0.43</span> | 
+                        <span style="color: #c62828;">📉 Total Pips Lost: -0.4</span> | 
+                        <span style="color: #c62828;">📊 Avg Max DD: $85.11</span> | 
+                        <span style="color: #c62828;">💥 Worst DD: $85.11</span>
+
+                        <table style="width: 100%; margin-top: 4px; font-size: 9px; border-collapse: collapse;">
+                            <tr style="background: #f5f5f5;"><th style="padding: 2px 4px; text-align: left;">Symbol</th><th>Type</th><th>Lots</th><th>Pips</th><th>Profit</th><th>Max DD</th><th>Max DD Pips</th><th>Hold hrs</th></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>buy</td><td>0.05</td><td style="color: #c62828;">-0.4</td><td style="color: #2e7d32;">$0.43</td><td style="color: #c62828;">$-85.11</td><td>-232.0</td><td>186</td></tr>
+</table></div>
+                    <div style="margin-bottom: 8px; padding: 6px; background: #fce4ec; border-left: 3px solid #e91e63; border-radius: 2px;">
+                        <strong>🔄 Reverse Martin (Profit < 0, Pips > 0): 4 trades (6.2%)</strong><br>
+                        <span style="color: #2e7d32;">📈 Pips Won: 28.9</span> | 
+                        <span style="color: #c62828;">💸 Cost Eaten: $16.26</span>
+                        <br><span style="font-size: 8px; color: #666;">Commission + Swap ate all profit. Direction was right, but holding costs killed it.</span>
+
+                        <table style="width: 100%; margin-top: 4px; font-size: 9px; border-collapse: collapse;">
+                            <tr style="background: #f5f5f5;"><th style="padding: 2px 4px; text-align: left;">Symbol</th><th>Type</th><th>Lots</th><th>Pips</th><th>Profit</th><th>Cost</th></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>sell</td><td>0.05</td><td style="color: #2e7d32;">14.4</td><td style="color: #c62828;">$-0.20</td><td style="color: #c62828;">$5.44</td></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>sell</td><td>0.05</td><td style="color: #2e7d32;">5.7</td><td style="color: #c62828;">$-3.36</td><td style="color: #c62828;">$5.44</td></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>sell</td><td>0.05</td><td style="color: #2e7d32;">5.0</td><td style="color: #c62828;">$-0.89</td><td style="color: #c62828;">$2.69</td></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>sell</td><td>0.05</td><td style="color: #2e7d32;">3.8</td><td style="color: #c62828;">$-1.32</td><td style="color: #c62828;">$2.69</td></tr>
+</table></div>
+                    <div style="margin-bottom: 8px; padding: 6px; background: #e8eaf6; border-left: 3px solid #3f51b5; border-radius: 2px;">
+                        <strong>💀 Cost Killed (Gross Profit > 0, Net < 0): 4 trades (6.2%)</strong><br>
+                        <span style="color: #c62828;">💸 Total Cost: $16.26</span>
+                        <br><span style="font-size: 8px; color: #666;">Trade direction was correct, but commission + swap exceeded the gross profit.</span>
+
+                        <table style="width: 100%; margin-top: 4px; font-size: 9px; border-collapse: collapse;">
+                            <tr style="background: #f5f5f5;"><th style="padding: 2px 4px; text-align: left;">Symbol</th><th>Pips</th><th>Net Profit</th><th>Commission</th><th>Swap</th><th>Total Cost</th></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>14.4</td><td style="color: #c62828;">$-0.20</td><td>$0.00</td><td>$-5.44</td><td style="color: #c62828;">$5.44</td></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>5.7</td><td style="color: #c62828;">$-3.36</td><td>$0.00</td><td>$-5.44</td><td style="color: #c62828;">$5.44</td></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>5.0</td><td style="color: #c62828;">$-0.89</td><td>$0.00</td><td>$-2.69</td><td style="color: #c62828;">$2.69</td></tr>
+
+                            <tr><td style="padding: 2px 4px;">GBPCAD</td><td>3.8</td><td style="color: #c62828;">$-1.32</td><td>$0.00</td><td>$-2.69</td><td style="color: #c62828;">$2.69</td></tr>
+</table></div>
+                </div>
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L1 ($-42 - $60) - 37 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">48.0 pips</span> <span style="color: #888; font-size: 8px;">(global(n=22))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">92.0 pips</span> <span style="color: #888; font-size: 8px;">(blend(n=37,w=0.10))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">🚩 0.52</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$21.77</td>
+                            <td>DD ratio: 1.00</td>
+                            <td class="score-cell rating-excellent">84.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$21.77 vs P50=$10.49, P75=$30.47 → 86.9 × 40% = 34.8<br>DD ratio: 1.00 → 50.2 × 20% = 10.0<br><strong>84.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$21.77</td>
+                            <td>DD ratio: 1.00</td>
+                            <td class="score-cell rating-excellent">84.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$21.77 vs P50=$10.49, P75=$30.47 → 86.9 × 40% = 34.8<br>DD ratio: 1.00 → 50.2 × 20% = 10.0<br><strong>84.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$21.77</td>
+                            <td>DD ratio: 1.00</td>
+                            <td class="score-cell rating-excellent">84.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$21.77 vs P50=$10.49, P75=$30.47 → 86.9 × 40% = 34.8<br>DD ratio: 1.00 → 50.2 × 20% = 10.0<br><strong>84.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$21.77</td>
+                            <td>DD ratio: 1.00</td>
+                            <td class="score-cell rating-excellent">84.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$21.77 vs P50=$10.49, P75=$30.47 → 86.9 × 40% = 34.8<br>DD ratio: 1.00 → 50.2 × 20% = 10.0<br><strong>84.8</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>89.19%*</td>
+                            <td>54.55%</td>
+                            <td>$19.18</td>
+                            <td class="score-cell rating-good">78.3</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">54.55% → 54.5 × 50% = 27.3<br>$19.18 vs P50=$8.61, P75=$17.30 → 102.2 × 50% = 51.1<br>89.19% (display only, not scored)<br><strong>78.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>89.19%*</td>
+                            <td>54.55%</td>
+                            <td>$19.18</td>
+                            <td class="score-cell rating-good">78.3</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">54.55% → 54.5 × 50% = 27.3<br>$19.18 vs P50=$8.61, P75=$17.30 → 102.2 × 50% = 51.1<br>89.19% (display only, not scored)<br><strong>78.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>20 pips</td>
+                            <td>81.08%*</td>
+                            <td>50.00%</td>
+                            <td>$13.70</td>
+                            <td class="score-cell rating-good">68.8</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">50.00% → 50.0 × 50% = 25.0<br>$13.70 vs P50=$8.61, P75=$17.30 → 87.6 × 50% = 43.8<br>81.08% (display only, not scored)<br><strong>68.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>25 pips</td>
+                            <td>78.38%*</td>
+                            <td>48.28%</td>
+                            <td>$11.87</td>
+                            <td class="score-cell rating-good">64.8</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">48.28% → 48.3 × 50% = 24.1<br>$11.87 vs P50=$8.61, P75=$17.30 → 81.3 × 50% = 40.6<br>78.38% (display only, not scored)<br><strong>64.8</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L2 ($-61 - $252) - 26 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">88.5 pips</span> <span style="color: #888; font-size: 8px;">(global(n=25))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">115.8 pips</span> <span style="color: #888; font-size: 8px;">(global(n=26))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">⚠️ 0.76</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$97.74</td>
+                            <td>DD ratio: 0.58</td>
+                            <td class="score-cell rating-excellent">87.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$97.74 vs P50=$85.32, P75=$113.80 → 83.1 × 40% = 33.2<br>DD ratio: 0.58 → 71.2 × 20% = 14.2<br><strong>87.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$97.74</td>
+                            <td>DD ratio: 0.58</td>
+                            <td class="score-cell rating-excellent">87.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$97.74 vs P50=$85.32, P75=$113.80 → 83.1 × 40% = 33.2<br>DD ratio: 0.58 → 71.2 × 20% = 14.2<br><strong>87.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$97.74</td>
+                            <td>DD ratio: 0.58</td>
+                            <td class="score-cell rating-excellent">87.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$97.74 vs P50=$85.32, P75=$113.80 → 83.1 × 40% = 33.2<br>DD ratio: 0.58 → 71.2 × 20% = 14.2<br><strong>87.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$97.74</td>
+                            <td>DD ratio: 0.58</td>
+                            <td class="score-cell rating-excellent">87.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$97.74 vs P50=$85.32, P75=$113.80 → 83.1 × 40% = 33.2<br>DD ratio: 0.58 → 71.2 × 20% = 14.2<br><strong>87.5</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="">
+                            <td>10 pips</td>
+                            <td>96.15%*</td>
+                            <td>96.00%</td>
+                            <td>$97.14</td>
+                            <td class="score-cell rating-excellent">90.5</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">96.00% → 96.0 × 50% = 48.0<br>$97.14 vs P50=$82.34, P75=$111.90 → 85.0 × 50% = 42.5<br>96.15% (display only, not scored)<br><strong>90.5</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>92.31%*</td>
+                            <td>95.83%</td>
+                            <td>$97.48</td>
+                            <td class="score-cell rating-excellent">90.6</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">95.83% → 95.8 × 50% = 47.9<br>$97.48 vs P50=$82.34, P75=$111.90 → 85.4 × 50% = 42.7<br>92.31% (display only, not scored)<br><strong>90.6</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>20 pips</td>
+                            <td>88.46%*</td>
+                            <td>95.65%</td>
+                            <td>$96.83</td>
+                            <td class="score-cell rating-excellent">90.2</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">95.65% → 95.7 × 50% = 47.8<br>$96.83 vs P50=$82.34, P75=$111.90 → 84.7 × 50% = 42.4<br>88.46% (display only, not scored)<br><strong>90.2</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>25 pips</td>
+                            <td>76.92%*</td>
+                            <td>95.00%</td>
+                            <td>$94.89</td>
+                            <td class="score-cell rating-excellent">88.9</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">95.00% → 95.0 × 50% = 47.5<br>$94.89 vs P50=$82.34, P75=$111.90 → 82.7 × 50% = 41.4<br>76.92% (display only, not scored)<br><strong>88.9</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L3 ($168 - $574) - 2 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">74.6 pips</span> <span style="color: #888; font-size: 8px;">(global(n=2))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">97.5 pips</span> <span style="color: #888; font-size: 8px;">(global(n=2))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">⚠️ 0.77</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$370.83</td>
+                            <td>DD ratio: 1.26</td>
+                            <td class="score-cell rating-excellent">95.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$370.83 vs P50=$6.32, P75=$18.22 → 120.0 × 40% = 48.0<br>DD ratio: 1.26 → 36.8 × 20% = 7.4<br><strong>95.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$370.83</td>
+                            <td>DD ratio: 1.26</td>
+                            <td class="score-cell rating-excellent">95.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$370.83 vs P50=$6.32, P75=$18.22 → 120.0 × 40% = 48.0<br>DD ratio: 1.26 → 36.8 × 20% = 7.4<br><strong>95.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$370.83</td>
+                            <td>DD ratio: 1.26</td>
+                            <td class="score-cell rating-excellent">95.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$370.83 vs P50=$6.32, P75=$18.22 → 120.0 × 40% = 48.0<br>DD ratio: 1.26 → 36.8 × 20% = 7.4<br><strong>95.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$370.83</td>
+                            <td>DD ratio: 1.26</td>
+                            <td class="score-cell rating-excellent">95.4</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$370.83 vs P50=$6.32, P75=$18.22 → 120.0 × 40% = 48.0<br>DD ratio: 1.26 → 36.8 × 20% = 7.4<br><strong>95.4</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$370.83</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$370.83 vs P50=$6.00, P75=$17.31 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$370.83</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$370.83 vs P50=$6.00, P75=$17.31 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$370.83</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$370.83 vs P50=$6.00, P75=$17.31 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>25 pips</td>
+                            <td>100.00%*</td>
+                            <td>100.00%</td>
+                            <td>$370.83</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$370.83 vs P50=$6.00, P75=$17.31 → 120.0 × 50% = 60.0<br>100.00% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="currency-section">
+            <div class="currency-header">USDCHF</div>
+            
+            <div class="currency-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Total Trades</span>
+                    <span class="stat-value">49</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Win Rate</span>
+                    <span class="stat-value">93.88%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Profit</span>
+                    <span class="stat-value">$1852.28</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg Profit</span>
+                    <span class="stat-value">$37.80</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg TP</span>
+                    <span class="stat-value">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg SL</span>
+                    <span class="stat-value">$0.00</span>
+                </div>
+            </div>
+
+            <div style="margin: 8px; border: 2px solid #4CAF50; border-radius: 6px; overflow: hidden;">
+                <div style="background: #e8f5e9; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #e0e0e0;">
+                    🎯 Copy Trade 建議
+                </div>
+                <div style="padding: 10px 12px; font-size: 11px; line-height: 1.8;">
+                    <div><strong>建議：</strong>✅ 建議 CoP (Copy on Profit)</div>
+                    <div><strong>信心度：</strong>🟢 高</div>
+
+                    <div><strong>策略：</strong>CoP · Wait <strong>5 pips</strong></div>
+                    <div><strong>建議 TP/SL：</strong>TP = 88.5 pips / SL = 115.8 pips (R:R = ⚠️ 0.76)</div>
+
+                    <div><strong>理由：</strong>馬丁依賴度低 (0.0%)、勝率 93.9%、信號質素高</div>
+                    <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd; font-size: 9px; color: #666;"><strong>背景數據：</strong>期望值 4.177R · 勝率 93.9% · 盈虧比 4.51 · 馬丁依賴 0.0% · 最佳 CoP 105.8 · 最佳 CoL 110.0</div>
+                </div>
+            </div>
+
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #e3f2fd; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #1976d2; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #1976d2;">
+                    📈 值博率分析 (Expectancy + Kelly + Safety Margin)
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #e8eaf6;">
+                            <th>層級</th><th>#</th><th>勝率</th><th>R</th><th>E</th>
+                            <th>Kelly</th><th>¼Kelly</th><th>BE</th><th>安全</th><th>等級</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr style="">
+                            <td><strong>L1</strong></td>
+                            <td>42</td>
+                            <td>92.9%</td>
+                            <td>3.10</td>
+                            <td style="color: #2e7d32; font-weight: bold;">2.810R</td>
+                            <td>90.6%</td>
+                            <td>22.6%</td>
+                            <td>24.4%</td>
+                            <td>🟢 68.5%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                        <tr style="">
+                            <td><strong>L2</strong></td>
+                            <td>7</td>
+                            <td>100.0%</td>
+                            <td>999.00</td>
+                            <td style="color: #2e7d32; font-weight: bold;">999.000R</td>
+                            <td>100.0%</td>
+                            <td>25.0%</td>
+                            <td>0.1%</td>
+                            <td>🟢 99.9%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                        <tr style="background: #f0f4ff;">
+                            <td><strong>Overall</strong></td>
+                            <td>49</td>
+                            <td>93.9%</td>
+                            <td>4.51</td>
+                            <td style="color: #2e7d32; font-weight: bold;">4.177R</td>
+                            <td>92.5%</td>
+                            <td>23.1%</td>
+                            <td>18.1%</td>
+                            <td>🟢 75.7%</td>
+                            <td style="font-size: 9px;">穩健</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>值博率解讀：</strong>期望值 4.177R（每冒 1R 風險期望回報 4.177R）。即使勝率跌至 18.1% 或盈虧比跌至 0.06 仍可打和。安全邊際 🟢 75.7%（穩健）。
+                </div>
+</div>
+
+            <div style="margin: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="background: #fff3e0; padding: 6px 10px; font-weight: bold; font-size: 11px; color: #e65100; border-bottom: 1px solid #e0e0e0;
+                    border-left: 3px solid #ff9800;">
+                    🎰 馬丁層級深度分析
+                </div>
+                <div style="padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #eee;">
+                    <strong>馬丁盈利依賴度：</strong><span style="color: #2e7d32; font-weight: bold;">0.0%</span>
+                    &nbsp;|&nbsp; 馬丁交易數：0 筆
+                    &nbsp;|&nbsp; 總盈利 $1879.43 中 $0.00 來自馬丁
+                </div>
+                <table class="comparison-table" style="font-size: 10px;">
+                    <thead>
+                        <tr style="background: #fff8e1;">
+                            <th>層級</th><th>#</th><th>馬丁數</th><th>觸發</th><th>均深(pips)</th>
+                            <th>最深(pips)</th><th>均DD($)</th><th>最DD($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td><strong>L1</strong></td>
+                            <td>42</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>L2</strong></td>
+                            <td>7</td>
+                            <td>0</td>
+                            <td style="color: #2e7d32; font-weight: bold;">0.0%</td>
+                            <td>0.0</td>
+                            <td>0.0</td>
+                            <td>$0.00</td>
+                            <td>$0.00</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+                <div style="padding: 6px 10px; font-size: 9px; color: #666; border-top: 1px solid #e0e0e0;">
+                    <strong>觸發率</strong> = Classic Martin 數 / 該層總交易數。紅色 >10%，橙色 >3%，綠色 ≤3%。<br>
+                    <strong>平均深度</strong> = 馬丁交易的平均 Max Loss Pips，反映觸發後要扛幾深。
+                </div>
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L1 ($-14 - $65) - 42 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">51.3 pips</span> <span style="color: #888; font-size: 8px;">(blend(n=39,w=0.13))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">72.0 pips</span> <span style="color: #888; font-size: 8px;">(blend(n=42,w=0.17))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">⚠️ 0.71</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="">
+                            <td>5 pips</td>
+                            <td>97.44%</td>
+                            <td>$28.75</td>
+                            <td>DD ratio: 0.67</td>
+                            <td class="score-cell rating-good">78.9</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">97.44% → 97.4 × 40% = 39.0<br>$28.75 vs P50=$30.20, P75=$40.66 → 66.6 × 40% = 26.7<br>DD ratio: 0.67 → 66.3 × 20% = 13.3<br><strong>78.9</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>10 pips</td>
+                            <td>92.31%</td>
+                            <td>$30.26</td>
+                            <td>DD ratio: 0.60</td>
+                            <td class="score-cell rating-good">79.0</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">92.31% → 92.3 × 40% = 36.9<br>$30.26 vs P50=$30.20, P75=$40.66 → 70.2 × 40% = 28.1<br>DD ratio: 0.60 → 70.0 × 20% = 14.0<br><strong>79.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>15 pips</td>
+                            <td>87.18%</td>
+                            <td>$31.73</td>
+                            <td>DD ratio: 0.54</td>
+                            <td class="score-cell rating-good">79.2</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">87.18% → 87.2 × 40% = 34.9<br>$31.73 vs P50=$30.20, P75=$40.66 → 74.4 × 40% = 29.8<br>DD ratio: 0.54 → 73.2 × 20% = 14.6<br><strong>79.3</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>82.05%</td>
+                            <td>$33.10</td>
+                            <td>DD ratio: 0.45</td>
+                            <td class="score-cell rating-good">79.7</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">82.05% → 82.1 × 40% = 32.8<br>$33.10 vs P50=$30.20, P75=$40.66 → 78.3 × 40% = 31.3<br>DD ratio: 0.45 → 77.7 × 20% = 15.5<br><strong>79.7</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>69.05%*</td>
+                            <td>89.66%</td>
+                            <td>$21.27</td>
+                            <td class="score-cell rating-good">79.3</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">89.66% → 89.7 × 50% = 44.8<br>$21.27 vs P50=$21.62, P75=$28.33 → 68.9 × 50% = 34.4<br>69.05% (display only, not scored)<br><strong>79.3</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>15 pips</td>
+                            <td>61.90%*</td>
+                            <td>88.46%</td>
+                            <td>$20.51</td>
+                            <td class="score-cell rating-good">77.4</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">88.46% → 88.5 × 50% = 44.2<br>$20.51 vs P50=$21.62, P75=$28.33 → 66.4 × 50% = 33.2<br>61.90% (display only, not scored)<br><strong>77.4</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>20 pips</td>
+                            <td>57.14%*</td>
+                            <td>87.50%</td>
+                            <td>$21.55</td>
+                            <td class="score-cell rating-good">78.6</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">87.50% → 87.5 × 50% = 43.8<br>$21.55 vs P50=$21.62, P75=$28.33 → 69.8 × 50% = 34.9<br>57.14% (display only, not scored)<br><strong>78.6</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>25 pips</td>
+                            <td>52.38%*</td>
+                            <td>86.36%</td>
+                            <td>$20.26</td>
+                            <td class="score-cell rating-good">76.0</td>
+                            <td class="score-cell rating-good">⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">86.36% → 86.4 × 50% = 43.2<br>$20.26 vs P50=$21.62, P75=$28.33 → 65.6 × 50% = 32.8<br>52.38% (display only, not scored)<br><strong>76.0</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="level-section">
+                <div class="level-header">
+                    L2 ($79 - $169) - 7 trades
+                </div>
+                <div style="margin: 6px 8px; padding: 8px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 10px;">
+                    <strong>📍 Suggested TP/SL:</strong>
+                    &nbsp; TP = <span style="color: #2e7d32; font-weight: bold;">88.5 pips</span> <span style="color: #888; font-size: 8px;">(global(n=7))</span>
+                    &nbsp;|&nbsp; SL = <span style="color: #c62828; font-weight: bold;">115.8 pips</span> <span style="color: #888; font-size: 8px;">(global(n=7))</span>
+                    &nbsp;|&nbsp; R:R = <span style="font-weight: bold;">⚠️ 0.76</span>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🚀 Copy on Profit (Trigger Rate 40% + Alpha Capture Profit 40% + DDE 20%)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%<span class="formula">公式：trigger_rate × 100 × 0.4</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">DDE<span class="formula">公式：max(0, 100 - 50 × avg_dd_ratio) × 0.2</span></th>
+                                <th class="formula-tip">Score<span class="formula">公式：Trigger Rate + Alpha Capture + DDE<br>＝ (trigger_rate × 100 × 0.4)<br>＋ (動態百分位評分 × 0.4)<br>＋ (max(0, 100 - 50 × avg_dd_ratio) × 0.2)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>5 pips</td>
+                            <td>100.00%</td>
+                            <td>$112.02</td>
+                            <td>DD ratio: 0.18</td>
+                            <td class="score-cell rating-excellent">105.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$112.02 vs P50=$34.46, P75=$61.16 → 119.0 × 40% = 47.6<br>DD ratio: 0.18 → 90.9 × 20% = 18.2<br><strong>105.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>100.00%</td>
+                            <td>$112.02</td>
+                            <td>DD ratio: 0.18</td>
+                            <td class="score-cell rating-excellent">105.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$112.02 vs P50=$34.46, P75=$61.16 → 119.0 × 40% = 47.6<br>DD ratio: 0.18 → 90.9 × 20% = 18.2<br><strong>105.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>100.00%</td>
+                            <td>$112.02</td>
+                            <td>DD ratio: 0.18</td>
+                            <td class="score-cell rating-excellent">105.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$112.02 vs P50=$34.46, P75=$61.16 → 119.0 × 40% = 47.6<br>DD ratio: 0.18 → 90.9 × 20% = 18.2<br><strong>105.8</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>20 pips</td>
+                            <td>100.00%</td>
+                            <td>$112.02</td>
+                            <td>DD ratio: 0.18</td>
+                            <td class="score-cell rating-excellent">105.8</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 40% = 40.0<br>$112.02 vs P50=$34.46, P75=$61.16 → 119.0 × 40% = 47.6<br>DD ratio: 0.18 → 90.9 × 20% = 18.2<br><strong>105.8</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <div class="strategy-section">
+                    <div class="strategy-header">🛡️ Copy on Lose (Recovery Rate 50% + Alpha Capture Profit 50% | Trigger Rate: display only)</div>
+                    <div class="table-wrap"><table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Wait</th>
+                                <th class="formula-tip">Trig%*<span class="formula">顯示用途，不計入評分<br>公式：trigger_rate × 100</span></th>
+                                <th class="formula-tip">Recov%<span class="formula">公式：recovery_rate × 100 × 0.5</span></th>
+                                <th>Avg</th>
+                                <th class="formula-tip">Score<span class="formula">公式：Recovery Rate + Alpha Capture<br>＝ (recovery_rate × 100 × 0.5)<br>＋ (動態百分位評分 × 0.5)</span></th>
+                                <th>Rating</th>
+                                <th>ℹ️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        <tr class="best-score">
+                            <td>10 pips</td>
+                            <td>28.57%*</td>
+                            <td>100.00%</td>
+                            <td>$116.04</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$116.04 vs P50=$13.83, P75=$34.58 → 120.0 × 50% = 60.0<br>28.57% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="best-score">
+                            <td>15 pips</td>
+                            <td>14.29%*</td>
+                            <td>100.00%</td>
+                            <td>$142.53</td>
+                            <td class="score-cell rating-excellent">110.0</td>
+                            <td class="score-cell rating-excellent">⭐⭐⭐⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">100.00% → 100.0 × 50% = 50.0<br>$142.53 vs P50=$13.83, P75=$34.58 → 120.0 × 50% = 60.0<br>14.29% (display only, not scored)<br><strong>110.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>20 pips</td>
+                            <td>0.00%*</td>
+                            <td>0.00%</td>
+                            <td>$0.00</td>
+                            <td class="score-cell rating-poor">0.0</td>
+                            <td class="score-cell rating-poor">⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">0.00% → 0.0 × 50% = 0.0<br>$0.00 vs P50=$13.83, P75=$34.58 → 0.0 × 50% = 0.0<br>0.00% (display only, not scored)<br><strong>0.0</strong></span></span></td>
+                        </tr>
+
+                        <tr class="">
+                            <td>25 pips</td>
+                            <td>0.00%*</td>
+                            <td>0.00%</td>
+                            <td>$0.00</td>
+                            <td class="score-cell rating-poor">0.0</td>
+                            <td class="score-cell rating-poor">⭐</td>
+                            <td class="score-details"><span class="info-icon">i<span class="tip">0.00% → 0.0 × 50% = 0.0<br>$0.00 vs P50=$13.83, P75=$34.58 → 0.0 × 50% = 0.0<br>0.00% (display only, not scored)<br><strong>0.0</strong></span></span></td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="footer">
+            Copy Trade Analysis - Signal #25830<br>
+            Generated by Trade Strategy Analyzer v3 (DDE + TP/SL)<br>
+            <span style="font-size: 8px;">
+            Scoring: CoP Trigger 40% + Alpha Capture 40% + DDE 20% | CoL Recovery 50% + Alpha Capture 50%<br>
+            TP = P85 of winning trades' Max Pips | SL = P85 of all trades' Max Loss Pips | R:R = TP/SL
+            </span>
+        </div>
+    </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.comparison-table').forEach(function(table) {
+        var headers = table.querySelectorAll('thead th');
+        headers.forEach(function(th, colIdx) {
+            if (th.textContent.trim() === 'ℹ️') return;
+            th.classList.add('sortable');
+            th.addEventListener('click', function() {
+                var tbody = table.querySelector('tbody');
+                if (!tbody) return;
+                var rows = Array.from(tbody.querySelectorAll('tr'));
+                var asc = th.classList.contains('sort-asc');
+                headers.forEach(function(h) { h.classList.remove('sort-asc','sort-desc'); });
+                if (asc) { th.classList.add('sort-desc'); } else { th.classList.add('sort-asc'); }
+                rows.sort(function(a, b) {
+                    var aVal = a.children[colIdx] ? a.children[colIdx].textContent.trim() : '';
+                    var bVal = b.children[colIdx] ? b.children[colIdx].textContent.trim() : '';
+                    var aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+                    var bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+                    if (!isNaN(aNum) && !isNaN(bNum)) { return asc ? aNum - bNum : bNum - aNum; }
+                    return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                });
+                rows.forEach(function(r) { tbody.appendChild(r); });
+            });
+        });
+    });
+});
+</script>
+</body>
+</html>
