@@ -284,11 +284,12 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
         pf_str = 'Inf' if pf > 999 else f'{pf:.1f}'
         
         signal_id = r['signal_id']
-        report_url = f'./detailed_comparison_all_levels_{signal_id}.html'
+        report_url = f'../reports/signal_{signal_id}.html'
+        deep_analysis_url = f'../reports/Signal_Deep_Analysis_{signal_id}.html'
         signal_page_url = f'https://forex-forest.com/signals/{signal_id}'
         html += f'''<tr{row_class}>
 <td>{rank}</td>
-<td class="sig"><a href="{signal_page_url}" target="_blank" style="color:var(--accent);font-weight:bold;text-decoration:none">{signal_id}</a> <a href="{report_url}" target="_blank" title="Open Detailed Report" style="text-decoration:none;font-size:14px">📊</a></td>
+<td class="sig"><a href="{signal_page_url}" target="_blank" style="color:var(--accent);font-weight:bold;text-decoration:none">{signal_id}</a> <a href="{report_url}" target="_blank" title="開啟 Martin V3 報告" style="text-decoration:none;font-size:14px">📊</a> <a href="{deep_analysis_url}" target="_blank" title="Signal 深度分析" style="text-decoration:none;font-size:14px">🔍</a></td>
 <td>{r['total_symbols']}</td>
 <td class="{score_cls}">{r['avg_score']}</td>
 <td class="p4">{r['clean_pct']}%</td>

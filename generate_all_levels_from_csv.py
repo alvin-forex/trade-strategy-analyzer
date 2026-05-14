@@ -2257,7 +2257,7 @@ def main():
         signal_id = stem.replace('signal_', '').replace('_trades', '')
     else:
         signal_id = stem
-    output_file = OUTPUT_DIR / f"detailed_comparison_all_levels_{signal_id}.html"
+    output_file = OUTPUT_DIR / f"Signal_Deep_Analysis_{signal_id}.html"
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html)
     
