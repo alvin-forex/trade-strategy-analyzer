@@ -154,7 +154,7 @@ def generate_html(all_results):
 
         return f'''<tr data-symbol="{r['symbol']}"{rc_cls}>
 <td data-val="{idx}.0">{idx}</td>
-<td><a href="https://signals.algoforest.com/signals/{r['signal_id']}" target="_blank">{r['signal_id']}</a> <a href="../detailed_comparison_all_levels_{r['signal_id']}.html" target="_blank">📊</a></td>
+<td><a href="https://signals.algoforest.com/signals/{r['signal_id']}">{r['signal_id']}</a> <a href="../detailed_comparison_all_levels_{r['signal_id']}.html">📊</a></td>
 <td style="font-weight:bold;color:var(--primary)">{r['symbol']}</td>
 {dde_cell}
 <td data-val="{r["rr"]}">{r["rr"]:.0f}</td><td data-val="{r["ml"]}">{r["ml"]:.0f}</td>
