@@ -711,17 +711,27 @@ function sameMinute(d1, d2) {
 let _layerMapping = null;
 
 function buildLayerMapping(trades) {
-  // Collect unique lot sizes, sort ascending
-  const uniqueLots = [...new Set(trades.map(t => t._lots))].sort((a, b) => a - b);
-  const mapping = {};
-  uniqueLots.forEach((lot, i) => { mapping[lot] = i + 1; }); // L1, L2, L3, ...
+  // Per-symbol layer mapping: each symbol gets its own L1, L2, L3...
+  const bySymbol = {};
+  trades.forEach(t => {
+    const sym = t.Symbol;
+    if (!bySymbol[sym]) bySymbol[sym] = [];
+    bySymbol[sym].push(t._lots);
+  });
+  const mapping = {}; // key = "symbol|lot" -> level
+  for (const [sym, lots] of Object.entries(bySymbol)) {
+    const uniqueLots = [...new Set(lots)].sort((a, b) => a - b);
+    uniqueLots.forEach((lot, i) => {
+      mapping[sym + '|' + lot] = i + 1; // L1, L2, L3, ...
+    });
+  }
   _layerMapping = mapping;
   return mapping;
 }
 
-function detectLayer(lots) {
+function detectLayer(lots, symbol) {
   if (!_layerMapping) return 1;
-  return _layerMapping[lots] || 1;
+  return _layerMapping[(symbol || '') + '|' + lots] || 1;
 }
 
 // === Position Builder ===
@@ -732,7 +742,7 @@ function buildPositions(trades) {
   buildLayerMapping(trades);
 
   // Assign layers
-  trades.forEach(t => { t._layer = detectLayer(t._lots); });
+  trades.forEach(t => { t._layer = detectLayer(t._lots, t.Symbol); });
 
   // Sort by close time
   trades.sort((a,b)=>a._closeTime - b._closeTime);
