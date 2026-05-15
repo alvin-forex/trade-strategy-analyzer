@@ -74,13 +74,31 @@ def load_trades(csv_path):
 
 
 def assign_lot_levels(trades):
-    unique_lots = sorted(set(round(t['lots'], 4) for t in trades))
-    lot_to_level = {}
-    for i, lot in enumerate(unique_lots):
-        lot_to_level[lot] = 'L9+' if i >= 8 else f'L{i+1}'
+    """Per-symbol layer mapping: each symbol gets its own L1, L2, L3... mapping."""
+    # Group trades by symbol
+    from collections import defaultdict
+    symbol_trades = defaultdict(list)
     for t in trades:
-        t['lot_level'] = lot_to_level.get(round(t['lots'], 4), 'L1')
-    return lot_to_level
+        symbol_trades[t['symbol']].append(t)
+    
+    lot_to_level = {}  # (symbol, lot) -> level
+    for sym, sym_trades in symbol_trades.items():
+        unique_lots = sorted(set(round(t['lots'], 4) for t in sym_trades))
+        for i, lot in enumerate(unique_lots):
+            level = 'L9+' if i >= 8 else f'L{i+1}'
+            lot_to_level[(sym, lot)] = level
+    
+    for t in trades:
+        key = (t['symbol'], round(t['lots'], 4))
+        t['lot_level'] = lot_to_level.get(key, 'L1')
+    
+    # Return a summary for logging
+    summary = {}
+    for (sym, lot), level in lot_to_level.items():
+        if sym not in summary:
+            summary[sym] = {}
+        summary[sym][lot] = level
+    return summary
 
 
 def percentile(data, pct):
@@ -355,6 +373,7 @@ def analyze_cop(trades, wait_levels, level_key):
     sig_p50, sig_p75, sig_n = compute_signal_percentiles(trades, level_key, 'profit')
     eff_p50, eff_p75 = get_effective_percentiles(sig_p50, sig_p75, sig_n, level_key, 'profit')
     results = {}
+    prev_key = None
     for wp in wait_levels:
         triggered = [t for t in trades if t['net_profit'] > 0 and abs(t.get('max_pips', 0)) >= wp]
         total_wins = sum(1 for t in trades if t['net_profit'] > 0)
@@ -364,12 +383,24 @@ def analyze_cop(trades, wait_levels, level_key):
         ps = alpha_capture_score(avg_p, eff_p50, eff_p75)
         ds = dde_score(triggered)
         ws = ts * 0.4 + ps * 0.4 + ds * 0.2
+
+        # Check if this result is identical to previous wait level
+        is_duplicate = False
+        if prev_key is not None:
+            prev = results[prev_key]
+            if (prev['triggered'] == len(triggered) and
+                prev['avg_profit'] == round(avg_p, 2)):
+                is_duplicate = True
+
         results[wp] = {
             'triggered': len(triggered), 'total_wins': total_wins,
             'trigger_rate': tr, 'avg_profit': round(avg_p, 2),
             'weighted': round(ws, 1),
             'rating': '⭐⭐⭐⭐' if ws >= 80 else '⭐⭐⭐' if ws >= 60 else '⭐⭐' if ws >= 40 else '⭐',
+            'is_duplicate': is_duplicate,
         }
+        if not is_duplicate:
+            prev_key = wp
     return results
 
 
@@ -377,6 +408,7 @@ def analyze_col(trades, wait_levels, level_key):
     sig_p50, sig_p75, sig_n = compute_signal_percentiles(trades, level_key, 'lose')
     eff_p50, eff_p75 = get_effective_percentiles(sig_p50, sig_p75, sig_n, level_key, 'lose')
     results = {}
+    prev_key = None
     for wp in wait_levels:
         triggered = 0
         recovered = 0
@@ -392,12 +424,25 @@ def analyze_col(trades, wait_levels, level_key):
         rs = rr * 100
         ps = alpha_capture_score(avg_p, eff_p50, eff_p75)
         ws = rs * 0.5 + ps * 0.5
+
+        # Check if this result is identical to previous wait level
+        is_duplicate = False
+        if prev_key is not None:
+            prev = results[prev_key]
+            if (prev['triggered'] == triggered and
+                prev['recovered'] == recovered and
+                prev['avg_profit'] == round(avg_p, 2)):
+                is_duplicate = True
+
         results[wp] = {
             'triggered': triggered, 'recovered': recovered,
             'recovery_rate': rr, 'avg_profit': round(avg_p, 2),
             'weighted': round(ws, 1),
             'rating': '⭐⭐⭐⭐' if ws >= 80 else '⭐⭐⭐' if ws >= 60 else '⭐⭐' if ws >= 40 else '⭐',
+            'is_duplicate': is_duplicate,
         }
+        if not is_duplicate:
+            prev_key = wp
     return results
 
 
@@ -711,13 +756,21 @@ def generate_report(signal_id, csv_path, output_path):
         for lv in sorted(cop_col.keys(), key=LEVEL_ORDER):
             cd = cop_col[lv]
             for wp, r in sorted(cd.get('cop', {}).items()):
-                section += f'''<tr><td>{lv}</td><td style="color:#28a745">CoP</td><td>{wp}pip</td>
-                  <td>{r['triggered']}/{r['total_wins']}</td><td>{r['trigger_rate']:.0%}</td>
-                  <td>${r['avg_profit']:.2f}</td><td><b>{r['weighted']}</b></td><td>{r['rating']}</td></tr>'''
+                if r.get('is_duplicate'):
+                    section += f'''<tr style="opacity:0.4"><td>{lv}</td><td style="color:#28a745">CoP</td><td>{wp}pip</td>
+                      <td colspan="5" style="text-align:center;color:#999">≈ 同上（數據相同）</td></tr>'''
+                else:
+                    section += f'''<tr><td>{lv}</td><td style="color:#28a745">CoP</td><td>{wp}pip</td>
+                      <td>{r['triggered']}/{r['total_wins']}</td><td>{r['trigger_rate']:.0%}</td>
+                      <td>${r['avg_profit']:.2f}</td><td><b>{r['weighted']}</b></td><td>{r['rating']}</td></tr>'''
             for wp, r in sorted(cd.get('col', {}).items()):
-                section += f'''<tr><td>{lv}</td><td style="color:#f39c12">CoL</td><td>{wp}pip</td>
-                  <td>{r['triggered']}</td><td>{r['recovery_rate']:.0%}</td>
-                  <td>${r['avg_profit']:.2f}</td><td><b>{r['weighted']}</b></td><td>{r['rating']}</td></tr>'''
+                if r.get('is_duplicate'):
+                    section += f'''<tr style="opacity:0.4"><td>{lv}</td><td style="color:#f39c12">CoL</td><td>{wp}pip</td>
+                      <td colspan="5" style="text-align:center;color:#999">≈ 同上（數據相同）</td></tr>'''
+                else:
+                    section += f'''<tr><td>{lv}</td><td style="color:#f39c12">CoL</td><td>{wp}pip</td>
+                      <td>{r['triggered']}</td><td>{r['recovery_rate']:.0%}</td>
+                      <td>${r['avg_profit']:.2f}</td><td><b>{r['weighted']}</b></td><td>{r['rating']}</td></tr>'''
         section += '</tbody></table></div></div></div>'
 
         # Blacklist entry for this CCY
