@@ -87,7 +87,7 @@ def generate_html(all_results):
     sorted_syms = sorted(sym_counts.items())
 
     # Global stats
-    total_pips = sum(r['total_profit'] for r in all_results)
+    total_pips = sum(r['total_net_pips'] for r in all_results)
     n_scored = len(scored)
     n_ccy = len(by_ccy)
     global_best = max(r['dde_v4'] for r in scored) if scored else 0
@@ -124,19 +124,19 @@ def generate_html(all_results):
             dde_cell = f'<td class="{sc}" data-val="{r["dde_v4"]}">{r["dde_v4"]:.1f}</td>'
 
         # DD class
-        dd_cls = get_dd_class(r['max_dd'])
+        dd_cls = get_dd_class(r['max_dd_pips'])
 
         # Profit
-        if is_red and r['total_profit'] < 0:
-            profit_cell = f'<td>{fmt_pips(r["total_profit"])}</td>'
+        if is_red and r['total_net_pips'] < 0:
+            profit_cell = f'<td>{fmt_pips(r["total_net_pips"])}</td>'
         else:
-            profit_cell = f'<td data-val="{r["total_profit"]}">{fmt_pips(r["total_profit"])}</td>'
+            profit_cell = f'<td data-val="{r["total_net_pips"]}">{fmt_pips(r["total_net_pips"])}</td>'
 
         # DD
-        dd_cell = f'<td class="{dd_cls}" data-val="{r["max_dd"]}">{fmt_pips(r["max_dd"])}</td>'
-        if is_red and abs(r['max_dd']) < 500:
+        dd_cell = f'<td class="{dd_cls}" data-val="{r["max_dd_pips"]}">{fmt_pips(r["max_dd_pips"])}</td>'
+        if is_red and abs(r['max_dd_pips']) < 500:
             # Red cards may not have data-val on DD
-            dd_cell = f'<td class="{dd_cls}">{fmt_pips(r["max_dd"])}</td>'
+            dd_cell = f'<td class="{dd_cls}">{fmt_pips(r["max_dd_pips"])}</td>'
 
         # PF
         pf = r['pf']
