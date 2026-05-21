@@ -85,6 +85,31 @@ def auto_detect_ea_from_set(signal_id):
         return counts.most_common(1)[0][0]
     return None
 
+def get_all_eas(signal_id):
+    """Get all EA types for a signal, sorted by SET file count (desc)."""
+    sid = str(signal_id)
+    import os, re
+    from collections import Counter
+    counts = Counter()
+    for root, dirs, files in os.walk(str(SAMPLES_DIR).replace('samples', 'downloads')):
+        for f in files:
+            if not f.endswith('.set'):
+                continue
+            m = re.match(r'\((\d+)\)', f)
+            if m and m.group(1) == sid:
+                rest = f[len(m.group(0)):]
+                ea_match = re.match(r'(.*?)(?:AUD|CAD|CHF|EUR|GBP|JPY|NZD|USD|XAU|XAG|GAS|BVSPX|Fra)', rest)
+                if ea_match:
+                    ea_raw = re.sub(r'[\s_]?v?[\d.]+$', '', ea_match.group(1).strip().rstrip('_ '))
+                    ea = EA_NORMALIZE.get(ea_raw, ea_raw)
+                    if ea != 'Helper':
+                        counts[ea] += 1
+    if counts:
+        return [ea for ea, _ in counts.most_common()]
+    # Fallback: single EA from get_ea_type
+    single = get_ea_type(sid)
+    return [single] if single and single != 'UNK' else []
+
 def get_ea_type(signal_id):
     sid = str(signal_id)
     # 1. Manual override (boss-confirmed) takes priority
@@ -327,13 +352,15 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
             rank = str(i)
         
         score_cls = get_score_class(r['avg_score'])
+        signal_id = r['signal_id']
+        all_eas = get_all_eas(signal_id)
         ea_cls = f'ea-{r["ea_type"]}'
+        ea_tags = ' '.join([f'<span class="ea-tag ea-{ea}">{ea}</span>' for ea in all_eas])
         dd_cls = r['dd_class']
         
         pf = r['profit_factor']
         pf_str = 'Inf' if pf > 999 else f'{pf:.1f}'
-        
-        signal_id = r['signal_id']
+
         report_url = f'../reports/index_{signal_id}.html'
         martin_url = f'../reports/Signal_Deep_Analysis_{signal_id}.html'
         signal_page_url = f'https://signals.algoforest.com/signals/{signal_id}'
@@ -350,7 +377,7 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 <td>{pf_str}</td>
 <td><span class="tf">{r['timeframe']}</span></td>
 <td class="m">{r['layer_info']}</td>
-<td><span class="ea-tag {ea_cls}">{r['ea_type']}</span></td>
+<td>{ea_tags}</td>
 </tr>
 '''
     
