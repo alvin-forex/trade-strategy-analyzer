@@ -289,9 +289,9 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 <div class="topnav">
   <a href="./index.html" class="topnav-logo">🦀 TSA</a>
   <div class="topnav-links">
-    <a href="./signal_ranking_dde_v4.html" class="topnav-link active">🏆 Signal 排名</a>
-    <a href="./reports/ranking_ccy.html" class="topnav-link">💱 CCY 排名</a>
-    <a href="./ccy_timeframe_volatility.html" class="topnav-link">📊 波幅表</a>
+    <a href="./signal_ranking.html" class="topnav-link active">🏆 Signal 排名</a>
+    <a href="./admin/ccy_ranking.html" class="topnav-link">💱 CCY 排名</a>
+    <a href="./admin/symbol_ranking.html" class="topnav-link">📊 波幅波</a>
   </div>
   <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">🌙</button>
 </div>
@@ -335,11 +335,11 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
         
         signal_id = r['signal_id']
         report_url = f'../reports/index_{signal_id}.html'
-        deep_analysis_url = f'../reports/index_{signal_id}.html'
+        martin_url = f'../reports/Signal_Deep_Analysis_{signal_id}.html'
         signal_page_url = f'https://signals.algoforest.com/signals/{signal_id}'
         html += f'''<tr{row_class}>
 <td>{rank}</td>
-<td class="sig"><a href="{signal_page_url}" style="color:var(--accent);font-weight:bold;text-decoration:none">{signal_id}</a> <a href="{report_url}" title="Signal 深度分析" style="text-decoration:none;font-size:14px">📊</a> <a href="{deep_analysis_url}" title="Signal 深度分析" style="text-decoration:none;font-size:14px">🔍</a></td>
+<td class="sig"><a href="{signal_page_url}" style="color:var(--accent);font-weight:bold;text-decoration:none">{signal_id}</a> <a href="{report_url}" title="Signal 深度分析" style="text-decoration:none;font-size:14px">📊</a> <a href="{martin_url}" title="馬丁剖析法" style="text-decoration:none;font-size:14px">🔍</a></td>
 <td>{r['total_symbols']}</td>
 <td class="{score_cls}">{r['avg_score']}</td>
 <td class="p4">{r['clean_pct']}%</td>
