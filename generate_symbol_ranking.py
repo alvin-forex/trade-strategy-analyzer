@@ -346,6 +346,14 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 </style>
 </head>
 <body>
+<div class="topnav" style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#111520;border-bottom:1px solid #1e2433;margin-bottom:16px;position:sticky;top:0;z-index:100">
+  <a href="../index.html" style="font-weight:700;font-size:1em;color:#FFD700;text-decoration:none;margin-right:auto">🦀 TSA</a>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <a href="../signal_ranking.html" style="color:#666;text-decoration:none;font-size:.88em;font-weight:600;padding:4px 10px;border-radius:6px">🏆 Signal 排名</a>
+    <a href="./ccy_ranking.html" style="color:#666;text-decoration:none;font-size:.88em;font-weight:600;padding:4px 10px;border-radius:6px">💱 CCY 排名</a>
+    <a href="./symbol_ranking.html" style="color:#FFD700;text-decoration:none;font-size:.88em;font-weight:600;padding:4px 10px;border-radius:6px;background:#1a1f2e">📊 波幅波</a>
+  </div>
+</div>
 <h1>📊 Symbol Ranking - DDE v3 Copy Strategy</h1>
 <div class="sub">Trigger 40% + Alpha Capture 40% + DDE 20% | {total_signals} signals × {len(sorted_symbols)} symbols | {total_records} pairs | {now}</div>
 
@@ -495,7 +503,7 @@ def generate_symbol_table(sym, rankings):
 
         html += f'''<tr{row_class}>
 <td>{rank}</td>
-<td class="sig">{r['signal_id']}</td>
+<td class="sig"><a href="https://signals.algoforest.com/signals/{r['signal_id']}" style="color:#64b5f6;font-weight:bold;text-decoration:none">{r['signal_id']}</a> <a href="../reports/index_{r['signal_id']}.html" style="text-decoration:none;font-size:14px" title="深度分析">📊</a> <a href="../reports/Signal_Deep_Analysis_{r['signal_id']}.html" style="text-decoration:none;font-size:14px" title="馬丁剖析法">🔍</a></td>
 <td>{r['symbol']}</td>
 <td class="{score_cls}">{r['avg_score']}</td>
 <td class="p4">{r['star4_count']}</td>
