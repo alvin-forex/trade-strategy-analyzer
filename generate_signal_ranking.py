@@ -37,12 +37,12 @@ LEVEL_RANGES = {
 # EA type mapping
 EA_MAP = {
     'DW': ['10437','11984','13790','17547','21698','22200','22278','25830','30359','31781','32719','3291','33101','31593','34574','36338','36397','36511','34259','20846','16538','38678'],
-    'SMA': ['106','1980','2351','32278','32541','5001','5275','537','5566','11889','13863','14724','16596','16698','16706','17611','17823','10864','14158','5636'],
-    'MKD': ['12962','13461','14341','14592','1470','17962','20805','23617','25668','25260','8325','7919'],
+    'SMA': ['106','1980','2351','32278','32541','5001','5275','537','5566','11889','13863','14724','16596','16698','16706','17611','17823','10864','14158','5636','12173'],
+    'MKD': ['12962','13461','14341','14592','1470','17962','20805','23617','25668','25260','8325','7919','7999'],
     'S10': ['13798','16596'],
-    'Flash': ['19849'],
+    'Flash': ['19849','10344'],
     'GEM': ['14581'],
-    'MAN': ['12173'],
+    'MAN': [],
 }
 
 def get_ea_type(signal_id):
@@ -166,13 +166,14 @@ def main():
             'clean_pct': score_data['clean_pct'],
             'total_trades': rec.get('total_trades', 0),
             'win_rate': rec.get('win_rate', 0),
-            'profit_factor': rec.get('profit_factor', 0),
+            'profit_factor': round(abs(rec.get('total_profit', 0) / abs(rec.get('max_loss', 1))), 1) if rec.get('max_loss', 0) != 0 else 999,
             'total_profit': rec.get('total_profit', 0),
-            'max_dd': rec.get('max_dd', 0),
+            'total_pips': rec.get('total_pips', 0),
+            'max_dd': rec.get('max_loss', 0),
             'timeframe': rec.get('timeframe', ''),
             'ea_type': get_ea_type(sid),
             'layer_info': get_layer_info(rec),
-            'dd_class': get_dd_class(rec.get('max_dd', 0)),
+            'dd_class': get_dd_class(rec.get('max_loss', 0)),
         })
     
     results.sort(key=lambda x: x['avg_score'], reverse=True)
@@ -256,7 +257,7 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 </div>
 <div style="overflow-x:auto;width:100%"><table><thead><tr>
 <th>#</th><th>Signal</th><th>CCY</th><th>DDE</th><th>CB</th>
-<th>Win%</th><th>#</th><th>Profit</th><th>DD</th><th>PF</th>
+<th>Win%</th><th>Trades</th><th>Profit</th><th>DD</th><th>PF</th>
 <th>TF</th><th>LV</th><th>EA</th>
 </tr></thead><tbody>
 '''
@@ -295,8 +296,8 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 <td class="p4">{r['clean_pct']}%</td>
 <td>{r['win_rate']:.1f}%</td>
 <td>{r['total_trades']:,}</td>
-<td class="g">{r['total_profit']:,.0f} pips</td>
-<td class="m {dd_cls}">{r['max_dd']:,.0f} pips</td>
+<td class="g">${r['total_profit']:,.0f}<br><span style="font-size:0.75em;color:#888">{r['total_pips']:,.0f} pips</span></td>
+<td class="m {dd_cls}">${r['max_dd']:,.0f}</td>
 <td>{pf_str}</td>
 <td><span class="tf">{r['timeframe']}</span></td>
 <td class="m">{r['layer_info']}</td>
@@ -310,6 +311,16 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
     
     output_path = OUTPUT_DIR / 'signal_ranking_dde_v4.html'
     with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(html)
+    
+    # Also write to docs/ for GitHub Pages
+    docs_path = BASE_DIR / 'docs' / 'signal_ranking_dde_v4.html'
+    with open(docs_path, 'w', encoding='utf-8') as f:
+        f.write(html)
+    
+    # Also create signal_ranking.html (alias)
+    docs_alias = BASE_DIR / 'docs' / 'signal_ranking.html'
+    with open(docs_alias, 'w', encoding='utf-8') as f:
         f.write(html)
     
     print(f"\n✅ Generated: {output_path}")
