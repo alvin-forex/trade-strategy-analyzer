@@ -36,7 +36,7 @@ LEVEL_RANGES = {
 
 # EA type mapping
 EA_MAP = {
-    'DW': ['10437','11984','13790','17547','21698','22200','22278','25830','30359','31781','32719','3291','33101','31593','34574','36338','36397','36511','34259','20846','16538'],
+    'DW': ['10437','11984','13790','17547','21698','22200','22278','25830','30359','31781','32719','3291','33101','31593','34574','36338','36397','36511','34259','20846','16538','38678'],
     'SMA': ['106','1980','2351','32278','32541','5001','5275','537','5566','11889','13863','14724','16596','16698','16706','17611','17823','10864','14158','5636'],
     'MKD': ['12962','13461','14341','14592','1470','17962','20805','23617','25668','25260','8325','7919'],
     'S10': ['13798','16596'],
@@ -284,8 +284,8 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
         pf_str = 'Inf' if pf > 999 else f'{pf:.1f}'
         
         signal_id = r['signal_id']
-        report_url = f'../reports/Signal_Deep_Analysis_{signal_id}.html'
-        deep_analysis_url = f'../reports/Signal_Deep_Analysis_{signal_id}.html'
+        report_url = f'../reports/index_{signal_id}.html'
+        deep_analysis_url = f'../reports/index_{signal_id}.html'
         signal_page_url = f'https://signals.algoforest.com/signals/{signal_id}'
         html += f'''<tr{row_class}>
 <td>{rank}</td>
