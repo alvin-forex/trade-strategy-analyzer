@@ -34,21 +34,70 @@ LEVEL_RANGES = {
     'L9+': (400, float('inf'))
 }
 
-# EA type mapping
-EA_MAP = {
-    'DW': ['10437','11984','13790','17547','21698','22200','22278','25830','30359','31781','32719','3291','33101','31593','34574','36338','36397','36511','34259','20846','16538','38678'],
-    'SMA': ['106','1980','2351','32278','32541','5001','5275','537','5566','11889','13863','14724','16596','16698','16706','17611','17823','10864','14158','5636','12173'],
-    'MKD': ['12962','13461','14341','14592','1470','17962','20805','23617','25668','25260','8325','7919','7999'],
-    'S10': ['13798','16596'],
-    'Flash': ['19849','10344'],
-    'GEM': ['14581'],
-    'MAN': [],
+# EA type: manual overrides (boss-confirmed) take priority
+EA_OVERRIDES = {
+    '10344': 'Flash',   # Boss confirmed
+    '12173': 'SMA',     # Boss confirmed (Wayne Class = SMA strategy)
+    '7999': 'MKD',      # Boss confirmed (richman EA)
+    '38678': 'DW',      # Dragon Wave v2.10
 }
 
+# Auto-detected EA mapping from SET file counts
+EA_MAP = {
+    'DW': ['10437','106','11984','12962','13790','16538','17547','20846','21698','22200','22278','25830','31593','32541','32719','34259','36338','36397','36511'],
+    'SMA': ['537','1470','1980','2351','5001','5275','5566','10864','11984','14581','14724','16698','17611','17823','19849','23617','30359','33101','34574'],
+    'MKD': ['8325','13461','14592','25260','25668','31781'],
+    'S10': ['13798','16596'],
+    'Flash': ['7919','11889','13863','14158','14341','16706','17962','20805','19849'],
+    'GEM': ['3291'],
+}
+
+EA_NORMALIZE = {
+    'DragonWave': 'DW', 'Dragon Wave': 'DW',
+    'Flash': 'Flash',
+    'SMA': 'SMA', 'SMAPro': 'SMA', 'SMA Pro': 'SMA',
+    'MKD': 'MKD', 'MKDPro': 'MKD', 'MKD Pro': 'MKD',
+    'S10': 'S10',
+    'GeminiClient': 'GEM', 'Gemini Client': 'GEM',
+    'GeminiServer': 'GEM', 'Gemini Server': 'GEM',
+    'StableHelper': 'Helper', 'Stable Helper': 'Helper',
+}
+
+def auto_detect_ea_from_set(signal_id):
+    """Auto-detect primary EA from SET files in downloads/"""
+    import os, re
+    from collections import Counter
+    counts = Counter()
+    for root, dirs, files in os.walk(str(SAMPLES_DIR).replace('samples', 'downloads')):
+        for f in files:
+            if not f.endswith('.set'):
+                continue
+            m = re.match(r'\((\d+)\)', f)
+            if m and m.group(1) == str(signal_id):
+                rest = f[len(m.group(0)):]
+                ea_match = re.match(r'(.*?)(?:AUD|CAD|CHF|EUR|GBP|JPY|NZD|USD|XAU|XAG|GAS|BVSPX|Fra)', rest)
+                if ea_match:
+                    ea_raw = re.sub(r'[\s_]?v?[\d.]+$', '', ea_match.group(1).strip().rstrip('_ '))
+                    ea = EA_NORMALIZE.get(ea_raw, ea_raw)
+                    if ea != 'Helper':
+                        counts[ea] += 1
+    if counts:
+        return counts.most_common(1)[0][0]
+    return None
+
 def get_ea_type(signal_id):
+    sid = str(signal_id)
+    # 1. Manual override (boss-confirmed) takes priority
+    if sid in EA_OVERRIDES:
+        return EA_OVERRIDES[sid]
+    # 2. EA_MAP lookup
     for ea_type, signals in EA_MAP.items():
-        if signal_id in signals:
+        if sid in signals:
             return ea_type
+    # 3. Auto-detect from SET files
+    auto = auto_detect_ea_from_set(sid)
+    if auto:
+        return auto
     return 'UNK'
 
 def get_layer_info(rec):
