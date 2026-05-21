@@ -338,6 +338,12 @@ svg text { font-family: -apple-system, sans-serif; }
   <!-- Copy Grade -->
   <div class="card" id="copyGradeCard"></div>
 
+  <!-- Executive Summary -->
+  <div class="card" id="execSummaryCard" style="display:none">
+    <h2><span class="icon">📋</span> Executive Summary</h2>
+    <div id="execSummary"></div>
+  </div>
+
   <!-- Summary Stats -->
   <div class="card">
     <h2><span class="icon">📊</span> 摘要統計</h2>
@@ -1355,6 +1361,9 @@ async function analyze() {
     renderSETParams(setCats);
     prog.style.width='100%';
 
+    // Render Executive Summary card
+    renderExecutiveSummary(overall, positions, layerStats, symbolStats);
+
     $('results').style.display='block';
     $('uploadCard').style.display='none';
     btn.textContent='✅ 分析完成！重新分析';
@@ -1404,6 +1413,96 @@ async function analyze() {
 }
 
 // === Renderers ===
+function renderExecutiveSummary(overall, positions, layerStats, symbolStats) {
+  const card = $('execSummaryCard');
+  const el = $('execSummary');
+  if (!overall || !positions || !positions.length) { card.style.display='none'; return; }
+
+  const totalTrades = positions.length;
+  const wins = positions.filter(p => p.net_profit > 0).length;
+  const winRate = (wins / totalTrades * 100).toFixed(1);
+  const totalProfit = positions.reduce((s, p) => s + (p.net_profit || 0), 0);
+  const totalPips = positions.reduce((s, p) => s + (p.pips || 0), 0);
+  const maxDD = overall.maxDD || 0;
+  const pf = overall.profitFactor || 0;
+  const avgHolding = totalTrades > 0 ? (positions.reduce((s, p) => s + (p.holdingHours || 0), 0) / totalTrades).toFixed(1) : 0;
+  
+  // Layer analysis
+  const maxLayer = Math.max(...positions.map(p => p.layer || 1));
+  const layer1Only = positions.filter(p => (p.layer || 1) === 1).length;
+  const layer1Rate = (layer1Only / totalTrades * 100).toFixed(0);
+  
+  // Symbol count
+  const symbols = [...new Set(positions.map(p => p.symbol))];
+  const symbolCount = symbols.length;
+  
+  // Best/worst symbol
+  const symPnl = {};
+  positions.forEach(p => { symPnl[p.symbol] = (symPnl[p.symbol] || 0) + (p.net_profit || 0); });
+  const sortedSyms = Object.entries(symPnl).sort((a, b) => b[1] - a[1]);
+  const bestSym = sortedSyms[0];
+  const worstSym = sortedSyms[sortedSyms.length - 1];
+  
+  // Verdict
+  let verdict = '', verdictColor = '', verdictIcon = '';
+  const wr = parseFloat(winRate);
+  if (wr >= 70 && pf >= 1.5 && maxLayer <= 3) {
+    verdict = '首選 Copy'; verdictColor = '#28a745'; verdictIcon = '⭐⭐⭐';
+  } else if (wr >= 60 && pf >= 1.2) {
+    verdict = '可考慮 Copy'; verdictColor = '#FFC107'; verdictIcon = '⭐⭐';
+  } else if (wr >= 50) {
+    verdict = '觀察中'; verdictColor = '#fd7e14'; verdictIcon = '⭐';
+  } else {
+    verdict = '不建議 Copy'; verdictColor = '#dc3545'; verdictIcon = '⚠️';
+  }
+  
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:8px">
+        <div style="font-size:1.5em">${verdictIcon}</div>
+        <div style="font-size:1.2em;font-weight:bold;color:${verdictColor};margin:4px 0">${verdict}</div>
+        <div style="font-size:0.8em;color:var(--text2)">綜合評價</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="text-align:center;padding:8px;background:var(--bg-hover);border-radius:6px">
+          <div style="font-size:1.1em;font-weight:bold;color:#28a745">$${totalProfit.toFixed(0)}</div>
+          <div style="font-size:0.7em;color:var(--text2)">總盈虧</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg-hover);border-radius:6px">
+          <div style="font-size:1.1em;font-weight:bold">${winRate}%</div>
+          <div style="font-size:0.7em;color:var(--text2)">勝率</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg-hover);border-radius:6px">
+          <div style="font-size:1.1em;font-weight:bold;color:#dc3545">$${Math.abs(maxDD).toFixed(0)}</div>
+          <div style="font-size:0.7em;color:var(--text2)">最大回撤</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg-hover);border-radius:6px">
+          <div style="font-size:1.1em;font-weight:bold">${pf.toFixed(1)}</div>
+          <div style="font-size:0.7em;color:var(--text2)">盈虧比</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+      <div style="text-align:center;padding:6px;background:var(--bg-hover);border-radius:6px">
+        <div style="font-weight:bold">${totalTrades}</div><div style="font-size:0.7em;color:var(--text2)">交易數</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:var(--bg-hover);border-radius:6px">
+        <div style="font-weight:bold">${symbolCount}對</div><div style="font-size:0.7em;color:var(--text2)">貨幣對</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:var(--bg-hover);border-radius:6px">
+        <div style="font-weight:bold">${avgHolding}h</div><div style="font-size:0.7em;color:var(--text2)">平均持倉</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:var(--bg-hover);border-radius:6px">
+        <div style="font-weight:bold">${maxLayer}層</div><div style="font-size:0.7em;color:var(--text2)">最深層數</div>
+      </div>
+    </div>
+    ${bestSym ? `<div style="font-size:0.85em;color:var(--text2);padding:8px;background:var(--bg-hover);border-radius:6px">
+      💰 最強: <b style="color:#28a745">${bestSym[0]}</b> ($${bestSym[1].toFixed(0)}) ${worstSym && worstSym[0] !== bestSym[0] ? `| 💀 最弱: <b style="color:#dc3545">${worstSym[0]}</b> ($${worstSym[1].toFixed(0)})` : ''}
+    </div>` : ''}
+  `;
+  card.style.display = 'block';
+}
+
 function renderCopyGrade(g) {
   $('copyGradeCard').innerHTML = `
     <div class="copy-grade">
