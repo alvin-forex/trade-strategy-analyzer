@@ -1361,15 +1361,15 @@ async function analyze() {
     renderSETParams(setCats);
     prog.style.width='100%';
 
-    // Render Executive Summary card
-    renderExecutiveSummary(overall, positions, layerStats, symbolStats);
-
     $('results').style.display='block';
     $('uploadCard').style.display='none';
     btn.textContent='✅ 分析完成！重新分析';
     btn.disabled=false;
     $('downloadBtn').style.display='inline-block';
     $('saveArchiveBtn').style.display='inline-block';
+
+    // Render Executive Summary card
+    renderExecutiveSummary(overall, positions, layerStats, symbolStats, martinV3Data);
 
     // Auto-archive after analysis
     try { _doSaveArchive(positions, true); } catch(e) { console.warn('Auto-archive failed:', e); }
@@ -1413,7 +1413,64 @@ async function analyze() {
 }
 
 // === Renderers ===
-function renderExecutiveSummary(overall, positions, layerStats, symbolStats) {
+function renderMartinSummary(martinV3Data) {
+  if (!martinV3Data) return '';
+  const s = martinV3Data.summary;
+  const bl = martinV3Data.blacklist;
+  const aGrade = martinV3Data.aGradeLayers;
+  const recovery = martinV3Data.recovery;
+  
+  // Martin risk level
+  let riskLevel, riskColor, riskIcon;
+  if (s.blacklistCount === 0 && s.unrecoverableCount === 0 && s.negEvCount <= 1) {
+    riskLevel = '低風險'; riskColor = '#28a745'; riskIcon = '✅';
+  } else if (s.unrecoverableCount > 0 || s.blacklistCount >= 3) {
+    riskLevel = '高風險'; riskColor = '#dc3545'; riskIcon = '🔴';
+  } else {
+    riskLevel = '中等風險'; riskColor = '#FFC107'; riskIcon = '🟡';
+  }
+  
+  let html = `<div style="margin-top:12px;padding:12px;background:var(--bg-hover);border-radius:8px;border-left:4px solid ${riskColor}">`;
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <b style="font-size:0.95em">🎲 馬丁風險分析</b>
+    <span style="color:${riskColor};font-weight:bold;font-size:0.9em">${riskIcon} ${riskLevel}</span>
+  </div>`;
+  
+  // Quick stats row
+  html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:0.8em;margin-bottom:8px">`;
+  html += `<div style="text-align:center"><b>${s.totalLayers}</b><br><span style="color:var(--text2)">層級組合</span></div>`;
+  html += `<div style="text-align:center"><b style="color:#28a745">${s.posEvCount}</b><br><span style="color:var(--text2)">正EV層</span></div>`;
+  html += `<div style="text-align:center"><b style="color:#dc3545">${s.negEvCount}</b><br><span style="color:var(--text2)">負EV層</span></div>`;
+  html += `<div style="text-align:center"><b style="color:#28a745">${s.aGradeCount}</b><br><span style="color:var(--text2)">A級+層</span></div>`;
+  html += `</div>`;
+  
+  // Blacklist warnings
+  if (bl.length > 0) {
+    html += `<div style="font-size:0.8em;color:#dc3545;margin-bottom:4px">⚠️ 黑名單 (${bl.length}): `;
+    html += bl.slice(0, 3).map(b => `${b.symbol} ${b.direction} (${b.level})`).join(' · ');
+    if (bl.length > 3) html += ` +${bl.length - 3}更多`;
+    html += `</div>`;
+  }
+  
+  // A-grade recommendations
+  if (aGrade.length > 0) {
+    html += `<div style="font-size:0.8em;color:#28a745">⭐ A級+ (${aGrade.length}): `;
+    html += aGrade.slice(0, 3).map(a => `${a.symbol} ${a.direction} L${a.lots} (EV$${a.evDollar.toFixed(0)}, ${a.rating})`).join(' · ');
+    if (aGrade.length > 3) html += ` +${aGrade.length - 3}更多`;
+    html += `</div>`;
+  }
+  
+  // Recovery status
+  const unrecoverable = recovery.filter(r => r.status.includes('無法恢復'));
+  if (unrecoverable.length > 0) {
+    html += `<div style="font-size:0.8em;color:#dc3545">🔴 無法恢復: ${unrecoverable.map(r => r.symbol + ' ' + r.direction).join(' · ')}</div>`;
+  }
+  
+  html += `</div>`;
+  return html;
+}
+
+function renderExecutiveSummary(overall, positions, layerStats, symbolStats, martinV3Data) {
   const card = $('execSummaryCard');
   const el = $('execSummary');
   if (!overall || !positions || !positions.length) { card.style.display='none'; return; }
@@ -1496,9 +1553,10 @@ function renderExecutiveSummary(overall, positions, layerStats, symbolStats) {
         <div style="font-weight:bold">${maxLayer}層</div><div style="font-size:0.7em;color:var(--text2)">最深層數</div>
       </div>
     </div>
-    ${bestSym ? `<div style="font-size:0.85em;color:var(--text2);padding:8px;background:var(--bg-hover);border-radius:6px">
+    ${bestSym ? `<div style="font-size:0.85em;color:var(--text2);padding:8px;background:var(--bg-hover);border-radius:6px;margin-bottom:12px">
       💰 最強: <b style="color:#28a745">${bestSym[0]}</b> ($${bestSym[1].toFixed(0)}) ${worstSym && worstSym[0] !== bestSym[0] ? `| 💀 最弱: <b style="color:#dc3545">${worstSym[0]}</b> ($${worstSym[1].toFixed(0)})` : ''}
     </div>` : ''}
+    ${renderMartinSummary(martinV3Data)}
   `;
   card.style.display = 'block';
 }
