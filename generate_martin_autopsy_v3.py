@@ -296,6 +296,22 @@ def compute_rating(stats: dict) -> str:
         return 'E'
 
 
+def compute_score(stats: dict) -> float:
+    """計算層級評分（0-100），與 compute_rating 相同邏輯"""
+    wr = stats['wr']
+    ev = stats['ev']
+    odds = min(stats['odds_pips'], stats['odds_dollar'])
+    count = stats['count']
+    score = 0
+    score += 30 if wr >= 80 else 25 if wr >= 70 else 18 if wr >= 60 else 10 if wr >= 50 else max(0, wr / 5)
+    score += 30 if ev >= 20 else 25 if ev >= 10 else 18 if ev >= 5 else 10 if ev >= 0 else max(0, 10 + ev / 2)
+    score += 20 if odds >= 2.0 else 15 if odds >= 1.5 else 10 if odds >= 1.0 else max(0, odds * 10)
+    score += 15 if count >= 10 else 12 if count >= 5 else 8 if count >= 3 else max(0, count * 2)
+    hold = stats['avg_hold']
+    score += 5 if hold <= 24 else 4 if hold <= 72 else 3 if hold <= 168 else 2 if hold <= 360 else 1
+    return round(score, 1)
+
+
 # ─── Part 1: CCY × Direction 總覽 ──────────────────────────
 
 def build_ccy_direction_summary(layer_stats: Dict) -> List[dict]:
@@ -737,7 +753,7 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th>Layer</th><th>Rating</th><th>Trades</th><th>W:L</th>
+                <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
                 <th>WR%</th><th>EV$</th><th>WinPip</th><th>LossPip</th>
                 <th>Odds$</th><th>OddsPip</th><th>MFE</th><th>MAE</th><th>MaxMAE</th>
                 <th>Hold(h)</th><th>Total$</th>
@@ -746,12 +762,14 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
 '''
         for ls in sl:
             rating = compute_rating(ls)
+            score = compute_score(ls)
             row_cls = ' class="row-a"' if rating in ('S+','S','A') else ' class="row-d"' if rating in ('D','E') else ''
             ev_cls = 'positive' if ls['ev']>0 else 'negative'
             pnl_cls = 'positive' if ls['total_pnl']>0 else 'negative' if ls['total_pnl']<0 else 'neutral'
             sec += f'''<tr{row_cls}>
                 <td><b>{ls["layer_label"]}</b></td>
                 <td><span class="rating-badge" style="background:{rb(rating)};color:{rc(rating)}">{rating}</span></td>
+                <td>{score}</td>
                 <td>{ls["count"]}</td>
                 <td>{ls["win_count"]}:{ls["loss_count"]}</td>
                 <td>{ls["wr"]}%</td>
