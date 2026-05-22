@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>馬丁剖析法 V3 — Signal #5636</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #e0e0e0;
+            background: #0a0a1a;
+            padding: 15px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a3e 0%, #2d1b69 50%, #1a1a3e 100%);
+            border: 1px solid #4a3f8a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 22px;
+            color: #FFD700;
+            margin-bottom: 4px;
+        }
+        .header .subtitle {
+            font-size: 12px;
+            color: #999;
+        }
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .kpi-card .label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .kpi-card .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            margin-top: 4px;
+        }
+        .kpi-card .value.green { color: #2ecc71; }
+        .kpi-card .value.red { color: #e74c3c; }
+        .kpi-card .value.gold { color: #FFD700; }
+        
+        /* Section */
+        .section {
+            background: #0f0f23;
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .section-header {
+            background: linear-gradient(90deg, #1a1a3e, #2d1b69);
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            border-bottom: 1px solid #3a3a6a;
+        }
+        .section-header .badge {
+            display: inline-block;
+            background: #FFD700;
+            color: #000;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-weight: normal;
+        }
+        .section-body {
+            padding: 12px;
+        }
+        
+        /* Tables */
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        table th {
+            background: #1a1a3e;
+            color: #bbb;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #3a3a6a;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+        }
+        table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #1a1a2a;
+            white-space: nowrap;
+        }
+        table tr:hover { background: rgba(255,255,255,0.03); }
+        
+        .positive { color: #2ecc71; }
+        .negative { color: #e74c3c; }
+        .neutral { color: #888; }
+        
+        /* Rating badge */
+        .rating {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            text-align: center;
+            min-width: 30px;
+        }
+        
+        /* TP/SL bar chart */
+        .bar-chart {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin: 3px 0;
+        }
+        .bar {
+            height: 16px;
+            border-radius: 3px;
+            min-width: 2px;
+            position: relative;
+            font-size: 9px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 4px;
+        }
+        .bar.tp { background: #2ecc71; }
+        .bar.soft_sl { background: #f39c12; }
+        .bar.hard_sl { background: #e74c3c; }
+        
+        /* Status indicator */
+        .status { font-size: 14px; }
+        
+        /* Scatter chart (canvas) */
+        .scatter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        .scatter-card {
+            background: #0a0a18;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 8px;
+        }
+        .scatter-card .title {
+            font-size: 11px;
+            color: #bbb;
+            margin-bottom: 4px;
+        }
+        .scatter-card .stats-row {
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        canvas.scatter { width: 100%; height: 180px; }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 2px;
+            background: #0a0a18;
+            border-bottom: 2px solid #2a2a4a;
+            padding: 0 12px;
+        }
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #888;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab:hover { color: #ccc; }
+        .tab.active {
+            color: #FFD700;
+            border-bottom-color: #FFD700;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 15px;
+            color: #555;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <h1>🔬 馬丁剖析法 V3 — Signal #5636</h1>
+        <div class="subtitle">
+            數據覆蓋 3 個 CCY×Direction 組合 · 10 個層級 · 生成時間 2026-05-22 11:16
+        </div>
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="label">總交易</div>
+                <div class="value">211</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">總盈虧</div>
+                <div class="value green">$+9,727.72</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">勝率</div>
+                <div class="value green">68.2%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">平均持倉</div>
+                <div class="value">62.8h</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">A 級以上</div>
+                <div class="value gold">8 層</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">黑名單</div>
+                <div class="value green">0 個</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('part1')">Part 1 · CCY總覽</div>
+        <div class="tab" onclick="switchTab('part2')">Part 2 · MFE/MAE</div>
+        <div class="tab" onclick="switchTab('part3')">Part 3 · TP/SL</div>
+        <div class="tab" onclick="switchTab('part4')">Part 4 · 排行榜</div>
+        <div class="tab" onclick="switchTab('part5')">Part 5 · 黑名單</div>
+        <div class="tab" onclick="switchTab('part6')">Part 6 · 恢復力</div>
+    </div>
+    
+    <!-- Part 1: CCY × Direction 總覽 -->
+    <div id="part1" class="tab-content active">
+        <div class="section">
+            <div class="section-header">
+                Part 1 · CCY × Direction 總覽
+                <span class="badge">3 組合</span>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>CCY</th>
+                                <th>Dir</th>
+                                <th>Trades</th>
+                                <th>Layers</th>
+                                <th>MaxD</th>
+                                <th>Total$</th>
+                                <th>WR%</th>
+                                <th>EV$/L</th>
+                                <th>AvgW Pip</th>
+                                <th>AvgL Pip</th>
+                                <th>Odds$</th>
+                                <th>OddsPip</th>
+                                <th>AvgMFE</th>
+                                <th>AvgMAE</th>
+                                <th>MaxMAE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td><b>EURUSD</b></td>
+                                <td>sell</td>
+                                <td>98</td>
+                                <td>5</td>
+                                <td>5</td>
+                                <td class="positive"><b>$+4,185.40</b></td>
+                                <td>64.3%</td>
+                                <td class="positive">+333.78</td>
+                                <td>65.6</td>
+                                <td>25.9</td>
+                                <td>400.22</td>
+                                <td>400.15</td>
+                                <td>67.4</td>
+                                <td>51.1</td>
+                                <td><b>361.7</b></td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>109</td>
+                                <td>4</td>
+                                <td>4</td>
+                                <td class="positive"><b>$+3,627.33</b></td>
+                                <td>70.6%</td>
+                                <td class="positive">+172.54</td>
+                                <td>54.9</td>
+                                <td>21.5</td>
+                                <td>251.22</td>
+                                <td>251.65</td>
+                                <td>49.9</td>
+                                <td>24.9</td>
+                                <td><b>296.1</b></td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td><b>profit</b></td>
+                                <td>buy</td>
+                                <td>4</td>
+                                <td>1</td>
+                                <td>1</td>
+                                <td class="positive"><b>$+1,914.99</b></td>
+                                <td>100.0%</td>
+                                <td class="positive">+478.75</td>
+                                <td>0.0</td>
+                                <td>0.0</td>
+                                <td>999.0</td>
+                                <td>999.0</td>
+                                <td>0.0</td>
+                                <td>0.0</td>
+                                <td><b>0.0</b></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 2: MFE/MAE -->
+    <div id="part2" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 2 · MFE/MAE 散點分析
+                <span class="badge">每層一圖 · 綠=Win · 紅=Loss</span>
+            </div>
+            <div class="section-body">
+                <div class="scatter-grid" id="scatter-grid">
+                    <div class="scatter-card">
+                        <div class="title"><b>EURUSD buy</b> (4 layers)</div>
+                        <div class="stats-row">
+                            L0.16 (n=75) WR:69.3% MFE:26.5 MAE:34.9 MaxMAE:296.1<br>
+                            L0.24 (n=23) WR:69.6% MFE:27.2 MAE:38.8 MaxMAE:222.4<br>
+                            L0.36 (n=9) WR:77.8% MFE:54.7 MAE:26.1 MaxMAE:68.0<br>
+                            L0.54 (n=2) WR:100.0% MFE:91.0 MAE:0.0 MaxMAE:0.0<br>
+                        </div>
+                        <canvas id="chart_0" class="scatter" width="280" height="180"></canvas>
+                    </div>
+                    <div class="scatter-card">
+                        <div class="title"><b>EURUSD sell</b> (5 layers)</div>
+                        <div class="stats-row">
+                            L0.16 (n=59) WR:59.3% MFE:29.5 MAE:60.4 MaxMAE:361.7<br>
+                            L0.24 (n=25) WR:64.0% MFE:29.0 MAE:59.1 MaxMAE:264.1<br>
+                            L0.36 (n=10) WR:80.0% MFE:46.9 MAE:75.0 MaxMAE:208.5<br>
+                            L0.54 (n=3) WR:100.0% MFE:90.1 MAE:60.9 MaxMAE:107.8<br>
+                            L0.81 (n=1) WR:100.0% MFE:141.4 MAE:0.0 MaxMAE:0.0<br>
+                        </div>
+                        <canvas id="chart_1" class="scatter" width="280" height="180"></canvas>
+                    </div>
+                    <div class="scatter-card">
+                        <div class="title"><b>profit buy</b> (1 layers)</div>
+                        <div class="stats-row">
+                            L0.01 (n=4) WR:100.0% MFE:0.0 MAE:0.0 MaxMAE:0.0<br>
+                        </div>
+                        <canvas id="chart_2" class="scatter" width="280" height="180"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 3: TP/SL -->
+    <div id="part3" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 3 · A 級以上 TP/SL 建議（混合方案）
+                <span class="badge">8 層</span>
+            </div>
+            <div class="section-body">
+                <div style="font-size:10px; color:#888; margin-bottom:10px;">
+                    TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE × 1.2 &nbsp;|&nbsp; Hard SL = Pair Max MAE × 1.3 &nbsp;|&nbsp; R:R = TP / Soft SL（≥1.5x 可接受，≥3.0x 優秀）
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rating</th>
+                                <th>CCY</th>
+                                <th>Dir</th>
+                                <th>Layer</th>
+                                <th>n</th>
+                                <th>WR%</th>
+                                <th>EV$</th>
+                                <th>TP(pip)</th>
+                                <th>SoftSL</th>
+                                <th>HardSL</th>
+                                <th>R:R</th>
+                                <th>Total$</th>
+                                <th>AvgHold</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.54</td>
+                                <td>2</td>
+                                <td>100.0%</td>
+                                <td class="positive">+486.55</td>
+                                <td class="positive">91.0</td>
+                                <td style="color:#f39c12">0.0</td>
+                                <td class="negative">384.9</td>
+                                <td class="negative"><b>0x</b></td>
+                                <td class="positive">+973.11</td>
+                                <td>22h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>profit</b></td>
+                                <td>buy</td>
+                                <td>L0.01</td>
+                                <td>4</td>
+                                <td>100.0%</td>
+                                <td class="positive">+478.75</td>
+                                <td class="positive">0.0</td>
+                                <td style="color:#f39c12">0.0</td>
+                                <td class="negative">0.0</td>
+                                <td class="negative"><b>0x</b></td>
+                                <td class="positive">+1914.99</td>
+                                <td>0h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.54</td>
+                                <td>3</td>
+                                <td>100.0%</td>
+                                <td class="positive">+455.04</td>
+                                <td class="positive">90.1</td>
+                                <td style="color:#f39c12">73.1</td>
+                                <td class="negative">470.2</td>
+                                <td class="negative"><b>1.23x</b></td>
+                                <td class="positive">+1365.13</td>
+                                <td>157h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.36</td>
+                                <td>9</td>
+                                <td>77.8%</td>
+                                <td class="positive">+168.54</td>
+                                <td class="positive">54.7</td>
+                                <td style="color:#f39c12">31.3</td>
+                                <td class="negative">384.9</td>
+                                <td class="positive"><b>1.75x</b></td>
+                                <td class="positive">+1516.88</td>
+                                <td>63h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.36</td>
+                                <td>10</td>
+                                <td>80.0%</td>
+                                <td class="positive">+104.34</td>
+                                <td class="positive">46.9</td>
+                                <td style="color:#f39c12">90.0</td>
+                                <td class="negative">470.2</td>
+                                <td class="negative"><b>0.52x</b></td>
+                                <td class="positive">+1043.35</td>
+                                <td>141h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.24</td>
+                                <td>23</td>
+                                <td>69.6%</td>
+                                <td class="positive">+28.71</td>
+                                <td class="positive">27.2</td>
+                                <td style="color:#f39c12">46.6</td>
+                                <td class="negative">384.9</td>
+                                <td class="negative"><b>0.58x</b></td>
+                                <td class="positive">+660.26</td>
+                                <td>50h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.24</td>
+                                <td>25</td>
+                                <td>64.0%</td>
+                                <td class="positive">+28.33</td>
+                                <td class="positive">29.0</td>
+                                <td style="color:#f39c12">70.9</td>
+                                <td class="negative">470.2</td>
+                                <td class="negative"><b>0.41x</b></td>
+                                <td class="positive">+708.20</td>
+                                <td>95h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#E3F2FD;color:#3498db">A</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.16</td>
+                                <td>75</td>
+                                <td>69.3%</td>
+                                <td class="positive">+6.36</td>
+                                <td class="positive">26.5</td>
+                                <td style="color:#f39c12">41.9</td>
+                                <td class="negative">384.9</td>
+                                <td class="negative"><b>0.63x</b></td>
+                                <td class="positive">+477.08</td>
+                                <td>41h</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 4: Ranking -->
+    <div id="part4" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 4 · A 級以上排行榜
+                <span class="badge">8 層</span>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Rating</th>
+                                <th>CCY</th>
+                                <th>Dir</th>
+                                <th>Layer</th>
+                                <th>Trades</th>
+                                <th>WR%</th>
+                                <th>EV$</th>
+                                <th>Odds$</th>
+                                <th>OddsPip</th>
+                                <th>TP(pip)</th>
+                                <th>SoftSL</th>
+                                <th>HardSL</th>
+                                <th>Total$</th>
+                                <th>AvgHold(h)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.54</td>
+                                <td>2</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+486.55</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">91.0</td>
+                                <td style="color:#f39c12">0.0</td>
+                                <td class="negative">384.9</td>
+                                <td class="positive">+973.11</td>
+                                <td>22</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>profit</b></td>
+                                <td>buy</td>
+                                <td>L0.01</td>
+                                <td>4</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+478.75</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">0.0</td>
+                                <td style="color:#f39c12">0.0</td>
+                                <td class="negative">0.0</td>
+                                <td class="positive">+1914.99</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.54</td>
+                                <td>3</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+455.04</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">90.1</td>
+                                <td style="color:#f39c12">73.1</td>
+                                <td class="negative">470.2</td>
+                                <td class="positive">+1365.13</td>
+                                <td>157</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.36</td>
+                                <td>9</td>
+                                <td>77.8%</td>
+                                <td class="positive"><b>+168.54</b></td>
+                                <td>4.34</td>
+                                <td>5.8</td>
+                                <td class="positive">54.7</td>
+                                <td style="color:#f39c12">31.3</td>
+                                <td class="negative">384.9</td>
+                                <td class="positive">+1516.88</td>
+                                <td>63</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.36</td>
+                                <td>10</td>
+                                <td>80.0%</td>
+                                <td class="positive"><b>+104.34</b></td>
+                                <td>1.16</td>
+                                <td>0.97</td>
+                                <td class="positive">46.9</td>
+                                <td style="color:#f39c12">90.0</td>
+                                <td class="negative">470.2</td>
+                                <td class="positive">+1043.35</td>
+                                <td>141</td>
+                            </tr>
+                            <tr>
+                                <td>6</td>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.24</td>
+                                <td>23</td>
+                                <td>69.6%</td>
+                                <td class="positive"><b>+28.71</b></td>
+                                <td>0.96</td>
+                                <td>1.15</td>
+                                <td class="positive">27.2</td>
+                                <td style="color:#f39c12">46.6</td>
+                                <td class="negative">384.9</td>
+                                <td class="positive">+660.26</td>
+                                <td>50</td>
+                            </tr>
+                            <tr>
+                                <td>7</td>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.24</td>
+                                <td>25</td>
+                                <td>64.0%</td>
+                                <td class="positive"><b>+28.33</b></td>
+                                <td>1.25</td>
+                                <td>1.13</td>
+                                <td class="positive">29.0</td>
+                                <td style="color:#f39c12">70.9</td>
+                                <td class="negative">470.2</td>
+                                <td class="positive">+708.20</td>
+                                <td>95</td>
+                            </tr>
+                            <tr>
+                                <td>8</td>
+                                <td><span class="rating" style="background:#E3F2FD;color:#3498db">A</span></td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.16</td>
+                                <td>75</td>
+                                <td>69.3%</td>
+                                <td class="positive"><b>+6.36</b></td>
+                                <td>0.56</td>
+                                <td>0.63</td>
+                                <td class="positive">26.5</td>
+                                <td style="color:#f39c12">41.9</td>
+                                <td class="negative">384.9</td>
+                                <td class="positive">+477.08</td>
+                                <td>41</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 5: Blacklist -->
+    <div id="part5" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 5 · 黑名單
+                <span class="badge">0 個危險組合</span>
+            </div>
+            <div class="section-body">
+                <div style="text-align:center;padding:20px;color:#2ecc71;">✅ 沒有危險組合，所有 CCY×Direction 表現良好</div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 6: Recovery -->
+    <div id="part6" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 6 · 恢復力分析
+                <span class="badge">如果最深層被 Hard SL 止損，要用最佳 EV 層贏幾多次先追得返？</span>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>狀態</th>
+                                <th>CCY</th>
+                                <th>Dir</th>
+                                <th>最深層</th>
+                                <th>最差損失</th>
+                                <th>最佳 EV 層</th>
+                                <th>Best EV$</th>
+                                <th>恢復次數</th>
+                                <th>恢復天數</th>
+                                <th>說明</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="status">🟢</td>
+                                <td><b>EURUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.54</td>
+                                <td class="negative">$54.00</td>
+                                <td>L0.54</td>
+                                <td class="positive">+486.55</td>
+                                <td><b>1</b></td>
+                                <td>1天</td>
+                                <td>安全 (1次)</td>
+                            </tr>
+                            <tr>
+                                <td class="status">🟢</td>
+                                <td><b>EURUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.81</td>
+                                <td class="negative">$81.00</td>
+                                <td>L0.81</td>
+                                <td class="positive">+1081.43</td>
+                                <td><b>1</b></td>
+                                <td>1天</td>
+                                <td>安全 (1次)</td>
+                            </tr>
+                            <tr>
+                                <td class="status">🟢</td>
+                                <td><b>profit</b></td>
+                                <td>buy</td>
+                                <td>L0.01</td>
+                                <td class="negative">$1.00</td>
+                                <td>L0.01</td>
+                                <td class="positive">+478.75</td>
+                                <td><b>1</b></td>
+                                <td>22天</td>
+                                <td>安全 (1次)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        馬丁剖析法 V3 · 數據說話，紀律至上 · Quant 📊
+    </div>
+</div>
+
+<script>
+// Tab switching
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// Scatter charts
+const scatterData = {"0": [{"net_pips": 25.6, "mae": 29.1, "mfe": 50.3, "is_win": true, "layer": "L0.16"}, {"net_pips": -24.7, "mae": 61.9, "mfe": 11.3, "is_win": false, "layer": "L0.16"}, {"net_pips": 19.3, "mae": 0.0, "mfe": 43.1, "is_win": true, "layer": "L0.16"}, {"net_pips": 48.0, "mae": 0.0, "mfe": 52.3, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.5, "mae": 3.0, "mfe": 28.3, "is_win": true, "layer": "L0.16"}, {"net_pips": -55.0, "mae": 168.3, "mfe": 16.3, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.2, "mae": 0.0, "mfe": 34.6, "is_win": true, "layer": "L0.16"}, {"net_pips": -29.0, "mae": 78.2, "mfe": 5.6, "is_win": false, "layer": "L0.16"}, {"net_pips": -44.5, "mae": 114.4, "mfe": 5.3, "is_win": false, "layer": "L0.16"}, {"net_pips": 41.5, "mae": 29.4, "mfe": 41.5, "is_win": true, "layer": "L0.16"}, {"net_pips": 40.6, "mae": 21.0, "mfe": 41.0, "is_win": true, "layer": "L0.16"}, {"net_pips": 41.2, "mae": 17.5, "mfe": 51.3, "is_win": true, "layer": "L0.16"}, {"net_pips": 25.1, "mae": 49.6, "mfe": 35.5, "is_win": true, "layer": "L0.16"}, {"net_pips": 19.8, "mae": 0.0, "mfe": 19.8, "is_win": true, "layer": "L0.16"}, {"net_pips": -25.8, "mae": 51.5, "mfe": 28.5, "is_win": false, "layer": "L0.16"}, {"net_pips": 24.2, "mae": 1.9, "mfe": 50.2, "is_win": true, "layer": "L0.16"}, {"net_pips": 24.4, "mae": 27.7, "mfe": 43.4, "is_win": true, "layer": "L0.16"}, {"net_pips": 44.5, "mae": 11.0, "mfe": 54.7, "is_win": true, "layer": "L0.16"}, {"net_pips": 29.9, "mae": 43.5, "mfe": 38.7, "is_win": true, "layer": "L0.16"}, {"net_pips": -50.2, "mae": 145.7, "mfe": 14.5, "is_win": false, "layer": "L0.16"}, {"net_pips": 23.0, "mae": 9.0, "mfe": 44.3, "is_win": true, "layer": "L0.16"}, {"net_pips": 44.7, "mae": 29.0, "mfe": 44.7, "is_win": true, "layer": "L0.16"}, {"net_pips": 19.3, "mae": 0.0, "mfe": 42.9, "is_win": true, "layer": "L0.16"}, {"net_pips": 22.1, "mae": 2.2, "mfe": 30.3, "is_win": true, "layer": "L0.16"}, {"net_pips": -18.1, "mae": 96.8, "mfe": 6.1, "is_win": false, "layer": "L0.16"}, {"net_pips": 22.8, "mae": 34.8, "mfe": 40.5, "is_win": true, "layer": "L0.16"}, {"net_pips": -30.7, "mae": 71.4, "mfe": 11.4, "is_win": false, "layer": "L0.16"}, {"net_pips": -23.8, "mae": 54.4, "mfe": 2.4, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.7, "mae": 20.3, "mfe": 41.6, "is_win": true, "layer": "L0.16"}, {"net_pips": 42.5, "mae": 30.7, "mfe": 47.8, "is_win": true, "layer": "L0.16"}, {"net_pips": 22.3, "mae": 34.8, "mfe": 30.0, "is_win": true, "layer": "L0.16"}, {"net_pips": 49.9, "mae": 10.7, "mfe": 57.9, "is_win": true, "layer": "L0.16"}, {"net_pips": 26.1, "mae": 0.0, "mfe": 40.8, "is_win": true, "layer": "L0.16"}, {"net_pips": 49.0, "mae": 14.6, "mfe": 57.4, "is_win": true, "layer": "L0.16"}, {"net_pips": 21.1, "mae": 8.7, "mfe": 39.9, "is_win": true, "layer": "L0.16"}, {"net_pips": 21.5, "mae": 0.0, "mfe": 28.7, "is_win": true, "layer": "L0.16"}, {"net_pips": -134.8, "mae": 134.8, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 44.0, "mae": 0.0, "mfe": 44.0, "is_win": true, "layer": "L0.16"}, {"net_pips": 51.8, "mae": 0.0, "mfe": 51.8, "is_win": true, "layer": "L0.16"}, {"net_pips": 10.0, "mae": 0.0, "mfe": 10.0, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.4, "mae": 0.0, "mfe": 20.4, "is_win": true, "layer": "L0.16"}, {"net_pips": 2.9, "mae": 0.01, "mfe": 2.9, "is_win": false, "layer": "L0.16"}, {"net_pips": -33.8, "mae": 33.8, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.8, "mae": 0.01, "mfe": 20.8, "is_win": true, "layer": "L0.16"}, {"net_pips": 21.5, "mae": 0.0, "mfe": 21.5, "is_win": true, "layer": "L0.16"}, {"net_pips": -79.5, "mae": 79.5, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 19.3, "mae": 0.0, "mfe": 19.3, "is_win": true, "layer": "L0.16"}, {"net_pips": -60.8, "mae": 119.4, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": -39.0, "mae": 86.6, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": -27.6, "mae": 27.6, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 21.4, "mae": 3.5, "mfe": 33.3, "is_win": true, "layer": "L0.16"}, {"net_pips": 21.1, "mae": 0.0, "mfe": 21.1, "is_win": true, "layer": "L0.16"}, {"net_pips": -17.6, "mae": 17.6, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.7, "mae": 0.0, "mfe": 20.7, "is_win": true, "layer": "L0.16"}, {"net_pips": 18.4, "mae": 0.0, "mfe": 18.4, "is_win": true, "layer": "L0.16"}, {"net_pips": 54.4, "mae": 22.1, "mfe": 54.4, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.5, "mae": 0.0, "mfe": 20.5, "is_win": true, "layer": "L0.16"}, {"net_pips": 19.9, "mae": 1.7, "mfe": 19.9, "is_win": true, "layer": "L0.16"}, {"net_pips": 47.3, "mae": 33.2, "mfe": 47.3, "is_win": true, "layer": "L0.16"}, {"net_pips": 24.2, "mae": 6.8, "mfe": 24.2, "is_win": true, "layer": "L0.16"}, {"net_pips": 58.7, "mae": 3.7, "mfe": 58.7, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.9, "mae": 0.0, "mfe": 20.9, "is_win": true, "layer": "L0.16"}, {"net_pips": -56.9, "mae": 150.0, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": -11.6, "mae": 57.0, "mfe": 4.3, "is_win": false, "layer": "L0.16"}, {"net_pips": -22.2, "mae": 90.1, "mfe": 9.8, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.5, "mae": 4.5, "mfe": 41.2, "is_win": true, "layer": "L0.16"}, {"net_pips": 51.7, "mae": 6.7, "mfe": 62.2, "is_win": true, "layer": "L0.16"}, {"net_pips": -26.3, "mae": 59.9, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": -135.9, "mae": 296.1, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.5, "mae": 0.0, "mfe": 20.5, "is_win": true, "layer": "L0.16"}, {"net_pips": 22.8, "mae": 0.0, "mfe": 22.8, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.4, "mae": 0.0, "mfe": 20.4, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.7, "mae": 0.0, "mfe": 20.7, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.2, "mae": 0.0, "mfe": 20.2, "is_win": true, "layer": "L0.16"}, {"net_pips": -111.4, "mae": 111.4, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 27.4, "mae": 10.1, "mfe": 30.7, "is_win": true, "layer": "L0.24"}, {"net_pips": -1.9, "mae": 117.8, "mfe": 9.6, "is_win": false, "layer": "L0.24"}, {"net_pips": 28.6, "mae": 20.4, "mfe": 35.9, "is_win": true, "layer": "L0.24"}, {"net_pips": 6.5, "mae": 63.4, "mfe": 15.5, "is_win": true, "layer": "L0.24"}, {"net_pips": 30.3, "mae": 0.0, "mfe": 32.9, "is_win": true, "layer": "L0.24"}, {"net_pips": 0.1, "mae": 95.4, "mfe": 18.3, "is_win": false, "layer": "L0.24"}, {"net_pips": 31.7, "mae": 47.0, "mfe": 34.2, "is_win": true, "layer": "L0.24"}, {"net_pips": 29.4, "mae": 0.0, "mfe": 31.8, "is_win": true, "layer": "L0.24"}, {"net_pips": 26.0, "mae": 3.6, "mfe": 29.6, "is_win": true, "layer": "L0.24"}, {"net_pips": -62.4, "mae": 62.4, "mfe": 0.0, "is_win": false, "layer": "L0.24"}, {"net_pips": 86.2, "mae": 0.0, "mfe": 86.2, "is_win": true, "layer": "L0.24"}, {"net_pips": 32.0, "mae": 0.0, "mfe": 32.0, "is_win": true, "layer": "L0.24"}, {"net_pips": -6.4, "mae": 6.4, "mfe": 0.0, "is_win": false, "layer": "L0.24"}, {"net_pips": 33.7, "mae": 23.3, "mfe": 33.7, "is_win": true, "layer": "L0.24"}, {"net_pips": 35.4, "mae": 11.9, "mfe": 35.4, "is_win": true, "layer": "L0.24"}, {"net_pips": 28.4, "mae": 0.0, "mfe": 34.5, "is_win": true, "layer": "L0.24"}, {"net_pips": 34.6, "mae": 0.0, "mfe": 34.6, "is_win": true, "layer": "L0.24"}, {"net_pips": -6.2, "mae": 99.1, "mfe": 18.2, "is_win": false, "layer": "L0.24"}, {"net_pips": 39.8, "mae": 5.5, "mfe": 39.8, "is_win": true, "layer": "L0.24"}, {"net_pips": 29.5, "mae": 38.8, "mfe": 29.5, "is_win": true, "layer": "L0.24"}, {"net_pips": 29.5, "mae": 4.1, "mfe": 29.5, "is_win": true, "layer": "L0.24"}, {"net_pips": -62.2, "mae": 222.4, "mfe": 13.6, "is_win": false, "layer": "L0.24"}, {"net_pips": -61.4, "mae": 61.4, "mfe": 0.0, "is_win": false, "layer": "L0.24"}, {"net_pips": 45.2, "mae": 68.0, "mfe": 48.1, "is_win": true, "layer": "L0.36"}, {"net_pips": 56.7, "mae": 13.2, "mfe": 65.7, "is_win": true, "layer": "L0.36"}, {"net_pips": 50.5, "mae": 45.0, "mfe": 54.3, "is_win": true, "layer": "L0.36"}, {"net_pips": -11.8, "mae": 11.8, "mfe": 0.0, "is_win": false, "layer": "L0.36"}, {"net_pips": 50.5, "mae": 0.0, "mfe": 50.5, "is_win": true, "layer": "L0.36"}, {"net_pips": 96.3, "mae": 0.0, "mfe": 96.3, "is_win": true, "layer": "L0.36"}, {"net_pips": 45.9, "mae": 47.2, "mfe": 45.9, "is_win": true, "layer": "L0.36"}, {"net_pips": 121.6, "mae": 38.6, "mfe": 131.2, "is_win": true, "layer": "L0.36"}, {"net_pips": -11.2, "mae": 11.2, "mfe": 0.0, "is_win": false, "layer": "L0.36"}, {"net_pips": 90.7, "mae": 0.0, "mfe": 90.7, "is_win": true, "layer": "L0.54"}, {"net_pips": 91.3, "mae": 0.0, "mfe": 91.3, "is_win": true, "layer": "L0.54"}], "1": [{"net_pips": -26.3, "mae": 58.1, "mfe": 3.4, "is_win": false, "layer": "L0.16"}, {"net_pips": -60.0, "mae": 133.9, "mfe": 5.8, "is_win": false, "layer": "L0.16"}, {"net_pips": 74.8, "mae": 10.2, "mfe": 85.4, "is_win": true, "layer": "L0.16"}, {"net_pips": -83.4, "mae": 138.2, "mfe": 9.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 19.4, "mae": 66.4, "mfe": 32.8, "is_win": true, "layer": "L0.16"}, {"net_pips": 71.5, "mae": 0.0, "mfe": 79.6, "is_win": true, "layer": "L0.16"}, {"net_pips": 51.8, "mae": 5.7, "mfe": 55.9, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.3, "mae": 1.7, "mfe": 39.5, "is_win": true, "layer": "L0.16"}, {"net_pips": -25.8, "mae": 53.7, "mfe": 2.4, "is_win": false, "layer": "L0.16"}, {"net_pips": -13.0, "mae": 62.1, "mfe": 27.5, "is_win": false, "layer": "L0.16"}, {"net_pips": -60.6, "mae": 138.1, "mfe": 21.7, "is_win": false, "layer": "L0.16"}, {"net_pips": 19.7, "mae": 19.6, "mfe": 47.4, "is_win": true, "layer": "L0.16"}, {"net_pips": -25.0, "mae": 62.5, "mfe": 11.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 24.6, "mae": 3.7, "mfe": 24.6, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.1, "mae": 54.0, "mfe": 30.6, "is_win": true, "layer": "L0.16"}, {"net_pips": 56.5, "mae": 25.8, "mfe": 65.5, "is_win": true, "layer": "L0.16"}, {"net_pips": 40.5, "mae": 17.3, "mfe": 46.1, "is_win": true, "layer": "L0.16"}, {"net_pips": 49.4, "mae": 9.0, "mfe": 57.2, "is_win": true, "layer": "L0.16"}, {"net_pips": -17.0, "mae": 70.4, "mfe": 11.9, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.0, "mae": 10.0, "mfe": 34.4, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.3, "mae": 19.7, "mfe": 28.3, "is_win": true, "layer": "L0.16"}, {"net_pips": -26.0, "mae": 65.7, "mfe": 4.3, "is_win": false, "layer": "L0.16"}, {"net_pips": 19.2, "mae": 24.2, "mfe": 29.2, "is_win": true, "layer": "L0.16"}, {"net_pips": 46.4, "mae": 45.8, "mfe": 53.8, "is_win": true, "layer": "L0.16"}, {"net_pips": -59.7, "mae": 110.9, "mfe": 7.2, "is_win": false, "layer": "L0.16"}, {"net_pips": 61.4, "mae": 15.5, "mfe": 67.7, "is_win": true, "layer": "L0.16"}, {"net_pips": -27.3, "mae": 84.3, "mfe": 7.6, "is_win": false, "layer": "L0.16"}, {"net_pips": -26.4, "mae": 52.3, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": -54.3, "mae": 142.6, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.2, "mae": 0.0, "mfe": 47.6, "is_win": true, "layer": "L0.16"}, {"net_pips": -19.4, "mae": 147.8, "mfe": 0.7, "is_win": false, "layer": "L0.16"}, {"net_pips": 19.9, "mae": 0.6, "mfe": 33.8, "is_win": true, "layer": "L0.16"}, {"net_pips": -202.8, "mae": 316.0, "mfe": 19.4, "is_win": false, "layer": "L0.16"}, {"net_pips": 19.9, "mae": 36.5, "mfe": 28.7, "is_win": true, "layer": "L0.16"}, {"net_pips": 44.0, "mae": 13.5, "mfe": 51.4, "is_win": true, "layer": "L0.16"}, {"net_pips": 44.0, "mae": 36.5, "mfe": 44.1, "is_win": true, "layer": "L0.16"}, {"net_pips": 20.6, "mae": 19.5, "mfe": 45.8, "is_win": true, "layer": "L0.16"}, {"net_pips": 52.4, "mae": 4.3, "mfe": 53.8, "is_win": true, "layer": "L0.16"}, {"net_pips": -63.3, "mae": 193.9, "mfe": 11.9, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.5, "mae": 0.0, "mfe": 31.1, "is_win": true, "layer": "L0.16"}, {"net_pips": 22.2, "mae": 24.8, "mfe": 38.9, "is_win": true, "layer": "L0.16"}, {"net_pips": 54.1, "mae": 26.3, "mfe": 62.5, "is_win": true, "layer": "L0.16"}, {"net_pips": 19.5, "mae": 15.9, "mfe": 34.0, "is_win": true, "layer": "L0.16"}, {"net_pips": 39.7, "mae": 36.3, "mfe": 43.9, "is_win": true, "layer": "L0.16"}, {"net_pips": -14.8, "mae": 83.4, "mfe": 4.7, "is_win": false, "layer": "L0.16"}, {"net_pips": -237.2, "mae": 361.7, "mfe": 18.2, "is_win": false, "layer": "L0.16"}, {"net_pips": -74.6, "mae": 265.1, "mfe": 5.1, "is_win": false, "layer": "L0.16"}, {"net_pips": -60.5, "mae": 174.6, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 47.9, "mae": 7.1, "mfe": 55.8, "is_win": true, "layer": "L0.16"}, {"net_pips": 49.2, "mae": 2.7, "mfe": 49.2, "is_win": true, "layer": "L0.16"}, {"net_pips": 8.7, "mae": 52.1, "mfe": 11.1, "is_win": true, "layer": "L0.16"}, {"net_pips": 48.4, "mae": 20.2, "mfe": 48.4, "is_win": true, "layer": "L0.16"}, {"net_pips": -27.1, "mae": 74.8, "mfe": 0.2, "is_win": false, "layer": "L0.16"}, {"net_pips": 20.7, "mae": 0.0, "mfe": 20.7, "is_win": true, "layer": "L0.16"}, {"net_pips": -25.2, "mae": 50.3, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": -10.7, "mae": 66.3, "mfe": 22.9, "is_win": false, "layer": "L0.16"}, {"net_pips": 21.4, "mae": 0.0, "mfe": 21.4, "is_win": true, "layer": "L0.16"}, {"net_pips": -29.8, "mae": 29.8, "mfe": 0.0, "is_win": false, "layer": "L0.16"}, {"net_pips": 44.6, "mae": 0.0, "mfe": 44.6, "is_win": true, "layer": "L0.16"}, {"net_pips": 26.4, "mae": 5.8, "mfe": 35.9, "is_win": true, "layer": "L0.24"}, {"net_pips": -4.9, "mae": 79.5, "mfe": 5.8, "is_win": false, "layer": "L0.24"}, {"net_pips": -1.5, "mae": 56.3, "mfe": 3.2, "is_win": false, "layer": "L0.24"}, {"net_pips": 25.3, "mae": 1.5, "mfe": 31.3, "is_win": true, "layer": "L0.24"}, {"net_pips": 39.7, "mae": 9.4, "mfe": 47.6, "is_win": true, "layer": "L0.24"}, {"net_pips": 3.2, "mae": 74.3, "mfe": 3.7, "is_win": true, "layer": "L0.24"}, {"net_pips": 26.0, "mae": 11.7, "mfe": 31.0, "is_win": true, "layer": "L0.24"}, {"net_pips": 29.4, "mae": 20.4, "mfe": 38.9, "is_win": true, "layer": "L0.24"}, {"net_pips": 25.4, "mae": 14.1, "mfe": 32.8, "is_win": true, "layer": "L0.24"}, {"net_pips": -8.9, "mae": 60.4, "mfe": 6.7, "is_win": false, "layer": "L0.24"}, {"net_pips": 26.2, "mae": 31.2, "mfe": 31.4, "is_win": true, "layer": "L0.24"}, {"net_pips": 24.7, "mae": 1.2, "mfe": 28.1, "is_win": true, "layer": "L0.24"}, {"net_pips": -3.5, "mae": 91.9, "mfe": 11.0, "is_win": false, "layer": "L0.24"}, {"net_pips": 103.6, "mae": 24.8, "mfe": 112.4, "is_win": true, "layer": "L0.24"}, {"net_pips": -66.6, "mae": 180.1, "mfe": 28.8, "is_win": false, "layer": "L0.24"}, {"net_pips": -13.2, "mae": 143.1, "mfe": 25.2, "is_win": false, "layer": "L0.24"}, {"net_pips": 36.2, "mae": 33.1, "mfe": 36.2, "is_win": true, "layer": "L0.24"}, {"net_pips": -139.4, "mae": 264.1, "mfe": 31.3, "is_win": false, "layer": "L0.24"}, {"net_pips": -19.9, "mae": 209.2, "mfe": 0.0, "is_win": false, "layer": "L0.24"}, {"net_pips": -9.6, "mae": 124.1, "mfe": 7.6, "is_win": false, "layer": "L0.24"}, {"net_pips": 58.4, "mae": 3.2, "mfe": 61.4, "is_win": true, "layer": "L0.24"}, {"net_pips": 26.4, "mae": 21.3, "mfe": 28.5, "is_win": true, "layer": "L0.24"}, {"net_pips": 25.2, "mae": 0.0, "mfe": 25.2, "is_win": true, "layer": "L0.24"}, {"net_pips": 32.8, "mae": 16.3, "mfe": 32.8, "is_win": true, "layer": "L0.24"}, {"net_pips": 28.2, "mae": 0.0, "mfe": 28.2, "is_win": true, "layer": "L0.24"}, {"net_pips": 53.1, "mae": 21.2, "mfe": 60.7, "is_win": true, "layer": "L0.36"}, {"net_pips": 48.8, "mae": 6.3, "mfe": 53.2, "is_win": true, "layer": "L0.36"}, {"net_pips": 52.7, "mae": 23.6, "mfe": 52.7, "is_win": true, "layer": "L0.36"}, {"net_pips": 42.9, "mae": 8.3, "mfe": 48.6, "is_win": true, "layer": "L0.36"}, {"net_pips": 48.6, "mae": 39.4, "mfe": 52.0, "is_win": true, "layer": "L0.36"}, {"net_pips": -9.4, "mae": 123.0, "mfe": 15.1, "is_win": false, "layer": "L0.36"}, {"net_pips": 39.9, "mae": 90.3, "mfe": 49.6, "is_win": true, "layer": "L0.36"}, {"net_pips": -83.9, "mae": 208.5, "mfe": 45.5, "is_win": false, "layer": "L0.36"}, {"net_pips": 34.9, "mae": 155.1, "mfe": 43.9, "is_win": true, "layer": "L0.36"}, {"net_pips": 40.3, "mae": 74.0, "mfe": 48.0, "is_win": true, "layer": "L0.36"}, {"net_pips": 93.5, "mae": 20.1, "mfe": 99.8, "is_win": true, "layer": "L0.54"}, {"net_pips": 17.2, "mae": 107.8, "mfe": 26.1, "is_win": true, "layer": "L0.54"}, {"net_pips": 134.6, "mae": 54.7, "mfe": 144.3, "is_win": true, "layer": "L0.54"}, {"net_pips": 132.2, "mae": 0.0, "mfe": 141.4, "is_win": true, "layer": "L0.81"}], "2": [{"net_pips": 0.0, "mae": 0.0, "mfe": 0.0, "is_win": true, "layer": "L0.01"}, {"net_pips": 0.0, "mae": 0.0, "mfe": 0.0, "is_win": true, "layer": "L0.01"}, {"net_pips": 0.0, "mae": 0.0, "mfe": 0.0, "is_win": true, "layer": "L0.01"}, {"net_pips": 0.0, "mae": 0.0, "mfe": 0.0, "is_win": true, "layer": "L0.01"}]};
+
+function drawScatter(canvasId, data) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.offsetWidth * 2;
+    const h = canvas.height = canvas.offsetHeight * 2;
+    ctx.scale(2, 2);
+    const cw = canvas.offsetWidth;
+    const ch = canvas.offsetHeight;
+    
+    // Clear
+    ctx.fillStyle = '#0a0a18';
+    ctx.fillRect(0, 0, cw, ch);
+    
+    // Compute bounds
+    let allVals = data.map(d => Math.abs(d.net_pips)).concat(data.map(d => d.mae)).concat(data.map(d => d.mfe));
+    let maxVal = Math.max(...allVals, 1);
+    
+    const pad = { top: 10, right: 10, bottom: 20, left: 35 };
+    const plotW = cw - pad.left - pad.right;
+    const plotH = ch - pad.top - pad.bottom;
+    
+    // Grid
+    ctx.strokeStyle = '#1a1a2a';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+        let y = pad.top + plotH * i / 4;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + plotW, y); ctx.stroke();
+        let val = Math.round(maxVal * (1 - i/4));
+        ctx.fillStyle = '#555';
+        ctx.font = '8px sans-serif';
+        ctx.fillText(val, 2, y + 3);
+    }
+    
+    // Zero line
+    let zeroY = pad.top + plotH * 0.5;
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + plotW, zeroY); ctx.stroke();
+    
+    // Dots
+    for (const d of data) {
+        let x = pad.left + (d.mae / maxVal) * plotW;
+        let y_pos = d.is_win ? (pad.top + plotH * (1 - d.mfe / maxVal)) : (pad.top + plotH * (1 - d.net_pips / maxVal));
+        y_pos = Math.max(pad.top, Math.min(pad.top + plotH, y_pos));
+        x = Math.max(pad.left, Math.min(pad.left + plotW, x));
+        
+        ctx.beginPath();
+        ctx.arc(x, y_pos, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = d.is_win ? '#2ecc71' : '#e74c3c';
+        ctx.fill();
+    }
+}
+
+// Draw all charts
+for (const [id, data] of Object.entries(scatterData)) {
+    drawScatter('chart_' + id, data);
+}
+
+// Redraw on resize
+window.addEventListener('resize', () => {
+    for (const [id, data] of Object.entries(scatterData)) {
+        drawScatter('chart_' + id, data);
+    }
+});
+</script>
+</body>
+</html>
