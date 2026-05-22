@@ -375,7 +375,7 @@ def compute_tp_sl(layer_stats: Dict, min_rating: str = 'A') -> List[dict]:
         
         tp = stats['avg_mfe']
         soft_sl = stats['avg_mae']
-        hard_sl = ccy_dir_max_mae[(stats['symbol'], stats['direction'])]
+        hard_sl = stats['max_mae']  # 用該層自身的 Max MAE（不乘倍數）
         rr = tp / soft_sl if soft_sl > 0 else 0
         
         results.append({
@@ -523,625 +523,657 @@ def compute_recovery(layer_stats: Dict) -> List[dict]:
 def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
                   ccy_summary: List[dict], tp_sl_data: List[dict],
                   blacklist: List[dict], recovery: List[dict]) -> str:
-    """生成完整 HTML 報告（含 sidebar、SVG 圖表、CSS tooltip）"""
+    """生成完整 HTML 報告 — 按 CCY×Direction 分組，每組包含 Part 1-6"""
     
     total_trades = len(trades)
     total_pnl = sum(t['net_profit'] for t in trades)
     total_wins = sum(1 for t in trades if t['net_profit'] > 0)
     wr = total_wins / total_trades * 100 if total_trades else 0
     avg_hold = sum(t['holding_hours'] for t in trades) / total_trades if total_trades else 0
+    total_layers = len(layer_stats)
+    num_ccy = len(ccy_summary)
     
     rating_order = {'S+': 6, 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1, 'E': 0}
     
-    def rating_color(r):
-        return {'S+': '#FFD700', 'S': '#2ecc71', 'A': '#3498db', 'B': '#9b59b6',
-                'C': '#f39c12', 'D': '#e67e22', 'E': '#e74c3c'}.get(r, '#999')
+    def rc(r):
+        return {'S+':'#FFD700','S':'#9b59b6','A':'#2ecc71','B':'#3498db',
+                'C':'#f39c12','D':'#95a5a6','E':'#e74c3c'}.get(r,'#999')
     
-    def rating_bg(r):
-        return {'S+': '#FFF8E1', 'S': '#E8F5E9', 'A': '#E3F2FD', 'B': '#F3E5F5',
-                'C': '#FFF3E0', 'D': '#FBE9E7', 'E': '#FFEBEE'}.get(r, '#F5F5F5')
+    def rb(r):
+        return {'S+':'#FFF8E1','S':'#F3E5F5','A':'#E8F5E9','B':'#E3F2FD',
+                'C':'#FFF3E0','D':'#F5F5F5','E':'#FFEBEE'}.get(r,'#F5F5F5')
     
-    def pnl_prefix(val):
-        return '+' if val > 0 else ''
+    def pp(v):
+        return '+' if v > 0 else ''
     
-    # ─── Part 4 排行榜 ───
-    ranking = tp_sl_data
-
-    # ─── Part 1 條形圖數據 ───
-    bar_chart_groups = []
-    max_abs_pnl = max(abs(s['total_pnl']) for s in ccy_summary) if ccy_summary else 1
-    max_abs_pip = max(max(abs(s['avg_win_pips']), abs(s['avg_loss_pips'])) for s in ccy_summary) if ccy_summary else 1
+    # ── Group by CCY×Direction, sort by Total P&L desc ──
+    ccy_groups = defaultdict(dict)
+    for key, stats in layer_stats.items():
+        ccy_groups[(stats['symbol'], stats['direction'])][key] = stats
+    
+    sorted_ccy = sorted(ccy_groups.items(),
+        key=lambda x: sum(s['total_pnl'] for s in x[1].values()), reverse=True)
+    
+    # ── Global bar chart data ──
+    bar_groups = []
     for s in ccy_summary:
-        bar_chart_groups.append({
+        bar_groups.append({
             'label': f"{s['symbol']} {s['direction']}",
             'total_pnl': s['total_pnl'],
             'total_pips': s.get('total_pips', 0),
             'win_pip': s['avg_win_pips'],
             'loss_pip': s['avg_loss_pips'],
         })
+    max_abs_pnl = max((abs(s['total_pnl']) for s in ccy_summary), default=1) or 1
+    max_abs_pip = max((max(abs(s['avg_win_pips']), abs(s['avg_loss_pips'])) for s in ccy_summary), default=1) or 1
+    max_abs_total_pip = max((abs(g['total_pips']) for g in bar_groups), default=1) or 1
     
-    # Build SVG bar chart for Part 1
-    def build_p1_bar_svg(groups, max_pnl, max_pip):
-        if not groups:
-            return '<p style="color:#888;text-align:center;padding:20px">無數據</p>'
-        n = len(groups)
-        svg_h = max(200, n * 38 + 60)
-        bar_h = 14
-        group_gap = 38
-        left_margin = 60
-        right_margin = 60
-        chart_w = 700
-        plot_w = chart_w - left_margin - right_margin
-        
-        # Scale: left axis ($), right axis (pip)
-        def pnl_x(val):
-            return left_margin + (val / max(max_pnl, 1)) * (plot_w / 2) + plot_w / 2
-        def pip_x(val):
-            return left_margin + (val / max(max_pip, 1)) * (plot_w / 2) + plot_w / 2
-        
-        svg = f'<svg viewBox="0 0 {chart_w} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
-        # Background
-        svg += f'<rect width="{chart_w}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
-        # Zero line
-        zero_x = left_margin + plot_w // 2
-        svg += f'<line x1="{zero_x}" y1="30" x2="{zero_x}" y2="{svg_h-30}" stroke="#333" stroke-width="1"/>'
-        # Grid lines
-        for frac in [0.25, 0.5, 0.75, 1.0]:
-            gx = left_margin + plot_w * frac
-            svg += f'<line x1="{gx}" y1="30" x2="{gx}" y2="{svg_h-30}" stroke="#1a1a2a" stroke-width="0.5"/>'
-            gx2 = left_margin + plot_w * (1 - frac)
-            svg += f'<line x1="{gx2}" y1="30" x2="{gx2}" y2="{svg_h-30}" stroke="#1a1a2a" stroke-width="0.5"/>'
-        
-        # Axis labels
-        svg += f'<text x="{left_margin}" y="18" fill="#2ecc71" font-size="9" text-anchor="start">-$</text>'
-        svg += f'<text x="{chart_w - right_margin}" y="18" fill="#2ecc71" font-size="9" text-anchor="end">+$</text>'
-        svg += f'<text x="{chart_w - right_margin + 5}" y="18" fill="#5dade2" font-size="9" text-anchor="start">PIP→</text>'
-        
-        for i, g in enumerate(groups):
-            y_base = 30 + i * group_gap + 10
-            # Label
-            svg += f'<text x="4" y="{y_base + 5}" fill="#ccc" font-size="9">{g["label"]}</text>'
-            # Total$ bar
-            pnl_w = abs(g['total_pnl']) / max(max_pnl, 1) * (plot_w / 2)
-            pnl_col = '#2ecc71' if g['total_pnl'] >= 0 else '#e74c3c'
-            if g['total_pnl'] >= 0:
-                bx = zero_x
-            else:
-                bx = zero_x - pnl_w
-            svg += f'<rect x="{bx:.1f}" y="{y_base - 8}" width="{max(pnl_w, 1):.1f}" height="{bar_h}" fill="{pnl_col}" rx="2" opacity="0.85"/>'
-            svg += f'<text x="{bx + pnl_w + 3:.1f}" y="{y_base + 3}" fill="#ccc" font-size="8">${g["total_pnl"]:,.0f}</text>'
-            
-            # WinPip bar (above pnl bar)
-            pip_w = abs(g['win_pip']) / max(max_pip, 1) * (plot_w / 2)
-            svg += f'<rect x="{zero_x:.1f}" y="{y_base - 8 - bar_h - 1}" width="{max(pip_w, 1):.1f}" height="{bar_h - 2}" fill="#5dade2" rx="2" opacity="0.6"/>'
-            # LossPip bar (negative direction)
-            loss_w = abs(g['loss_pip']) / max(max_pip, 1) * (plot_w / 2)
-            svg += f'<rect x="{zero_x - loss_w:.1f}" y="{y_base - 8 - bar_h - 1}" width="{max(loss_w, 1):.1f}" height="{bar_h - 2}" fill="#e67e22" rx="2" opacity="0.6"/>'
-        
-        # Legend
-        ly = svg_h - 12
-        svg += f'<rect x="{left_margin}" y="{ly - 8}" width="10" height="8" fill="#2ecc71" rx="1"/>'
-        svg += f'<text x="{left_margin + 14}" y="{ly}" fill="#aaa" font-size="8">Total$ (+)</text>'
-        svg += f'<rect x="{left_margin + 70}" y="{ly - 8}" width="10" height="8" fill="#e74c3c" rx="1"/>'
-        svg += f'<text x="{left_margin + 84}" y="{ly}" fill="#aaa" font-size="8">Total$ (-)</text>'
-        svg += f'<rect x="{left_margin + 140}" y="{ly - 8}" width="10" height="8" fill="#5dade2" rx="1"/>'
-        svg += f'<text x="{left_margin + 154}" y="{ly}" fill="#aaa" font-size="8">WinPip</text>'
-        svg += f'<rect x="{left_margin + 200}" y="{ly - 8}" width="10" height="8" fill="#e67e22" rx="1"/>'
-        svg += f'<text x="{left_margin + 214}" y="{ly}" fill="#aaa" font-size="8">LossPip</text>'
-        
+    # ── SVG builders ──
+    def build_dollar_bar_svg(groups, max_pnl):
+        if not groups: return '<p style="color:#888;text-align:center;padding:20px">無數據</p>'
+        n = len(groups); svg_h = max(200, n*38+60); bar_h = 14; gap = 38; lm = 60; rm = 60; cw = 700; pw = cw-lm-rm; zx = lm+pw//2
+        svg = f'<svg viewBox="0 0 {cw} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
+        svg += f'<rect width="{cw}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
+        svg += f'<line x1="{zx}" y1="30" x2="{zx}" y2="{svg_h-30}" stroke="#333" stroke-width="1"/>'
+        for frac in [0.25,0.5,0.75,1.0]:
+            gx=lm+pw*frac; svg += f'<line x1="{gx:.1f}" y1="30" x2="{gx:.1f}" y2="{svg_h-30}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            gx2=lm+pw*(1-frac); svg += f'<line x1="{gx2:.1f}" y1="30" x2="{gx2:.1f}" y2="{svg_h-30}" stroke="#1a1a2a" stroke-width="0.5"/>'
+        svg += f'<text x="{lm}" y="18" fill="#2ecc71" font-size="9" text-anchor="start">-$</text>'
+        svg += f'<text x="{cw-rm}" y="18" fill="#2ecc71" font-size="9" text-anchor="end">+$</text>'
+        for i,g in enumerate(groups):
+            yb = 30+i*gap+10
+            svg += f'<text x="4" y="{yb+5}" fill="#ccc" font-size="9">{g["label"]}</text>'
+            pw_ = abs(g['total_pnl'])/max(max_pnl,1)*(pw/2); col = '#2ecc71' if g['total_pnl']>=0 else '#e74c3c'
+            bx = zx if g['total_pnl']>=0 else zx-pw_
+            svg += f'<rect x="{bx:.1f}" y="{yb-8}" width="{max(pw_,1):.1f}" height="{bar_h}" fill="{col}" rx="2" opacity="0.85"/>'
+            svg += f'<text x="{bx+pw_+3:.1f}" y="{yb+3}" fill="#ccc" font-size="8">${g["total_pnl"]:,.0f}</text>'
+            ww = abs(g['win_pip'])/max(max_abs_pip,1)*(pw/2)
+            svg += f'<rect x="{zx:.1f}" y="{yb-8-bar_h-1}" width="{max(ww,1):.1f}" height="{bar_h-2}" fill="#5dade2" rx="2" opacity="0.6"/>'
+            lw = abs(g['loss_pip'])/max(max_abs_pip,1)*(pw/2)
+            svg += f'<rect x="{zx-lw:.1f}" y="{yb-8-bar_h-1}" width="{max(lw,1):.1f}" height="{bar_h-2}" fill="#e67e22" rx="2" opacity="0.6"/>'
+        ly = svg_h-12
+        svg += f'<rect x="{lm}" y="{ly-8}" width="10" height="8" fill="#2ecc71" rx="1"/><text x="{lm+14}" y="{ly}" fill="#aaa" font-size="8">Total$(+)</text>'
+        svg += f'<rect x="{lm+70}" y="{ly-8}" width="10" height="8" fill="#e74c3c" rx="1"/><text x="{lm+84}" y="{ly}" fill="#aaa" font-size="8">Total$(-)</text>'
+        svg += f'<rect x="{lm+140}" y="{ly-8}" width="10" height="8" fill="#5dade2" rx="1"/><text x="{lm+154}" y="{ly}" fill="#aaa" font-size="8">WinPip</text>'
+        svg += f'<rect x="{lm+200}" y="{ly-8}" width="10" height="8" fill="#e67e22" rx="1"/><text x="{lm+214}" y="{ly}" fill="#aaa" font-size="8">LossPip</text>'
         svg += '</svg>'
         return svg
     
-    p1_bar_svg = build_p1_bar_svg(bar_chart_groups, max_abs_pnl, max_abs_pip)
-    
-    # ─── PIP Bar Chart for Part 1 ───
-    max_abs_total_pip = max(abs(g['total_pips']) for g in bar_chart_groups) if bar_chart_groups else 1
-    
-    def build_p1_pip_bar_svg(groups, max_pip):
-        if not groups:
-            return '<p style="color:#888;text-align:center;padding:20px">無數據</p>'
-        n = len(groups)
-        svg_h = max(180, n * 32 + 50)
-        bar_h = 14
-        group_gap = 32
-        left_margin = 60
-        right_margin = 40
-        chart_w = 700
-        plot_w = chart_w - left_margin - right_margin
-        zero_x = left_margin + plot_w // 2
-        
-        svg = f'<svg viewBox="0 0 {chart_w} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
-        svg += f'<rect width="{chart_w}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
-        # Zero line
-        svg += f'<line x1="{zero_x}" y1="25" x2="{zero_x}" y2="{svg_h-25}" stroke="#333" stroke-width="1"/>'
-        # Grid
-        for frac in [0.25, 0.5, 0.75, 1.0]:
-            gx = left_margin + plot_w * frac
-            svg += f'<line x1="{gx:.1f}" y1="25" x2="{gx:.1f}" y2="{svg_h-25}" stroke="#1a1a2a" stroke-width="0.5"/>'
-            gx2 = left_margin + plot_w * (1 - frac)
-            svg += f'<line x1="{gx2:.1f}" y1="25" x2="{gx2:.1f}" y2="{svg_h-25}" stroke="#1a1a2a" stroke-width="0.5"/>'
-        
-        for i, g in enumerate(groups):
-            y_base = 25 + i * group_gap + 10
-            svg += f'<text x="4" y="{y_base + 4}" fill="#ccc" font-size="9">{g["label"]}</text>'
-            # PIP bar
-            pip_val = g['total_pips']
-            pip_w = abs(pip_val) / max(max_pip, 1) * (plot_w / 2)
-            pip_col = '#2ecc71' if pip_val >= 0 else '#e74c3c'
-            if pip_val >= 0:
-                bx = zero_x
-            else:
-                bx = zero_x - pip_w
-            svg += f'<rect x="{bx:.1f}" y="{y_base - 7}" width="{max(pip_w, 1):.1f}" height="{bar_h}" fill="{pip_col}" rx="2" opacity="0.85"/>'
-            svg += f'<text x="{bx + pip_w + 3:.1f}" y="{y_base + 4}" fill="#ccc" font-size="8">{pip_val:+.1f} pip</text>'
-        
-        # Legend
-        ly = svg_h - 8
-        svg += f'<rect x="{left_margin}" y="{ly-8}" width="10" height="8" fill="#2ecc71" rx="1"/>'
-        svg += f'<text x="{left_margin+14}" y="{ly}" fill="#aaa" font-size="8">賺 PIP</text>'
-        svg += f'<rect x="{left_margin+60}" y="{ly-8}" width="10" height="8" fill="#e74c3c" rx="1"/>'
-        svg += f'<text x="{left_margin+74}" y="{ly}" fill="#aaa" font-size="8">蝕 PIP</text>'
-        
+    def build_pip_bar_svg(groups, max_pip):
+        if not groups: return '<p style="color:#888;text-align:center;padding:20px">無數據</p>'
+        n = len(groups); svg_h = max(180, n*32+50); bar_h = 14; gap = 32; lm = 60; rm = 40; cw = 700; pw = cw-lm-rm; zx = lm+pw//2
+        svg = f'<svg viewBox="0 0 {cw} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
+        svg += f'<rect width="{cw}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
+        svg += f'<line x1="{zx}" y1="25" x2="{zx}" y2="{svg_h-25}" stroke="#333" stroke-width="1"/>'
+        for i,g in enumerate(groups):
+            yb = 25+i*gap+10
+            svg += f'<text x="4" y="{yb+4}" fill="#ccc" font-size="9">{g["label"]}</text>'
+            pv = g['total_pips']; pw_ = abs(pv)/max(max_pip,1)*(pw/2); col = '#2ecc71' if pv>=0 else '#e74c3c'
+            bx = zx if pv>=0 else zx-pw_
+            svg += f'<rect x="{bx:.1f}" y="{yb-7}" width="{max(pw_,1):.1f}" height="{bar_h}" fill="{col}" rx="2" opacity="0.85"/>'
+            svg += f'<text x="{bx+pw_+3:.1f}" y="{yb+4}" fill="#ccc" font-size="8">{pv:+.1f} pip</text>'
         svg += '</svg>'
         return svg
     
-    p1_pip_bar_svg = build_p1_pip_bar_svg(bar_chart_groups, max_abs_total_pip)
-    
-    # ─── Part 2: MFE/MAE 散點圖 (inline SVG + CSS tooltip) ───
-    ccy_dir_groups = defaultdict(dict)
-    for key, stats in layer_stats.items():
-        ccy_key = (stats['symbol'], stats['direction'])
-        ccy_dir_groups[ccy_key][key] = stats
-    
-    def build_scatter_svg(symbol, direction, layers, trade_list):
-        """Build inline SVG scatter chart: X=MFE, Y=-MAE, with CSS tooltip"""
-        if not trade_list:
+    def build_layer_scatter(trade_details, title=""):
+        """Per-layer scatter SVG: X=MFE, Y=-MAE"""
+        if not trade_details:
             return '<p style="color:#888;font-size:10px">無交易數據</p>'
-        
-        svg_w, svg_h = 340, 240
-        pad = {'top': 20, 'right': 15, 'bottom': 30, 'left': 35}
-        plot_w = svg_w - pad['left'] - pad['right']
-        plot_h = svg_h - pad['top'] - pad['bottom']
-        
-        # Compute bounds
-        max_mfe = max((abs(d['mfe']) for d in trade_list), default=1) or 1
-        max_mae = max((abs(d['mae']) for d in trade_list), default=1) or 1
-        # Add 10% padding
-        max_mfe *= 1.1
-        max_mae *= 1.1
-        
-        svg = f'<svg viewBox="0 0 {svg_w} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
-        svg += f'<rect width="{svg_w}" height="{svg_h}" fill="#0a0a18" rx="4"/>'
-        
-        # Grid
+        sw, sh = 340, 240; pad = {'top':20,'right':15,'bottom':30,'left':35}
+        pw_ = sw-pad['left']-pad['right']; ph = sh-pad['top']-pad['bottom']
+        mx_mfe = max((abs(d['mfe']) for d in trade_details), default=1) or 1; mx_mfe *= 1.1
+        mx_mae = max((abs(d['mae']) for d in trade_details), default=1) or 1; mx_mae *= 1.1
+        svg = f'<svg viewBox="0 0 {sw} {sh}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
+        svg += f'<rect width="{sw}" height="{sh}" fill="#0a0a18" rx="4"/>'
         for i in range(5):
-            frac = i / 4
-            gx = pad['left'] + plot_w * frac
-            gy = pad['top'] + plot_h * frac
-            svg += f'<line x1="{gx:.1f}" y1="{pad["top"]}" x2="{gx:.1f}" y2="{pad["top"]+plot_h}" stroke="#1a1a2a" stroke-width="0.5"/>'
-            svg += f'<line x1="{pad["left"]}" y1="{gy:.1f}" x2="{pad["left"]+plot_w}" y2="{gy:.1f}" stroke="#1a1a2a" stroke-width="0.5"/>'
-            # X axis labels (MFE)
-            mfe_val = max_mfe * frac
-            svg += f'<text x="{gx:.1f}" y="{svg_h - 8}" fill="#555" font-size="7" text-anchor="middle">{mfe_val:.0f}</text>'
-            # Y axis labels (-MAE)
-            mae_val = max_mae * (1 - frac)
-            svg += f'<text x="{pad["left"]-4}" y="{gy+3:.1f}" fill="#555" font-size="7" text-anchor="end">{mae_val:.0f}</text>'
-        
-        # Axis titles
-        svg += f'<text x="{pad["left"]+plot_w//2}" y="{svg_h-1}" fill="#777" font-size="8" text-anchor="middle">MFE →</text>'
-        svg += f'<text x="8" y="{pad["top"]+plot_h//2}" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,{pad["top"]+plot_h//2})">-MAE →</text>'
-        
-        # Scatter dots with CSS tooltip
-        # We need a <style> block inside the SVG for tooltips
-        svg += '<style>'
-        svg += '.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}'
-        svg += '</style>'
-        
-        for idx, d in enumerate(trade_list):
-            mfe = abs(d['mfe'])
-            mae = abs(d['mae'])
-            is_win = d['is_win']
-            col = '#2ecc71' if is_win else '#e74c3c'
-            
-            cx = pad['left'] + (mfe / max_mfe) * plot_w
-            cy = pad['top'] + (1 - mae / max_mae) * plot_h
-            # Clamp
-            cx = max(pad['left'], min(pad['left'] + plot_w, cx))
-            cy = max(pad['top'], min(pad['top'] + plot_h, cy))
-            
-            svg += f'<g class="dot">'
-            svg += f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="3" fill="{col}"/>'
-            # Tooltip (shown on hover via CSS)
-            tip_x = cx + 6
-            tip_y = cy - 8
-            # Keep tooltip within bounds
-            if tip_x + 90 > svg_w:
-                tip_x = cx - 96
-            if tip_y < 10:
-                tip_y = cy + 10
-            hold_h = d.get('holding_hours', 0)
-            tip_text = f"#{idx+1} MFE:{d['mfe']:.1f} MAE:{d['mae']:.1f} ${d['net_profit']:.2f} L{d['lots']} Hold:{hold_h:.1f}h"
-            svg += f'<g class="tip">'
-            svg += f'<rect x="{tip_x:.1f}" y="{tip_y-8:.1f}" width="{len(tip_text)*5.2+8:.0f}" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/>'
-            svg += f'<text x="{tip_x+4:.1f}" y="{tip_y+2:.1f}" fill="#eee" font-size="7">{tip_text}</text>'
-            svg += '</g>'
-            svg += '</g>\n'
-        
+            f_ = i/4; gx = pad['left']+pw_*f_; gy = pad['top']+ph*f_
+            svg += f'<line x1="{gx:.1f}" y1="{pad["top"]}" x2="{gx:.1f}" y2="{pad["top"]+ph}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            svg += f'<line x1="{pad["left"]}" y1="{gy:.1f}" x2="{pad["left"]+pw_}" y2="{gy:.1f}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            svg += f'<text x="{gx:.1f}" y="{sh-8}" fill="#555" font-size="7" text-anchor="middle">{mx_mfe*f_:.0f}</text>'
+            svg += f'<text x="{pad["left"]-4}" y="{gy+3:.1f}" fill="#555" font-size="7" text-anchor="end">{mx_mae*(1-f_):.0f}</text>'
+        svg += f'<text x="{pad["left"]+pw_//2}" y="{sh-1}" fill="#777" font-size="8" text-anchor="middle">MFE →</text>'
+        svg += f'<text x="8" y="{pad["top"]+ph//2}" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,{pad["top"]+ph//2})">-MAE →</text>'
+        svg += '<style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style>'
+        for idx,d in enumerate(trade_details):
+            mfe = abs(d['mfe']); mae = abs(d['mae']); col = '#2ecc71' if d['is_win'] else '#e74c3c'
+            cx = pad['left']+(mfe/mx_mfe)*pw_; cy = pad['top']+(1-mae/mx_mae)*ph
+            cx = max(pad['left'], min(pad['left']+pw_, cx)); cy = max(pad['top'], min(pad['top']+ph, cy))
+            svg += f'<g class="dot"><circle cx="{cx:.1f}" cy="{cy:.1f}" r="3" fill="{col}"/>'
+            tx = cx+6; ty = cy-8
+            if tx+90 > sw: tx = cx-96
+            if ty < 10: ty = cy+10
+            hh = d.get('holding_hours',0)
+            tt = f"#{idx+1} MFE:{d['mfe']:.1f} MAE:{d['mae']:.1f} ${d['net_profit']:.2f} L{d['lots']} Hold:{hh:.1f}h"
+            svg += f'<g class="tip"><rect x="{tx:.1f}" y="{ty-8:.1f}" width="{len(tt)*5.2+8:.0f}" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/>'
+            svg += f'<text x="{tx+4:.1f}" y="{ty+2:.1f}" fill="#eee" font-size="7">{tt}</text></g></g>\n'
         svg += '</svg>'
         return svg
     
-    # Build scatter SVGs per CCY×Dir
-    scatter_svgs = []
-    for (symbol, direction), layers in sorted(ccy_dir_groups.items()):
-        all_trades = []
-        for lkey, lstats in sorted(layers.items(), key=lambda x: x[1]['lots']):
-            for td in lstats['trade_details']:
-                all_trades.append(td)
-        scatter_svgs.append({
-            'symbol': symbol,
-            'direction': direction,
-            'layer_count': len(layers),
-            'svg': build_scatter_svg(symbol, direction, layers, all_trades),
-            'layers_summary': layers,
-        })
-    
-    # ─── Part 3: TP/SL 條形圖 SVG ───
-    def build_tpsl_bar_svg(tp_sl_items):
-        if not tp_sl_items:
-            return '<p style="color:#888;text-align:center;padding:20px">無 A 級以上層級</p>'
-        
-        n = len(tp_sl_items)
-        svg_w = 700
-        bar_h = 16
-        group_gap = 6
-        left_margin = 100
-        right_margin = 20
-        top_pad = 30
-        bot_pad = 30
-        plot_w = svg_w - left_margin - right_margin
-        svg_h = top_pad + n * (bar_h * 2 + group_gap + 10) + bot_pad
-        
-        max_sl = max(max(r['soft_sl'], r['hard_sl'], r['tp']) for r in tp_sl_items) or 1
-        
-        svg = f'<svg viewBox="0 0 {svg_w} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
-        svg += f'<rect width="{svg_w}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
-        
-        # Grid
-        for frac in [0.25, 0.5, 0.75, 1.0]:
-            gx = left_margin + plot_w * frac
-            svg += f'<line x1="{gx:.1f}" y1="{top_pad-10}" x2="{gx:.1f}" y2="{svg_h - bot_pad + 10}" stroke="#1a1a2a" stroke-width="0.5"/>'
-            val = max_sl * frac
-            svg += f'<text x="{gx:.1f}" y="{top_pad - 14}" fill="#555" font-size="7" text-anchor="middle">{val:.0f}</text>'
-        
-        for i, r in enumerate(tp_sl_items):
-            y_base = top_pad + i * (bar_h * 2 + group_gap + 10)
-            label = f"{r['symbol']} {r['direction']} {r['layer']}"
-            rc = rating_color(r['rating'])
-            svg += f'<text x="4" y="{y_base + 6}" fill="#ccc" font-size="8">{label}</text>'
-            svg += f'<text x="4" y="{y_base + 16}" fill="{rc}" font-size="8" font-weight="bold">{r["rating"]}</text>'
-            
-            # Soft SL bar
-            soft_w = (r['soft_sl'] / max_sl) * plot_w
-            svg += f'<rect x="{left_margin:.1f}" y="{y_base:.1f}" width="{max(soft_w, 1):.1f}" height="{bar_h}" fill="#f39c12" rx="2" opacity="0.85"/>'
-            svg += f'<text x="{left_margin + soft_w + 3:.1f}" y="{y_base + 11}" fill="#ccc" font-size="7">SL {r["soft_sl"]}</text>'
-            
-            # Hard SL bar
-            hard_w = (r['hard_sl'] / max_sl) * plot_w
-            svg += f'<rect x="{left_margin:.1f}" y="{y_base + bar_h + 1:.1f}" width="{max(hard_w, 1):.1f}" height="{bar_h}" fill="#e74c3c" rx="2" opacity="0.85"/>'
-            svg += f'<text x="{left_margin + hard_w + 3:.1f}" y="{y_base + bar_h + 12}" fill="#ccc" font-size="7">Hard {r["hard_sl"]}</text>'
-        
-        # Legend
-        ly = svg_h - 10
-        svg += f'<rect x="{left_margin}" y="{ly-8}" width="10" height="8" fill="#f39c12" rx="1"/>'
-        svg += f'<text x="{left_margin+14}" y="{ly}" fill="#aaa" font-size="8">Soft SL</text>'
-        svg += f'<rect x="{left_margin+70}" y="{ly-8}" width="10" height="8" fill="#e74c3c" rx="1"/>'
-        svg += f'<text x="{left_margin+84}" y="{ly}" fill="#aaa" font-size="8">Hard SL</text>'
-        
+    def build_tpsl_bar(layers_data):
+        """TP/SL bar chart for layers in a CCY×Direction group"""
+        if not layers_data: return ''
+        items = [(ls, compute_rating(ls)) for ls in layers_data]
+        n = len(items); sw = 700; bh = 14; gap = 4; lm = 100; rm = 20; tp_ = 30; bp_ = 30; pw_ = sw-lm-rm
+        sh = tp_ + n*(bh*2+gap+12) + bp_
+        mx = max(max(ls['avg_mae'], ls['max_mae'], ls['avg_mfe']) for ls,_ in items) or 1
+        svg = f'<svg viewBox="0 0 {sw} {sh}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
+        svg += f'<rect width="{sw}" height="{sh}" fill="#0a0a18" rx="6"/>'
+        for frac in [0.25,0.5,0.75,1.0]:
+            gx=lm+pw_*frac; svg += f'<line x1="{gx:.1f}" y1="{tp_-10}" x2="{gx:.1f}" y2="{sh-bp_+10}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            svg += f'<text x="{gx:.1f}" y="{tp_-14}" fill="#555" font-size="7" text-anchor="middle">{mx*frac:.0f}</text>'
+        for i,(ls,rat) in enumerate(items):
+            yb = tp_ + i*(bh*2+gap+12)
+            svg += f'<text x="4" y="{yb+6}" fill="#ccc" font-size="8">{ls["layer_label"]}</text>'
+            svg += f'<text x="4" y="{yb+16}" fill="{rc(rat)}" font-size="8" font-weight="bold">{rat}</text>'
+            sw_ = (ls['avg_mae']/mx)*pw_
+            svg += f'<rect x="{lm:.1f}" y="{yb:.1f}" width="{max(sw_,1):.1f}" height="{bh}" fill="#f39c12" rx="2" opacity="0.85"/>'
+            svg += f'<text x="{lm+sw_+3:.1f}" y="{yb+11}" fill="#ccc" font-size="7">SL {ls["avg_mae"]}</text>'
+            hw = (ls['max_mae']/mx)*pw_
+            svg += f'<rect x="{lm:.1f}" y="{yb+bh+1:.1f}" width="{max(hw,1):.1f}" height="{bh}" fill="#e74c3c" rx="2" opacity="0.85"/>'
+            svg += f'<text x="{lm+hw+3:.1f}" y="{yb+bh+12}" fill="#ccc" font-size="7">Hard {ls["max_mae"]}</text>'
+        ly = sh-10
+        svg += f'<rect x="{lm}" y="{ly-8}" width="10" height="8" fill="#f39c12" rx="1"/><text x="{lm+14}" y="{ly}" fill="#aaa" font-size="8">Soft SL</text>'
+        svg += f'<rect x="{lm+70}" y="{ly-8}" width="10" height="8" fill="#e74c3c" rx="1"/><text x="{lm+84}" y="{ly}" fill="#aaa" font-size="8">Hard SL</text>'
         svg += '</svg>'
         return svg
     
-    p3_bar_svg = build_tpsl_bar_svg(tp_sl_data)
+    def layer_danger(ls):
+        d = 0.0
+        if ls['total_pnl'] < 0: d += abs(ls['total_pnl']) / 500
+        if ls['wr'] < 50: d += 2
+        if ls['ev'] < 0: d += min(abs(ls['ev']) / 10, 5)
+        if ls['odds_pips'] < 1.0: d += 2
+        if ls['count'] < 3: d += 1
+        if ls['layer_idx'] > 5: d += 1
+        return round(d, 1)
     
-    # ─── Build full HTML ───
+    dollar_svg = build_dollar_bar_svg(bar_groups, max_abs_pnl)
+    pip_svg = build_pip_bar_svg(bar_groups, max_abs_total_pip)
+    
+    # ── Build navigation links ──
+    nav_links = ' '.join(
+        f'<a href="#ccy-{sym}-{dr}">{sym} {dr.upper()}</a>'
+        for (sym, dr), _ in sorted_ccy
+    )
+    
+    # ── Build CCY×Direction sections ──
+    ccy_sections = []
+    
+    for idx_ccy, ((symbol, direction), layers) in enumerate(sorted_ccy):
+        gs = next((s for s in ccy_summary if s['symbol']==symbol and s['direction']==direction), None)
+        if not gs: continue
+        
+        sl = sorted(layers.values(), key=lambda x: x['lots'])  # shallow → deep
+        best_ev = max((l['ev'] for l in sl), default=0)
+        total_pnl_grp = gs['total_pnl']
+        is_open = ' open' if idx_ccy == 0 else ''
+        
+        sec = f'''
+    <details id="ccy-{symbol}-{direction}" class="ccy-section"{is_open}>
+      <summary class="ccy-summary">
+        <span style="font-size:16px">📌</span> <b>{symbol} {direction.upper()}</b>
+        &nbsp;—&nbsp; <span class="{'positive' if total_pnl_grp>0 else 'negative'}">${pp(total_pnl_grp)}{total_pnl_grp:,.2f}</span>
+        &nbsp;·&nbsp; {gs['trades']} trades
+        &nbsp;·&nbsp; WR {gs['wr']}%
+        &nbsp;·&nbsp; {len(sl)} layers
+      </summary>
+'''
+        # ── Part 1: 組合概覽 ──
+        sec += '''
+      <div class="section">
+        <div class="section-header">
+          Part 1 · 組合概覽
+          <span class="badge">''' + str(len(sl)) + ''' 層</span>
+          <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+            <b>組合概覽說明</b><br>
+            顯示此 CCY×Direction 下每一層嘅完整統計。<br>
+            <span style="color:#2ecc71">綠色行</span> = A 級以上 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = D 級以下<br><br>
+            <b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br>
+            <b>EV$</b>: 預期盈虧 | <b>Odds</b>: 盈虧比 | <b>MFE/MAE</b>: 最大有利/不利波幅
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>Trades</th><th>W:L</th>
+                <th>WR%</th><th>EV$</th><th>WinPip</th><th>LossPip</th>
+                <th>Odds$</th><th>OddsPip</th><th>MFE</th><th>MAE</th><th>MaxMAE</th>
+                <th>Hold(h)</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+'''
+        for ls in sl:
+            rating = compute_rating(ls)
+            row_cls = ' class="row-a"' if rating in ('S+','S','A') else ' class="row-d"' if rating in ('D','E') else ''
+            ev_cls = 'positive' if ls['ev']>0 else 'negative'
+            pnl_cls = 'positive' if ls['total_pnl']>0 else 'negative' if ls['total_pnl']<0 else 'neutral'
+            sec += f'''<tr{row_cls}>
+                <td><b>{ls["layer_label"]}</b></td>
+                <td><span class="rating-badge" style="background:{rb(rating)};color:{rc(rating)}">{rating}</span></td>
+                <td>{ls["count"]}</td>
+                <td>{ls["win_count"]}:{ls["loss_count"]}</td>
+                <td>{ls["wr"]}%</td>
+                <td class="{ev_cls}">{pp(ls["ev"])}{ls["ev"]}</td>
+                <td>{ls["avg_win_pips"]}</td>
+                <td>{ls["avg_loss_pips"]}</td>
+                <td>{ls["odds_dollar"]}</td>
+                <td>{ls["odds_pips"]}</td>
+                <td>{ls["avg_mfe"]}</td>
+                <td>{ls["avg_mae"]}</td>
+                <td><b>{ls["max_mae"]}</b></td>
+                <td>{ls["avg_hold"]}</td>
+                <td class="{pnl_cls}"><b>${pp(ls["total_pnl"])}{ls["total_pnl"]:,.2f}</b></td>
+              </tr>
+'''
+        sec += '''              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+'''
+        # ── Part 2: MFE/MAE 散點圖 (per layer) ──
+        sec += '''
+      <div class="section">
+        <div class="section-header">
+          Part 2 · MFE/MAE 散點分析
+          <span class="badge">每層一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
+          <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+            <b>MFE/MAE 散點分析</b><br>
+            每層獨立嘅散點圖：X=MFE（最大有利波幅），Y=-MAE（最大不利波幅）。<br>
+            綠色 = 盈利交易 | 紅色 = 虧損交易<br>
+            Hover 可查看每筆交易詳情。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="scatter-grid">
+'''
+        for ls in sl:
+            rating = compute_rating(ls)
+            sec += f'''            <div class="scatter-card">
+              <div class="title"><b>{ls["layer_label"]}</b> <span class="rating-badge" style="background:{rb(rating)};color:{rc(rating)}">{rating}</span> (n={ls["count"]}) &nbsp; WR:{ls["wr"]}% EV:{pp(ls["ev"])}{ls["ev"]}$</div>
+              {build_layer_scatter(ls["trade_details"], ls["layer_label"])}
+            </div>
+'''
+        sec += '''          </div>
+        </div>
+      </div>
+'''
+        # ── Part 3: TP/SL (all layers, no multiplier) ──
+        sec += '''
+      <div class="section">
+        <div class="section-header">
+          Part 3 · TP/SL 建議（原始值，不乘倍數）
+          <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+            <b>TP/SL 說明</b><br>
+            <b>TP</b> = 該層平均 MFE（不乘倍數）<br>
+            <b>Soft SL</b> = 該層平均 MAE（不乘倍數）<br>
+            <b>Hard SL</b> = 該層歷史最大 MAE（不乘倍數）<br>
+            <b>R:R</b> = TP / Soft SL（≥1.5x 可接受，≥3.0x 優秀）
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="font-size:10px;color:#888;margin-bottom:8px;">
+            TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Max MAE &nbsp;|&nbsp; 全部原始值，不乘倍數
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>n</th>
+                <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
+              </tr></thead>
+              <tbody>
+'''
+        for ls in sl:
+            rating = compute_rating(ls)
+            tp = ls['avg_mfe']
+            soft_sl = ls['avg_mae']   # 不乘倍數
+            hard_sl = ls['max_mae']   # 不乘倍數，用層級自身 Max MAE
+            rr = tp / soft_sl if soft_sl > 0 else 0
+            rr_cls = 'positive' if rr >= 1.5 else 'negative'
+            sec += f'''              <tr>
+                <td><b>{ls["layer_label"]}</b></td>
+                <td><span class="rating-badge" style="background:{rb(rating)};color:{rc(rating)}">{rating}</span></td>
+                <td>{ls["count"]}</td>
+                <td class="positive">{tp}</td>
+                <td style="color:#f39c12">{soft_sl}</td>
+                <td class="negative">{hard_sl}</td>
+                <td class="{rr_cls}"><b>{rr:.2f}x</b></td>
+              </tr>
+'''
+        sec += '''              </tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">📊 Soft SL vs Hard SL 條形圖</div>
+''' + build_tpsl_bar(sl) + '''
+          </div>
+        </div>
+      </div>
+'''
+        # ── Part 4: 排行榜 (A+ only in this group) ──
+        a_plus = [(ls, compute_rating(ls)) for ls in sl if rating_order.get(compute_rating(ls), 0) >= 4]
+        a_plus.sort(key=lambda x: (-rating_order.get(x[1], 0), -x[0]['ev']))
+        sec += f'''
+      <div class="section">
+        <div class="section-header">
+          Part 4 · 排行榜（A 級以上）
+          <span class="badge">{len(a_plus)} 層</span>
+          <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+            <b>排行榜說明</b><br>
+            此 CCY×Direction 內 A 級以上嘅層級，按評級同 EV 降序排列。<br>
+            評級基於 WR(25%) + EV(30%) + Odds(20%) + Count(15%) + Hold(10%)。
+          </span></i>
+        </div>
+        <div class="section-body">
+'''
+        if a_plus:
+            sec += '''          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Rating</th><th>Layer</th><th>n</th>
+                <th>WR%</th><th>EV$</th><th>Odds$</th><th>OddsPip</th>
+                <th>MFE</th><th>MAE</th><th>Total$</th><th>Hold(h)</th>
+              </tr></thead>
+              <tbody>
+'''
+            for rank, (ls, rat) in enumerate(a_plus, 1):
+                pnl_cls = 'positive' if ls['total_pnl']>0 else 'negative'
+                ev_cls = 'positive' if ls['ev']>0 else 'negative'
+                sec += f'''              <tr>
+                <td>{rank}</td>
+                <td><span class="rating-badge" style="background:{rb(rat)};color:{rc(rat)}">{rat}</span></td>
+                <td><b>{ls["layer_label"]}</b></td>
+                <td>{ls["count"]}</td>
+                <td>{ls["wr"]}%</td>
+                <td class="{ev_cls}"><b>{pp(ls["ev"])}{ls["ev"]}</b></td>
+                <td>{ls["odds_dollar"]}</td>
+                <td>{ls["odds_pips"]}</td>
+                <td>{ls["avg_mfe"]}</td>
+                <td>{ls["avg_mae"]}</td>
+                <td class="{pnl_cls}">{pp(ls["total_pnl"])}{ls["total_pnl"]:,.2f}</td>
+                <td>{ls["avg_hold"]:.0f}</td>
+              </tr>
+'''
+            sec += '''              </tbody>
+            </table>
+          </div>
+'''
+        else:
+            sec += '          <div style="text-align:center;padding:15px;color:#888;">此組合暫無 A 級以上層級</div>\n'
+        sec += '''        </div>
+      </div>
+'''
+        # ── Part 5: 黑名單 (dangerous layers in this group) ──
+        dangerous = [(ls, layer_danger(ls)) for ls in sl if layer_danger(ls) >= 1]
+        dangerous.sort(key=lambda x: -x[1])
+        sec += f'''
+      <div class="section">
+        <div class="section-header">
+          Part 5 · 黑名單（高危層級）
+          <span class="badge">{len(dangerous)} 層</span>
+          <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+            <b>黑名單說明</b><br>
+            此 CCY×Direction 內 Danger Score ≥ 1 嘅層級。<br>
+            危險因素：負 P&L、低 WR、負 EV、低 Odds、樣本少、深層級。<br>
+            ⚠️ WARNING: 1-3 &nbsp;|&nbsp; 💀 DEADLY: &gt;3
+          </span></i>
+        </div>
+        <div class="section-body">
+'''
+        if dangerous:
+            sec += '''          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>危險度</th><th>Danger</th><th>Layer</th><th>Rating</th>
+                <th>n</th><th>WR%</th><th>EV$</th><th>OddsPip</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+'''
+            for ls, dg in dangerous:
+                rat = compute_rating(ls)
+                level = '💀 DEADLY' if dg > 3 else '⚠️ WARNING'
+                pnl_cls = 'negative' if ls['total_pnl'] < 0 else 'positive'
+                ev_cls = 'negative' if ls['ev'] < 0 else 'positive'
+                sec += f'''              <tr>
+                <td>{level}</td>
+                <td><b>{dg}</b></td>
+                <td><b>{ls["layer_label"]}</b></td>
+                <td><span class="rating-badge" style="background:{rb(rat)};color:{rc(rat)}">{rat}</span></td>
+                <td>{ls["count"]}</td>
+                <td>{ls["wr"]}%</td>
+                <td class="{ev_cls}">{pp(ls["ev"])}{ls["ev"]}</td>
+                <td>{ls["odds_pips"]}</td>
+                <td class="{pnl_cls}">${pp(ls["total_pnl"])}{ls["total_pnl"]:,.2f}</td>
+              </tr>
+'''
+            sec += '''              </tbody>
+            </table>
+          </div>
+'''
+        else:
+            sec += '          <div style="text-align:center;padding:15px;color:#2ecc71;">✅ 此組合無高危層級</div>\n'
+        sec += '''        </div>
+      </div>
+'''
+        # ── Part 6: 恢復力 (per layer) ──
+        sec += '''
+      <div class="section">
+        <div class="section-header">
+          Part 6 · 恢復力分析
+          <span class="badge">每層恢復天數</span>
+          <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+            <b>恢復力說明</b><br>
+            如果該層被止損，需要幾多次最佳 EV 層交易先可以追回損失。<br>
+            🟢 100%勝率或≤4次 &nbsp;|&nbsp; 🟡 5-20次 &nbsp;|&nbsp; 🔴 &gt;20次或EV≤0
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>狀態</th><th>Layer</th><th>Rating</th><th>損失$</th>
+                <th>Best EV$</th><th>恢復次數</th><th>恢復天數</th><th>說明</th>
+              </tr></thead>
+              <tbody>
+'''
+        for ls in sl:
+            rat = compute_rating(ls)
+            avg_loss = ls['avg_loss'] if ls['loss_count'] > 0 else ls['lots'] * 100
+            if best_ev > 0:
+                rec_trades = math.ceil(avg_loss / best_ev)
+            else:
+                rec_trades = 999
+            
+            # Frequency estimate for this group
+            total_grp_trades = sum(l['count'] for l in sl)
+            freq_month = total_grp_trades / 3
+            if freq_month > 0:
+                rec_days = round(rec_trades / freq_month * 30)
+            else:
+                rec_days = 999
+            
+            if ls['wr'] == 100:
+                status = '🟢'; status_text = '100% WR'
+            elif rec_trades <= 4:
+                status = '🟢'; status_text = f'安全 ({rec_trades}次)'
+            elif rec_trades <= 20:
+                status = '🟡'; status_text = f'需時 ({rec_trades}次)'
+            else:
+                status = '🔴'; status_text = '無法恢復'
+            
+            sec += f'''              <tr>
+                <td>{status}</td>
+                <td><b>{ls["layer_label"]}</b></td>
+                <td><span class="rating-badge" style="background:{rb(rat)};color:{rc(rat)}">{rat}</span></td>
+                <td class="negative">${avg_loss:,.2f}</td>
+                <td class="{'positive' if best_ev>0 else 'negative'}">{pp(best_ev)}{best_ev}</td>
+                <td><b>{rec_trades if rec_trades<999 else '∞'}</b></td>
+                <td>{rec_days if rec_days<999 else '∞'}天</td>
+                <td>{status_text}</td>
+              </tr>
+'''
+        sec += '''              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </details>
+'''
+        ccy_sections.append(sec)
+    
+    # ── Assemble full HTML ──
+    all_sections = '\n'.join(ccy_sections)
+    
     html = f"""<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>馬丁剖析法 V3 — Signal #{signal_id}</title>
-    <link rel="stylesheet" href="../sidebar.css">
     <style>
         :root {{--bg:#0a0a1a;--surface:#0f0f23;--border:#2a2a4a;--text:#e0e0e0;--muted:#888;--accent:#FFD700}}
         [data-theme="light"] {{--bg:#f5f5f5;--surface:#fff;--border:#ddd;--text:#222;--muted:#666;--accent:#d4a017}}
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        * {{ margin:0; padding:0; box-sizing:border-box; }}
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            font-size: 12px;
-            line-height: 1.5;
-            color: var(--text);
-            background: var(--bg);
-            padding: 15px;
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+            font-size:12px; line-height:1.5; color:var(--text); background:var(--bg); padding:15px;
         }}
-        body.has-sidebar {{ margin-left: 200px; }}
         .theme-toggle {{
             position:fixed;top:12px;right:16px;z-index:1001;
             background:var(--surface);color:var(--text);border:1px solid var(--border);
             border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;
-            display:flex;align-items:center;justify-content:center;
-            transition:background .2s;
+            display:flex;align-items:center;justify-content:center;transition:background .2s;
         }}
         .theme-toggle:hover {{ background:var(--border); }}
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-        }}
-        
-        /* Header */
+        .container {{ max-width:1400px; margin:0 auto; }}
         .header {{
-            background: linear-gradient(135deg, #1a1a3e 0%, #2d1b69 50%, #1a1a3e 100%);
-            border: 1px solid #4a3f8a;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            background:linear-gradient(135deg,#1a1a3e 0%,#2d1b69 50%,#1a1a3e 100%);
+            border:1px solid #4a3f8a; border-radius:12px; padding:20px; margin-bottom:20px;
         }}
-        .header h1 {{
-            font-size: 22px;
-            color: #FFD700;
-            margin-bottom: 4px;
-        }}
-        .header .subtitle {{
-            font-size: 12px;
-            color: #999;
-        }}
+        .header h1 {{ font-size:22px; color:#FFD700; margin-bottom:4px; }}
+        .header .subtitle {{ font-size:12px; color:#999; }}
         .kpi-row {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
-            margin-top: 15px;
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+            gap:12px; margin-top:15px;
         }}
         .kpi-card {{
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 10px;
-            text-align: center;
+            background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
+            border-radius:8px; padding:10px; text-align:center;
         }}
-        .kpi-card .label {{
-            font-size: 10px;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        .kpi-card .value {{
-            font-size: 18px;
-            font-weight: bold;
-            color: #fff;
-            margin-top: 4px;
-        }}
-        .kpi-card .value.green {{ color: #2ecc71; }}
-        .kpi-card .value.red {{ color: #e74c3c; }}
-        .kpi-card .value.gold {{ color: #FFD700; }}
-        
-        /* Section */
+        .kpi-card .label {{ font-size:10px; color:#888; text-transform:uppercase; letter-spacing:0.5px; }}
+        .kpi-card .value {{ font-size:18px; font-weight:bold; color:#fff; margin-top:4px; }}
+        .kpi-card .value.green {{ color:#2ecc71; }}
+        .kpi-card .value.red {{ color:#e74c3c; }}
+        .kpi-card .value.gold {{ color:#FFD700; }}
         .section {{
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            margin-bottom: 20px;
-            overflow: hidden;
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; margin-bottom:12px; overflow:hidden;
         }}
         .section-header {{
-            background: linear-gradient(90deg, #1a1a3e, #2d1b69);
-            padding: 12px 16px;
-            font-size: 14px;
-            font-weight: bold;
-            color: #fff;
-            border-bottom: 1px solid #3a3a6a;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            background:linear-gradient(90deg,#1a1a3e,#2d1b69);
+            padding:10px 14px; font-size:13px; font-weight:bold; color:#fff;
+            border-bottom:1px solid #3a3a6a; display:flex; align-items:center; gap:8px;
         }}
         .section-header .badge {{
-            display: inline-block;
-            background: #FFD700;
-            color: #000;
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-weight: normal;
+            display:inline-block; background:#FFD700; color:#000;
+            font-size:10px; padding:2px 8px; border-radius:10px; font-weight:normal;
         }}
-        .section-body {{
-            padding: 12px;
-        }}
-        
-        /* Info icon with tooltip */
+        .section-body {{ padding:12px; }}
         .info-icon {{
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.15);
-            color: #ccc;
-            font-size: 11px;
-            cursor: help;
-            font-style: normal;
-            flex-shrink: 0;
+            position:relative; display:inline-flex; align-items:center; justify-content:center;
+            width:18px; height:18px; border-radius:50%; background:rgba(255,255,255,0.15);
+            color:#ccc; font-size:11px; cursor:help; font-style:normal; flex-shrink:0;
         }}
         .info-icon .info-tip {{
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1a1a3e;
-            border: 1px solid #4a3f8a;
-            border-radius: 6px;
-            padding: 8px 10px;
-            font-size: 10px;
-            font-weight: normal;
-            color: #ccc;
-            white-space: normal;
-            width: 280px;
-            z-index: 100;
-            line-height: 1.6;
-            box-shadow: 0 4px 12px rgba(0,0,0,.5);
-            pointer-events: none;
+            display:none; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+            background:#1a1a3e; border:1px solid #4a3f8a; border-radius:6px;
+            padding:8px 10px; font-size:10px; font-weight:normal; color:#ccc;
+            white-space:normal; width:280px; z-index:100; line-height:1.6;
+            box-shadow:0 4px 12px rgba(0,0,0,.5); pointer-events:none;
         }}
-        .info-icon:hover .info-tip,
-        .info-icon:focus .info-tip {{
-            display: block;
-        }}
-        
-        /* Tables */
-        .table-wrap {{
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-        }}
+        .info-icon:hover .info-tip, .info-icon:focus .info-tip {{ display:block; }}
+        .table-wrap {{ overflow-x:auto; -webkit-overflow-scrolling:touch; }}
+        table {{ width:100%; border-collapse:collapse; font-size:11px; }}
         table th {{
-            background: #1a1a3e;
-            color: #bbb;
-            padding: 6px 8px;
-            text-align: left;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid #3a3a6a;
-            white-space: nowrap;
-            position: sticky;
-            top: 0;
+            background:#1a1a3e; color:#bbb; padding:6px 8px; text-align:left;
+            font-size:10px; text-transform:uppercase; letter-spacing:0.5px;
+            border-bottom:1px solid #3a3a6a; white-space:nowrap; position:sticky; top:0;
         }}
-        table td {{
-            padding: 5px 8px;
-            border-bottom: 1px solid #1a1a2a;
-            white-space: nowrap;
+        table td {{ padding:5px 8px; border-bottom:1px solid #1a1a2a; white-space:nowrap; }}
+        table tr:hover {{ background:rgba(255,255,255,0.03); }}
+        .positive {{ color:#2ecc71; }}
+        .negative {{ color:#e74c3c; }}
+        .neutral {{ color:#888; }}
+        .rating-badge {{
+            display:inline-block; padding:1px 6px; border-radius:3px;
+            font-weight:700; font-size:11px; text-align:center; min-width:28px;
         }}
-        table tr:hover {{ background: rgba(255,255,255,0.03); }}
-        
-        .positive {{ color: #2ecc71; }}
-        .negative {{ color: #e74c3c; }}
-        .neutral {{ color: #888; }}
-        
-        /* Rating badge */
-        .rating {{
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 11px;
-            text-align: center;
-            min-width: 30px;
-        }}
-        
-        /* Scatter grid */
         .scatter-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-            gap: 12px;
+            display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:12px;
         }}
         .scatter-card {{
-            background: #0a0a18;
-            border: 1px solid #2a2a4a;
-            border-radius: 8px;
-            padding: 8px;
+            background:#0a0a18; border:1px solid #2a2a4a; border-radius:8px; padding:8px;
         }}
-        .scatter-card .title {{
-            font-size: 11px;
-            color: #bbb;
-            margin-bottom: 4px;
-        }}
-        .scatter-card .stats-row {{
-            font-size: 10px;
-            color: #888;
-            margin-bottom: 6px;
-        }}
-        
-        /* Chart container */
+        .scatter-card .title {{ font-size:11px; color:#bbb; margin-bottom:4px; }}
         .chart-container {{
-            margin-top: 16px;
-            padding: 12px;
-            background: #0a0a18;
-            border: 1px solid #2a2a4a;
-            border-radius: 8px;
+            margin-top:12px; padding:12px; background:#0a0a18;
+            border:1px solid #2a2a4a; border-radius:8px;
         }}
-        .chart-title {{
-            font-size: 11px;
-            color: #bbb;
-            margin-bottom: 8px;
-        }}
-        
-        /* Section nav — anchor-based, no JS tabs */
+        .chart-title {{ font-size:11px; color:#bbb; margin-bottom:8px; }}
         .section-nav {{
-            display: flex;
-            gap: 2px;
-            flex-wrap: wrap;
-            background: #0a0a18;
-            border-bottom: 2px solid #2a2a4a;
-            padding: 0 12px;
-            position: sticky;
-            top: 0;
-            z-index: 50;
+            display:flex; gap:2px; flex-wrap:wrap; background:#0a0a18;
+            border-bottom:2px solid #2a2a4a; padding:0 12px;
+            position:sticky; top:0; z-index:50;
         }}
         .section-nav a {{
-            padding: 8px 16px;
-            font-size: 12px;
-            color: #888;
-            text-decoration: none;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
+            padding:8px 14px; font-size:11px; color:#888; text-decoration:none;
+            border-bottom:2px solid transparent; transition:all 0.2s;
         }}
-        .section-nav a:hover {{ color: #FFD700; border-bottom-color: #FFD700; }}
-        .tab-panel {{ padding-top: 0; }}
-        
-        /* Footer */
-        .footer {{
-            text-align: center;
-            padding: 15px;
-            color: #555;
-            font-size: 10px;
+        .section-nav a:hover {{ color:#FFD700; border-bottom-color:#FFD700; }}
+        /* CCY section styles */
+        .ccy-section {{
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; margin-bottom:16px; padding:0;
         }}
-
-        /* Light theme overrides */
+        .ccy-summary {{
+            display:block; padding:14px 18px; font-size:14px; cursor:pointer;
+            background:linear-gradient(90deg,#1a1a3e,#2d1b69);
+            border-radius:10px; color:#fff; list-style:none;
+        }}
+        .ccy-summary::-webkit-details-marker {{ display:none; }}
+        .ccy-summary::before {{
+            content:'▶'; display:inline-block; font-size:12px; color:#FFD700;
+            margin-right:10px; transition:transform 0.15s;
+        }}
+        .ccy-section[open] .ccy-summary::before {{ transform:rotate(90deg); }}
+        .ccy-section > .section {{ margin:8px 12px 12px 12px; }}
+        .row-a {{ background:rgba(46,204,113,0.08); }}
+        .row-d {{ background:rgba(231,76,60,0.08); }}
+        .footer {{ text-align:center; padding:15px; color:#555; font-size:10px; }}
+        /* Light theme */
         [data-theme="light"] .header {{
-            background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 50%, #e8eaf6 100%);
-            border-color: #9fa8da;
+            background:linear-gradient(135deg,#e8eaf6 0%,#c5cae9 50%,#e8eaf6 100%);
+            border-color:#9fa8da;
         }}
-        [data-theme="light"] .header h1 {{ color: #1a237e; }}
+        [data-theme="light"] .header h1 {{ color:#1a237e; }}
         [data-theme="light"] .section-header {{
-            background: linear-gradient(90deg, #e8eaf6, #c5cae9);
-            color: #1a237e;
-            border-bottom-color: #9fa8da;
+            background:linear-gradient(90deg,#e8eaf6,#c5cae9);
+            color:#1a237e; border-bottom-color:#9fa8da;
         }}
-        [data-theme="light"] table th {{
-            background: #e8eaf6;
-            color: #555;
-            border-bottom-color: #c5cae9;
-        }}
-        [data-theme="light"] table td {{ border-bottom-color: #e0e0e0; }}
+        [data-theme="light"] table th {{ background:#e8eaf6; color:#555; border-bottom-color:#c5cae9; }}
+        [data-theme="light"] table td {{ border-bottom-color:#e0e0e0; }}
         [data-theme="light"] .scatter-card,
-        [data-theme="light"] .chart-container {{
-            background: #fff;
-            border-color: #ddd;
-        }}
-        [data-theme="light"] .info-icon .info-tip {{
-            background: #fff;
-            border-color: #ccc;
-            color: #333;
-        }}
-        [data-theme="light"] .section-nav {{
-            background: #e0e0e0;
-            border-bottom-color: #ccc;
+        [data-theme="light"] .chart-container {{ background:#fff; border-color:#ddd; }}
+        [data-theme="light"] .info-icon .info-tip {{ background:#fff; border-color:#ccc; color:#333; }}
+        [data-theme="light"] .section-nav {{ background:#e0e0e0; border-bottom-color:#ccc; }}
+        [data-theme="light"] .ccy-section {{ background:#fff; border-color:#ddd; }}
+        [data-theme="light"] .ccy-summary {{
+            background:linear-gradient(90deg,#e8eaf6,#c5cae9); color:#1a237e;
         }}
     </style>
     <script>
-    // Theme toggle (minimal JS, only for theme persistence)
     function toggleTheme(){{
         var t=document.documentElement.getAttribute('data-theme');
         if(t==='light'){{document.documentElement.removeAttribute('data-theme');localStorage.setItem('theme','dark')}}
@@ -1152,15 +1184,17 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
         if(s==='light')document.documentElement.setAttribute('data-theme','light');
     }})();
     </script>
+<link rel="stylesheet" href="../sidebar.css">
 </head>
-<body class="has-sidebar">
-<button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="切換亮/暗模式" style="position:fixed;top:12px;right:16px;z-index:1001">🌓</button>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()" title="切換亮/暗模式">🌓</button>
 <div class="container">
-    <!-- Header -->
+
+    <!-- ═══ Executive Summary ═══ -->
     <div class="header">
         <h1>🔬 馬丁剖析法 V3 — Signal #{signal_id}</h1>
         <div class="subtitle">
-            數據覆蓋 {len(ccy_summary)} 個 CCY×Direction 組合 · {len(layer_stats)} 個層級 · 生成時間 {datetime.now().strftime('%Y-%m-%d %H:%M')}
+            {num_ccy} 個 CCY×Direction 組合 · {total_layers} 個層級 · 生成時間 {datetime.now().strftime('%Y-%m-%d %H:%M')}
         </div>
         <div class="kpi-row">
             <div class="kpi-card">
@@ -1169,476 +1203,63 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
             </div>
             <div class="kpi-card">
                 <div class="label">總盈虧</div>
-                <div class="value {'green' if total_pnl > 0 else 'red'}">${pnl_prefix(total_pnl)}{total_pnl:,.2f}</div>
+                <div class="value {'green' if total_pnl>0 else 'red'}">${pp(total_pnl)}{total_pnl:,.2f}</div>
             </div>
             <div class="kpi-card">
                 <div class="label">勝率</div>
-                <div class="value {'green' if wr > 60 else 'red'}">{wr:.1f}%</div>
+                <div class="value {'green' if wr>60 else 'red'}">{wr:.1f}%</div>
             </div>
             <div class="kpi-card">
                 <div class="label">平均持倉</div>
                 <div class="value">{avg_hold:.1f}h</div>
             </div>
             <div class="kpi-card">
-                <div class="label">A 級以上</div>
-                <div class="value gold">{len(ranking)} 層</div>
+                <div class="label">CCY 組合</div>
+                <div class="value gold">{num_ccy}</div>
             </div>
             <div class="kpi-card">
-                <div class="label">黑名單</div>
-                <div class="value {'red' if blacklist else 'green'}">{len(blacklist)} 個</div>
+                <div class="label">層級總數</div>
+                <div class="value gold">{total_layers}</div>
             </div>
         </div>
     </div>
-    
-    <!-- Section Navigation (anchor-based) -->
+
+    <!-- Global Bar Charts -->
+    <div class="section">
+        <div class="section-header">📊 全局盈虧概覽</div>
+        <div class="section-body">
+            <div class="chart-container">
+                <div class="chart-title">Total$ 金額條形圖</div>
+                {dollar_svg}
+            </div>
+            <div class="chart-container" style="margin-top:12px">
+                <div class="chart-title">Total PIP 賺/蝕條形圖（綠=賺 · 紅=蝕）</div>
+                {pip_svg}
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
     <div class="section-nav">
-        <a href="#part1">Part 1 · CCY總覽</a>
-        <a href="#part2">Part 2 · MFE/MAE</a>
-        <a href="#part3">Part 3 · TP/SL</a>
-        <a href="#part4">Part 4 · 排行榜</a>
-        <a href="#part5">Part 5 · 黑名單</a>
-        <a href="#part6">Part 6 · 恢復力</a>
+        {nav_links}
     </div>
-    
-    <div class="tab-panels">
-    
-    <!-- Part 1: CCY × Direction 總覽 -->
-    <div id="part1" class="tab-panel">
-        <div class="section">
-            <div class="section-header">
-                Part 1 · CCY × Direction 總覽
-                <span class="badge">{len(ccy_summary)} 組合</span>
-                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
-                    <b>欄位說明：</b><br>
-                    <b>Trades</b>: 該 CCY×方向的總交易次數<br>
-                    <b>Layers</b>: 觸發的馬丁層級數量<br>
-                    <b>MaxD</b>: 最大回撤金額<br>
-                    <b>Total$</b>: 總盈虧金額<br>
-                    <b>WR%</b>: 勝率（盈利交易/總交易）<br>
-                    <b>EV$/L</b>: 每層預期盈虧<br>
-                    <b>WinPip</b>: 平均盈利 PIP<br>
-                    <b>LossPip</b>: 平均虧損 PIP<br>
-                    <b>Odds$</b>: 金額盈虧比<br>
-                    <b>OddsPip</b>: PIP 盈虧比<br>
-                    <b>MFE</b>: 最大有利波幅<br>
-                    <b>MAE</b>: 最大不利波幅<br>
-                    <b>MaxMAE</b>: 歷史最大 MAE
-                </span></i>
-            </div>
-            <div class="section-body">
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>CCY</th>
-                                <th>Dir</th>
-                                <th>Trades</th>
-                                <th>Layers</th>
-                                <th>MaxD</th>
-                                <th>Total$</th>
-                                <th>WR%</th>
-                                <th>EV$/L</th>
-                                <th>AvgW Pip</th>
-                                <th>AvgL Pip</th>
-                                <th>Odds$</th>
-                                <th>OddsPip</th>
-                                <th>AvgMFE</th>
-                                <th>AvgMAE</th>
-                                <th>MaxMAE</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-"""
-    
-    for i, s in enumerate(ccy_summary, 1):
-        pnl_cls = 'positive' if s['total_pnl'] > 0 else 'negative' if s['total_pnl'] < 0 else 'neutral'
-        anchor = f"ccy-{s['symbol']}-{s['direction']}"
-        html += f"""                            <tr>
-                                <td>{i}</td>
-                                <td><b><a href=\"#part2-{anchor}\" style=\"color:var(--text);text-decoration:none\">{s['symbol']}</a></b></td>
-                                <td><a href=\"#part2-{anchor}\" style=\"color:var(--text);text-decoration:none\">{s['direction']}</a></td>
-                                <td>{s['trades']}</td>
-                                <td>{s['layers']}</td>
-                                <td>{s['max_depth']}</td>
-                                <td class=\"{pnl_cls}\"><b>${pnl_prefix(s['total_pnl'])}{s['total_pnl']:,.2f}</b></td>
-                                <td>{s['wr']}%</td>
-                                <td class=\"{'positive' if s['avg_ev'] > 0 else 'negative'}\">{pnl_prefix(s['avg_ev'])}{s['avg_ev']}</td>
-                                <td>{s['avg_win_pips']}</td>
-                                <td>{s['avg_loss_pips']}</td>
-                                <td>{s['avg_odds_dollar']}</td>
-                                <td>{s['avg_odds_pips']}</td>
-                                <td>{s['avg_mfe']}</td>
-                                <td>{s['avg_mae']}</td>
-                                <td><b>{s['max_mae']}</b></td>
-                            </tr>
-"""
-    
-    html += f"""                        </tbody>
-                    </table>
-                </div>
-                <!-- Part 1 Dollar Bar Chart -->
-                <div class="chart-container">
-                    <div class="chart-title">📊 Total$ 金額條形圖</div>
-                    {p1_bar_svg}
-                </div>
-                <!-- Part 1 PIP Bar Chart -->
-                <div class="chart-container">
-                    <div class="chart-title">📊 Total PIP 賺/蝕條形圖（綠=賺 · 紅=蝕）</div>
-                    {p1_pip_bar_svg}
-                </div>
-            </div>
-        </div>
-    </div>
-"""
-    
-    # ─── Part 2: MFE/MAE 散點圖 ───
-    html += """    <!-- Part 2: MFE/MAE -->
-    <div id="part2" class="tab-panel">
-        <div class="section">
-            <div class="section-header">
-                Part 2 · MFE/MAE 散點分析
-                <span class="badge">每組合一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
-                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
-                    <b>MFE/MAE 散點分析</b><br>
-                    顯示每筆交易嘅最大有利波幅（MFE）同最大不利波幅（MAE）嘅關係。<br><br>
-                    <b>欄位說明：</b><br>
-                    <b>MFE</b>: Maximum Favorable Excursion — 交易期間最大有利波幅（PIP）<br>
-                    <b>MAE</b>: Maximum Adverse Excursion — 交易期間最大不利波幅（PIP）<br>
-                    <b>Hold</b>: 持倉時間（小時）<br>
-                    <b>L</b>: 馬丁層級（Lots 大小）<br><br>
-                    綠色圓點 = 盈利交易 | 紅色圓點 = 虧損交易<br>
-                    Hover 可看每筆交易詳情（MFE、MAE、金額、層級、持倉時間）
-                </span></i>
-            </div>
-            <div class="section-body">
-                <div class="scatter-grid">
-"""
-    
-    for sc in scatter_svgs:
-        layers_summary_lines = []
-        for lkey, lstats in sorted(sc['layers_summary'].items(), key=lambda x: x[1]['lots']):
-            layers_summary_lines.append(f"L{lstats['lots']} (n={lstats['count']}) WR:{lstats['wr']}% MFE:{lstats['avg_mfe']} MAE:{lstats['avg_mae']}")
-        
-        layers_text = '<br>\n'.join(layers_summary_lines)
-        anchor_id = f"part2-ccy-{sc['symbol']}-{sc['direction']}"
-        html += f"""                    <div class="scatter-card" id="{anchor_id}">
-                        <div class="title"><b>{sc['symbol']} {sc['direction']}</b> ({sc['layer_count']} layers)</div>
-                        <div class="stats-row">{layers_text}</div>
-                        {sc['svg']}
-                    </div>
-"""
-    
-    html += """                </div>
-            </div>
-        </div>
-    </div>
-"""
-    
-    # ─── Part 3: TP/SL ───
-    html += f"""    <!-- Part 3: TP/SL -->
-    <div id="part3" class="tab-panel">
-        <div class="section">
-            <div class="section-header">
-                Part 3 · A 級以上 TP/SL 建議（混合方案）
-                <span class="badge">{len(tp_sl_data)} 層</span>
-                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
-                    <b>TP/SL 建議說明</b><br>
-                    只顯示 A 級以上嘅層級，提供 Take Profit 同 Stop Loss 建議值。<br><br>
-                    <b>計算方法：</b><br>
-                    <b>TP</b>: 該層所有交易嘅平均 MFE（最大有利波幅）<br>
-                    <b>Soft SL</b>: 該層所有交易嘅平均 MAE（最大不利波幅）<br>
-                    <b>Hard SL</b>: 該 CCY×Direction 組合嘅歷史最大 MAE<br>
-                    <b>R:R</b>: TP / Soft SL（≥1.5x 可接受，≥3.0x 優秀）<br><br>
-                    <b>表格欄位：</b><br>
-                    Rating | CCY | Dir | Layer | n | WR% | EV$ | TP | SoftSL | HardSL | R:R | Total$ | AvgHold
-                </span></i>
-            </div>
-            <div class="section-body">
-                <div style="font-size:10px; color:#888; margin-bottom:10px;">
-                    TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Pair Max MAE &nbsp;|&nbsp; R:R = TP / Soft SL（≥1.5x 可接受，≥3.0x 優秀）
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Rating</th>
-                                <th>CCY</th>
-                                <th>Dir</th>
-                                <th>Layer</th>
-                                <th>n</th>
-                                <th>WR%</th>
-                                <th>EV$</th>
-                                <th>TP(pip)</th>
-                                <th>SoftSL</th>
-                                <th>HardSL</th>
-                                <th>R:R</th>
-                                <th>Total$</th>
-                                <th>AvgHold</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-"""
-    
-    for r in tp_sl_data:
-        rc = rating_color(r['rating'])
-        rbg = rating_bg(r['rating'])
-        rr_cls = 'positive' if r['rr'] >= 1.5 else 'negative'
-        html += f"""                            <tr>
-                                <td><span class="rating" style="background:{rbg};color:{rc}">{r['rating']}</span></td>
-                                <td><b>{r['symbol']}</b></td>
-                                <td>{r['direction']}</td>
-                                <td>{r['layer']}</td>
-                                <td>{r['count']}</td>
-                                <td>{r['wr']}%</td>
-                                <td class="{'positive' if r['ev'] > 0 else 'negative'}">{pnl_prefix(r['ev'])}{r['ev']}</td>
-                                <td class="positive">{r['tp']}</td>
-                                <td style="color:#f39c12">{r['soft_sl']}</td>
-                                <td class="negative">{r['hard_sl']}</td>
-                                <td class="{rr_cls}"><b>{r['rr']}x</b></td>
-                                <td class="{'positive' if r['total_pnl'] > 0 else 'negative'}">{pnl_prefix(r['total_pnl'])}{r['total_pnl']:.2f}</td>
-                                <td>{r['avg_hold']:.0f}h</td>
-                            </tr>
-"""
-    
-    html += f"""                        </tbody>
-                    </table>
-                </div>
-                <!-- Part 3 TP/SL Bar Chart -->
-                <div class="chart-container">
-                    <div class="chart-title">📊 TP/SL 條形圖 — 🟠 Soft SL / 🔴 Hard SL</div>
-                    {p3_bar_svg}
-                </div>
-            </div>
-        </div>
-    </div>
-"""
-    
-    # ─── Part 4: 排行榜 ───
-    html += f"""    <!-- Part 4: Ranking -->
-    <div id="part4" class="tab-panel">
-        <div class="section">
-            <div class="section-header">
-                Part 4 · A 級以上排行榜
-                <span class="badge">{len(ranking)} 層</span>
-                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
-                    <b>排行榜說明</b><br>
-                    只顯示 A 級以上嘅層級，按評級同 EV 排序。<br><br>
-                    <b>評級系統（S+ 到 E）：</b><br>
-                    基於 5 個維度加權計算：<br>
-                    <b>WR (25%)</b>: 勝率 — 越高越好<br>
-                    <b>EV (30%)</b>: 預期盈虧 — 核心指標<br>
-                    <b>Odds (20%)</b>: 盈虧比 — 越高越好<br>
-                    <b>Count (15%)</b>: 樣本數 — 越多越可靠<br>
-                    <b>Hold (10%)</b>: 持倉效率 — 越短越好<br><br>
-                    <b>評級映射：</b>S+ ≥85 | S ≥70 | A ≥55 | B ≥40 | C ≥25 | D ≥15 | E &lt;15
-                </span></i>
-            </div>
-            <div class="section-body">
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Rating</th>
-                                <th>CCY</th>
-                                <th>Dir</th>
-                                <th>Layer</th>
-                                <th>Trades</th>
-                                <th>WR%</th>
-                                <th>EV$</th>
-                                <th>Odds$</th>
-                                <th>OddsPip</th>
-                                <th>TP(pip)</th>
-                                <th>SoftSL</th>
-                                <th>HardSL</th>
-                                <th>Total$</th>
-                                <th>AvgHold(h)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-"""
-    
-    for i, r in enumerate(ranking, 1):
-        rc = rating_color(r['rating'])
-        rbg = rating_bg(r['rating'])
-        html += f"""                            <tr>
-                                <td>{i}</td>
-                                <td><span class="rating" style="background:{rbg};color:{rc}">{r['rating']}</span></td>
-                                <td><b>{r['symbol']}</b></td>
-                                <td>{r['direction']}</td>
-                                <td>{r['layer']}</td>
-                                <td>{r['count']}</td>
-                                <td>{r['wr']}%</td>
-                                <td class="{'positive' if r['ev'] > 0 else 'negative'}"><b>{pnl_prefix(r['ev'])}{r['ev']}</b></td>
-                                <td>{r['odds_dollar']}</td>
-                                <td>{r['odds_pips']}</td>
-                                <td class="positive">{r['tp']}</td>
-                                <td style="color:#f39c12">{r['soft_sl']}</td>
-                                <td class="negative">{r['hard_sl']}</td>
-                                <td class="{'positive' if r['total_pnl'] > 0 else 'negative'}">{pnl_prefix(r['total_pnl'])}{r['total_pnl']:.2f}</td>
-                                <td>{r['avg_hold']:.0f}</td>
-                            </tr>
-"""
-    
-    html += """                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-"""
-    
-    # ─── Part 5: 黑名單 ───
-    html += f"""    <!-- Part 5: Blacklist -->
-    <div id="part5" class="tab-panel">
-        <div class="section">
-            <div class="section-header">
-                Part 5 · 黑名單
-                <span class="badge">{len(blacklist)} 個危險組合</span>
-                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
-                    <b>黑名單說明</b><br>
-                    列出所有危險嘅 CCY×Direction 組合。<br><br>
-                    <b>Danger Score 計算方法：</b><br>
-                    基於以下因素加權計算：<br>
-                    1. 總虧損金額（每 $1000 加 1 分）<br>
-                    2. 平均賠率 &lt; 1.0（加 3 分）<br>
-                    3. 勝率 &lt; 50%（加 2 分）<br>
-                    4. 平均 EV 爲負（按比例加分）<br>
-                    5. 最差層級 EV &lt; -50（加 2 分）<br><br>
-                    <b>危險等級：</b><br>
-                    ⚠️ WARNING: Danger ≥ 1<br>
-                    💀 DEADLY: Danger > 5<br><br>
-                    <b>表格欄位：</b>危險度 | Danger | CCY | Dir | Total$ | WR% | Avg Odds | Avg EV | Worst EV | 最差層 | Avg Hold
-                </span></i>
-            </div>
-            <div class="section-body">
-"""
-    
-    if blacklist:
-        html += """                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>危險度</th>
-                                <th>Danger</th>
-                                <th>CCY</th>
-                                <th>Dir</th>
-                                <th>Total$</th>
-                                <th>WR%</th>
-                                <th>Avg Odds</th>
-                                <th>Avg EV</th>
-                                <th>Worst EV</th>
-                                <th>最差層</th>
-                                <th>Avg Hold</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-"""
-        for b in blacklist:
-            html += f"""                            <tr>
-                                <td>{b['level']}</td>
-                                <td><b>{b['danger']}</b></td>
-                                <td><b>{b['symbol']}</b></td>
-                                <td>{b['direction']}</td>
-                                <td class="negative">{b['total_pnl']:.2f}</td>
-                                <td>{b['wr']}%</td>
-                                <td>{b['avg_odds']}</td>
-                                <td class="negative">{b['avg_ev']}</td>
-                                <td class="negative">{b['worst_ev']}</td>
-                                <td>{b['worst_layer']}</td>
-                                <td>{b['avg_hold']:.1f}h</td>
-                            </tr>
-"""
-        html += """                        </tbody>
-                    </table>
-                </div>
-"""
-    else:
-        html += '                <div style="text-align:center;padding:20px;color:#2ecc71;">✅ 沒有危險組合，所有 CCY×Direction 表現良好</div>\n'
-    
-    html += """            </div>
-        </div>
-    </div>
-"""
-    
-    # ─── Part 6: 恢復力 ───
-    html += f"""    <!-- Part 6: Recovery -->
-    <div id="part6" class="tab-panel">
-        <div class="section">
-            <div class="section-header">
-                Part 6 · 恢復力分析
-                <span class="badge">如果最深層被 Hard SL 止損，要用最佳 EV 層贏幾多次先追得返？</span>
-                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
-                    <b>恢復力分析說明</b><br>
-                    假設最深層被 Hard SL 止損，需要幾多次最佳 EV 層交易先可以追回損失。<br><br>
-                    <b>計算方式：</b><br>
-                    <b>恢復次數</b> = ceil(最深層平均損失 / 最佳 EV)<br>
-                    <b>恢復天數</b> = 恢復次數 / 每月交易頻率 × 30<br><br>
-                    <b>狀態標記：</b><br>
-                    🟢 安全: ≤4 次可恢復<br>
-                    🟡 需時: 5-20 次可恢復<br>
-                    🔴 無法恢復: >20 次或 EV ≤ 0<br><br>
-                    <b>表格欄位：</b>狀態 | CCY | Dir | 最深層 | 最差損失 | 最佳 EV 層 | Best EV$ | 恢復次數 | 恢復天數 | Avg Hold | 說明
-                </span></i>
-            </div>
-            <div class="section-body">
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>狀態</th>
-                                <th>CCY</th>
-                                <th>Dir</th>
-                                <th>最深層</th>
-                                <th>最差損失</th>
-                                <th>最佳 EV 層</th>
-                                <th>Best EV$</th>
-                                <th>恢復次數</th>
-                                <th>恢復天數</th>
-                                <th>Avg Hold</th>
-                                <th>說明</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-"""
-    
-    for r in recovery:
-        html += f"""                            <tr>
-                                <td>{r['status']}</td>
-                                <td><b>{r['symbol']}</b></td>
-                                <td>{r['direction']}</td>
-                                <td>{r['deepest_layer']}</td>
-                                <td class="negative">${r['worst_loss']:.2f}</td>
-                                <td>{r['best_ev_layer']}</td>
-                                <td class="{'positive' if r['best_ev'] > 0 else 'negative'}">{pnl_prefix(r['best_ev'])}{r['best_ev']}</td>
-                                <td><b>{r['recovery_trades'] if r['recovery_trades'] < 999 else '∞'}</b></td>
-                                <td>{r['recovery_days'] if r['recovery_days'] < 999 else '∞'}天</td>
-                                <td>{r['avg_hold']:.1f}h</td>
-                                <td>{r['status_text']}</td>
-                            </tr>
-"""
-    
-    html += f"""                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    </div><!-- end tab-panels -->
-    
+
+    <!-- ═══ CCY×Direction Sections ═══ -->
+    {all_sections}
+
     <div class="footer">
-        馬丁剖析法 V3 · 數據說話，紀律至上 · Quant 📊
+        馬丁剖析法 V3 · 按 CCY×Direction 分組 · 數據說話，紀律至上 · Quant 📊
     </div>
 </div>
-
 <script src="../sidebar.js"></script>
 </body>
 </html>
 """
     
     return html
+
+
+
 # ─── 主程序 ─────────────────────────────────────────────────
 
 def main():
