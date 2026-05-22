@@ -63,10 +63,17 @@ tr.top3{background:rgba(255,215,0,0.03)}
 <div><div class="v">26.5</div><div class="l">Worst</div></div>
 <div><div class="v">65%</div><div class="l">Avg CB</div></div>
 </div>
-<div style="overflow-x:auto;width:100%"><table><thead><tr>
-<th>#</th><th>Signal</th><th>CCY</th><th>DDE</th><th>CB</th>
-<th>Win%</th><th>#</th><th>Profit</th><th>DD</th><th>PF</th>
-<th>TF</th><th>LV</th><th>EA</th>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+<input type="text" id="searchInput" placeholder="🔍 搜尋 Signal / CCY / EA..." style="background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:14px;flex:1;min-width:180px;max-width:320px">
+<select id="eaFilter" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:14px">
+<option value="">全部 EA</option>
+</select>
+<span id="rowCount" style="font-size:0.8em;color:var(--text2)"></span>
+</div>
+<div style="overflow-x:auto;width:100%"><table id="tbl"><thead><tr>
+<th data-col="idx" data-type="num">#</th><th data-col="signal" data-type="num">Signal</th><th data-col="ccy" data-type="str">CCY</th><th data-col="dde" data-type="num">DDE</th><th data-col="cb" data-type="num">CB</th>
+<th data-col="wr" data-type="num">Win%</th><th data-col="trades" data-type="num">#</th><th data-col="profit" data-type="num">Profit</th><th data-col="dd" data-type="num">DD</th><th data-col="pf" data-type="num">PF</th>
+<th data-col="tf" data-type="str">TF</th><th data-col="lv" data-type="str">LV</th><th data-col="ea" data-type="str">EA</th>
 </tr></thead><tbody>
 <tr class="top3">
 <td>🥇</td>
@@ -923,5 +930,59 @@ tr.top3{background:rgba(255,215,0,0.03)}
 <td class="m">5LV</td>
 <td><span class="ea-tag ea-SMA">SMA</span></td>
 </tr>
-</tbody></table></div><script>function toggleTheme(){var t=document.documentElement.getAttribute("data-theme");var n=t==="light"?"dark":"light";document.documentElement.setAttribute("data-theme",n);localStorage.setItem("tsa-theme",n);var b=document.getElementById("theme-toggle");b.textContent=n==="dark"?"🌙":"☀️"}(function(){var s=localStorage.getItem("tsa-theme")||"dark";document.documentElement.setAttribute("data-theme",s);var b=document.getElementById("theme-toggle");if(b)b.textContent=s==="dark"?"🌙":"☀️"})();</script><script src="../sidebar.js"></script>
+</tbody></table></div><script>
+// === Sort & Filter for Signal Ranking ===
+(function(){
+var tbl=document.getElementById('tbl');if(!tbl)return;
+var thead=tbl.querySelector('thead'),tbody=tbl.querySelector('tbody');
+var search=document.getElementById('searchInput'),eaSel=document.getElementById('eaFilter'),countEl=document.getElementById('rowCount');
+var rows=Array.from(tbody.querySelectorAll('tr'));
+var sortCol=null,sortAsc=true;
+// Populate EA dropdown
+var eas=new Set();
+rows.forEach(function(r){var c=r.children[12];if(c){var t=c.textContent.trim();if(t)eas.add(t)}});
+Array.from(eas).sort().forEach(function(ea){var o=document.createElement('option');o.value=ea;o.textContent=ea;eaSel.appendChild(o)});
+function pv(cell,col,type){
+  if(col==='signal')return parseInt(cell.querySelector('a')?cell.querySelector('a').textContent:'0');
+  if(col==='profit'){var t=cell.textContent.replace(/[,\$pips ]/g,'');return parseFloat(t)||0}
+  if(col==='dd'){var t=cell.textContent.replace(/[,\$pips -]/g,'');return parseFloat(t)||0}
+  if(col==='pf'){var t=cell.textContent;return t==='Inf'?9999:parseFloat(t)||0}
+  if(type==='num')return parseFloat(cell.textContent.replace(/[^0-9.-]/g,''))||0;
+  return cell.textContent.trim();
+}
+function applyFilter(){
+  var q=(search?search.value:'').toLowerCase();
+  var ea=eaSel?eaSel.value:'';
+  var shown=0;
+  rows.forEach(function(r){
+    var txt=r.textContent.toLowerCase();
+    var mq=!q||txt.includes(q);
+    var me=!ea||r.children[12].textContent.trim().includes(ea);
+    r.style.display=(mq&&me)?'':'none';
+    if(mq&&me)shown++;
+  });
+  if(countEl)countEl.textContent='顯示 '+shown+' / '+rows.length;
+}
+// Sort on th click
+thead.querySelectorAll('th').forEach(function(th,i){
+  th.style.cursor='pointer';
+  th.addEventListener('click',function(){
+    var col=th.dataset.col,type=th.dataset.type||'str';
+    if(sortCol===col){sortAsc=!sortAsc}else{sortCol=col;sortAsc=true}
+    rows.sort(function(a,b){
+      var va=pv(a.children[i],col,type),vb=pv(b.children[i],col,type);
+      if(typeof va==='number'&&typeof vb==='number')return sortAsc?va-vb:vb-va;
+      return sortAsc?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+    });
+    rows.forEach(function(r){tbody.appendChild(r)});
+    thead.querySelectorAll('th').forEach(function(h){h.classList.remove('asc','desc')});
+    th.classList.add(sortAsc?'asc':'desc');
+  });
+});
+if(search)search.addEventListener('input',applyFilter);
+if(eaSel)eaSel.addEventListener('change',applyFilter);
+applyFilter();
+})();
+</script>
+<script>function toggleTheme(){var t=document.documentElement.getAttribute("data-theme");var n=t==="light"?"dark":"light";document.documentElement.setAttribute("data-theme",n);localStorage.setItem("tsa-theme",n);var b=document.getElementById("theme-toggle");b.textContent=n==="dark"?"🌙":"☀️"}(function(){var s=localStorage.getItem("tsa-theme")||"dark";document.documentElement.setAttribute("data-theme",s);var b=document.getElementById("theme-toggle");if(b)b.textContent=s==="dark"?"🌙":"☀️"})();</script><script src="../sidebar.js"></script>
 </body></html>
