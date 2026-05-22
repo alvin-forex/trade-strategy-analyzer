@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>馬丁剖析法 V3 — Signal #12173</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #e0e0e0;
+            background: #0a0a1a;
+            padding: 15px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a3e 0%, #2d1b69 50%, #1a1a3e 100%);
+            border: 1px solid #4a3f8a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 22px;
+            color: #FFD700;
+            margin-bottom: 4px;
+        }
+        .header .subtitle {
+            font-size: 12px;
+            color: #999;
+        }
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .kpi-card .label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .kpi-card .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            margin-top: 4px;
+        }
+        .kpi-card .value.green { color: #2ecc71; }
+        .kpi-card .value.red { color: #e74c3c; }
+        .kpi-card .value.gold { color: #FFD700; }
+        
+        /* Section */
+        .section {
+            background: #0f0f23;
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .section-header {
+            background: linear-gradient(90deg, #1a1a3e, #2d1b69);
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            border-bottom: 1px solid #3a3a6a;
+        }
+        .section-header .badge {
+            display: inline-block;
+            background: #FFD700;
+            color: #000;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-weight: normal;
+        }
+        .section-body {
+            padding: 12px;
+        }
+        
+        /* Tables */
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        table th {
+            background: #1a1a3e;
+            color: #bbb;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #3a3a6a;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+        }
+        table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #1a1a2a;
+            white-space: nowrap;
+        }
+        table tr:hover { background: rgba(255,255,255,0.03); }
+        
+        .positive { color: #2ecc71; }
+        .negative { color: #e74c3c; }
+        .neutral { color: #888; }
+        
+        /* Rating badge */
+        .rating {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            text-align: center;
+            min-width: 30px;
+        }
+        
+        /* TP/SL bar chart */
+        .bar-chart {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin: 3px 0;
+        }
+        .bar {
+            height: 16px;
+            border-radius: 3px;
+            min-width: 2px;
+            position: relative;
+            font-size: 9px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 4px;
+        }
+        .bar.tp { background: #2ecc71; }
+        .bar.soft_sl { background: #f39c12; }
+        .bar.hard_sl { background: #e74c3c; }
+        
+        /* Status indicator */
+        .status { font-size: 14px; }
+        
+        /* Scatter chart (canvas) */
+        .scatter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        .scatter-card {
+            background: #0a0a18;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 8px;
+        }
+        .scatter-card .title {
+            font-size: 11px;
+            color: #bbb;
+            margin-bottom: 4px;
+        }
+        .scatter-card .stats-row {
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        canvas.scatter { width: 100%; height: 180px; }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 2px;
+            background: #0a0a18;
+            border-bottom: 2px solid #2a2a4a;
+            padding: 0 12px;
+        }
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #888;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab:hover { color: #ccc; }
+        .tab.active {
+            color: #FFD700;
+            border-bottom-color: #FFD700;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 15px;
+            color: #555;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <h1>🔬 馬丁剖析法 V3 — Signal #12173</h1>
+        <div class="subtitle">
+            數據覆蓋 4 個 CCY×Direction 組合 · 38 個層級 · 生成時間 2026-05-22 11:15
+        </div>
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="label">總交易</div>
+                <div class="value">232</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">總盈虧</div>
+                <div class="value green">$+8,302.00</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">勝率</div>
+                <div class="value green">72.8%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">平均持倉</div>
+                <div class="value">170.0h</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">A 級以上</div>
+                <div class="value gold">17 層</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">黑名單</div>
+                <div class="value green">0 個</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('part1')">Part 1 · CCY總覽</div>
+        <div class="tab" onclick="switchTab('part2')">Part 2 · MFE/MAE</div>
+        <div class="tab" onclick="switchTab('part3')">Part 3 · TP/SL</div>
+        <div class="tab" onclick="switchTab('part4')">Part 4 · 排行榜</div>
+        <div class="tab" onclick="switchTab('part5')">Part 5 · 黑名單</div>
+        <div class="tab" onclick="switchTab('part6')">Part 6 · 恢復力</div>
+    </div>
+    
+    <!-- Part 1: CCY × Direction 總覽 -->
+    <div id="part1" class="tab-content active">
+        <div class="section">
+            <div class="section-header">
+                Part 1 · CCY × Direction 總覽
+                <span class="badge">4 組合</span>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>CCY</th>
+                                <th>Dir</th>
+                                <th>Trades</th>
+                                <th>Layers</th>
+                                <th>MaxD</th>
+                                <th>Total$</th>
+                                <th>WR%</th>
+                                <th>EV$/L</th>
+                                <th>AvgW Pip</th>
+                                <th>AvgL Pip</th>
+                                <th>Odds$</th>
+                                <th>OddsPip</th>
+                                <th>AvgMFE</th>
+                                <th>AvgMAE</th>
+                                <th>MaxMAE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>101</td>
+                                <td>10</td>
+                                <td>10</td>
+                                <td class="positive"><b>$+3,079.96</b></td>
+                                <td>80.2%</td>
+                                <td class="positive">+114.93</td>
+                                <td>49.0</td>
+                                <td>14.1</td>
+                                <td>500.28</td>
+                                <td>500.34</td>
+                                <td>46.4</td>
+                                <td>32.8</td>
+                                <td><b>107.8</b></td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>59</td>
+                                <td>9</td>
+                                <td>9</td>
+                                <td class="positive"><b>$+2,380.54</b></td>
+                                <td>71.2%</td>
+                                <td class="positive">+87.98</td>
+                                <td>41.7</td>
+                                <td>16.4</td>
+                                <td>444.64</td>
+                                <td>444.67</td>
+                                <td>39.2</td>
+                                <td>30.2</td>
+                                <td><b>121.3</b></td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>57</td>
+                                <td>9</td>
+                                <td>9</td>
+                                <td class="positive"><b>$+2,088.39</b></td>
+                                <td>64.9%</td>
+                                <td class="positive">+92.31</td>
+                                <td>42.9</td>
+                                <td>12.7</td>
+                                <td>342.56</td>
+                                <td>334.84</td>
+                                <td>37.5</td>
+                                <td>27.0</td>
+                                <td><b>83.6</b></td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td><b>EURGBP</b></td>
+                                <td>sell</td>
+                                <td>15</td>
+                                <td>10</td>
+                                <td>10</td>
+                                <td class="positive"><b>$+753.11</b></td>
+                                <td>60.0%</td>
+                                <td class="positive">+77.15</td>
+                                <td>19.4</td>
+                                <td>29.4</td>
+                                <td>399.73</td>
+                                <td>399.73</td>
+                                <td>19.3</td>
+                                <td>29.8</td>
+                                <td><b>87.1</b></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 2: MFE/MAE -->
+    <div id="part2" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 2 · MFE/MAE 散點分析
+                <span class="badge">每層一圖 · 綠=Win · 紅=Loss</span>
+            </div>
+            <div class="section-body">
+                <div class="scatter-grid" id="scatter-grid">
+                    <div class="scatter-card">
+                        <div class="title"><b>AUDUSD buy</b> (10 layers)</div>
+                        <div class="stats-row">
+                            L0.02 (n=31) WR:64.5% MFE:28.8 MAE:24.0 MaxMAE:107.8<br>
+                            L0.03 (n=20) WR:80.0% MFE:28.3 MAE:37.3 MaxMAE:106.5<br>
+                            L0.05 (n=17) WR:88.2% MFE:41.8 MAE:32.2 MaxMAE:88.7<br>
+                            L0.07 (n=13) WR:92.3% MFE:44.8 MAE:30.4 MaxMAE:73.7<br>
+                            L0.1 (n=7) WR:85.7% MFE:50.7 MAE:33.0 MaxMAE:56.7<br>
+                            L0.15 (n=6) WR:83.3% MFE:59.8 MAE:30.0 MaxMAE:85.3<br>
+                            L0.23 (n=4) WR:100.0% MFE:70.0 MAE:24.3 MaxMAE:70.2<br>
+                            L0.34 (n=1) WR:100.0% MFE:31.3 MAE:54.2 MaxMAE:54.2<br>
+                            L0.51 (n=1) WR:100.0% MFE:46.1 MAE:38.9 MaxMAE:38.9<br>
+                            L0.77 (n=1) WR:100.0% MFE:62.0 MAE:23.5 MaxMAE:23.5<br>
+                        </div>
+                        <canvas id="chart_0" class="scatter" width="280" height="180"></canvas>
+                    </div>
+                    <div class="scatter-card">
+                        <div class="title"><b>AUDUSD sell</b> (9 layers)</div>
+                        <div class="stats-row">
+                            L0.02 (n=16) WR:56.2% MFE:33.9 MAE:31.6 MaxMAE:121.3<br>
+                            L0.03 (n=8) WR:37.5% MFE:15.4 MAE:33.4 MaxMAE:74.6<br>
+                            L0.05 (n=7) WR:57.1% MFE:19.7 MAE:40.7 MaxMAE:65.7<br>
+                            L0.07 (n=7) WR:85.7% MFE:22.6 MAE:49.6 MaxMAE:93.9<br>
+                            L0.1 (n=7) WR:85.7% MFE:35.6 MAE:34.1 MaxMAE:78.4<br>
+                            L0.15 (n=6) WR:100.0% MFE:47.0 MAE:28.3 MaxMAE:63.0<br>
+                            L0.23 (n=3) WR:100.0% MFE:43.7 MAE:33.0 MaxMAE:47.8<br>
+                            L0.34 (n=3) WR:100.0% MFE:60.6 MAE:16.2 MaxMAE:32.4<br>
+                            L0.51 (n=2) WR:100.0% MFE:74.2 MAE:5.2 MaxMAE:10.5<br>
+                        </div>
+                        <canvas id="chart_1" class="scatter" width="280" height="180"></canvas>
+                    </div>
+                    <div class="scatter-card">
+                        <div class="title"><b>EURGBP buy</b> (9 layers)</div>
+                        <div class="stats-row">
+                            L0.02 (n=14) WR:64.3% MFE:22.0 MAE:31.8 MaxMAE:62.6<br>
+                            L0.03 (n=11) WR:54.5% MFE:23.1 MAE:28.8 MaxMAE:67.2<br>
+                            L0.05 (n=8) WR:50.0% MFE:29.6 MAE:21.6 MaxMAE:52.2<br>
+                            L0.07 (n=6) WR:50.0% MFE:27.8 MAE:22.5 MaxMAE:83.6<br>
+                            L0.1 (n=5) WR:60.0% MFE:26.1 MAE:49.0 MaxMAE:75.4<br>
+                            L0.15 (n=4) WR:75.0% MFE:30.4 MAE:43.1 MaxMAE:59.9<br>
+                            L0.23 (n=4) WR:100.0% MFE:46.5 MAE:27.0 MaxMAE:44.8<br>
+                            L0.34 (n=4) WR:100.0% MFE:61.8 MAE:12.0 MaxMAE:29.8<br>
+                            L0.51 (n=1) WR:100.0% MFE:70.2 MAE:6.9 MaxMAE:6.9<br>
+                        </div>
+                        <canvas id="chart_2" class="scatter" width="280" height="180"></canvas>
+                    </div>
+                    <div class="scatter-card">
+                        <div class="title"><b>EURGBP sell</b> (10 layers)</div>
+                        <div class="stats-row">
+                            L0.02 (n=4) WR:75.0% MFE:21.6 MAE:34.8 MaxMAE:87.1<br>
+                            L0.03 (n=2) WR:50.0% MFE:13.0 MAE:50.1 MaxMAE:72.1<br>
+                            L0.05 (n=2) WR:50.0% MFE:21.4 MAE:35.0 MaxMAE:56.9<br>
+                            L0.07 (n=1) WR:0.0% MFE:14.1 MAE:41.7 MaxMAE:41.7<br>
+                            L0.1 (n=1) WR:0.0% MFE:15.4 MAE:26.6 MaxMAE:26.6<br>
+                            L0.15 (n=1) WR:0.0% MFE:0.0 MAE:9.9 MaxMAE:9.9<br>
+                            L0.23 (n=1) WR:100.0% MFE:3.9 MAE:48.1 MaxMAE:48.1<br>
+                            L0.34 (n=1) WR:100.0% MFE:19.1 MAE:32.9 MaxMAE:32.9<br>
+                            L0.51 (n=1) WR:100.0% MFE:34.9 MAE:17.1 MaxMAE:17.1<br>
+                            L0.77 (n=1) WR:100.0% MFE:49.9 MAE:2.0 MaxMAE:2.0<br>
+                        </div>
+                        <canvas id="chart_3" class="scatter" width="280" height="180"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 3: TP/SL -->
+    <div id="part3" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 3 · A 級以上 TP/SL 建議（混合方案）
+                <span class="badge">17 層</span>
+            </div>
+            <div class="section-body">
+                <div style="font-size:10px; color:#888; margin-bottom:10px;">
+                    TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE × 1.2 &nbsp;|&nbsp; Hard SL = Pair Max MAE × 1.3 &nbsp;|&nbsp; R:R = TP / Soft SL（≥1.5x 可接受，≥3.0x 優秀）
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rating</th>
+                                <th>CCY</th>
+                                <th>Dir</th>
+                                <th>Layer</th>
+                                <th>n</th>
+                                <th>WR%</th>
+                                <th>EV$</th>
+                                <th>TP(pip)</th>
+                                <th>SoftSL</th>
+                                <th>HardSL</th>
+                                <th>R:R</th>
+                                <th>Total$</th>
+                                <th>AvgHold</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.51</td>
+                                <td>2</td>
+                                <td>100.0%</td>
+                                <td class="positive">+375.94</td>
+                                <td class="positive">74.2</td>
+                                <td style="color:#f39c12">6.2</td>
+                                <td class="negative">157.7</td>
+                                <td class="positive"><b>11.89x</b></td>
+                                <td class="positive">+751.87</td>
+                                <td>57h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.34</td>
+                                <td>4</td>
+                                <td>100.0%</td>
+                                <td class="positive">+252.47</td>
+                                <td class="positive">61.8</td>
+                                <td style="color:#f39c12">14.4</td>
+                                <td class="negative">108.7</td>
+                                <td class="positive"><b>4.29x</b></td>
+                                <td class="positive">+1009.89</td>
+                                <td>163h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.34</td>
+                                <td>3</td>
+                                <td>100.0%</td>
+                                <td class="positive">+204.14</td>
+                                <td class="positive">60.6</td>
+                                <td style="color:#f39c12">19.4</td>
+                                <td class="negative">157.7</td>
+                                <td class="positive"><b>3.12x</b></td>
+                                <td class="positive">+612.41</td>
+                                <td>52h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.23</td>
+                                <td>4</td>
+                                <td>100.0%</td>
+                                <td class="positive">+158.12</td>
+                                <td class="positive">70.0</td>
+                                <td style="color:#f39c12">29.2</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive"><b>2.4x</b></td>
+                                <td class="positive">+632.47</td>
+                                <td>132h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.23</td>
+                                <td>4</td>
+                                <td>100.0%</td>
+                                <td class="positive">+122.04</td>
+                                <td class="positive">46.5</td>
+                                <td style="color:#f39c12">32.4</td>
+                                <td class="negative">108.7</td>
+                                <td class="negative"><b>1.44x</b></td>
+                                <td class="positive">+488.17</td>
+                                <td>193h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.23</td>
+                                <td>3</td>
+                                <td>100.0%</td>
+                                <td class="positive">+99.38</td>
+                                <td class="positive">43.7</td>
+                                <td style="color:#f39c12">39.6</td>
+                                <td class="negative">157.7</td>
+                                <td class="negative"><b>1.1x</b></td>
+                                <td class="positive">+298.14</td>
+                                <td>62h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.15</td>
+                                <td>6</td>
+                                <td>83.3%</td>
+                                <td class="positive">+87.93</td>
+                                <td class="positive">59.8</td>
+                                <td style="color:#f39c12">36.0</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive"><b>1.66x</b></td>
+                                <td class="positive">+527.56</td>
+                                <td>106h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.15</td>
+                                <td>6</td>
+                                <td>100.0%</td>
+                                <td class="positive">+69.93</td>
+                                <td class="positive">47.0</td>
+                                <td style="color:#f39c12">34.0</td>
+                                <td class="negative">157.7</td>
+                                <td class="negative"><b>1.38x</b></td>
+                                <td class="positive">+419.57</td>
+                                <td>124h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.1</td>
+                                <td>7</td>
+                                <td>85.7%</td>
+                                <td class="positive">+43.57</td>
+                                <td class="positive">50.7</td>
+                                <td style="color:#f39c12">39.6</td>
+                                <td class="negative">140.1</td>
+                                <td class="negative"><b>1.28x</b></td>
+                                <td class="positive">+304.97</td>
+                                <td>130h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.15</td>
+                                <td>4</td>
+                                <td>75.0%</td>
+                                <td class="positive">+39.14</td>
+                                <td class="positive">30.4</td>
+                                <td style="color:#f39c12">51.7</td>
+                                <td class="negative">108.7</td>
+                                <td class="negative"><b>0.59x</b></td>
+                                <td class="positive">+156.56</td>
+                                <td>292h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.1</td>
+                                <td>7</td>
+                                <td>85.7%</td>
+                                <td class="positive">+32.4</td>
+                                <td class="positive">35.6</td>
+                                <td style="color:#f39c12">40.9</td>
+                                <td class="negative">157.7</td>
+                                <td class="negative"><b>0.87x</b></td>
+                                <td class="positive">+226.82</td>
+                                <td>150h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.07</td>
+                                <td>13</td>
+                                <td>92.3%</td>
+                                <td class="positive">+27.78</td>
+                                <td class="positive">44.8</td>
+                                <td style="color:#f39c12">36.5</td>
+                                <td class="negative">140.1</td>
+                                <td class="negative"><b>1.23x</b></td>
+                                <td class="positive">+361.10</td>
+                                <td>128h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.1</td>
+                                <td>5</td>
+                                <td>60.0%</td>
+                                <td class="positive">+16.64</td>
+                                <td class="positive">26.1</td>
+                                <td style="color:#f39c12">58.8</td>
+                                <td class="negative">108.7</td>
+                                <td class="negative"><b>0.44x</b></td>
+                                <td class="positive">+83.18</td>
+                                <td>351h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.05</td>
+                                <td>17</td>
+                                <td>88.2%</td>
+                                <td class="positive">+16.26</td>
+                                <td class="positive">41.8</td>
+                                <td style="color:#f39c12">38.6</td>
+                                <td class="negative">140.1</td>
+                                <td class="negative"><b>1.08x</b></td>
+                                <td class="positive">+276.35</td>
+                                <td>130h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.07</td>
+                                <td>7</td>
+                                <td>85.7%</td>
+                                <td class="positive">+11.8</td>
+                                <td class="positive">22.6</td>
+                                <td style="color:#f39c12">59.5</td>
+                                <td class="negative">157.7</td>
+                                <td class="negative"><b>0.38x</b></td>
+                                <td class="positive">+82.61</td>
+                                <td>175h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.03</td>
+                                <td>20</td>
+                                <td>80.0%</td>
+                                <td class="positive">+5.13</td>
+                                <td class="positive">28.3</td>
+                                <td style="color:#f39c12">44.8</td>
+                                <td class="negative">140.1</td>
+                                <td class="negative"><b>0.63x</b></td>
+                                <td class="positive">+102.64</td>
+                                <td>133h</td>
+                            </tr>
+                            <tr>
+                                <td><span class="rating" style="background:#E3F2FD;color:#3498db">A</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.02</td>
+                                <td>31</td>
+                                <td>64.5%</td>
+                                <td class="positive">+2.15</td>
+                                <td class="positive">28.8</td>
+                                <td style="color:#f39c12">28.8</td>
+                                <td class="negative">140.1</td>
+                                <td class="negative"><b>1.0x</b></td>
+                                <td class="positive">+66.54</td>
+                                <td>117h</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 4: Ranking -->
+    <div id="part4" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 4 · A 級以上排行榜
+                <span class="badge">17 層</span>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Rating</th>
+                                <th>CCY</th>
+                                <th>Dir</th>
+                                <th>Layer</th>
+                                <th>Trades</th>
+                                <th>WR%</th>
+                                <th>EV$</th>
+                                <th>Odds$</th>
+                                <th>OddsPip</th>
+                                <th>TP(pip)</th>
+                                <th>SoftSL</th>
+                                <th>HardSL</th>
+                                <th>Total$</th>
+                                <th>AvgHold(h)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.51</td>
+                                <td>2</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+375.94</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">74.2</td>
+                                <td style="color:#f39c12">6.2</td>
+                                <td class="negative">157.7</td>
+                                <td class="positive">+751.87</td>
+                                <td>57</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.34</td>
+                                <td>4</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+252.47</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">61.8</td>
+                                <td style="color:#f39c12">14.4</td>
+                                <td class="negative">108.7</td>
+                                <td class="positive">+1009.89</td>
+                                <td>163</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.34</td>
+                                <td>3</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+204.14</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">60.6</td>
+                                <td style="color:#f39c12">19.4</td>
+                                <td class="negative">157.7</td>
+                                <td class="positive">+612.41</td>
+                                <td>52</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.23</td>
+                                <td>4</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+158.12</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">70.0</td>
+                                <td style="color:#f39c12">29.2</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive">+632.47</td>
+                                <td>132</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.23</td>
+                                <td>4</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+122.04</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">46.5</td>
+                                <td style="color:#f39c12">32.4</td>
+                                <td class="negative">108.7</td>
+                                <td class="positive">+488.17</td>
+                                <td>193</td>
+                            </tr>
+                            <tr>
+                                <td>6</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.23</td>
+                                <td>3</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+99.38</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">43.7</td>
+                                <td style="color:#f39c12">39.6</td>
+                                <td class="negative">157.7</td>
+                                <td class="positive">+298.14</td>
+                                <td>62</td>
+                            </tr>
+                            <tr>
+                                <td>7</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.15</td>
+                                <td>6</td>
+                                <td>83.3%</td>
+                                <td class="positive"><b>+87.93</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">59.8</td>
+                                <td style="color:#f39c12">36.0</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive">+527.56</td>
+                                <td>106</td>
+                            </tr>
+                            <tr>
+                                <td>8</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.15</td>
+                                <td>6</td>
+                                <td>100.0%</td>
+                                <td class="positive"><b>+69.93</b></td>
+                                <td>999</td>
+                                <td>999</td>
+                                <td class="positive">47.0</td>
+                                <td style="color:#f39c12">34.0</td>
+                                <td class="negative">157.7</td>
+                                <td class="positive">+419.57</td>
+                                <td>124</td>
+                            </tr>
+                            <tr>
+                                <td>9</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.1</td>
+                                <td>7</td>
+                                <td>85.7%</td>
+                                <td class="positive"><b>+43.57</b></td>
+                                <td>3.19</td>
+                                <td>3.41</td>
+                                <td class="positive">50.7</td>
+                                <td style="color:#f39c12">39.6</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive">+304.97</td>
+                                <td>130</td>
+                            </tr>
+                            <tr>
+                                <td>10</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.15</td>
+                                <td>4</td>
+                                <td>75.0%</td>
+                                <td class="positive"><b>+39.14</b></td>
+                                <td>80.62</td>
+                                <td>2.01</td>
+                                <td class="positive">30.4</td>
+                                <td style="color:#f39c12">51.7</td>
+                                <td class="negative">108.7</td>
+                                <td class="positive">+156.56</td>
+                                <td>292</td>
+                            </tr>
+                            <tr>
+                                <td>11</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.1</td>
+                                <td>7</td>
+                                <td>85.7%</td>
+                                <td class="positive"><b>+32.4</b></td>
+                                <td>2.65</td>
+                                <td>2.77</td>
+                                <td class="positive">35.6</td>
+                                <td style="color:#f39c12">40.9</td>
+                                <td class="negative">157.7</td>
+                                <td class="positive">+226.82</td>
+                                <td>150</td>
+                            </tr>
+                            <tr>
+                                <td>12</td>
+                                <td><span class="rating" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.07</td>
+                                <td>13</td>
+                                <td>92.3%</td>
+                                <td class="positive"><b>+27.78</b></td>
+                                <td>1.41</td>
+                                <td>1.48</td>
+                                <td class="positive">44.8</td>
+                                <td style="color:#f39c12">36.5</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive">+361.10</td>
+                                <td>128</td>
+                            </tr>
+                            <tr>
+                                <td>13</td>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.1</td>
+                                <td>5</td>
+                                <td>60.0%</td>
+                                <td class="positive"><b>+16.64</b></td>
+                                <td>2.37</td>
+                                <td>5.22</td>
+                                <td class="positive">26.1</td>
+                                <td style="color:#f39c12">58.8</td>
+                                <td class="negative">108.7</td>
+                                <td class="positive">+83.18</td>
+                                <td>351</td>
+                            </tr>
+                            <tr>
+                                <td>14</td>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.05</td>
+                                <td>17</td>
+                                <td>88.2%</td>
+                                <td class="positive"><b>+16.26</b></td>
+                                <td>1.14</td>
+                                <td>1.22</td>
+                                <td class="positive">41.8</td>
+                                <td style="color:#f39c12">38.6</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive">+276.35</td>
+                                <td>130</td>
+                            </tr>
+                            <tr>
+                                <td>15</td>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.07</td>
+                                <td>7</td>
+                                <td>85.7%</td>
+                                <td class="positive"><b>+11.8</b></td>
+                                <td>0.81</td>
+                                <td>0.84</td>
+                                <td class="positive">22.6</td>
+                                <td style="color:#f39c12">59.5</td>
+                                <td class="negative">157.7</td>
+                                <td class="positive">+82.61</td>
+                                <td>175</td>
+                            </tr>
+                            <tr>
+                                <td>16</td>
+                                <td><span class="rating" style="background:#E8F5E9;color:#2ecc71">S</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.03</td>
+                                <td>20</td>
+                                <td>80.0%</td>
+                                <td class="positive"><b>+5.13</b></td>
+                                <td>0.96</td>
+                                <td>1.06</td>
+                                <td class="positive">28.3</td>
+                                <td style="color:#f39c12">44.8</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive">+102.64</td>
+                                <td>133</td>
+                            </tr>
+                            <tr>
+                                <td>17</td>
+                                <td><span class="rating" style="background:#E3F2FD;color:#3498db">A</span></td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.02</td>
+                                <td>31</td>
+                                <td>64.5%</td>
+                                <td class="positive"><b>+2.15</b></td>
+                                <td>1.1</td>
+                                <td>1.18</td>
+                                <td class="positive">28.8</td>
+                                <td style="color:#f39c12">28.8</td>
+                                <td class="negative">140.1</td>
+                                <td class="positive">+66.54</td>
+                                <td>117</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 5: Blacklist -->
+    <div id="part5" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 5 · 黑名單
+                <span class="badge">0 個危險組合</span>
+            </div>
+            <div class="section-body">
+                <div style="text-align:center;padding:20px;color:#2ecc71;">✅ 沒有危險組合，所有 CCY×Direction 表現良好</div>
+            </div>
+        </div>
+    </div>
+    <!-- Part 6: Recovery -->
+    <div id="part6" class="tab-content">
+        <div class="section">
+            <div class="section-header">
+                Part 6 · 恢復力分析
+                <span class="badge">如果最深層被 Hard SL 止損，要用最佳 EV 層贏幾多次先追得返？</span>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>狀態</th>
+                                <th>CCY</th>
+                                <th>Dir</th>
+                                <th>最深層</th>
+                                <th>最差損失</th>
+                                <th>最佳 EV 層</th>
+                                <th>Best EV$</th>
+                                <th>恢復次數</th>
+                                <th>恢復天數</th>
+                                <th>說明</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="status">🟢</td>
+                                <td><b>AUDUSD</b></td>
+                                <td>buy</td>
+                                <td>L0.77</td>
+                                <td class="negative">$77.00</td>
+                                <td>L0.77</td>
+                                <td class="positive">+472.36</td>
+                                <td><b>1</b></td>
+                                <td>1天</td>
+                                <td>安全 (1次)</td>
+                            </tr>
+                            <tr>
+                                <td class="status">🟢</td>
+                                <td><b>AUDUSD</b></td>
+                                <td>sell</td>
+                                <td>L0.51</td>
+                                <td class="negative">$51.00</td>
+                                <td>L0.51</td>
+                                <td class="positive">+375.94</td>
+                                <td><b>1</b></td>
+                                <td>2天</td>
+                                <td>安全 (1次)</td>
+                            </tr>
+                            <tr>
+                                <td class="status">🟢</td>
+                                <td><b>EURGBP</b></td>
+                                <td>buy</td>
+                                <td>L0.51</td>
+                                <td class="negative">$51.00</td>
+                                <td>L0.51</td>
+                                <td class="positive">+403.56</td>
+                                <td><b>1</b></td>
+                                <td>2天</td>
+                                <td>安全 (1次)</td>
+                            </tr>
+                            <tr>
+                                <td class="status">🟢</td>
+                                <td><b>EURGBP</b></td>
+                                <td>sell</td>
+                                <td>L0.77</td>
+                                <td class="negative">$77.00</td>
+                                <td>L0.77</td>
+                                <td class="positive">+529.81</td>
+                                <td><b>1</b></td>
+                                <td>6天</td>
+                                <td>安全 (1次)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        馬丁剖析法 V3 · 數據說話，紀律至上 · Quant 📊
+    </div>
+</div>
+
+<script>
+// Tab switching
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// Scatter charts
+const scatterData = {"0": [{"net_pips": -5.7, "mae": 82.8, "mfe": 5.5, "is_win": false, "layer": "L0.02"}, {"net_pips": 21.3, "mae": 50.1, "mfe": 52.9, "is_win": true, "layer": "L0.02"}, {"net_pips": 48.8, "mae": 0.0, "mfe": 48.8, "is_win": true, "layer": "L0.02"}, {"net_pips": 11.2, "mae": 0.0, "mfe": 11.2, "is_win": true, "layer": "L0.02"}, {"net_pips": 11.0, "mae": 0.0, "mfe": 11.0, "is_win": true, "layer": "L0.02"}, {"net_pips": -107.8, "mae": 107.8, "mfe": 6.9, "is_win": false, "layer": "L0.02"}, {"net_pips": -8.1, "mae": 8.1, "mfe": 15.5, "is_win": false, "layer": "L0.02"}, {"net_pips": -41.3, "mae": 41.3, "mfe": 18.7, "is_win": false, "layer": "L0.02"}, {"net_pips": 18.4, "mae": 25.1, "mfe": 18.4, "is_win": true, "layer": "L0.02"}, {"net_pips": 60.0, "mae": 4.2, "mfe": 60.0, "is_win": true, "layer": "L0.02"}, {"net_pips": -14.3, "mae": 14.3, "mfe": 6.2, "is_win": false, "layer": "L0.02"}, {"net_pips": -10.2, "mae": 10.2, "mfe": 20.9, "is_win": false, "layer": "L0.02"}, {"net_pips": -19.6, "mae": 19.6, "mfe": 46.4, "is_win": false, "layer": "L0.02"}, {"net_pips": 19.8, "mae": 29.1, "mfe": 19.8, "is_win": true, "layer": "L0.02"}, {"net_pips": 55.8, "mae": 13.6, "mfe": 55.8, "is_win": true, "layer": "L0.02"}, {"net_pips": 46.7, "mae": 0.0, "mfe": 46.7, "is_win": true, "layer": "L0.02"}, {"net_pips": 39.9, "mae": 1.5, "mfe": 39.9, "is_win": true, "layer": "L0.02"}, {"net_pips": 21.8, "mae": 19.0, "mfe": 21.8, "is_win": true, "layer": "L0.02"}, {"net_pips": 5.4, "mae": 60.8, "mfe": 5.4, "is_win": true, "layer": "L0.02"}, {"net_pips": 11.3, "mae": 57.3, "mfe": 11.3, "is_win": true, "layer": "L0.02"}, {"net_pips": 41.9, "mae": 1.5, "mfe": 41.9, "is_win": true, "layer": "L0.02"}, {"net_pips": -4.0, "mae": 4.0, "mfe": 16.4, "is_win": false, "layer": "L0.02"}, {"net_pips": 60.1, "mae": 6.0, "mfe": 60.1, "is_win": true, "layer": "L0.02"}, {"net_pips": 59.9, "mae": 8.9, "mfe": 59.9, "is_win": true, "layer": "L0.02"}, {"net_pips": -41.9, "mae": 41.9, "mfe": 0.0, "is_win": false, "layer": "L0.02"}, {"net_pips": 46.6, "mae": 7.1, "mfe": 46.6, "is_win": true, "layer": "L0.02"}, {"net_pips": -60.2, "mae": 60.2, "mfe": 31.5, "is_win": false, "layer": "L0.02"}, {"net_pips": 37.8, "mae": 7.6, "mfe": 37.8, "is_win": true, "layer": "L0.02"}, {"net_pips": 44.9, "mae": 0.4, "mfe": 44.9, "is_win": true, "layer": "L0.02"}, {"net_pips": 22.1, "mae": 55.1, "mfe": 22.1, "is_win": true, "layer": "L0.02"}, {"net_pips": -5.5, "mae": 5.5, "mfe": 7.8, "is_win": false, "layer": "L0.02"}, {"net_pips": 9.2, "mae": 67.7, "mfe": 20.6, "is_win": true, "layer": "L0.03"}, {"net_pips": 47.7, "mae": 23.7, "mfe": 58.8, "is_win": true, "layer": "L0.03"}, {"net_pips": 33.3, "mae": 0.0, "mfe": 33.3, "is_win": true, "layer": "L0.03"}, {"net_pips": 42.0, "mae": 0.0, "mfe": 42.0, "is_win": true, "layer": "L0.03"}, {"net_pips": -72.4, "mae": 72.4, "mfe": 21.9, "is_win": false, "layer": "L0.03"}, {"net_pips": 31.8, "mae": 32.6, "mfe": 31.8, "is_win": true, "layer": "L0.03"}, {"net_pips": -5.1, "mae": 5.1, "mfe": 10.1, "is_win": false, "layer": "L0.03"}, {"net_pips": 47.6, "mae": 0.0, "mfe": 47.6, "is_win": true, "layer": "L0.03"}, {"net_pips": 23.6, "mae": 88.9, "mfe": 23.6, "is_win": true, "layer": "L0.03"}, {"net_pips": 20.3, "mae": 30.8, "mfe": 20.3, "is_win": true, "layer": "L0.03"}, {"net_pips": 1.9, "mae": 26.7, "mfe": 1.9, "is_win": true, "layer": "L0.03"}, {"net_pips": 46.1, "mae": 2.8, "mfe": 46.1, "is_win": true, "layer": "L0.03"}, {"net_pips": 37.6, "mae": 0.0, "mfe": 37.6, "is_win": true, "layer": "L0.03"}, {"net_pips": 20.1, "mae": 45.9, "mfe": 20.1, "is_win": true, "layer": "L0.03"}, {"net_pips": 26.9, "mae": 41.7, "mfe": 26.9, "is_win": true, "layer": "L0.03"}, {"net_pips": 20.7, "mae": 42.4, "mfe": 20.7, "is_win": true, "layer": "L0.03"}, {"net_pips": 1.1, "mae": 106.5, "mfe": 1.1, "is_win": false, "layer": "L0.03"}, {"net_pips": -37.0, "mae": 37.0, "mfe": 32.7, "is_win": false, "layer": "L0.03"}, {"net_pips": 38.4, "mae": 38.9, "mfe": 38.4, "is_win": true, "layer": "L0.03"}, {"net_pips": 31.4, "mae": 83.3, "mfe": 31.4, "is_win": true, "layer": "L0.03"}, {"net_pips": 25.9, "mae": 51.2, "mfe": 37.1, "is_win": true, "layer": "L0.05"}, {"net_pips": 62.7, "mae": 8.7, "mfe": 73.8, "is_win": true, "layer": "L0.05"}, {"net_pips": 80.9, "mae": 0.0, "mfe": 80.9, "is_win": true, "layer": "L0.05"}, {"net_pips": 58.1, "mae": 0.0, "mfe": 58.1, "is_win": true, "layer": "L0.05"}, {"net_pips": -48.7, "mae": 48.7, "mfe": 31.9, "is_win": false, "layer": "L0.05"}, {"net_pips": 54.7, "mae": 9.9, "mfe": 54.7, "is_win": true, "layer": "L0.05"}, {"net_pips": 10.7, "mae": 56.5, "mfe": 10.7, "is_win": true, "layer": "L0.05"}, {"net_pips": 39.0, "mae": 73.5, "mfe": 39.0, "is_win": true, "layer": "L0.05"}, {"net_pips": 36.8, "mae": 14.2, "mfe": 36.8, "is_win": true, "layer": "L0.05"}, {"net_pips": 40.1, "mae": 0.0, "mfe": 40.1, "is_win": true, "layer": "L0.05"}, {"net_pips": 35.1, "mae": 30.9, "mfe": 35.1, "is_win": true, "layer": "L0.05"}, {"net_pips": 42.3, "mae": 26.3, "mfe": 42.3, "is_win": true, "layer": "L0.05"}, {"net_pips": 36.1, "mae": 26.9, "mfe": 36.1, "is_win": true, "layer": "L0.05"}, {"net_pips": 18.9, "mae": 88.7, "mfe": 18.9, "is_win": true, "layer": "L0.05"}, {"net_pips": -21.4, "mae": 21.4, "mfe": 15.0, "is_win": false, "layer": "L0.05"}, {"net_pips": 54.2, "mae": 23.0, "mfe": 54.2, "is_win": true, "layer": "L0.05"}, {"net_pips": 46.6, "mae": 68.1, "mfe": 46.6, "is_win": true, "layer": "L0.05"}, {"net_pips": 48.6, "mae": 28.5, "mfe": 59.8, "is_win": true, "layer": "L0.07"}, {"net_pips": -31.7, "mae": 31.7, "mfe": 8.8, "is_win": false, "layer": "L0.07"}, {"net_pips": 26.7, "mae": 40.8, "mfe": 26.7, "is_win": true, "layer": "L0.07"}, {"net_pips": 54.7, "mae": 57.9, "mfe": 54.7, "is_win": true, "layer": "L0.07"}, {"net_pips": 51.7, "mae": 0.0, "mfe": 51.7, "is_win": true, "layer": "L0.07"}, {"net_pips": 54.9, "mae": 0.0, "mfe": 54.9, "is_win": true, "layer": "L0.07"}, {"net_pips": 50.3, "mae": 16.0, "mfe": 50.3, "is_win": true, "layer": "L0.07"}, {"net_pips": 57.9, "mae": 10.8, "mfe": 57.9, "is_win": true, "layer": "L0.07"}, {"net_pips": 51.3, "mae": 11.8, "mfe": 51.3, "is_win": true, "layer": "L0.07"}, {"net_pips": 33.9, "mae": 73.7, "mfe": 33.9, "is_win": true, "layer": "L0.07"}, {"net_pips": 1.7, "mae": 63.3, "mfe": 1.7, "is_win": true, "layer": "L0.07"}, {"net_pips": 69.6, "mae": 7.7, "mfe": 69.6, "is_win": true, "layer": "L0.07"}, {"net_pips": 61.5, "mae": 53.2, "mfe": 61.5, "is_win": true, "layer": "L0.07"}, {"net_pips": 71.5, "mae": 5.5, "mfe": 82.8, "is_win": true, "layer": "L0.1"}, {"net_pips": -16.1, "mae": 16.1, "mfe": 13.8, "is_win": false, "layer": "L0.1"}, {"net_pips": 44.1, "mae": 23.6, "mfe": 44.1, "is_win": true, "layer": "L0.1"}, {"net_pips": 70.1, "mae": 42.4, "mfe": 70.1, "is_win": true, "layer": "L0.1"}, {"net_pips": 50.9, "mae": 56.7, "mfe": 50.9, "is_win": true, "layer": "L0.1"}, {"net_pips": 17.0, "mae": 47.9, "mfe": 17.0, "is_win": true, "layer": "L0.1"}, {"net_pips": 76.2, "mae": 38.5, "mfe": 76.2, "is_win": true, "layer": "L0.1"}, {"net_pips": 0.6, "mae": 85.3, "mfe": 0.6, "is_win": false, "layer": "L0.15"}, {"net_pips": 59.2, "mae": 8.5, "mfe": 59.2, "is_win": true, "layer": "L0.15"}, {"net_pips": 85.2, "mae": 27.4, "mfe": 85.2, "is_win": true, "layer": "L0.15"}, {"net_pips": 80.2, "mae": 12.4, "mfe": 80.2, "is_win": true, "layer": "L0.15"}, {"net_pips": 41.4, "mae": 23.6, "mfe": 41.4, "is_win": true, "layer": "L0.15"}, {"net_pips": 92.0, "mae": 22.7, "mfe": 92.0, "is_win": true, "layer": "L0.15"}, {"net_pips": 14.7, "mae": 70.2, "mfe": 14.7, "is_win": true, "layer": "L0.23"}, {"net_pips": 101.4, "mae": 11.1, "mfe": 101.4, "is_win": true, "layer": "L0.23"}, {"net_pips": 56.3, "mae": 8.7, "mfe": 56.3, "is_win": true, "layer": "L0.23"}, {"net_pips": 107.5, "mae": 7.2, "mfe": 107.5, "is_win": true, "layer": "L0.23"}, {"net_pips": 31.3, "mae": 54.2, "mfe": 31.3, "is_win": true, "layer": "L0.34"}, {"net_pips": 46.1, "mae": 38.9, "mfe": 46.1, "is_win": true, "layer": "L0.51"}, {"net_pips": 62.0, "mae": 23.5, "mfe": 62.0, "is_win": true, "layer": "L0.77"}], "1": [{"net_pips": 41.6, "mae": 0.0, "mfe": 41.6, "is_win": true, "layer": "L0.02"}, {"net_pips": 54.5, "mae": 3.0, "mfe": 54.5, "is_win": true, "layer": "L0.02"}, {"net_pips": 44.4, "mae": 20.6, "mfe": 44.4, "is_win": true, "layer": "L0.02"}, {"net_pips": 49.2, "mae": 11.2, "mfe": 49.2, "is_win": true, "layer": "L0.02"}, {"net_pips": -23.3, "mae": 23.3, "mfe": 6.0, "is_win": false, "layer": "L0.02"}, {"net_pips": 74.7, "mae": 14.3, "mfe": 74.7, "is_win": true, "layer": "L0.02"}, {"net_pips": -59.4, "mae": 59.4, "mfe": 19.9, "is_win": false, "layer": "L0.02"}, {"net_pips": 47.3, "mae": 8.0, "mfe": 47.3, "is_win": true, "layer": "L0.02"}, {"net_pips": -45.2, "mae": 45.2, "mfe": 31.3, "is_win": false, "layer": "L0.02"}, {"net_pips": 54.3, "mae": 12.7, "mfe": 54.3, "is_win": true, "layer": "L0.02"}, {"net_pips": -50.1, "mae": 50.1, "mfe": 20.5, "is_win": false, "layer": "L0.02"}, {"net_pips": 19.3, "mae": 28.1, "mfe": 19.3, "is_win": true, "layer": "L0.02"}, {"net_pips": -25.9, "mae": 25.9, "mfe": 6.0, "is_win": false, "layer": "L0.02"}, {"net_pips": -121.3, "mae": 121.3, "mfe": 3.7, "is_win": false, "layer": "L0.02"}, {"net_pips": 65.5, "mae": 5.1, "mfe": 65.5, "is_win": true, "layer": "L0.02"}, {"net_pips": -78.1, "mae": 78.1, "mfe": 3.4, "is_win": false, "layer": "L0.02"}, {"net_pips": 3.1, "mae": 74.6, "mfe": 3.1, "is_win": true, "layer": "L0.03"}, {"net_pips": 2.3, "mae": 62.2, "mfe": 2.3, "is_win": true, "layer": "L0.03"}, {"net_pips": -30.0, "mae": 30.0, "mfe": 46.4, "is_win": false, "layer": "L0.03"}, {"net_pips": -28.5, "mae": 28.5, "mfe": 0.0, "is_win": false, "layer": "L0.03"}, {"net_pips": 39.6, "mae": 7.8, "mfe": 39.6, "is_win": true, "layer": "L0.03"}, {"net_pips": -2.8, "mae": 2.8, "mfe": 9.1, "is_win": false, "layer": "L0.03"}, {"net_pips": -1.4, "mae": 1.4, "mfe": 22.9, "is_win": false, "layer": "L0.03"}, {"net_pips": -60.1, "mae": 60.1, "mfe": 0.0, "is_win": false, "layer": "L0.03"}, {"net_pips": 18.9, "mae": 58.8, "mfe": 18.9, "is_win": true, "layer": "L0.05"}, {"net_pips": 17.7, "mae": 47.1, "mfe": 17.7, "is_win": true, "layer": "L0.05"}, {"net_pips": -4.1, "mae": 4.1, "mfe": 53.7, "is_win": false, "layer": "L0.05"}, {"net_pips": -12.9, "mae": 12.9, "mfe": 9.6, "is_win": false, "layer": "L0.05"}, {"net_pips": 24.5, "mae": 51.5, "mfe": 24.5, "is_win": true, "layer": "L0.05"}, {"net_pips": 13.6, "mae": 65.7, "mfe": 13.6, "is_win": true, "layer": "L0.05"}, {"net_pips": -45.0, "mae": 45.0, "mfe": 0.0, "is_win": false, "layer": "L0.05"}, {"net_pips": 33.9, "mae": 43.8, "mfe": 33.9, "is_win": true, "layer": "L0.07"}, {"net_pips": 32.8, "mae": 31.9, "mfe": 32.8, "is_win": true, "layer": "L0.07"}, {"net_pips": 11.0, "mae": 61.6, "mfe": 11.0, "is_win": true, "layer": "L0.07"}, {"net_pips": 3.8, "mae": 93.9, "mfe": 3.8, "is_win": true, "layer": "L0.07"}, {"net_pips": 39.6, "mae": 36.3, "mfe": 39.6, "is_win": true, "layer": "L0.07"}, {"net_pips": 29.5, "mae": 50.1, "mfe": 29.5, "is_win": true, "layer": "L0.07"}, {"net_pips": -29.9, "mae": 29.9, "mfe": 7.8, "is_win": false, "layer": "L0.07"}, {"net_pips": 49.9, "mae": 27.8, "mfe": 49.9, "is_win": true, "layer": "L0.1"}, {"net_pips": 49.4, "mae": 15.4, "mfe": 49.4, "is_win": true, "layer": "L0.1"}, {"net_pips": 26.3, "mae": 46.3, "mfe": 26.3, "is_win": true, "layer": "L0.1"}, {"net_pips": 19.5, "mae": 78.4, "mfe": 19.5, "is_win": true, "layer": "L0.1"}, {"net_pips": 54.7, "mae": 21.2, "mfe": 54.7, "is_win": true, "layer": "L0.1"}, {"net_pips": 44.6, "mae": 34.8, "mfe": 44.6, "is_win": true, "layer": "L0.1"}, {"net_pips": -14.7, "mae": 14.7, "mfe": 4.6, "is_win": false, "layer": "L0.1"}, {"net_pips": 71.8, "mae": 5.9, "mfe": 71.8, "is_win": true, "layer": "L0.15"}, {"net_pips": 64.4, "mae": 0.3, "mfe": 64.4, "is_win": true, "layer": "L0.15"}, {"net_pips": 41.8, "mae": 30.8, "mfe": 41.8, "is_win": true, "layer": "L0.15"}, {"net_pips": 34.7, "mae": 63.0, "mfe": 34.7, "is_win": true, "layer": "L0.15"}, {"net_pips": 60.0, "mae": 19.6, "mfe": 60.0, "is_win": true, "layer": "L0.15"}, {"net_pips": 9.5, "mae": 50.4, "mfe": 9.5, "is_win": true, "layer": "L0.15"}, {"net_pips": 56.8, "mae": 15.8, "mfe": 56.8, "is_win": true, "layer": "L0.23"}, {"net_pips": 49.9, "mae": 47.8, "mfe": 49.9, "is_win": true, "layer": "L0.23"}, {"net_pips": 24.4, "mae": 35.5, "mfe": 24.4, "is_win": true, "layer": "L0.23"}, {"net_pips": 71.6, "mae": 1.0, "mfe": 71.6, "is_win": true, "layer": "L0.34"}, {"net_pips": 65.3, "mae": 32.4, "mfe": 65.3, "is_win": true, "layer": "L0.34"}, {"net_pips": 44.8, "mae": 15.3, "mfe": 44.8, "is_win": true, "layer": "L0.34"}, {"net_pips": 87.2, "mae": 10.5, "mfe": 87.2, "is_win": true, "layer": "L0.51"}, {"net_pips": 61.3, "mae": 0.0, "mfe": 61.3, "is_win": true, "layer": "L0.51"}], "2": [{"net_pips": -58.1, "mae": 58.1, "mfe": 15.4, "is_win": false, "layer": "L0.02"}, {"net_pips": -49.8, "mae": 49.8, "mfe": 33.9, "is_win": false, "layer": "L0.02"}, {"net_pips": 9.2, "mae": 50.9, "mfe": 9.2, "is_win": true, "layer": "L0.02"}, {"net_pips": -1.5, "mae": 1.5, "mfe": 9.5, "is_win": false, "layer": "L0.02"}, {"net_pips": 34.2, "mae": 5.9, "mfe": 34.2, "is_win": true, "layer": "L0.02"}, {"net_pips": 8.2, "mae": 47.0, "mfe": 8.2, "is_win": true, "layer": "L0.02"}, {"net_pips": -62.6, "mae": 62.6, "mfe": 19.5, "is_win": false, "layer": "L0.02"}, {"net_pips": -32.8, "mae": 32.8, "mfe": 11.9, "is_win": false, "layer": "L0.02"}, {"net_pips": 21.0, "mae": 43.3, "mfe": 21.0, "is_win": true, "layer": "L0.02"}, {"net_pips": 22.7, "mae": 32.6, "mfe": 22.7, "is_win": true, "layer": "L0.02"}, {"net_pips": 17.8, "mae": 15.7, "mfe": 17.8, "is_win": true, "layer": "L0.02"}, {"net_pips": 16.6, "mae": 19.2, "mfe": 16.6, "is_win": true, "layer": "L0.02"}, {"net_pips": 47.6, "mae": 16.6, "mfe": 47.6, "is_win": true, "layer": "L0.02"}, {"net_pips": 41.1, "mae": 9.5, "mfe": 41.1, "is_win": true, "layer": "L0.02"}, {"net_pips": -43.5, "mae": 43.5, "mfe": 28.5, "is_win": false, "layer": "L0.03"}, {"net_pips": -34.5, "mae": 34.5, "mfe": 24.9, "is_win": false, "layer": "L0.03"}, {"net_pips": 24.1, "mae": 35.9, "mfe": 24.1, "is_win": true, "layer": "L0.03"}, {"net_pips": 13.8, "mae": 67.2, "mfe": 13.8, "is_win": false, "layer": "L0.03"}, {"net_pips": 22.9, "mae": 31.8, "mfe": 22.9, "is_win": true, "layer": "L0.03"}, {"net_pips": -35.9, "mae": 35.9, "mfe": 1.3, "is_win": false, "layer": "L0.03"}, {"net_pips": -17.8, "mae": 17.8, "mfe": 0.0, "is_win": false, "layer": "L0.03"}, {"net_pips": 36.2, "mae": 28.1, "mfe": 36.2, "is_win": true, "layer": "L0.03"}, {"net_pips": 37.9, "mae": 17.4, "mfe": 37.9, "is_win": true, "layer": "L0.03"}, {"net_pips": 32.8, "mae": 0.7, "mfe": 32.8, "is_win": true, "layer": "L0.03"}, {"net_pips": 31.5, "mae": 4.5, "mfe": 31.5, "is_win": true, "layer": "L0.03"}, {"net_pips": -28.3, "mae": 28.3, "mfe": 23.3, "is_win": false, "layer": "L0.05"}, {"net_pips": -19.3, "mae": 19.3, "mfe": 39.9, "is_win": false, "layer": "L0.05"}, {"net_pips": 40.0, "mae": 20.1, "mfe": 40.0, "is_win": true, "layer": "L0.05"}, {"net_pips": 28.7, "mae": 52.2, "mfe": 28.7, "is_win": true, "layer": "L0.05"}, {"net_pips": 38.5, "mae": 16.5, "mfe": 38.5, "is_win": true, "layer": "L0.05"}, {"net_pips": -20.7, "mae": 20.7, "mfe": 6.4, "is_win": false, "layer": "L0.05"}, {"net_pips": -2.6, "mae": 2.6, "mfe": 9.3, "is_win": false, "layer": "L0.05"}, {"net_pips": 51.1, "mae": 13.2, "mfe": 51.1, "is_win": true, "layer": "L0.05"}, {"net_pips": -13.1, "mae": 13.1, "mfe": 10.5, "is_win": false, "layer": "L0.07"}, {"net_pips": -3.9, "mae": 3.9, "mfe": 26.2, "is_win": false, "layer": "L0.07"}, {"net_pips": 53.8, "mae": 27.2, "mfe": 53.8, "is_win": true, "layer": "L0.07"}, {"net_pips": 53.5, "mae": 1.2, "mfe": 53.5, "is_win": true, "layer": "L0.07"}, {"net_pips": -5.8, "mae": 5.8, "mfe": 10.4, "is_win": false, "layer": "L0.07"}, {"net_pips": 12.2, "mae": 83.6, "mfe": 12.2, "is_win": true, "layer": "L0.07"}, {"net_pips": 1.8, "mae": 75.4, "mfe": 1.8, "is_win": false, "layer": "L0.1"}, {"net_pips": 13.0, "mae": 46.1, "mfe": 13.0, "is_win": false, "layer": "L0.1"}, {"net_pips": 70.0, "mae": 11.0, "mfe": 70.0, "is_win": true, "layer": "L0.1"}, {"net_pips": 9.5, "mae": 52.5, "mfe": 9.5, "is_win": true, "layer": "L0.1"}, {"net_pips": 36.3, "mae": 59.8, "mfe": 36.3, "is_win": true, "layer": "L0.1"}, {"net_pips": 17.3, "mae": 59.9, "mfe": 17.3, "is_win": false, "layer": "L0.15"}, {"net_pips": 28.3, "mae": 30.6, "mfe": 28.3, "is_win": true, "layer": "L0.15"}, {"net_pips": 24.6, "mae": 37.4, "mfe": 24.6, "is_win": true, "layer": "L0.15"}, {"net_pips": 51.2, "mae": 44.7, "mfe": 51.2, "is_win": true, "layer": "L0.15"}, {"net_pips": 32.4, "mae": 44.8, "mfe": 32.4, "is_win": true, "layer": "L0.23"}, {"net_pips": 44.9, "mae": 14.1, "mfe": 44.9, "is_win": true, "layer": "L0.23"}, {"net_pips": 42.2, "mae": 19.8, "mfe": 42.2, "is_win": true, "layer": "L0.23"}, {"net_pips": 66.7, "mae": 29.4, "mfe": 66.7, "is_win": true, "layer": "L0.23"}, {"net_pips": 47.5, "mae": 29.8, "mfe": 47.5, "is_win": true, "layer": "L0.34"}, {"net_pips": 59.8, "mae": 0.0, "mfe": 59.8, "is_win": true, "layer": "L0.34"}, {"net_pips": 58.2, "mae": 3.9, "mfe": 58.2, "is_win": true, "layer": "L0.34"}, {"net_pips": 81.5, "mae": 14.3, "mfe": 81.5, "is_win": true, "layer": "L0.34"}, {"net_pips": 70.2, "mae": 6.9, "mfe": 70.2, "is_win": true, "layer": "L0.51"}], "3": [{"net_pips": -87.1, "mae": 87.1, "mfe": 15.6, "is_win": false, "layer": "L0.02"}, {"net_pips": 33.4, "mae": 6.4, "mfe": 33.4, "is_win": true, "layer": "L0.02"}, {"net_pips": 6.8, "mae": 45.3, "mfe": 6.8, "is_win": true, "layer": "L0.02"}, {"net_pips": 30.7, "mae": 0.2, "mfe": 30.7, "is_win": true, "layer": "L0.02"}, {"net_pips": -72.1, "mae": 72.1, "mfe": 2.3, "is_win": false, "layer": "L0.03"}, {"net_pips": 23.6, "mae": 28.1, "mfe": 23.6, "is_win": true, "layer": "L0.03"}, {"net_pips": -56.9, "mae": 56.9, "mfe": 3.7, "is_win": false, "layer": "L0.05"}, {"net_pips": 39.1, "mae": 13.0, "mfe": 39.1, "is_win": true, "layer": "L0.05"}, {"net_pips": -41.7, "mae": 41.7, "mfe": 14.1, "is_win": false, "layer": "L0.07"}, {"net_pips": -26.6, "mae": 26.6, "mfe": 15.4, "is_win": false, "layer": "L0.1"}, {"net_pips": -9.9, "mae": 9.9, "mfe": 0.0, "is_win": false, "layer": "L0.15"}, {"net_pips": 3.9, "mae": 48.1, "mfe": 3.9, "is_win": true, "layer": "L0.23"}, {"net_pips": 19.1, "mae": 32.9, "mfe": 19.1, "is_win": true, "layer": "L0.34"}, {"net_pips": 34.9, "mae": 17.1, "mfe": 34.9, "is_win": true, "layer": "L0.51"}, {"net_pips": 49.9, "mae": 2.0, "mfe": 49.9, "is_win": true, "layer": "L0.77"}]};
+
+function drawScatter(canvasId, data) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.offsetWidth * 2;
+    const h = canvas.height = canvas.offsetHeight * 2;
+    ctx.scale(2, 2);
+    const cw = canvas.offsetWidth;
+    const ch = canvas.offsetHeight;
+    
+    // Clear
+    ctx.fillStyle = '#0a0a18';
+    ctx.fillRect(0, 0, cw, ch);
+    
+    // Compute bounds
+    let allVals = data.map(d => Math.abs(d.net_pips)).concat(data.map(d => d.mae)).concat(data.map(d => d.mfe));
+    let maxVal = Math.max(...allVals, 1);
+    
+    const pad = { top: 10, right: 10, bottom: 20, left: 35 };
+    const plotW = cw - pad.left - pad.right;
+    const plotH = ch - pad.top - pad.bottom;
+    
+    // Grid
+    ctx.strokeStyle = '#1a1a2a';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+        let y = pad.top + plotH * i / 4;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + plotW, y); ctx.stroke();
+        let val = Math.round(maxVal * (1 - i/4));
+        ctx.fillStyle = '#555';
+        ctx.font = '8px sans-serif';
+        ctx.fillText(val, 2, y + 3);
+    }
+    
+    // Zero line
+    let zeroY = pad.top + plotH * 0.5;
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + plotW, zeroY); ctx.stroke();
+    
+    // Dots
+    for (const d of data) {
+        let x = pad.left + (d.mae / maxVal) * plotW;
+        let y_pos = d.is_win ? (pad.top + plotH * (1 - d.mfe / maxVal)) : (pad.top + plotH * (1 - d.net_pips / maxVal));
+        y_pos = Math.max(pad.top, Math.min(pad.top + plotH, y_pos));
+        x = Math.max(pad.left, Math.min(pad.left + plotW, x));
+        
+        ctx.beginPath();
+        ctx.arc(x, y_pos, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = d.is_win ? '#2ecc71' : '#e74c3c';
+        ctx.fill();
+    }
+}
+
+// Draw all charts
+for (const [id, data] of Object.entries(scatterData)) {
+    drawScatter('chart_' + id, data);
+}
+
+// Redraw on resize
+window.addEventListener('resize', () => {
+    for (const [id, data] of Object.entries(scatterData)) {
+        drawScatter('chart_' + id, data);
+    }
+});
+</script>
+</body>
+</html>
