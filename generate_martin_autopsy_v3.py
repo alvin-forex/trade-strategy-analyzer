@@ -567,19 +567,35 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     for key, stats in layer_stats.items():
         ccy_groups[(stats['symbol'], stats['direction'])][key] = stats
     
+    # Sort: group same CCY together, BUY before SELL, CCY alphabetical
     sorted_ccy = sorted(ccy_groups.items(),
-        key=lambda x: sum(s['total_pnl'] for s in x[1].values()), reverse=True)
+        key=lambda x: (x[0][0], 0 if x[0][1]=='buy' else 1))
     
     # ── Global bar chart data ──
     bar_groups = []
-    for s in ccy_summary:
-        bar_groups.append({
-            'label': f"{s['symbol']} {s['direction']}",
-            'total_pnl': s['total_pnl'],
-            'total_pips': s.get('total_pips', 0),
-            'win_pip': s['avg_win_pips'],
-            'loss_pip': s['avg_loss_pips'],
-        })
+    # Build from sorted_ccy to keep same CCY adjacent (BUY/SELL together)
+    for (symbol, direction), layers in sorted_ccy:
+        agg_pnl = sum(s['total_pnl'] for s in layers.values())
+        agg_pips = sum(s['net_pips'] for s in layers.values() if 'net_pips' in s)
+        # find in ccy_summary
+        match = [s for s in ccy_summary if s['symbol']==symbol and s['direction']==direction]
+        if match:
+            s = match[0]
+            bar_groups.append({
+                'label': f"{symbol} {direction}",
+                'total_pnl': agg_pnl,
+                'total_pips': agg_pips,
+                'win_pip': s['avg_win_pips'],
+                'loss_pip': s['avg_loss_pips'],
+            })
+        else:
+            bar_groups.append({
+                'label': f"{symbol} {direction}",
+                'total_pnl': agg_pnl,
+                'total_pips': agg_pips,
+                'win_pip': 0,
+                'loss_pip': 0,
+            })
     max_abs_pnl = max((abs(s['total_pnl']) for s in ccy_summary), default=1) or 1
     max_abs_pip = max((max(abs(s['avg_win_pips']), abs(s['avg_loss_pips'])) for s in ccy_summary), default=1) or 1
     max_abs_total_pip = max((abs(g['total_pips']) for g in bar_groups), default=1) or 1
