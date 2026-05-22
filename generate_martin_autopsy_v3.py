@@ -197,6 +197,8 @@ def compute_layer_stats(trades: List[dict]) -> Dict[str, dict]:
                         'mae': t['mae'],
                         'net_profit': t['net_profit'],
                         'is_win': t['net_profit'] > 0,
+                        'lots': t['lots'],
+                        'holding_hours': t['holding_hours'],
                     }
                     for t in lt
                 ],
@@ -307,6 +309,7 @@ def build_ccy_direction_summary(layer_stats: Dict) -> List[dict]:
     for (symbol, direction), layers in ccy_dir_data.items():
         total_trades = sum(l['count'] for l in layers)
         total_pnl = sum(l['total_pnl'] for l in layers)
+        total_pips = sum(l['avg_win_pips'] * l['win_count'] + (-l['avg_loss_pips']) * l['loss_count'] for l in layers)
         total_wins = sum(l['win_count'] for l in layers)
         wr = total_wins / total_trades * 100 if total_trades > 0 else 0
         
@@ -326,6 +329,7 @@ def build_ccy_direction_summary(layer_stats: Dict) -> List[dict]:
             'layers': len(layers),
             'max_depth': max(l['max_depth'] for l in layers),
             'total_pnl': round(total_pnl, 2),
+            'total_pips': round(total_pips, 1),
             'wr': round(wr, 1),
             'avg_ev': round(avg_ev, 2),
             'avg_win_pips': round(avg_win_pips, 1),
@@ -348,8 +352,8 @@ def compute_tp_sl(layer_stats: Dict, min_rating: str = 'A') -> List[dict]:
     """
     Part 3: A 級以上 TP/SL 建議
     TP = Avg MFE
-    Soft SL = Avg MAE × 1.2
-    Hard SL = Pair Max MAE × 1.3
+    Soft SL = Avg MAE
+    Hard SL = Pair Max MAE
     """
     rating_order = {'S+': 6, 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1, 'E': 0}
     min_level = rating_order.get(min_rating, 4)
@@ -370,8 +374,8 @@ def compute_tp_sl(layer_stats: Dict, min_rating: str = 'A') -> List[dict]:
             continue
         
         tp = stats['avg_mfe']
-        soft_sl = stats['avg_mae'] * 1.2
-        hard_sl = ccy_dir_max_mae[(stats['symbol'], stats['direction'])] * 1.3
+        soft_sl = stats['avg_mae']
+        hard_sl = ccy_dir_max_mae[(stats['symbol'], stats['direction'])]
         rr = tp / soft_sl if soft_sl > 0 else 0
         
         results.append({
@@ -432,6 +436,7 @@ def compute_blacklist(layer_stats: Dict) -> List[dict]:
         if danger >= 1:
             # 找最深層級
             deepest = max(layers, key=lambda x: x['layer_idx'])
+            avg_hold_all = sum(l['avg_hold'] * l['count'] for l in layers) / max(total_trades, 1)
             blacklist.append({
                 'symbol': symbol,
                 'direction': direction,
@@ -443,6 +448,7 @@ def compute_blacklist(layer_stats: Dict) -> List[dict]:
                 'worst_layer': deepest['layer_label'],
                 'danger': round(danger, 1),
                 'level': '💀 DEADLY' if danger > 5 else '⚠️ WARNING',
+                'avg_hold': round(avg_hold_all, 1),
             })
     
     blacklist.sort(key=lambda x: -x['danger'])
@@ -502,6 +508,7 @@ def compute_recovery(layer_stats: Dict) -> List[dict]:
             'recovery_days': int(recovery_days),
             'status': status,
             'status_text': status_text,
+            'avg_hold': round(sum(l['avg_hold'] * l['count'] for l in layers) / max(total_trades, 1), 1),
         })
     
     # 按恢復次數升序
@@ -511,10 +518,12 @@ def compute_recovery(layer_stats: Dict) -> List[dict]:
 
 # ─── HTML 生成 ───────────────────────────────────────────────
 
+
+
 def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
                   ccy_summary: List[dict], tp_sl_data: List[dict],
                   blacklist: List[dict], recovery: List[dict]) -> str:
-    """生成完整 HTML 報告"""
+    """生成完整 HTML 報告（含 sidebar、SVG 圖表、CSS tooltip）"""
     
     total_trades = len(trades)
     total_pnl = sum(t['net_profit'] for t in trades)
@@ -524,7 +533,6 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     
     rating_order = {'S+': 6, 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1, 'E': 0}
     
-    # 評級顏色
     def rating_color(r):
         return {'S+': '#FFD700', 'S': '#2ecc71', 'A': '#3498db', 'B': '#9b59b6',
                 'C': '#f39c12', 'D': '#e67e22', 'E': '#e74c3c'}.get(r, '#999')
@@ -533,31 +541,336 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
         return {'S+': '#FFF8E1', 'S': '#E8F5E9', 'A': '#E3F2FD', 'B': '#F3E5F5',
                 'C': '#FFF3E0', 'D': '#FBE9E7', 'E': '#FFEBEE'}.get(r, '#F5F5F5')
     
-    def pnl_color(val):
-        return '#2ecc71' if val > 0 else '#e74c3c' if val < 0 else '#999'
-    
     def pnl_prefix(val):
         return '+' if val > 0 else ''
     
-    # ─── Part 4 排行榜（從 tp_sl_data 已排序）───
+    # ─── Part 4 排行榜 ───
     ranking = tp_sl_data
+
+    # ─── Part 1 條形圖數據 ───
+    bar_chart_groups = []
+    max_abs_pnl = max(abs(s['total_pnl']) for s in ccy_summary) if ccy_summary else 1
+    max_abs_pip = max(max(abs(s['avg_win_pips']), abs(s['avg_loss_pips'])) for s in ccy_summary) if ccy_summary else 1
+    for s in ccy_summary:
+        bar_chart_groups.append({
+            'label': f"{s['symbol']} {s['direction']}",
+            'total_pnl': s['total_pnl'],
+            'total_pips': s.get('total_pips', 0),
+            'win_pip': s['avg_win_pips'],
+            'loss_pip': s['avg_loss_pips'],
+        })
     
+    # Build SVG bar chart for Part 1
+    def build_p1_bar_svg(groups, max_pnl, max_pip):
+        if not groups:
+            return '<p style="color:#888;text-align:center;padding:20px">無數據</p>'
+        n = len(groups)
+        svg_h = max(200, n * 38 + 60)
+        bar_h = 14
+        group_gap = 38
+        left_margin = 60
+        right_margin = 60
+        chart_w = 700
+        plot_w = chart_w - left_margin - right_margin
+        
+        # Scale: left axis ($), right axis (pip)
+        def pnl_x(val):
+            return left_margin + (val / max(max_pnl, 1)) * (plot_w / 2) + plot_w / 2
+        def pip_x(val):
+            return left_margin + (val / max(max_pip, 1)) * (plot_w / 2) + plot_w / 2
+        
+        svg = f'<svg viewBox="0 0 {chart_w} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
+        # Background
+        svg += f'<rect width="{chart_w}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
+        # Zero line
+        zero_x = left_margin + plot_w // 2
+        svg += f'<line x1="{zero_x}" y1="30" x2="{zero_x}" y2="{svg_h-30}" stroke="#333" stroke-width="1"/>'
+        # Grid lines
+        for frac in [0.25, 0.5, 0.75, 1.0]:
+            gx = left_margin + plot_w * frac
+            svg += f'<line x1="{gx}" y1="30" x2="{gx}" y2="{svg_h-30}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            gx2 = left_margin + plot_w * (1 - frac)
+            svg += f'<line x1="{gx2}" y1="30" x2="{gx2}" y2="{svg_h-30}" stroke="#1a1a2a" stroke-width="0.5"/>'
+        
+        # Axis labels
+        svg += f'<text x="{left_margin}" y="18" fill="#2ecc71" font-size="9" text-anchor="start">-$</text>'
+        svg += f'<text x="{chart_w - right_margin}" y="18" fill="#2ecc71" font-size="9" text-anchor="end">+$</text>'
+        svg += f'<text x="{chart_w - right_margin + 5}" y="18" fill="#5dade2" font-size="9" text-anchor="start">PIP→</text>'
+        
+        for i, g in enumerate(groups):
+            y_base = 30 + i * group_gap + 10
+            # Label
+            svg += f'<text x="4" y="{y_base + 5}" fill="#ccc" font-size="9">{g["label"]}</text>'
+            # Total$ bar
+            pnl_w = abs(g['total_pnl']) / max(max_pnl, 1) * (plot_w / 2)
+            pnl_col = '#2ecc71' if g['total_pnl'] >= 0 else '#e74c3c'
+            if g['total_pnl'] >= 0:
+                bx = zero_x
+            else:
+                bx = zero_x - pnl_w
+            svg += f'<rect x="{bx:.1f}" y="{y_base - 8}" width="{max(pnl_w, 1):.1f}" height="{bar_h}" fill="{pnl_col}" rx="2" opacity="0.85"/>'
+            svg += f'<text x="{bx + pnl_w + 3:.1f}" y="{y_base + 3}" fill="#ccc" font-size="8">${g["total_pnl"]:,.0f}</text>'
+            
+            # WinPip bar (above pnl bar)
+            pip_w = abs(g['win_pip']) / max(max_pip, 1) * (plot_w / 2)
+            svg += f'<rect x="{zero_x:.1f}" y="{y_base - 8 - bar_h - 1}" width="{max(pip_w, 1):.1f}" height="{bar_h - 2}" fill="#5dade2" rx="2" opacity="0.6"/>'
+            # LossPip bar (negative direction)
+            loss_w = abs(g['loss_pip']) / max(max_pip, 1) * (plot_w / 2)
+            svg += f'<rect x="{zero_x - loss_w:.1f}" y="{y_base - 8 - bar_h - 1}" width="{max(loss_w, 1):.1f}" height="{bar_h - 2}" fill="#e67e22" rx="2" opacity="0.6"/>'
+        
+        # Legend
+        ly = svg_h - 12
+        svg += f'<rect x="{left_margin}" y="{ly - 8}" width="10" height="8" fill="#2ecc71" rx="1"/>'
+        svg += f'<text x="{left_margin + 14}" y="{ly}" fill="#aaa" font-size="8">Total$ (+)</text>'
+        svg += f'<rect x="{left_margin + 70}" y="{ly - 8}" width="10" height="8" fill="#e74c3c" rx="1"/>'
+        svg += f'<text x="{left_margin + 84}" y="{ly}" fill="#aaa" font-size="8">Total$ (-)</text>'
+        svg += f'<rect x="{left_margin + 140}" y="{ly - 8}" width="10" height="8" fill="#5dade2" rx="1"/>'
+        svg += f'<text x="{left_margin + 154}" y="{ly}" fill="#aaa" font-size="8">WinPip</text>'
+        svg += f'<rect x="{left_margin + 200}" y="{ly - 8}" width="10" height="8" fill="#e67e22" rx="1"/>'
+        svg += f'<text x="{left_margin + 214}" y="{ly}" fill="#aaa" font-size="8">LossPip</text>'
+        
+        svg += '</svg>'
+        return svg
+    
+    p1_bar_svg = build_p1_bar_svg(bar_chart_groups, max_abs_pnl, max_abs_pip)
+    
+    # ─── PIP Bar Chart for Part 1 ───
+    max_abs_total_pip = max(abs(g['total_pips']) for g in bar_chart_groups) if bar_chart_groups else 1
+    
+    def build_p1_pip_bar_svg(groups, max_pip):
+        if not groups:
+            return '<p style="color:#888;text-align:center;padding:20px">無數據</p>'
+        n = len(groups)
+        svg_h = max(180, n * 32 + 50)
+        bar_h = 14
+        group_gap = 32
+        left_margin = 60
+        right_margin = 40
+        chart_w = 700
+        plot_w = chart_w - left_margin - right_margin
+        zero_x = left_margin + plot_w // 2
+        
+        svg = f'<svg viewBox="0 0 {chart_w} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
+        svg += f'<rect width="{chart_w}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
+        # Zero line
+        svg += f'<line x1="{zero_x}" y1="25" x2="{zero_x}" y2="{svg_h-25}" stroke="#333" stroke-width="1"/>'
+        # Grid
+        for frac in [0.25, 0.5, 0.75, 1.0]:
+            gx = left_margin + plot_w * frac
+            svg += f'<line x1="{gx:.1f}" y1="25" x2="{gx:.1f}" y2="{svg_h-25}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            gx2 = left_margin + plot_w * (1 - frac)
+            svg += f'<line x1="{gx2:.1f}" y1="25" x2="{gx2:.1f}" y2="{svg_h-25}" stroke="#1a1a2a" stroke-width="0.5"/>'
+        
+        for i, g in enumerate(groups):
+            y_base = 25 + i * group_gap + 10
+            svg += f'<text x="4" y="{y_base + 4}" fill="#ccc" font-size="9">{g["label"]}</text>'
+            # PIP bar
+            pip_val = g['total_pips']
+            pip_w = abs(pip_val) / max(max_pip, 1) * (plot_w / 2)
+            pip_col = '#2ecc71' if pip_val >= 0 else '#e74c3c'
+            if pip_val >= 0:
+                bx = zero_x
+            else:
+                bx = zero_x - pip_w
+            svg += f'<rect x="{bx:.1f}" y="{y_base - 7}" width="{max(pip_w, 1):.1f}" height="{bar_h}" fill="{pip_col}" rx="2" opacity="0.85"/>'
+            svg += f'<text x="{bx + pip_w + 3:.1f}" y="{y_base + 4}" fill="#ccc" font-size="8">{pip_val:+.1f} pip</text>'
+        
+        # Legend
+        ly = svg_h - 8
+        svg += f'<rect x="{left_margin}" y="{ly-8}" width="10" height="8" fill="#2ecc71" rx="1"/>'
+        svg += f'<text x="{left_margin+14}" y="{ly}" fill="#aaa" font-size="8">賺 PIP</text>'
+        svg += f'<rect x="{left_margin+60}" y="{ly-8}" width="10" height="8" fill="#e74c3c" rx="1"/>'
+        svg += f'<text x="{left_margin+74}" y="{ly}" fill="#aaa" font-size="8">蝕 PIP</text>'
+        
+        svg += '</svg>'
+        return svg
+    
+    p1_pip_bar_svg = build_p1_pip_bar_svg(bar_chart_groups, max_abs_total_pip)
+    
+    # ─── Part 2: MFE/MAE 散點圖 (inline SVG + CSS tooltip) ───
+    ccy_dir_groups = defaultdict(dict)
+    for key, stats in layer_stats.items():
+        ccy_key = (stats['symbol'], stats['direction'])
+        ccy_dir_groups[ccy_key][key] = stats
+    
+    def build_scatter_svg(symbol, direction, layers, trade_list):
+        """Build inline SVG scatter chart: X=MFE, Y=-MAE, with CSS tooltip"""
+        if not trade_list:
+            return '<p style="color:#888;font-size:10px">無交易數據</p>'
+        
+        svg_w, svg_h = 340, 240
+        pad = {'top': 20, 'right': 15, 'bottom': 30, 'left': 35}
+        plot_w = svg_w - pad['left'] - pad['right']
+        plot_h = svg_h - pad['top'] - pad['bottom']
+        
+        # Compute bounds
+        max_mfe = max((abs(d['mfe']) for d in trade_list), default=1) or 1
+        max_mae = max((abs(d['mae']) for d in trade_list), default=1) or 1
+        # Add 10% padding
+        max_mfe *= 1.1
+        max_mae *= 1.1
+        
+        svg = f'<svg viewBox="0 0 {svg_w} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
+        svg += f'<rect width="{svg_w}" height="{svg_h}" fill="#0a0a18" rx="4"/>'
+        
+        # Grid
+        for i in range(5):
+            frac = i / 4
+            gx = pad['left'] + plot_w * frac
+            gy = pad['top'] + plot_h * frac
+            svg += f'<line x1="{gx:.1f}" y1="{pad["top"]}" x2="{gx:.1f}" y2="{pad["top"]+plot_h}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            svg += f'<line x1="{pad["left"]}" y1="{gy:.1f}" x2="{pad["left"]+plot_w}" y2="{gy:.1f}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            # X axis labels (MFE)
+            mfe_val = max_mfe * frac
+            svg += f'<text x="{gx:.1f}" y="{svg_h - 8}" fill="#555" font-size="7" text-anchor="middle">{mfe_val:.0f}</text>'
+            # Y axis labels (-MAE)
+            mae_val = max_mae * (1 - frac)
+            svg += f'<text x="{pad["left"]-4}" y="{gy+3:.1f}" fill="#555" font-size="7" text-anchor="end">{mae_val:.0f}</text>'
+        
+        # Axis titles
+        svg += f'<text x="{pad["left"]+plot_w//2}" y="{svg_h-1}" fill="#777" font-size="8" text-anchor="middle">MFE →</text>'
+        svg += f'<text x="8" y="{pad["top"]+plot_h//2}" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,{pad["top"]+plot_h//2})">-MAE →</text>'
+        
+        # Scatter dots with CSS tooltip
+        # We need a <style> block inside the SVG for tooltips
+        svg += '<style>'
+        svg += '.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}'
+        svg += '</style>'
+        
+        for idx, d in enumerate(trade_list):
+            mfe = abs(d['mfe'])
+            mae = abs(d['mae'])
+            is_win = d['is_win']
+            col = '#2ecc71' if is_win else '#e74c3c'
+            
+            cx = pad['left'] + (mfe / max_mfe) * plot_w
+            cy = pad['top'] + (1 - mae / max_mae) * plot_h
+            # Clamp
+            cx = max(pad['left'], min(pad['left'] + plot_w, cx))
+            cy = max(pad['top'], min(pad['top'] + plot_h, cy))
+            
+            svg += f'<g class="dot">'
+            svg += f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="3" fill="{col}"/>'
+            # Tooltip (shown on hover via CSS)
+            tip_x = cx + 6
+            tip_y = cy - 8
+            # Keep tooltip within bounds
+            if tip_x + 90 > svg_w:
+                tip_x = cx - 96
+            if tip_y < 10:
+                tip_y = cy + 10
+            hold_h = d.get('holding_hours', 0)
+            tip_text = f"#{idx+1} MFE:{d['mfe']:.1f} MAE:{d['mae']:.1f} ${d['net_profit']:.2f} L{d['lots']} Hold:{hold_h:.1f}h"
+            svg += f'<g class="tip">'
+            svg += f'<rect x="{tip_x:.1f}" y="{tip_y-8:.1f}" width="{len(tip_text)*5.2+8:.0f}" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/>'
+            svg += f'<text x="{tip_x+4:.1f}" y="{tip_y+2:.1f}" fill="#eee" font-size="7">{tip_text}</text>'
+            svg += '</g>'
+            svg += '</g>\n'
+        
+        svg += '</svg>'
+        return svg
+    
+    # Build scatter SVGs per CCY×Dir
+    scatter_svgs = []
+    for (symbol, direction), layers in sorted(ccy_dir_groups.items()):
+        all_trades = []
+        for lkey, lstats in sorted(layers.items(), key=lambda x: x[1]['lots']):
+            for td in lstats['trade_details']:
+                all_trades.append(td)
+        scatter_svgs.append({
+            'symbol': symbol,
+            'direction': direction,
+            'layer_count': len(layers),
+            'svg': build_scatter_svg(symbol, direction, layers, all_trades),
+            'layers_summary': layers,
+        })
+    
+    # ─── Part 3: TP/SL 條形圖 SVG ───
+    def build_tpsl_bar_svg(tp_sl_items):
+        if not tp_sl_items:
+            return '<p style="color:#888;text-align:center;padding:20px">無 A 級以上層級</p>'
+        
+        n = len(tp_sl_items)
+        svg_w = 700
+        bar_h = 16
+        group_gap = 6
+        left_margin = 100
+        right_margin = 20
+        top_pad = 30
+        bot_pad = 30
+        plot_w = svg_w - left_margin - right_margin
+        svg_h = top_pad + n * (bar_h * 2 + group_gap + 10) + bot_pad
+        
+        max_sl = max(max(r['soft_sl'], r['hard_sl'], r['tp']) for r in tp_sl_items) or 1
+        
+        svg = f'<svg viewBox="0 0 {svg_w} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
+        svg += f'<rect width="{svg_w}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
+        
+        # Grid
+        for frac in [0.25, 0.5, 0.75, 1.0]:
+            gx = left_margin + plot_w * frac
+            svg += f'<line x1="{gx:.1f}" y1="{top_pad-10}" x2="{gx:.1f}" y2="{svg_h - bot_pad + 10}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            val = max_sl * frac
+            svg += f'<text x="{gx:.1f}" y="{top_pad - 14}" fill="#555" font-size="7" text-anchor="middle">{val:.0f}</text>'
+        
+        for i, r in enumerate(tp_sl_items):
+            y_base = top_pad + i * (bar_h * 2 + group_gap + 10)
+            label = f"{r['symbol']} {r['direction']} {r['layer']}"
+            rc = rating_color(r['rating'])
+            svg += f'<text x="4" y="{y_base + 6}" fill="#ccc" font-size="8">{label}</text>'
+            svg += f'<text x="4" y="{y_base + 16}" fill="{rc}" font-size="8" font-weight="bold">{r["rating"]}</text>'
+            
+            # Soft SL bar
+            soft_w = (r['soft_sl'] / max_sl) * plot_w
+            svg += f'<rect x="{left_margin:.1f}" y="{y_base:.1f}" width="{max(soft_w, 1):.1f}" height="{bar_h}" fill="#f39c12" rx="2" opacity="0.85"/>'
+            svg += f'<text x="{left_margin + soft_w + 3:.1f}" y="{y_base + 11}" fill="#ccc" font-size="7">SL {r["soft_sl"]}</text>'
+            
+            # Hard SL bar
+            hard_w = (r['hard_sl'] / max_sl) * plot_w
+            svg += f'<rect x="{left_margin:.1f}" y="{y_base + bar_h + 1:.1f}" width="{max(hard_w, 1):.1f}" height="{bar_h}" fill="#e74c3c" rx="2" opacity="0.85"/>'
+            svg += f'<text x="{left_margin + hard_w + 3:.1f}" y="{y_base + bar_h + 12}" fill="#ccc" font-size="7">Hard {r["hard_sl"]}</text>'
+        
+        # Legend
+        ly = svg_h - 10
+        svg += f'<rect x="{left_margin}" y="{ly-8}" width="10" height="8" fill="#f39c12" rx="1"/>'
+        svg += f'<text x="{left_margin+14}" y="{ly}" fill="#aaa" font-size="8">Soft SL</text>'
+        svg += f'<rect x="{left_margin+70}" y="{ly-8}" width="10" height="8" fill="#e74c3c" rx="1"/>'
+        svg += f'<text x="{left_margin+84}" y="{ly}" fill="#aaa" font-size="8">Hard SL</text>'
+        
+        svg += '</svg>'
+        return svg
+    
+    p3_bar_svg = build_tpsl_bar_svg(tp_sl_data)
+    
+    # ─── Build full HTML ───
     html = f"""<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>馬丁剖析法 V3 — Signal #{signal_id}</title>
+    <link rel="stylesheet" href="../sidebar.css">
     <style>
+        :root {{--bg:#0a0a1a;--surface:#0f0f23;--border:#2a2a4a;--text:#e0e0e0;--muted:#888;--accent:#FFD700}}
+        [data-theme="light"] {{--bg:#f5f5f5;--surface:#fff;--border:#ddd;--text:#222;--muted:#666;--accent:#d4a017}}
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-size: 12px;
             line-height: 1.5;
-            color: #e0e0e0;
-            background: #0a0a1a;
+            color: var(--text);
+            background: var(--bg);
             padding: 15px;
         }}
+        body.has-sidebar {{ margin-left: 200px; }}
+        .theme-toggle {{
+            position:fixed;top:12px;right:16px;z-index:1001;
+            background:var(--surface);color:var(--text);border:1px solid var(--border);
+            border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;
+            transition:background .2s;
+        }}
+        .theme-toggle:hover {{ background:var(--border); }}
         .container {{
             max-width: 1400px;
             margin: 0 auto;
@@ -611,8 +924,8 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
         
         /* Section */
         .section {{
-            background: #0f0f23;
-            border: 1px solid #2a2a4a;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 10px;
             margin-bottom: 20px;
             overflow: hidden;
@@ -624,6 +937,9 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
             font-weight: bold;
             color: #fff;
             border-bottom: 1px solid #3a3a6a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }}
         .section-header .badge {{
             display: inline-block;
@@ -632,11 +948,51 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
             font-size: 10px;
             padding: 2px 8px;
             border-radius: 10px;
-            margin-left: 8px;
             font-weight: normal;
         }}
         .section-body {{
             padding: 12px;
+        }}
+        
+        /* Info icon with tooltip */
+        .info-icon {{
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            color: #ccc;
+            font-size: 11px;
+            cursor: help;
+            font-style: normal;
+            flex-shrink: 0;
+        }}
+        .info-icon .info-tip {{
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a1a3e;
+            border: 1px solid #4a3f8a;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 10px;
+            font-weight: normal;
+            color: #ccc;
+            white-space: normal;
+            width: 280px;
+            z-index: 100;
+            line-height: 1.6;
+            box-shadow: 0 4px 12px rgba(0,0,0,.5);
+            pointer-events: none;
+        }}
+        .info-icon:hover .info-tip,
+        .info-icon:focus .info-tip {{
+            display: block;
         }}
         
         /* Tables */
@@ -684,35 +1040,10 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
             min-width: 30px;
         }}
         
-        /* TP/SL bar chart */
-        .bar-chart {{
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            margin: 3px 0;
-        }}
-        .bar {{
-            height: 16px;
-            border-radius: 3px;
-            min-width: 2px;
-            position: relative;
-            font-size: 9px;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            padding: 0 4px;
-        }}
-        .bar.tp {{ background: #2ecc71; }}
-        .bar.soft_sl {{ background: #f39c12; }}
-        .bar.hard_sl {{ background: #e74c3c; }}
-        
-        /* Status indicator */
-        .status {{ font-size: 14px; }}
-        
-        /* Scatter chart (canvas) */
+        /* Scatter grid */
         .scatter-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
             gap: 12px;
         }}
         .scatter-card {{
@@ -731,31 +1062,43 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
             color: #888;
             margin-bottom: 6px;
         }}
-        canvas.scatter {{ width: 100%; height: 180px; }}
         
-        /* Tabs */
-        .tabs {{
+        /* Chart container */
+        .chart-container {{
+            margin-top: 16px;
+            padding: 12px;
+            background: #0a0a18;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+        }}
+        .chart-title {{
+            font-size: 11px;
+            color: #bbb;
+            margin-bottom: 8px;
+        }}
+        
+        /* Section nav — anchor-based, no JS tabs */
+        .section-nav {{
             display: flex;
             gap: 2px;
+            flex-wrap: wrap;
             background: #0a0a18;
             border-bottom: 2px solid #2a2a4a;
             padding: 0 12px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
         }}
-        .tab {{
+        .section-nav a {{
             padding: 8px 16px;
-            cursor: pointer;
             font-size: 12px;
             color: #888;
+            text-decoration: none;
             border-bottom: 2px solid transparent;
             transition: all 0.2s;
         }}
-        .tab:hover {{ color: #ccc; }}
-        .tab.active {{
-            color: #FFD700;
-            border-bottom-color: #FFD700;
-        }}
-        .tab-content {{ display: none; }}
-        .tab-content.active {{ display: block; }}
+        .section-nav a:hover {{ color: #FFD700; border-bottom-color: #FFD700; }}
+        .tab-panel {{ padding-top: 0; }}
         
         /* Footer */
         .footer {{
@@ -764,9 +1107,54 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
             color: #555;
             font-size: 10px;
         }}
+
+        /* Light theme overrides */
+        [data-theme="light"] .header {{
+            background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 50%, #e8eaf6 100%);
+            border-color: #9fa8da;
+        }}
+        [data-theme="light"] .header h1 {{ color: #1a237e; }}
+        [data-theme="light"] .section-header {{
+            background: linear-gradient(90deg, #e8eaf6, #c5cae9);
+            color: #1a237e;
+            border-bottom-color: #9fa8da;
+        }}
+        [data-theme="light"] table th {{
+            background: #e8eaf6;
+            color: #555;
+            border-bottom-color: #c5cae9;
+        }}
+        [data-theme="light"] table td {{ border-bottom-color: #e0e0e0; }}
+        [data-theme="light"] .scatter-card,
+        [data-theme="light"] .chart-container {{
+            background: #fff;
+            border-color: #ddd;
+        }}
+        [data-theme="light"] .info-icon .info-tip {{
+            background: #fff;
+            border-color: #ccc;
+            color: #333;
+        }}
+        [data-theme="light"] .section-nav {{
+            background: #e0e0e0;
+            border-bottom-color: #ccc;
+        }}
     </style>
+    <script>
+    // Theme toggle (minimal JS, only for theme persistence)
+    function toggleTheme(){{
+        var t=document.documentElement.getAttribute('data-theme');
+        if(t==='light'){{document.documentElement.removeAttribute('data-theme');localStorage.setItem('theme','dark')}}
+        else{{document.documentElement.setAttribute('data-theme','light');localStorage.setItem('theme','light')}}
+    }}
+    (function(){{
+        var s=localStorage.getItem('theme');
+        if(s==='light')document.documentElement.setAttribute('data-theme','light');
+    }})();
+    </script>
 </head>
-<body>
+<body class="has-sidebar">
+<button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="切換亮/暗模式" style="position:fixed;top:12px;right:16px;z-index:1001">🌓</button>
 <div class="container">
     <!-- Header -->
     <div class="header">
@@ -793,7 +1181,7 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
             </div>
             <div class="kpi-card">
                 <div class="label">A 級以上</div>
-                <div class="value gold">{len([r for r in ranking])} 層</div>
+                <div class="value gold">{len(ranking)} 層</div>
             </div>
             <div class="kpi-card">
                 <div class="label">黑名單</div>
@@ -802,22 +1190,40 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
         </div>
     </div>
     
-    <!-- Tabs -->
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('part1')">Part 1 · CCY總覽</div>
-        <div class="tab" onclick="switchTab('part2')">Part 2 · MFE/MAE</div>
-        <div class="tab" onclick="switchTab('part3')">Part 3 · TP/SL</div>
-        <div class="tab" onclick="switchTab('part4')">Part 4 · 排行榜</div>
-        <div class="tab" onclick="switchTab('part5')">Part 5 · 黑名單</div>
-        <div class="tab" onclick="switchTab('part6')">Part 6 · 恢復力</div>
+    <!-- Section Navigation (anchor-based) -->
+    <div class="section-nav">
+        <a href="#part1">Part 1 · CCY總覽</a>
+        <a href="#part2">Part 2 · MFE/MAE</a>
+        <a href="#part3">Part 3 · TP/SL</a>
+        <a href="#part4">Part 4 · 排行榜</a>
+        <a href="#part5">Part 5 · 黑名單</a>
+        <a href="#part6">Part 6 · 恢復力</a>
     </div>
     
+    <div class="tab-panels">
+    
     <!-- Part 1: CCY × Direction 總覽 -->
-    <div id="part1" class="tab-content active">
+    <div id="part1" class="tab-panel">
         <div class="section">
             <div class="section-header">
                 Part 1 · CCY × Direction 總覽
                 <span class="badge">{len(ccy_summary)} 組合</span>
+                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+                    <b>欄位說明：</b><br>
+                    <b>Trades</b>: 該 CCY×方向的總交易次數<br>
+                    <b>Layers</b>: 觸發的馬丁層級數量<br>
+                    <b>MaxD</b>: 最大回撤金額<br>
+                    <b>Total$</b>: 總盈虧金額<br>
+                    <b>WR%</b>: 勝率（盈利交易/總交易）<br>
+                    <b>EV$/L</b>: 每層預期盈虧<br>
+                    <b>WinPip</b>: 平均盈利 PIP<br>
+                    <b>LossPip</b>: 平均虧損 PIP<br>
+                    <b>Odds$</b>: 金額盈虧比<br>
+                    <b>OddsPip</b>: PIP 盈虧比<br>
+                    <b>MFE</b>: 最大有利波幅<br>
+                    <b>MAE</b>: 最大不利波幅<br>
+                    <b>MaxMAE</b>: 歷史最大 MAE
+                </span></i>
             </div>
             <div class="section-body">
                 <div class="table-wrap">
@@ -847,16 +1253,17 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     
     for i, s in enumerate(ccy_summary, 1):
         pnl_cls = 'positive' if s['total_pnl'] > 0 else 'negative' if s['total_pnl'] < 0 else 'neutral'
+        anchor = f"ccy-{s['symbol']}-{s['direction']}"
         html += f"""                            <tr>
                                 <td>{i}</td>
-                                <td><b>{s['symbol']}</b></td>
-                                <td>{s['direction']}</td>
+                                <td><b><a href=\"#part2-{anchor}\" style=\"color:var(--text);text-decoration:none\">{s['symbol']}</a></b></td>
+                                <td><a href=\"#part2-{anchor}\" style=\"color:var(--text);text-decoration:none\">{s['direction']}</a></td>
                                 <td>{s['trades']}</td>
                                 <td>{s['layers']}</td>
                                 <td>{s['max_depth']}</td>
-                                <td class="{pnl_cls}"><b>${pnl_prefix(s['total_pnl'])}{s['total_pnl']:,.2f}</b></td>
+                                <td class=\"{pnl_cls}\"><b>${pnl_prefix(s['total_pnl'])}{s['total_pnl']:,.2f}</b></td>
                                 <td>{s['wr']}%</td>
-                                <td class="{'positive' if s['avg_ev'] > 0 else 'negative'}">{pnl_prefix(s['avg_ev'])}{s['avg_ev']}</td>
+                                <td class=\"{'positive' if s['avg_ev'] > 0 else 'negative'}\">{pnl_prefix(s['avg_ev'])}{s['avg_ev']}</td>
                                 <td>{s['avg_win_pips']}</td>
                                 <td>{s['avg_loss_pips']}</td>
                                 <td>{s['avg_odds_dollar']}</td>
@@ -867,8 +1274,18 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
                             </tr>
 """
     
-    html += """                        </tbody>
+    html += f"""                        </tbody>
                     </table>
+                </div>
+                <!-- Part 1 Dollar Bar Chart -->
+                <div class="chart-container">
+                    <div class="chart-title">📊 Total$ 金額條形圖</div>
+                    {p1_bar_svg}
+                </div>
+                <!-- Part 1 PIP Bar Chart -->
+                <div class="chart-container">
+                    <div class="chart-title">📊 Total PIP 賺/蝕條形圖（綠=賺 · 紅=蝕）</div>
+                    {p1_pip_bar_svg}
                 </div>
             </div>
         </div>
@@ -877,37 +1294,40 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     
     # ─── Part 2: MFE/MAE 散點圖 ───
     html += """    <!-- Part 2: MFE/MAE -->
-    <div id="part2" class="tab-content">
+    <div id="part2" class="tab-panel">
         <div class="section">
             <div class="section-header">
                 Part 2 · MFE/MAE 散點分析
-                <span class="badge">每層一圖 · 綠=Win · 紅=Loss</span>
+                <span class="badge">每組合一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
+                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+                    <b>MFE/MAE 散點分析</b><br>
+                    顯示每筆交易嘅最大有利波幅（MFE）同最大不利波幅（MAE）嘅關係。<br><br>
+                    <b>欄位說明：</b><br>
+                    <b>MFE</b>: Maximum Favorable Excursion — 交易期間最大有利波幅（PIP）<br>
+                    <b>MAE</b>: Maximum Adverse Excursion — 交易期間最大不利波幅（PIP）<br>
+                    <b>Hold</b>: 持倉時間（小時）<br>
+                    <b>L</b>: 馬丁層級（Lots 大小）<br><br>
+                    綠色圓點 = 盈利交易 | 紅色圓點 = 虧損交易<br>
+                    Hover 可看每筆交易詳情（MFE、MAE、金額、層級、持倉時間）
+                </span></i>
             </div>
             <div class="section-body">
-                <div class="scatter-grid" id="scatter-grid">
+                <div class="scatter-grid">
 """
     
-    # 為每個 CCY×Dir 生成散點圖卡片
-    ccy_dir_groups = defaultdict(dict)
-    for key, stats in layer_stats.items():
-        ccy_key = (stats['symbol'], stats['direction'])
-        ccy_dir_groups[ccy_key][key] = stats
-    
-    chart_idx = 0
-    for (symbol, direction), layers in sorted(ccy_dir_groups.items()):
-        html += f"""                    <div class="scatter-card">
-                        <div class="title"><b>{symbol} {direction}</b> ({len(layers)} layers)</div>
-                        <div class="stats-row">
-"""
-        # 顯示每層摘要
-        for lkey, lstats in sorted(layers.items(), key=lambda x: x[1]['lots']):
-            html += f"                            L{lstats['lots']} (n={lstats['count']}) WR:{lstats['wr']}% MFE:{lstats['avg_mfe']} MAE:{lstats['avg_mae']} MaxMAE:{lstats['max_mae']}<br>\n"
+    for sc in scatter_svgs:
+        layers_summary_lines = []
+        for lkey, lstats in sorted(sc['layers_summary'].items(), key=lambda x: x[1]['lots']):
+            layers_summary_lines.append(f"L{lstats['lots']} (n={lstats['count']}) WR:{lstats['wr']}% MFE:{lstats['avg_mfe']} MAE:{lstats['avg_mae']}")
         
-        html += f"""                        </div>
-                        <canvas id="chart_{chart_idx}" class="scatter" width="280" height="180"></canvas>
+        layers_text = '<br>\n'.join(layers_summary_lines)
+        anchor_id = f"part2-ccy-{sc['symbol']}-{sc['direction']}"
+        html += f"""                    <div class="scatter-card" id="{anchor_id}">
+                        <div class="title"><b>{sc['symbol']} {sc['direction']}</b> ({sc['layer_count']} layers)</div>
+                        <div class="stats-row">{layers_text}</div>
+                        {sc['svg']}
                     </div>
 """
-        chart_idx += 1
     
     html += """                </div>
             </div>
@@ -917,15 +1337,26 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     
     # ─── Part 3: TP/SL ───
     html += f"""    <!-- Part 3: TP/SL -->
-    <div id="part3" class="tab-content">
+    <div id="part3" class="tab-panel">
         <div class="section">
             <div class="section-header">
                 Part 3 · A 級以上 TP/SL 建議（混合方案）
                 <span class="badge">{len(tp_sl_data)} 層</span>
+                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+                    <b>TP/SL 建議說明</b><br>
+                    只顯示 A 級以上嘅層級，提供 Take Profit 同 Stop Loss 建議值。<br><br>
+                    <b>計算方法：</b><br>
+                    <b>TP</b>: 該層所有交易嘅平均 MFE（最大有利波幅）<br>
+                    <b>Soft SL</b>: 該層所有交易嘅平均 MAE（最大不利波幅）<br>
+                    <b>Hard SL</b>: 該 CCY×Direction 組合嘅歷史最大 MAE<br>
+                    <b>R:R</b>: TP / Soft SL（≥1.5x 可接受，≥3.0x 優秀）<br><br>
+                    <b>表格欄位：</b><br>
+                    Rating | CCY | Dir | Layer | n | WR% | EV$ | TP | SoftSL | HardSL | R:R | Total$ | AvgHold
+                </span></i>
             </div>
             <div class="section-body">
                 <div style="font-size:10px; color:#888; margin-bottom:10px;">
-                    TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE × 1.2 &nbsp;|&nbsp; Hard SL = Pair Max MAE × 1.3 &nbsp;|&nbsp; R:R = TP / Soft SL（≥1.5x 可接受，≥3.0x 優秀）
+                    TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Pair Max MAE &nbsp;|&nbsp; R:R = TP / Soft SL（≥1.5x 可接受，≥3.0x 優秀）
                 </div>
                 <div class="table-wrap">
                     <table>
@@ -970,8 +1401,13 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
                             </tr>
 """
     
-    html += """                        </tbody>
+    html += f"""                        </tbody>
                     </table>
+                </div>
+                <!-- Part 3 TP/SL Bar Chart -->
+                <div class="chart-container">
+                    <div class="chart-title">📊 TP/SL 條形圖 — 🟠 Soft SL / 🔴 Hard SL</div>
+                    {p3_bar_svg}
                 </div>
             </div>
         </div>
@@ -980,11 +1416,23 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     
     # ─── Part 4: 排行榜 ───
     html += f"""    <!-- Part 4: Ranking -->
-    <div id="part4" class="tab-content">
+    <div id="part4" class="tab-panel">
         <div class="section">
             <div class="section-header">
                 Part 4 · A 級以上排行榜
                 <span class="badge">{len(ranking)} 層</span>
+                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+                    <b>排行榜說明</b><br>
+                    只顯示 A 級以上嘅層級，按評級同 EV 排序。<br><br>
+                    <b>評級系統（S+ 到 E）：</b><br>
+                    基於 5 個維度加權計算：<br>
+                    <b>WR (25%)</b>: 勝率 — 越高越好<br>
+                    <b>EV (30%)</b>: 預期盈虧 — 核心指標<br>
+                    <b>Odds (20%)</b>: 盈虧比 — 越高越好<br>
+                    <b>Count (15%)</b>: 樣本數 — 越多越可靠<br>
+                    <b>Hold (10%)</b>: 持倉效率 — 越短越好<br><br>
+                    <b>評級映射：</b>S+ ≥85 | S ≥70 | A ≥55 | B ≥40 | C ≥25 | D ≥15 | E &lt;15
+                </span></i>
             </div>
             <div class="section-body">
                 <div class="table-wrap">
@@ -1043,11 +1491,26 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     
     # ─── Part 5: 黑名單 ───
     html += f"""    <!-- Part 5: Blacklist -->
-    <div id="part5" class="tab-content">
+    <div id="part5" class="tab-panel">
         <div class="section">
             <div class="section-header">
                 Part 5 · 黑名單
                 <span class="badge">{len(blacklist)} 個危險組合</span>
+                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+                    <b>黑名單說明</b><br>
+                    列出所有危險嘅 CCY×Direction 組合。<br><br>
+                    <b>Danger Score 計算方法：</b><br>
+                    基於以下因素加權計算：<br>
+                    1. 總虧損金額（每 $1000 加 1 分）<br>
+                    2. 平均賠率 &lt; 1.0（加 3 分）<br>
+                    3. 勝率 &lt; 50%（加 2 分）<br>
+                    4. 平均 EV 爲負（按比例加分）<br>
+                    5. 最差層級 EV &lt; -50（加 2 分）<br><br>
+                    <b>危險等級：</b><br>
+                    ⚠️ WARNING: Danger ≥ 1<br>
+                    💀 DEADLY: Danger > 5<br><br>
+                    <b>表格欄位：</b>危險度 | Danger | CCY | Dir | Total$ | WR% | Avg Odds | Avg EV | Worst EV | 最差層 | Avg Hold
+                </span></i>
             </div>
             <div class="section-body">
 """
@@ -1067,13 +1530,14 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
                                 <th>Avg EV</th>
                                 <th>Worst EV</th>
                                 <th>最差層</th>
+                                <th>Avg Hold</th>
                             </tr>
                         </thead>
                         <tbody>
 """
         for b in blacklist:
             html += f"""                            <tr>
-                                <td class="status">{b['level']}</td>
+                                <td>{b['level']}</td>
                                 <td><b>{b['danger']}</b></td>
                                 <td><b>{b['symbol']}</b></td>
                                 <td>{b['direction']}</td>
@@ -1083,6 +1547,7 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
                                 <td class="negative">{b['avg_ev']}</td>
                                 <td class="negative">{b['worst_ev']}</td>
                                 <td>{b['worst_layer']}</td>
+                                <td>{b['avg_hold']:.1f}h</td>
                             </tr>
 """
         html += """                        </tbody>
@@ -1099,11 +1564,23 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     
     # ─── Part 6: 恢復力 ───
     html += f"""    <!-- Part 6: Recovery -->
-    <div id="part6" class="tab-content">
+    <div id="part6" class="tab-panel">
         <div class="section">
             <div class="section-header">
                 Part 6 · 恢復力分析
                 <span class="badge">如果最深層被 Hard SL 止損，要用最佳 EV 層贏幾多次先追得返？</span>
+                <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+                    <b>恢復力分析說明</b><br>
+                    假設最深層被 Hard SL 止損，需要幾多次最佳 EV 層交易先可以追回損失。<br><br>
+                    <b>計算方式：</b><br>
+                    <b>恢復次數</b> = ceil(最深層平均損失 / 最佳 EV)<br>
+                    <b>恢復天數</b> = 恢復次數 / 每月交易頻率 × 30<br><br>
+                    <b>狀態標記：</b><br>
+                    🟢 安全: ≤4 次可恢復<br>
+                    🟡 需時: 5-20 次可恢復<br>
+                    🔴 無法恢復: >20 次或 EV ≤ 0<br><br>
+                    <b>表格欄位：</b>狀態 | CCY | Dir | 最深層 | 最差損失 | 最佳 EV 層 | Best EV$ | 恢復次數 | 恢復天數 | Avg Hold | 說明
+                </span></i>
             </div>
             <div class="section-body">
                 <div class="table-wrap">
@@ -1119,6 +1596,7 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
                                 <th>Best EV$</th>
                                 <th>恢復次數</th>
                                 <th>恢復天數</th>
+                                <th>Avg Hold</th>
                                 <th>說明</th>
                             </tr>
                         </thead>
@@ -1127,7 +1605,7 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     
     for r in recovery:
         html += f"""                            <tr>
-                                <td class="status">{r['status']}</td>
+                                <td>{r['status']}</td>
                                 <td><b>{r['symbol']}</b></td>
                                 <td>{r['direction']}</td>
                                 <td>{r['deepest_layer']}</td>
@@ -1136,129 +1614,31 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
                                 <td class="{'positive' if r['best_ev'] > 0 else 'negative'}">{pnl_prefix(r['best_ev'])}{r['best_ev']}</td>
                                 <td><b>{r['recovery_trades'] if r['recovery_trades'] < 999 else '∞'}</b></td>
                                 <td>{r['recovery_days'] if r['recovery_days'] < 999 else '∞'}天</td>
+                                <td>{r['avg_hold']:.1f}h</td>
                                 <td>{r['status_text']}</td>
                             </tr>
 """
     
-    html += """                        </tbody>
+    html += f"""                        </tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
-"""
     
-    # ─── JavaScript: Tab switching + Scatter charts ───
-    # 收集散點圖數據
-    scatter_data = {}
-    chart_idx = 0
-    for (symbol, direction), layers in sorted(ccy_dir_groups.items()):
-        chart_scatter = []
-        for lkey, lstats in sorted(layers.items(), key=lambda x: x[1]['lots']):
-            for td in lstats['trade_details']:
-                chart_scatter.append({
-                    'net_pips': td['net_pips'],
-                    'mae': td['mae'],
-                    'mfe': td['mfe'],
-                    'is_win': td['is_win'],
-                    'layer': lstats['layer_label'],
-                })
-        scatter_data[str(chart_idx)] = chart_scatter
-        chart_idx += 1
+    </div><!-- end tab-panels -->
     
-    scatter_json = json.dumps(scatter_data)
-    
-    html += f"""
     <div class="footer">
         馬丁剖析法 V3 · 數據說話，紀律至上 · Quant 📊
     </div>
 </div>
 
-<script>
-// Tab switching
-function switchTab(tabId) {{
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
-}}
-
-// Scatter charts
-const scatterData = {scatter_json};
-
-function drawScatter(canvasId, data) {{
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width = canvas.offsetWidth * 2;
-    const h = canvas.height = canvas.offsetHeight * 2;
-    ctx.scale(2, 2);
-    const cw = canvas.offsetWidth;
-    const ch = canvas.offsetHeight;
-    
-    // Clear
-    ctx.fillStyle = '#0a0a18';
-    ctx.fillRect(0, 0, cw, ch);
-    
-    // Compute bounds
-    let allVals = data.map(d => Math.abs(d.net_pips)).concat(data.map(d => d.mae)).concat(data.map(d => d.mfe));
-    let maxVal = Math.max(...allVals, 1);
-    
-    const pad = {{ top: 10, right: 10, bottom: 20, left: 35 }};
-    const plotW = cw - pad.left - pad.right;
-    const plotH = ch - pad.top - pad.bottom;
-    
-    // Grid
-    ctx.strokeStyle = '#1a1a2a';
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 4; i++) {{
-        let y = pad.top + plotH * i / 4;
-        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + plotW, y); ctx.stroke();
-        let val = Math.round(maxVal * (1 - i/4));
-        ctx.fillStyle = '#555';
-        ctx.font = '8px sans-serif';
-        ctx.fillText(val, 2, y + 3);
-    }}
-    
-    // Zero line
-    let zeroY = pad.top + plotH * 0.5;
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + plotW, zeroY); ctx.stroke();
-    
-    // Dots
-    for (const d of data) {{
-        let x = pad.left + (d.mae / maxVal) * plotW;
-        let y_pos = d.is_win ? (pad.top + plotH * (1 - d.mfe / maxVal)) : (pad.top + plotH * (1 - d.net_pips / maxVal));
-        y_pos = Math.max(pad.top, Math.min(pad.top + plotH, y_pos));
-        x = Math.max(pad.left, Math.min(pad.left + plotW, x));
-        
-        ctx.beginPath();
-        ctx.arc(x, y_pos, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = d.is_win ? '#2ecc71' : '#e74c3c';
-        ctx.fill();
-    }}
-}}
-
-// Draw all charts
-for (const [id, data] of Object.entries(scatterData)) {{
-    drawScatter('chart_' + id, data);
-}}
-
-// Redraw on resize
-window.addEventListener('resize', () => {{
-    for (const [id, data] of Object.entries(scatterData)) {{
-        drawScatter('chart_' + id, data);
-    }}
-}});
-</script>
+<script src="../sidebar.js"></script>
 </body>
 </html>
 """
     
     return html
-
-
 # ─── 主程序 ─────────────────────────────────────────────────
 
 def main():
