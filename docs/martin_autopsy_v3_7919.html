@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>馬丁剖析法 V3 - Signal #7919</title>
+    <style>
+        :root {--bg:#0a0a1a;--surface:#0f0f23;--border:#2a2a4a;--text:#e0e0e0;--muted:#888;--accent:#FFD700}
+        [data-theme="light"] {--bg:#f5f5f5;--surface:#fff;--border:#ddd;--text:#222;--muted:#666;--accent:#d4a017}
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+            font-size:12px; line-height:1.5; color:var(--text); background:var(--bg); padding:15px;
+        }
+        .theme-toggle {
+            position:fixed;top:12px;right:16px;z-index:1001;
+            background:var(--surface);color:var(--text);border:1px solid var(--border);
+            border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;transition:background .2s;
+        }
+        .theme-toggle:hover { background:var(--border); }
+        .container { max-width:1400px; margin:0 auto; }
+        .header {
+            background:linear-gradient(135deg,#1a1a3e 0%,#2d1b69 50%,#1a1a3e 100%);
+            border:1px solid #4a3f8a; border-radius:12px; padding:20px; margin-bottom:20px;
+        }
+        .header h1 { font-size:22px; color:#FFD700; margin-bottom:4px; }
+        .header .subtitle { font-size:12px; color:#999; }
+        .kpi-row {
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+            gap:12px; margin-top:15px;
+        }
+        .kpi-card {
+            background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
+            border-radius:8px; padding:10px; text-align:center;
+        }
+        .kpi-card .label { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+        .kpi-card .value { font-size:18px; font-weight:bold; color:#fff; margin-top:4px; }
+        .kpi-card .value.green { color:#2ecc71; }
+        .kpi-card .value.red { color:#e74c3c; }
+        .kpi-card .value.gold { color:#FFD700; }
+        .section {
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; margin-bottom:12px; overflow:hidden;
+        }
+        .section-header {
+            background:linear-gradient(90deg,#1a1a3e,#2d1b69);
+            padding:10px 14px; font-size:13px; font-weight:bold; color:#fff;
+            border-bottom:1px solid #3a3a6a; display:flex; align-items:center; gap:8px;
+        }
+        .section-header .badge {
+            display:inline-block; background:#FFD700; color:#000;
+            font-size:10px; padding:2px 8px; border-radius:10px; font-weight:normal;
+        }
+        .section-body { padding:12px; }
+        .info-icon {
+            position:relative; display:inline-flex; align-items:center; justify-content:center;
+            width:18px; height:18px; border-radius:50%; background:rgba(255,255,255,0.15);
+            color:#ccc; font-size:11px; cursor:help; font-style:normal; flex-shrink:0;
+        }
+        .info-icon .info-tip {
+            display:none; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+            background:#1a1a3e; border:1px solid #4a3f8a; border-radius:6px;
+            padding:8px 10px; font-size:10px; font-weight:normal; color:#ccc;
+            white-space:normal; width:280px; z-index:100; line-height:1.6;
+            box-shadow:0 4px 12px rgba(0,0,0,.5); pointer-events:none;
+        }
+        .info-icon:hover .info-tip, .info-icon:focus .info-tip { display:block; }
+        .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        table { width:100%; border-collapse:collapse; font-size:11px; }
+        table th {
+            background:#1a1a3e; color:#bbb; padding:6px 8px; text-align:left;
+            font-size:10px; text-transform:uppercase; letter-spacing:0.5px;
+            border-bottom:1px solid #3a3a6a; white-space:nowrap; position:sticky; top:0;
+        }
+        table td { padding:5px 8px; border-bottom:1px solid #1a1a2a; white-space:nowrap; }
+        table tr:hover { background:rgba(255,255,255,0.03); }
+        .positive { color:#2ecc71; }
+        .negative { color:#e74c3c; }
+        .neutral { color:#888; }
+        .rating-badge {
+            display:inline-block; padding:1px 6px; border-radius:3px;
+            font-weight:700; font-size:11px; text-align:center; min-width:28px;
+        }
+        .scatter-grid {
+            display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:12px;
+        }
+        .scatter-card {
+            background:#0a0a18; border:1px solid #2a2a4a; border-radius:8px; padding:8px;
+        }
+        .scatter-card .title { font-size:11px; color:#bbb; margin-bottom:4px; }
+        .chart-container {
+            margin-top:12px; padding:12px; background:#0a0a18;
+            border:1px solid #2a2a4a; border-radius:8px;
+        }
+        .chart-title { font-size:11px; color:#bbb; margin-bottom:8px; }
+        .section-nav {
+            display:flex; gap:2px; flex-wrap:wrap; background:#0a0a18;
+            border-bottom:2px solid #2a2a4a; padding:0 12px;
+            position:sticky; top:0; z-index:50;
+        }
+        .section-nav a {
+            padding:8px 14px; font-size:11px; color:#888; text-decoration:none;
+            border-bottom:2px solid transparent; transition:all 0.2s;
+        }
+        .section-nav a:hover { color:#FFD700; border-bottom-color:#FFD700; }
+        /* CCY section styles */
+        .ccy-section {
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; margin-bottom:16px; padding:0;
+        }
+        .ccy-summary {
+            display:block; padding:14px 18px; font-size:14px; cursor:pointer;
+            background:linear-gradient(90deg,#1a1a3e,#2d1b69);
+            border-radius:10px; color:#fff; list-style:none;
+        }
+        .ccy-summary::-webkit-details-marker { display:none; }
+        .ccy-summary::before {
+            content:'▶'; display:inline-block; font-size:12px; color:#FFD700;
+            margin-right:10px; transition:transform 0.15s;
+        }
+        .ccy-section[open] .ccy-summary::before { transform:rotate(90deg); }
+        .ccy-section > .section { margin:8px 12px 12px 12px; }
+        .row-a { background:rgba(46,204,113,0.08); }
+        .row-d { background:rgba(231,76,60,0.08); }
+        .footer { text-align:center; padding:15px; color:#555; font-size:10px; }
+        /* Light theme */
+        [data-theme="light"] .header {
+            background:linear-gradient(135deg,#e8eaf6 0%,#c5cae9 50%,#e8eaf6 100%);
+            border-color:#9fa8da;
+        }
+        [data-theme="light"] .header h1 { color:#1a237e; }
+        [data-theme="light"] .section-header {
+            background:linear-gradient(90deg,#e8eaf6,#c5cae9);
+            color:#1a237e; border-bottom-color:#9fa8da;
+        }
+        [data-theme="light"] table th { background:#e8eaf6; color:#555; border-bottom-color:#c5cae9; }
+        [data-theme="light"] table td { border-bottom-color:#e0e0e0; }
+        [data-theme="light"] .scatter-card,
+        [data-theme="light"] .chart-container { background:#fff; border-color:#ddd; }
+        [data-theme="light"] .info-icon .info-tip { background:#fff; border-color:#ccc; color:#333; }
+        [data-theme="light"] .section-nav { background:#e0e0e0; border-bottom-color:#ccc; }
+        [data-theme="light"] .ccy-section { background:#fff; border-color:#ddd; }
+        [data-theme="light"] .ccy-summary {
+            background:linear-gradient(90deg,#e8eaf6,#c5cae9); color:#1a237e;
+        }
+    </style>
+    <script>
+    function toggleTheme(){
+        var t=document.documentElement.getAttribute('data-theme');
+        if(t==='light'){document.documentElement.removeAttribute('data-theme');localStorage.setItem('theme','dark')}
+        else{document.documentElement.setAttribute('data-theme','light');localStorage.setItem('theme','light')}
+    }
+    (function(){
+        var s=localStorage.getItem('theme');
+        if(s==='light')document.documentElement.setAttribute('data-theme','light');
+    })();
+    </script>
+<link rel="stylesheet" href="../sidebar.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()" title="切換亮/暗模式">🌓</button>
+<div class="container">
+
+    <!-- ═══ Executive Summary ═══ -->
+    <div class="header">
+        <h1>🔬 馬丁剖析法 V3 - Signal #7919</h1>
+        <div class="subtitle">
+            4 個 CCY×Direction 組合 · 11 個層級 · 生成時間 2026-05-22 21:59
+        </div>
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="label">總交易</div>
+                <div class="value">35</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">總盈虧</div>
+                <div class="value green">$+760.69</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">勝率</div>
+                <div class="value green">68.6%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">平均持倉</div>
+                <div class="value">103.2h</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">CCY 組合</div>
+                <div class="value gold">4</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">層級總數</div>
+                <div class="value gold">11</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Bar Chart (merged $ + PIP) -->
+    <div class="section">
+        <div class="section-header">📊 全局盈虧概覽(金額 + PIP)
+            <i class="info-icon" tabindex="0">i<span class="info-tip">
+                <b>盈虧概覽說明</b><br>
+                每個 CCY×Direction 顯示兩組數據:<br><br>
+                <b>金額條(粗)</b>:Total$ 盈虧金額<br>
+                綠色 = 盈利 | 紅色 = 虧損<br><br>
+                <b>PIP 條(細)</b>:Total PIP 盈虧<br>
+                藍色 = 盈利 PIP | 橙色 = 虧損 PIP<br><br>
+                每條 bar 旁邊顯示精確數值
+            </span></i>
+        </div>
+        <div class="section-body">
+            <div class="chart-container">
+                <svg viewBox="0 0 780 238" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="780" height="238" fill="#0a0a18" rx="6"/><line x1="390" y1="30" x2="390" y2="203" stroke="#333" stroke-width="1"/><line x1="230.0" y1="30" x2="230.0" y2="203" stroke="#1a1a2a" stroke-width="0.5"/><line x1="550.0" y1="30" x2="550.0" y2="203" stroke="#1a1a2a" stroke-width="0.5"/><line x1="390.0" y1="30" x2="390.0" y2="203" stroke="#1a1a2a" stroke-width="0.5"/><line x1="390.0" y1="30" x2="390.0" y2="203" stroke="#1a1a2a" stroke-width="0.5"/><line x1="550.0" y1="30" x2="550.0" y2="203" stroke="#1a1a2a" stroke-width="0.5"/><line x1="230.0" y1="30" x2="230.0" y2="203" stroke="#1a1a2a" stroke-width="0.5"/><line x1="710.0" y1="30" x2="710.0" y2="203" stroke="#1a1a2a" stroke-width="0.5"/><line x1="70.0" y1="30" x2="70.0" y2="203" stroke="#1a1a2a" stroke-width="0.5"/><text x="70" y="18" fill="#e74c3c" font-size="9" text-anchor="start">-$ / -PIP</text><text x="710" y="18" fill="#2ecc71" font-size="9" text-anchor="end">+$ / +PIP</text><text x="4" y="38" fill="#ccc" font-size="9">NZDSGD buy</text><rect x="390.0" y="28" width="301.3" height="16" fill="#2ecc71" rx="2" opacity="0.85"/><text x="694.3" y="40" fill="#2ecc71" font-size="8" font-weight="bold" text-anchor="start">$+283</text><rect x="390.0" y="46" width="1.0" height="8" fill="#5dade2" rx="2" opacity="0.8"/><text x="393.0" y="54" fill="#5dade2" font-size="7" text-anchor="start">+0.0 pip</text><text x="4" y="80" fill="#ccc" font-size="9">NZDSGD sell</text><rect x="390.0" y="70" width="320.0" height="16" fill="#2ecc71" rx="2" opacity="0.85"/><text x="713.0" y="82" fill="#2ecc71" font-size="8" font-weight="bold" text-anchor="start">$+301</text><rect x="390.0" y="88" width="1.0" height="8" fill="#5dade2" rx="2" opacity="0.8"/><text x="393.0" y="96" fill="#5dade2" font-size="7" text-anchor="start">+0.0 pip</text><text x="4" y="122" fill="#ccc" font-size="9">USDSGD buy</text><rect x="390.0" y="112" width="146.3" height="16" fill="#2ecc71" rx="2" opacity="0.85"/><text x="539.3" y="124" fill="#2ecc71" font-size="8" font-weight="bold" text-anchor="start">$+138</text><rect x="390.0" y="130" width="1.0" height="8" fill="#5dade2" rx="2" opacity="0.8"/><text x="393.0" y="138" fill="#5dade2" font-size="7" text-anchor="start">+0.0 pip</text><text x="4" y="164" fill="#ccc" font-size="9">USDSGD sell</text><rect x="390.0" y="154" width="41.9" height="16" fill="#2ecc71" rx="2" opacity="0.85"/><text x="434.9" y="166" fill="#2ecc71" font-size="8" font-weight="bold" text-anchor="start">$+39</text><rect x="390.0" y="172" width="1.0" height="8" fill="#5dade2" rx="2" opacity="0.8"/><text x="393.0" y="180" fill="#5dade2" font-size="7" text-anchor="start">+0.0 pip</text><rect x="70" y="220" width="10" height="8" fill="#2ecc71" rx="1"/><text x="84" y="228" fill="#aaa" font-size="8">盈利$</text><rect x="125" y="220" width="10" height="8" fill="#e74c3c" rx="1"/><text x="139" y="228" fill="#aaa" font-size="8">虧損$</text><rect x="190" y="220" width="10" height="4" fill="#5dade2" rx="1"/><text x="204" y="228" fill="#aaa" font-size="8">盈利PIP</text><rect x="265" y="220" width="10" height="4" fill="#e67e22" rx="1"/><text x="279" y="228" fill="#aaa" font-size="8">虧損PIP</text></svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="section-nav">
+        <a href="#ccy-NZDSGD-buy">NZDSGD BUY</a> <a href="#ccy-NZDSGD-sell">NZDSGD SELL</a> <a href="#ccy-USDSGD-buy">USDSGD BUY</a> <a href="#ccy-USDSGD-sell">USDSGD SELL</a>
+    </div>
+
+    <!-- ═══ CCY×Direction Sections ═══ -->
+    
+    <details id="ccy-NZDSGD-buy" class="ccy-section" open>
+      <summary class="ccy-summary">
+        <span style="font-size:16px">📌</span> <b>NZDSGD BUY</b>
+        &nbsp;-&nbsp; <span class="positive">$+283.13</span>
+        &nbsp;·&nbsp; 14 trades
+        &nbsp;·&nbsp; WR 64.3%
+        &nbsp;·&nbsp; 3 layers
+      </summary>
+
+      <div class="section">
+        <div class="section-header">
+          Part 1 · 組合概覽
+          <span class="badge">3 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>組合概覽說明</b><br>
+            顯示此 CCY×Direction 下每一層嘅完整統計。<br>
+            <span style="color:#2ecc71">綠色行</span> = A 級以上 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = D 級以下<br><br>
+            <b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br>
+            <b>EV$</b>: 預期盈虧 | <b>Odds</b>: 盈虧比 | <b>MFE/MAE</b>: 最大有利/不利波幅
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
+                <th>WR%</th><th>EV$</th><th>WinPip</th><th>LossPip</th>
+                <th>Odds$</th><th>OddsPip</th><th>MFE</th><th>MAE</th><th>MaxMAE</th>
+                <th>Hold(h)</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+<tr>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>45</td>
+                <td>9</td>
+                <td>5:4</td>
+                <td>55.6%</td>
+                <td class="positive">+4.47</td>
+                <td>27.6</td>
+                <td>16.4</td>
+                <td>1.37</td>
+                <td>1.68</td>
+                <td>19.7</td>
+                <td>35.6</td>
+                <td><b>95.7</b></td>
+                <td>79.5</td>
+                <td class="positive"><b>$+40.21</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>87</td>
+                <td>4</td>
+                <td>3:1</td>
+                <td>75.0%</td>
+                <td class="positive">+26.14</td>
+                <td>25.3</td>
+                <td>4.5</td>
+                <td>4.17</td>
+                <td>5.61</td>
+                <td>19.9</td>
+                <td>20.9</td>
+                <td><b>58.5</b></td>
+                <td>46.4</td>
+                <td class="positive"><b>$+104.56</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>86</td>
+                <td>1</td>
+                <td>1:0</td>
+                <td>100.0%</td>
+                <td class="positive">+138.36</td>
+                <td>45.7</td>
+                <td>0</td>
+                <td>999</td>
+                <td>999</td>
+                <td>46.2</td>
+                <td>5.2</td>
+                <td><b>5.2</b></td>
+                <td>65.8</td>
+                <td class="positive"><b>$+138.36</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 2 · MFE/MAE 散點分析
+          <span class="badge">每層一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>MFE/MAE 散點分析</b><br>
+            每層獨立嘅散點圖:X=MFE(最大有利波幅),Y=-MAE(最大不利波幅)。<br>
+            綠色 = 盈利交易 | 紅色 = 虧損交易<br>
+            Hover 可查看每筆交易詳情。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="scatter-grid">
+            <div class="scatter-card">
+              <div class="title"><b>L0.1</b> <span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span> (n=9) &nbsp; WR:55.6% EV:+4.47$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">105</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">9</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">79</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">17</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">53</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">26</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">26</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">34</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="110.8" cy="139.6" r="3" fill="#e74c3c"/><g class="tip"><rect x="116.8" y="123.6" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="120.8" y="133.6" fill="#eee" font-size="7">#1 MFE:9.0 MAE:39.0 $-8.70 L0.1 Hold:34.1h</text></g></g>
+<g class="dot"><circle cx="71.2" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="77.2" y="21.3" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="81.2" y="31.3" fill="#eee" font-size="7">#2 MFE:4.3 MAE:95.7 $-33.99 L0.1 Hold:124.5h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="125.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="109.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="119.0" fill="#eee" font-size="7">#3 MFE:0.0 MAE:47.1 $-9.06 L0.1 Hold:95.2h</text></g></g>
+<g class="dot"><circle cx="286.0" cy="147.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="190.0" y="131.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="194.0" y="141.0" fill="#eee" font-size="7">#4 MFE:29.8 MAE:34.9 $19.83 L0.1 Hold:109.1h</text></g></g>
+<g class="dot"><circle cx="269.2" cy="147.4" r="3" fill="#2ecc71"/><g class="tip"><rect x="173.2" y="131.4" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="177.2" y="141.4" fill="#eee" font-size="7">#5 MFE:27.8 MAE:34.7 $19.17 L0.1 Hold:63.9h</text></g></g>
+<g class="dot"><circle cx="286.8" cy="166.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="190.8" y="150.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="194.8" y="160.0" fill="#eee" font-size="7">#6 MFE:29.9 MAE:24.4 $18.92 L0.1 Hold:164.5h</text></g></g>
+<g class="dot"><circle cx="197.6" cy="134.4" r="3" fill="#e74c3c"/><g class="tip"><rect x="203.6" y="118.4" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="207.6" y="128.4" fill="#eee" font-size="7">#7 MFE:19.3 MAE:41.9 $-5.14 L0.1 Hold:107.2h</text></g></g>
+<g class="dot"><circle cx="254.8" cy="205.1" r="3" fill="#2ecc71"/><g class="tip"><rect x="158.8" y="189.1" width="221" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="162.8" y="199.1" fill="#eee" font-size="7">#8 MFE:26.1 MAE:2.7 $17.60 L0.1 Hold:8.0h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="221" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#9 MFE:31.3 MAE:0.0 $21.58 L0.1 Hold:9.6h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L0.2</b> <span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span> (n=4) &nbsp; WR:75.0% EV:+26.14$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">64</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">8</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">48</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">15</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">32</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">23</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">16</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">31</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="279.9" cy="201.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="183.9" y="185.7" width="221" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="187.9" y="195.7" fill="#eee" font-size="7">#1 MFE:26.1 MAE:2.8 $36.49 L0.2 Hold:9.2h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#2 MFE:0.0 MAE:58.5 $-9.08 L0.2 Hold:90.5h</text></g></g>
+<g class="dot"><circle cx="273.3" cy="171.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="177.3" y="155.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="181.3" y="165.0" fill="#eee" font-size="7">#3 MFE:25.4 MAE:13.2 $34.24 L0.2 Hold:78.3h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="183.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="167.7" width="221" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="177.7" fill="#eee" font-size="7">#4 MFE:28.1 MAE:8.9 $42.91 L0.2 Hold:7.5h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L0.4</b> <span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span> (n=1) &nbsp; WR:100.0% EV:+138.36$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">6</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">13</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">4</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">25</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">3</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">38</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">1</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">51</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="298.6" cy="37.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="21.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="31.3" fill="#eee" font-size="7">#1 MFE:46.2 MAE:5.2 $138.36 L0.4 Hold:65.8h</text></g></g>
+</svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 3 · TP/SL 建議(原始值,不乘倍數)
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>TP/SL 說明</b><br>
+            <b>TP</b> = 該層平均 MFE(不乘倍數)<br>
+            <b>Soft SL</b> = 該層平均 MAE(不乘倍數)<br>
+            <b>Hard SL</b> = 該層歷史最大 MAE(不乘倍數)<br>
+            <b>R:R</b> = TP / Soft SL(≥1.5x 可接受,≥3.0x 優秀)
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="font-size:10px;color:#888;margin-bottom:8px;">
+            TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Max MAE &nbsp;|&nbsp; 全部原始值,不乘倍數
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>n</th>
+                <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>9</td>
+                <td class="positive">19.7</td>
+                <td style="color:#f39c12">35.6</td>
+                <td class="negative">95.7</td>
+                <td class="negative"><b>0.55x</b></td>
+              </tr>
+              <tr>
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>4</td>
+                <td class="positive">19.9</td>
+                <td style="color:#f39c12">20.9</td>
+                <td class="negative">58.5</td>
+                <td class="negative"><b>0.95x</b></td>
+              </tr>
+              <tr>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>1</td>
+                <td class="positive">46.2</td>
+                <td style="color:#f39c12">5.2</td>
+                <td class="negative">5.2</td>
+                <td class="positive"><b>8.88x</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">📊 Soft SL vs Hard SL 條形圖</div>
+<svg viewBox="0 0 700 192" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="700" height="192" fill="#0a0a18" rx="6"/><line x1="245.0" y1="20" x2="245.0" y2="172" stroke="#1a1a2a" stroke-width="0.5"/><text x="245.0" y="16" fill="#555" font-size="7" text-anchor="middle">24</text><line x1="390.0" y1="20" x2="390.0" y2="172" stroke="#1a1a2a" stroke-width="0.5"/><text x="390.0" y="16" fill="#555" font-size="7" text-anchor="middle">48</text><line x1="535.0" y1="20" x2="535.0" y2="172" stroke="#1a1a2a" stroke-width="0.5"/><text x="535.0" y="16" fill="#555" font-size="7" text-anchor="middle">72</text><line x1="680.0" y1="20" x2="680.0" y2="172" stroke="#1a1a2a" stroke-width="0.5"/><text x="680.0" y="16" fill="#555" font-size="7" text-anchor="middle">96</text><text x="4" y="36" fill="#ccc" font-size="8">L0.1</text><text x="4" y="46" fill="#3498db" font-size="8" font-weight="bold">B</text><rect x="100.0" y="30.0" width="215.8" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="318.8" y="41" fill="#ccc" font-size="7">SL 35.6</text><rect x="100.0" y="45.0" width="580.0" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="683.0" y="56" fill="#ccc" font-size="7">Hard 95.7</text><text x="4" y="80" fill="#ccc" font-size="8">L0.2</text><text x="4" y="90" fill="#FFD700" font-size="8" font-weight="bold">S+</text><rect x="100.0" y="74.0" width="126.7" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="229.7" y="85" fill="#ccc" font-size="7">SL 20.9</text><rect x="100.0" y="89.0" width="354.5" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="457.5" y="100" fill="#ccc" font-size="7">Hard 58.5</text><text x="4" y="124" fill="#ccc" font-size="8">L0.4</text><text x="4" y="134" fill="#FFD700" font-size="8" font-weight="bold">S+</text><rect x="100.0" y="118.0" width="31.5" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="134.5" y="129" fill="#ccc" font-size="7">SL 5.2</text><rect x="100.0" y="133.0" width="31.5" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="134.5" y="144" fill="#ccc" font-size="7">Hard 5.2</text><rect x="100" y="174" width="10" height="8" fill="#f39c12" rx="1"/><text x="114" y="182" fill="#aaa" font-size="8">Soft SL</text><rect x="170" y="174" width="10" height="8" fill="#e74c3c" rx="1"/><text x="184" y="182" fill="#aaa" font-size="8">Hard SL</text></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 4 · 排行榜(A 級以上)
+          <span class="badge">2 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>排行榜說明</b><br>
+            此 CCY×Direction 內 A 級以上嘅層級,按評級同 EV 降序排列。<br>
+            評級基於 WR(25%) + EV(30%) + Odds(20%) + Count(15%) + Hold(10%)。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Rating</th><th>Layer</th><th>n</th>
+                <th>WR%</th><th>EV$</th><th>Odds$</th><th>OddsPip</th>
+                <th>MFE</th><th>MAE</th><th>Total$</th><th>Hold(h)</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>1</td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td><b>L0.4</b></td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td class="positive"><b>+138.36</b></td>
+                <td>999</td>
+                <td>999</td>
+                <td>46.2</td>
+                <td>5.2</td>
+                <td class="positive">+138.36</td>
+                <td>66</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td><b>L0.2</b></td>
+                <td>4</td>
+                <td>75.0%</td>
+                <td class="positive"><b>+26.14</b></td>
+                <td>4.17</td>
+                <td>5.61</td>
+                <td>19.9</td>
+                <td>20.9</td>
+                <td class="positive">+104.56</td>
+                <td>46</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 5 · 黑名單(高危層級)
+          <span class="badge">1 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>黑名單說明</b><br>
+            此 CCY×Direction 內 Danger Score ≥ 1 嘅層級。<br>
+            危險因素:負 P&L、低 WR、負 EV、低 Odds、樣本少、深層級。<br>
+            ⚠️ WARNING: 1-3 &nbsp;|&nbsp; 💀 DEADLY: &gt;3
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>危險度</th><th>Danger</th><th>Layer</th><th>Rating</th>
+                <th>n</th><th>WR%</th><th>EV$</th><th>OddsPip</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>1.0</b></td>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td class="positive">+138.36</td>
+                <td>999</td>
+                <td class="positive">$+138.36</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 6 · 恢復力分析
+          <span class="badge">每層恢復天數</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>恢復力說明</b><br>
+            如果該層被止損,需要幾多次最佳 EV 層交易先可以追回損失。<br>
+            🟢 100%勝率或≤4次 &nbsp;|&nbsp; 🟡 5-20次 &nbsp;|&nbsp; 🔴 &gt;20次或EV≤0
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>狀態</th><th>Layer</th><th>Rating</th><th>損失$</th>
+                <th>Best EV$</th><th>恢復次數</th><th>恢復天數</th><th>說明</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td class="negative">$14.22</td>
+                <td class="positive">+138.36</td>
+                <td><b>1</b></td>
+                <td>6天</td>
+                <td>安全 (1次)</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td class="negative">$9.08</td>
+                <td class="positive">+138.36</td>
+                <td><b>1</b></td>
+                <td>6天</td>
+                <td>安全 (1次)</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td class="negative">$40.00</td>
+                <td class="positive">+138.36</td>
+                <td><b>1</b></td>
+                <td>6天</td>
+                <td>100% WR</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 7 · 層級 TP/SL 盈利分析
+          <span class="badge">3/3 層盈利</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>層級 TP/SL 盈利分析說明</b><br>
+            基於 CCY 總覽統計,分析每層 TP/SL 是否有盈利邊緣。<br><br>
+            <b>TP/SL</b>: 該層實際 MFE(最大有利波幅)= TP 能力,MAE(最大不利波幅)= SL 風險<br>
+            <b>Edge</b>: WR × TP - (1-WR) × SL,正值 = 有盈利邊緣<br>
+            <b>vs CCY</b>: 與 CCY 平均嘅偏差百分比<br>
+            <span style="color:#2ecc71">綠色行</span> = 盈利層 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = 虧損層
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-bottom:8px">
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY WR</div><div style="color:#FFD700;font-size:14px;font-weight:bold">64.3%</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY EV$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+20.22</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY TP (Avg MFE)</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">21.6</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY SL (Avg MAE)</div><div style="color:#e74c3c;font-size:14px;font-weight:bold">29.2</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">盈利層數</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">3/3</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY Total$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+283.13</div></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>狀態</th><th>Trades</th><th>WR%</th>
+                <th>TP</th><th>SL</th><th>Hard SL</th><th>TP/SL比</th>
+                <th>Edge</th><th>vs CCY TP</th><th>vs CCY SL</th>
+                <th>EV$</th><th>Total$</th><th>盈利%</th>
+              </tr></thead>
+              <tbody>
+              <tr class="row-a">
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>✅</td>
+                <td>9</td>
+                <td>55.6%</td>
+                <td style="color:#2ecc71">19.7</td>
+                <td style="color:#f39c12">35.6</td>
+                <td style="color:#e74c3c">95.7</td>
+                <td>0.55</td>
+                <td class="negative">-4.85</td>
+                <td style="color:#e74c3c">-9.0%</td>
+                <td style="color:#e74c3c">+21.8%</td>
+                <td class="positive">+4.47</td>
+                <td class="positive"><b>+40.21</b></td>
+                <td>31.4%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>✅</td>
+                <td>4</td>
+                <td>75.0%</td>
+                <td style="color:#2ecc71">19.9</td>
+                <td style="color:#f39c12">20.9</td>
+                <td style="color:#e74c3c">58.5</td>
+                <td>0.95</td>
+                <td class="positive">+9.7</td>
+                <td style="color:#e74c3c">-8.1%</td>
+                <td style="color:#2ecc71">-28.5%</td>
+                <td class="positive">+26.14</td>
+                <td class="positive"><b>+104.56</b></td>
+                <td>287.9%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>✅</td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td style="color:#2ecc71">46.2</td>
+                <td style="color:#f39c12">5.2</td>
+                <td style="color:#e74c3c">5.2</td>
+                <td>8.88</td>
+                <td class="positive">+46.2</td>
+                <td style="color:#2ecc71">+113.4%</td>
+                <td style="color:#2ecc71">-82.2%</td>
+                <td class="positive">+138.36</td>
+                <td class="positive"><b>+138.36</b></td>
+                <td>13836.0%</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </details>
+
+
+    <details id="ccy-NZDSGD-sell" class="ccy-section">
+      <summary class="ccy-summary">
+        <span style="font-size:16px">📌</span> <b>NZDSGD SELL</b>
+        &nbsp;-&nbsp; <span class="positive">$+300.71</span>
+        &nbsp;·&nbsp; 12 trades
+        &nbsp;·&nbsp; WR 66.7%
+        &nbsp;·&nbsp; 4 layers
+      </summary>
+
+      <div class="section">
+        <div class="section-header">
+          Part 1 · 組合概覽
+          <span class="badge">4 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>組合概覽說明</b><br>
+            顯示此 CCY×Direction 下每一層嘅完整統計。<br>
+            <span style="color:#2ecc71">綠色行</span> = A 級以上 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = D 級以下<br><br>
+            <b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br>
+            <b>EV$</b>: 預期盈虧 | <b>Odds</b>: 盈虧比 | <b>MFE/MAE</b>: 最大有利/不利波幅
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
+                <th>WR%</th><th>EV$</th><th>WinPip</th><th>LossPip</th>
+                <th>Odds$</th><th>OddsPip</th><th>MFE</th><th>MAE</th><th>MaxMAE</th>
+                <th>Hold(h)</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+<tr>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td>36.6</td>
+                <td>6</td>
+                <td>3:3</td>
+                <td>50.0%</td>
+                <td class="negative">-6.59</td>
+                <td>21.0</td>
+                <td>25.3</td>
+                <td>0.49</td>
+                <td>0.83</td>
+                <td>16.5</td>
+                <td>55.1</td>
+                <td><b>113.0</b></td>
+                <td>122.8</td>
+                <td class="negative"><b>$-39.55</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>74.7</td>
+                <td>4</td>
+                <td>3:1</td>
+                <td>75.0%</td>
+                <td class="positive">+20.69</td>
+                <td>31.7</td>
+                <td>19.2</td>
+                <td>0.87</td>
+                <td>1.65</td>
+                <td>25.9</td>
+                <td>36.4</td>
+                <td><b>83.0</b></td>
+                <td>103.2</td>
+                <td class="positive"><b>$+82.75</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>79</td>
+                <td>1</td>
+                <td>1:0</td>
+                <td>100.0%</td>
+                <td class="positive">+10.99</td>
+                <td>17.3</td>
+                <td>0</td>
+                <td>999</td>
+                <td>999</td>
+                <td>23.8</td>
+                <td>46.2</td>
+                <td><b>46.2</b></td>
+                <td>226.8</td>
+                <td class="positive"><b>$+10.99</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L0.8</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>85</td>
+                <td>1</td>
+                <td>1:0</td>
+                <td>100.0%</td>
+                <td class="positive">+246.52</td>
+                <td>47.7</td>
+                <td>0</td>
+                <td>999</td>
+                <td>999</td>
+                <td>53.9</td>
+                <td>16.1</td>
+                <td><b>16.1</b></td>
+                <td>150.2</td>
+                <td class="positive"><b>$+246.52</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 2 · MFE/MAE 散點分析
+          <span class="badge">每層一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>MFE/MAE 散點分析</b><br>
+            每層獨立嘅散點圖:X=MFE(最大有利波幅),Y=-MAE(最大不利波幅)。<br>
+            綠色 = 盈利交易 | 紅色 = 虧損交易<br>
+            Hover 可查看每筆交易詳情。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="scatter-grid">
+            <div class="scatter-card">
+              <div class="title"><b>L0.1</b> <span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span> (n=6) &nbsp; WR:50.0% EV:-6.59$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">124</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">8</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">93</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">16</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">62</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">24</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">31</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">31</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="35.0" cy="103.6" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="87.6" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="97.6" fill="#eee" font-size="7">#1 MFE:0.0 MAE:69.6 $-11.62 L0.1 Hold:26.6h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="186.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="170.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="180.3" fill="#eee" font-size="7">#2 MFE:28.5 MAE:15.5 $20.93 L0.1 Hold:59.2h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="149.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="133.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="143.0" fill="#eee" font-size="7">#3 MFE:0.0 MAE:39.9 $-11.35 L0.1 Hold:33.9h</text></g></g>
+<g class="dot"><circle cx="269.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="173.0" y="21.3" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="177.0" y="31.3" fill="#eee" font-size="7">#4 MFE:25.3 MAE:113.0 $-54.67 L0.1 Hold:375.6h</text></g></g>
+<g class="dot"><circle cx="228.3" cy="162.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="234.3" y="146.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="238.3" y="156.0" fill="#eee" font-size="7">#5 MFE:20.9 MAE:31.4 $15.85 L0.1 Hold:26.7h</text></g></g>
+<g class="dot"><circle cx="260.7" cy="116.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="164.7" y="100.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="168.7" y="110.0" fill="#eee" font-size="7">#6 MFE:24.4 MAE:61.5 $1.31 L0.1 Hold:214.8h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L0.2</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=4) &nbsp; WR:75.0% EV:+20.69$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">91</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">12</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">68</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">23</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">46</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">35</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">23</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">46</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="262.4" cy="168.4" r="3" fill="#2ecc71"/><g class="tip"><rect x="166.4" y="152.4" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="170.4" y="162.4" fill="#eee" font-size="7">#1 MFE:36.4 MAE:20.0 $56.24 L0.2 Hold:6.1h</text></g></g>
+<g class="dot"><circle cx="181.2" cy="189.8" r="3" fill="#2ecc71"/><g class="tip"><rect x="187.2" y="173.8" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="191.2" y="183.8" fill="#eee" font-size="7">#2 MFE:23.4 MAE:9.7 $24.43 L0.2 Hold:11.8h</text></g></g>
+<g class="dot"><circle cx="45.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="51.0" y="21.3" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="55.0" y="31.3" fill="#eee" font-size="7">#3 MFE:1.6 MAE:83.0 $-51.61 L0.2 Hold:235.2h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="141.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="125.7" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="135.7" fill="#eee" font-size="7">#4 MFE:42.2 MAE:32.8 $53.69 L0.2 Hold:159.9h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L0.4</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=1) &nbsp; WR:100.0% EV:+10.99$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">51</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">7</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">38</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">13</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">25</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">20</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">13</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">26</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="298.6" cy="37.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="21.3" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="31.3" fill="#eee" font-size="7">#1 MFE:23.8 MAE:46.2 $10.99 L0.4 Hold:226.8h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L0.8</b> <span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span> (n=1) &nbsp; WR:100.0% EV:+246.52$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">18</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">15</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">13</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">30</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">9</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">44</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">4</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">59</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="298.6" cy="37.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="21.3" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="31.3" fill="#eee" font-size="7">#1 MFE:53.9 MAE:16.1 $246.52 L0.8 Hold:150.2h</text></g></g>
+</svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 3 · TP/SL 建議(原始值,不乘倍數)
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>TP/SL 說明</b><br>
+            <b>TP</b> = 該層平均 MFE(不乘倍數)<br>
+            <b>Soft SL</b> = 該層平均 MAE(不乘倍數)<br>
+            <b>Hard SL</b> = 該層歷史最大 MAE(不乘倍數)<br>
+            <b>R:R</b> = TP / Soft SL(≥1.5x 可接受,≥3.0x 優秀)
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="font-size:10px;color:#888;margin-bottom:8px;">
+            TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Max MAE &nbsp;|&nbsp; 全部原始值,不乘倍數
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>n</th>
+                <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td>6</td>
+                <td class="positive">16.5</td>
+                <td style="color:#f39c12">55.1</td>
+                <td class="negative">113.0</td>
+                <td class="negative"><b>0.30x</b></td>
+              </tr>
+              <tr>
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>4</td>
+                <td class="positive">25.9</td>
+                <td style="color:#f39c12">36.4</td>
+                <td class="negative">83.0</td>
+                <td class="negative"><b>0.71x</b></td>
+              </tr>
+              <tr>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>1</td>
+                <td class="positive">23.8</td>
+                <td style="color:#f39c12">46.2</td>
+                <td class="negative">46.2</td>
+                <td class="negative"><b>0.52x</b></td>
+              </tr>
+              <tr>
+                <td><b>L0.8</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>1</td>
+                <td class="positive">53.9</td>
+                <td style="color:#f39c12">16.1</td>
+                <td class="negative">16.1</td>
+                <td class="positive"><b>3.35x</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">📊 Soft SL vs Hard SL 條形圖</div>
+<svg viewBox="0 0 700 236" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="700" height="236" fill="#0a0a18" rx="6"/><line x1="245.0" y1="20" x2="245.0" y2="216" stroke="#1a1a2a" stroke-width="0.5"/><text x="245.0" y="16" fill="#555" font-size="7" text-anchor="middle">28</text><line x1="390.0" y1="20" x2="390.0" y2="216" stroke="#1a1a2a" stroke-width="0.5"/><text x="390.0" y="16" fill="#555" font-size="7" text-anchor="middle">56</text><line x1="535.0" y1="20" x2="535.0" y2="216" stroke="#1a1a2a" stroke-width="0.5"/><text x="535.0" y="16" fill="#555" font-size="7" text-anchor="middle">85</text><line x1="680.0" y1="20" x2="680.0" y2="216" stroke="#1a1a2a" stroke-width="0.5"/><text x="680.0" y="16" fill="#555" font-size="7" text-anchor="middle">113</text><text x="4" y="36" fill="#ccc" font-size="8">L0.1</text><text x="4" y="46" fill="#f39c12" font-size="8" font-weight="bold">C</text><rect x="100.0" y="30.0" width="282.8" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="385.8" y="41" fill="#ccc" font-size="7">SL 55.1</text><rect x="100.0" y="45.0" width="580.0" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="683.0" y="56" fill="#ccc" font-size="7">Hard 113.0</text><text x="4" y="80" fill="#ccc" font-size="8">L0.2</text><text x="4" y="90" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="74.0" width="186.8" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="289.8" y="85" fill="#ccc" font-size="7">SL 36.4</text><rect x="100.0" y="89.0" width="426.0" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="529.0" y="100" fill="#ccc" font-size="7">Hard 83.0</text><text x="4" y="124" fill="#ccc" font-size="8">L0.4</text><text x="4" y="134" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="118.0" width="237.1" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="340.1" y="129" fill="#ccc" font-size="7">SL 46.2</text><rect x="100.0" y="133.0" width="237.1" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="340.1" y="144" fill="#ccc" font-size="7">Hard 46.2</text><text x="4" y="168" fill="#ccc" font-size="8">L0.8</text><text x="4" y="178" fill="#FFD700" font-size="8" font-weight="bold">S+</text><rect x="100.0" y="162.0" width="82.6" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="185.6" y="173" fill="#ccc" font-size="7">SL 16.1</text><rect x="100.0" y="177.0" width="82.6" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="185.6" y="188" fill="#ccc" font-size="7">Hard 16.1</text><rect x="100" y="218" width="10" height="8" fill="#f39c12" rx="1"/><text x="114" y="226" fill="#aaa" font-size="8">Soft SL</text><rect x="170" y="218" width="10" height="8" fill="#e74c3c" rx="1"/><text x="184" y="226" fill="#aaa" font-size="8">Hard SL</text></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 4 · 排行榜(A 級以上)
+          <span class="badge">3 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>排行榜說明</b><br>
+            此 CCY×Direction 內 A 級以上嘅層級,按評級同 EV 降序排列。<br>
+            評級基於 WR(25%) + EV(30%) + Odds(20%) + Count(15%) + Hold(10%)。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Rating</th><th>Layer</th><th>n</th>
+                <th>WR%</th><th>EV$</th><th>Odds$</th><th>OddsPip</th>
+                <th>MFE</th><th>MAE</th><th>Total$</th><th>Hold(h)</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>1</td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td><b>L0.8</b></td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td class="positive"><b>+246.52</b></td>
+                <td>999</td>
+                <td>999</td>
+                <td>53.9</td>
+                <td>16.1</td>
+                <td class="positive">+246.52</td>
+                <td>150</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L0.2</b></td>
+                <td>4</td>
+                <td>75.0%</td>
+                <td class="positive"><b>+20.69</b></td>
+                <td>0.87</td>
+                <td>1.65</td>
+                <td>25.9</td>
+                <td>36.4</td>
+                <td class="positive">+82.75</td>
+                <td>103</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L0.4</b></td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td class="positive"><b>+10.99</b></td>
+                <td>999</td>
+                <td>999</td>
+                <td>23.8</td>
+                <td>46.2</td>
+                <td class="positive">+10.99</td>
+                <td>227</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 5 · 黑名單(高危層級)
+          <span class="badge">3 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>黑名單說明</b><br>
+            此 CCY×Direction 內 Danger Score ≥ 1 嘅層級。<br>
+            危險因素:負 P&L、低 WR、負 EV、低 Odds、樣本少、深層級。<br>
+            ⚠️ WARNING: 1-3 &nbsp;|&nbsp; 💀 DEADLY: &gt;3
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>危險度</th><th>Danger</th><th>Layer</th><th>Rating</th>
+                <th>n</th><th>WR%</th><th>EV$</th><th>OddsPip</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.7</b></td>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td>6</td>
+                <td>50.0%</td>
+                <td class="negative">-6.59</td>
+                <td>0.83</td>
+                <td class="negative">$-39.55</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>1.0</b></td>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td class="positive">+10.99</td>
+                <td>999</td>
+                <td class="positive">$+10.99</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>1.0</b></td>
+                <td><b>L0.8</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td class="positive">+246.52</td>
+                <td>999</td>
+                <td class="positive">$+246.52</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 6 · 恢復力分析
+          <span class="badge">每層恢復天數</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>恢復力說明</b><br>
+            如果該層被止損,需要幾多次最佳 EV 層交易先可以追回損失。<br>
+            🟢 100%勝率或≤4次 &nbsp;|&nbsp; 🟡 5-20次 &nbsp;|&nbsp; 🔴 &gt;20次或EV≤0
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>狀態</th><th>Layer</th><th>Rating</th><th>損失$</th>
+                <th>Best EV$</th><th>恢復次數</th><th>恢復天數</th><th>說明</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td class="negative">$25.88</td>
+                <td class="positive">+246.52</td>
+                <td><b>1</b></td>
+                <td>8天</td>
+                <td>安全 (1次)</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$51.61</td>
+                <td class="positive">+246.52</td>
+                <td><b>1</b></td>
+                <td>8天</td>
+                <td>安全 (1次)</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$40.00</td>
+                <td class="positive">+246.52</td>
+                <td><b>1</b></td>
+                <td>8天</td>
+                <td>100% WR</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.8</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td class="negative">$80.00</td>
+                <td class="positive">+246.52</td>
+                <td><b>1</b></td>
+                <td>8天</td>
+                <td>100% WR</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 7 · 層級 TP/SL 盈利分析
+          <span class="badge">3/4 層盈利</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>層級 TP/SL 盈利分析說明</b><br>
+            基於 CCY 總覽統計,分析每層 TP/SL 是否有盈利邊緣。<br><br>
+            <b>TP/SL</b>: 該層實際 MFE(最大有利波幅)= TP 能力,MAE(最大不利波幅)= SL 風險<br>
+            <b>Edge</b>: WR × TP - (1-WR) × SL,正值 = 有盈利邊緣<br>
+            <b>vs CCY</b>: 與 CCY 平均嘅偏差百分比<br>
+            <span style="color:#2ecc71">綠色行</span> = 盈利層 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = 虧損層
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-bottom:8px">
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY WR</div><div style="color:#FFD700;font-size:14px;font-weight:bold">66.7%</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY EV$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+25.06</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY TP (Avg MFE)</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">23.4</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY SL (Avg MAE)</div><div style="color:#e74c3c;font-size:14px;font-weight:bold">44.9</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">盈利層數</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">3/4</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY Total$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+300.71</div></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>狀態</th><th>Trades</th><th>WR%</th>
+                <th>TP</th><th>SL</th><th>Hard SL</th><th>TP/SL比</th>
+                <th>Edge</th><th>vs CCY TP</th><th>vs CCY SL</th>
+                <th>EV$</th><th>Total$</th><th>盈利%</th>
+              </tr></thead>
+              <tbody>
+              <tr class="row-d">
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td>❌</td>
+                <td>6</td>
+                <td>50.0%</td>
+                <td style="color:#2ecc71">16.5</td>
+                <td style="color:#f39c12">55.1</td>
+                <td style="color:#e74c3c">113.0</td>
+                <td>0.3</td>
+                <td class="negative">-19.3</td>
+                <td style="color:#e74c3c">-29.4%</td>
+                <td style="color:#e74c3c">+22.8%</td>
+                <td class="negative">-6.59</td>
+                <td class="negative"><b>-39.55</b></td>
+                <td>-25.5%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>4</td>
+                <td>75.0%</td>
+                <td style="color:#2ecc71">25.9</td>
+                <td style="color:#f39c12">36.4</td>
+                <td style="color:#e74c3c">83.0</td>
+                <td>0.71</td>
+                <td class="positive">+10.32</td>
+                <td style="color:#2ecc71">+10.9%</td>
+                <td style="color:#2ecc71">-18.9%</td>
+                <td class="positive">+20.69</td>
+                <td class="positive"><b>+82.75</b></td>
+                <td>40.1%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td style="color:#2ecc71">23.8</td>
+                <td style="color:#f39c12">46.2</td>
+                <td style="color:#e74c3c">46.2</td>
+                <td>0.52</td>
+                <td class="positive">+23.8</td>
+                <td style="color:#2ecc71">+1.9%</td>
+                <td style="color:#e74c3c">+3.0%</td>
+                <td class="positive">+10.99</td>
+                <td class="positive"><b>+10.99</b></td>
+                <td>1099.0%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L0.8</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>✅</td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td style="color:#2ecc71">53.9</td>
+                <td style="color:#f39c12">16.1</td>
+                <td style="color:#e74c3c">16.1</td>
+                <td>3.35</td>
+                <td class="positive">+53.9</td>
+                <td style="color:#2ecc71">+130.8%</td>
+                <td style="color:#2ecc71">-64.1%</td>
+                <td class="positive">+246.52</td>
+                <td class="positive"><b>+246.52</b></td>
+                <td>24652.0%</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </details>
+
+
+    <details id="ccy-USDSGD-buy" class="ccy-section">
+      <summary class="ccy-summary">
+        <span style="font-size:16px">📌</span> <b>USDSGD BUY</b>
+        &nbsp;-&nbsp; <span class="positive">$+137.50</span>
+        &nbsp;·&nbsp; 7 trades
+        &nbsp;·&nbsp; WR 71.4%
+        &nbsp;·&nbsp; 3 layers
+      </summary>
+
+      <div class="section">
+        <div class="section-header">
+          Part 1 · 組合概覽
+          <span class="badge">3 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>組合概覽說明</b><br>
+            顯示此 CCY×Direction 下每一層嘅完整統計。<br>
+            <span style="color:#2ecc71">綠色行</span> = A 級以上 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = D 級以下<br><br>
+            <b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br>
+            <b>EV$</b>: 預期盈虧 | <b>Odds</b>: 盈虧比 | <b>MFE/MAE</b>: 最大有利/不利波幅
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
+                <th>WR%</th><th>EV$</th><th>WinPip</th><th>LossPip</th>
+                <th>Odds$</th><th>OddsPip</th><th>MFE</th><th>MAE</th><th>MaxMAE</th>
+                <th>Hold(h)</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+<tr>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td>31.4</td>
+                <td>4</td>
+                <td>2:2</td>
+                <td>50.0%</td>
+                <td class="negative">-8.56</td>
+                <td>30.4</td>
+                <td>43.5</td>
+                <td>0.57</td>
+                <td>0.7</td>
+                <td>19.4</td>
+                <td>64.4</td>
+                <td><b>132.5</b></td>
+                <td>168.9</td>
+                <td class="negative"><b>$-34.25</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>87</td>
+                <td>2</td>
+                <td>2:0</td>
+                <td>100.0%</td>
+                <td class="positive">+21.15</td>
+                <td>16.6</td>
+                <td>0</td>
+                <td>999</td>
+                <td>999</td>
+                <td>34.6</td>
+                <td>31.1</td>
+                <td><b>57.3</b></td>
+                <td>142.7</td>
+                <td class="positive"><b>$+42.31</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>86</td>
+                <td>1</td>
+                <td>1:0</td>
+                <td>100.0%</td>
+                <td class="positive">+129.44</td>
+                <td>44.0</td>
+                <td>0</td>
+                <td>999</td>
+                <td>999</td>
+                <td>47.4</td>
+                <td>19.1</td>
+                <td><b>19.1</b></td>
+                <td>59.4</td>
+                <td class="positive"><b>$+129.44</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 2 · MFE/MAE 散點分析
+          <span class="badge">每層一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>MFE/MAE 散點分析</b><br>
+            每層獨立嘅散點圖:X=MFE(最大有利波幅),Y=-MAE(最大不利波幅)。<br>
+            綠色 = 盈利交易 | 紅色 = 虧損交易<br>
+            Hover 可查看每筆交易詳情。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="scatter-grid">
+            <div class="scatter-card">
+              <div class="title"><b>L0.1</b> <span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span> (n=4) &nbsp; WR:50.0% EV:-8.56$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">146</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">9</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">109</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">19</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">73</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">28</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">36</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">38</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="237.5" cy="166.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="243.5" y="150.7" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="247.5" y="160.7" fill="#eee" font-size="7">#1 MFE:26.5 MAE:33.2 $20.16 L0.1 Hold:45.9h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="158.5" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="142.5" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="152.5" fill="#eee" font-size="7">#2 MFE:34.5 MAE:39.5 $26.06 L0.1 Hold:24.3h</text></g></g>
+<g class="dot"><circle cx="126.7" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="132.7" y="21.3" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="136.7" y="31.3" fill="#eee" font-size="7">#3 MFE:12.0 MAE:132.5 $-66.43 L0.1 Hold:539.7h</text></g></g>
+<g class="dot"><circle cx="71.7" cy="141.7" r="3" fill="#e74c3c"/><g class="tip"><rect x="77.7" y="125.7" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="81.7" y="135.7" fill="#eee" font-size="7">#4 MFE:4.8 MAE:52.4 $-14.04 L0.1 Hold:65.7h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L0.2</b> <span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span> (n=2) &nbsp; WR:100.0% EV:+21.15$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">63</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">11</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">47</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">23</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">32</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">34</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">16</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">45</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="298.6" cy="37.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="21.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="31.3" fill="#eee" font-size="7">#1 MFE:41.0 MAE:57.3 $1.48 L0.2 Hold:224.9h</text></g></g>
+<g class="dot"><circle cx="216.3" cy="194.9" r="3" fill="#2ecc71"/><g class="tip"><rect x="222.3" y="178.9" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="226.3" y="188.9" fill="#eee" font-size="7">#2 MFE:28.2 MAE:5.0 $40.83 L0.2 Hold:60.4h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L0.4</b> <span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span> (n=1) &nbsp; WR:100.0% EV:+129.44$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">21</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">13</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">16</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">26</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">11</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">39</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">5</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">52</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="298.6" cy="37.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="21.3" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="31.3" fill="#eee" font-size="7">#1 MFE:47.4 MAE:19.1 $129.44 L0.4 Hold:59.4h</text></g></g>
+</svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 3 · TP/SL 建議(原始值,不乘倍數)
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>TP/SL 說明</b><br>
+            <b>TP</b> = 該層平均 MFE(不乘倍數)<br>
+            <b>Soft SL</b> = 該層平均 MAE(不乘倍數)<br>
+            <b>Hard SL</b> = 該層歷史最大 MAE(不乘倍數)<br>
+            <b>R:R</b> = TP / Soft SL(≥1.5x 可接受,≥3.0x 優秀)
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="font-size:10px;color:#888;margin-bottom:8px;">
+            TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Max MAE &nbsp;|&nbsp; 全部原始值,不乘倍數
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>n</th>
+                <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td>4</td>
+                <td class="positive">19.4</td>
+                <td style="color:#f39c12">64.4</td>
+                <td class="negative">132.5</td>
+                <td class="negative"><b>0.30x</b></td>
+              </tr>
+              <tr>
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>2</td>
+                <td class="positive">34.6</td>
+                <td style="color:#f39c12">31.1</td>
+                <td class="negative">57.3</td>
+                <td class="negative"><b>1.11x</b></td>
+              </tr>
+              <tr>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>1</td>
+                <td class="positive">47.4</td>
+                <td style="color:#f39c12">19.1</td>
+                <td class="negative">19.1</td>
+                <td class="positive"><b>2.48x</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">📊 Soft SL vs Hard SL 條形圖</div>
+<svg viewBox="0 0 700 192" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="700" height="192" fill="#0a0a18" rx="6"/><line x1="245.0" y1="20" x2="245.0" y2="172" stroke="#1a1a2a" stroke-width="0.5"/><text x="245.0" y="16" fill="#555" font-size="7" text-anchor="middle">33</text><line x1="390.0" y1="20" x2="390.0" y2="172" stroke="#1a1a2a" stroke-width="0.5"/><text x="390.0" y="16" fill="#555" font-size="7" text-anchor="middle">66</text><line x1="535.0" y1="20" x2="535.0" y2="172" stroke="#1a1a2a" stroke-width="0.5"/><text x="535.0" y="16" fill="#555" font-size="7" text-anchor="middle">99</text><line x1="680.0" y1="20" x2="680.0" y2="172" stroke="#1a1a2a" stroke-width="0.5"/><text x="680.0" y="16" fill="#555" font-size="7" text-anchor="middle">132</text><text x="4" y="36" fill="#ccc" font-size="8">L0.1</text><text x="4" y="46" fill="#f39c12" font-size="8" font-weight="bold">C</text><rect x="100.0" y="30.0" width="281.9" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="384.9" y="41" fill="#ccc" font-size="7">SL 64.4</text><rect x="100.0" y="45.0" width="580.0" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="683.0" y="56" fill="#ccc" font-size="7">Hard 132.5</text><text x="4" y="80" fill="#ccc" font-size="8">L0.2</text><text x="4" y="90" fill="#FFD700" font-size="8" font-weight="bold">S+</text><rect x="100.0" y="74.0" width="136.1" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="239.1" y="85" fill="#ccc" font-size="7">SL 31.1</text><rect x="100.0" y="89.0" width="250.8" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="353.8" y="100" fill="#ccc" font-size="7">Hard 57.3</text><text x="4" y="124" fill="#ccc" font-size="8">L0.4</text><text x="4" y="134" fill="#FFD700" font-size="8" font-weight="bold">S+</text><rect x="100.0" y="118.0" width="83.6" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="186.6" y="129" fill="#ccc" font-size="7">SL 19.1</text><rect x="100.0" y="133.0" width="83.6" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="186.6" y="144" fill="#ccc" font-size="7">Hard 19.1</text><rect x="100" y="174" width="10" height="8" fill="#f39c12" rx="1"/><text x="114" y="182" fill="#aaa" font-size="8">Soft SL</text><rect x="170" y="174" width="10" height="8" fill="#e74c3c" rx="1"/><text x="184" y="182" fill="#aaa" font-size="8">Hard SL</text></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 4 · 排行榜(A 級以上)
+          <span class="badge">2 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>排行榜說明</b><br>
+            此 CCY×Direction 內 A 級以上嘅層級,按評級同 EV 降序排列。<br>
+            評級基於 WR(25%) + EV(30%) + Odds(20%) + Count(15%) + Hold(10%)。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Rating</th><th>Layer</th><th>n</th>
+                <th>WR%</th><th>EV$</th><th>Odds$</th><th>OddsPip</th>
+                <th>MFE</th><th>MAE</th><th>Total$</th><th>Hold(h)</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>1</td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td><b>L0.4</b></td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td class="positive"><b>+129.44</b></td>
+                <td>999</td>
+                <td>999</td>
+                <td>47.4</td>
+                <td>19.1</td>
+                <td class="positive">+129.44</td>
+                <td>59</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td><b>L0.2</b></td>
+                <td>2</td>
+                <td>100.0%</td>
+                <td class="positive"><b>+21.15</b></td>
+                <td>999</td>
+                <td>999</td>
+                <td>34.6</td>
+                <td>31.1</td>
+                <td class="positive">+42.31</td>
+                <td>143</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 5 · 黑名單(高危層級)
+          <span class="badge">3 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>黑名單說明</b><br>
+            此 CCY×Direction 內 Danger Score ≥ 1 嘅層級。<br>
+            危險因素:負 P&L、低 WR、負 EV、低 Odds、樣本少、深層級。<br>
+            ⚠️ WARNING: 1-3 &nbsp;|&nbsp; 💀 DEADLY: &gt;3
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>危險度</th><th>Danger</th><th>Layer</th><th>Rating</th>
+                <th>n</th><th>WR%</th><th>EV$</th><th>OddsPip</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.9</b></td>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td>4</td>
+                <td>50.0%</td>
+                <td class="negative">-8.56</td>
+                <td>0.7</td>
+                <td class="negative">$-34.25</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>1.0</b></td>
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>2</td>
+                <td>100.0%</td>
+                <td class="positive">+21.15</td>
+                <td>999</td>
+                <td class="positive">$+42.31</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>1.0</b></td>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td class="positive">+129.44</td>
+                <td>999</td>
+                <td class="positive">$+129.44</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 6 · 恢復力分析
+          <span class="badge">每層恢復天數</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>恢復力說明</b><br>
+            如果該層被止損,需要幾多次最佳 EV 層交易先可以追回損失。<br>
+            🟢 100%勝率或≤4次 &nbsp;|&nbsp; 🟡 5-20次 &nbsp;|&nbsp; 🔴 &gt;20次或EV≤0
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>狀態</th><th>Layer</th><th>Rating</th><th>損失$</th>
+                <th>Best EV$</th><th>恢復次數</th><th>恢復天數</th><th>說明</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td class="negative">$40.23</td>
+                <td class="positive">+129.44</td>
+                <td><b>1</b></td>
+                <td>13天</td>
+                <td>安全 (1次)</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td class="negative">$20.00</td>
+                <td class="positive">+129.44</td>
+                <td><b>1</b></td>
+                <td>13天</td>
+                <td>100% WR</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td class="negative">$40.00</td>
+                <td class="positive">+129.44</td>
+                <td><b>1</b></td>
+                <td>13天</td>
+                <td>100% WR</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 7 · 層級 TP/SL 盈利分析
+          <span class="badge">2/3 層盈利</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>層級 TP/SL 盈利分析說明</b><br>
+            基於 CCY 總覽統計,分析每層 TP/SL 是否有盈利邊緣。<br><br>
+            <b>TP/SL</b>: 該層實際 MFE(最大有利波幅)= TP 能力,MAE(最大不利波幅)= SL 風險<br>
+            <b>Edge</b>: WR × TP - (1-WR) × SL,正值 = 有盈利邊緣<br>
+            <b>vs CCY</b>: 與 CCY 平均嘅偏差百分比<br>
+            <span style="color:#2ecc71">綠色行</span> = 盈利層 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = 虧損層
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-bottom:8px">
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY WR</div><div style="color:#FFD700;font-size:14px;font-weight:bold">71.4%</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY EV$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+19.64</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY TP (Avg MFE)</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">27.7</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY SL (Avg MAE)</div><div style="color:#e74c3c;font-size:14px;font-weight:bold">48.4</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">盈利層數</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">2/3</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY Total$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+137.50</div></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>狀態</th><th>Trades</th><th>WR%</th>
+                <th>TP</th><th>SL</th><th>Hard SL</th><th>TP/SL比</th>
+                <th>Edge</th><th>vs CCY TP</th><th>vs CCY SL</th>
+                <th>EV$</th><th>Total$</th><th>盈利%</th>
+              </tr></thead>
+              <tbody>
+              <tr class="row-d">
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#FFF3E0;color:#f39c12">C</span></td>
+                <td>❌</td>
+                <td>4</td>
+                <td>50.0%</td>
+                <td style="color:#2ecc71">19.4</td>
+                <td style="color:#f39c12">64.4</td>
+                <td style="color:#e74c3c">132.5</td>
+                <td>0.3</td>
+                <td class="negative">-22.5</td>
+                <td style="color:#e74c3c">-30.1%</td>
+                <td style="color:#e74c3c">+33.0%</td>
+                <td class="negative">-8.56</td>
+                <td class="negative"><b>-34.25</b></td>
+                <td>-21.3%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L0.2</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>✅</td>
+                <td>2</td>
+                <td>100.0%</td>
+                <td style="color:#2ecc71">34.6</td>
+                <td style="color:#f39c12">31.1</td>
+                <td style="color:#e74c3c">57.3</td>
+                <td>1.11</td>
+                <td class="positive">+34.6</td>
+                <td style="color:#2ecc71">+24.7%</td>
+                <td style="color:#2ecc71">-35.8%</td>
+                <td class="positive">+21.15</td>
+                <td class="positive"><b>+42.31</b></td>
+                <td>2115.5%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L0.4</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>✅</td>
+                <td>1</td>
+                <td>100.0%</td>
+                <td style="color:#2ecc71">47.4</td>
+                <td style="color:#f39c12">19.1</td>
+                <td style="color:#e74c3c">19.1</td>
+                <td>2.48</td>
+                <td class="positive">+47.4</td>
+                <td style="color:#2ecc71">+70.9%</td>
+                <td style="color:#2ecc71">-60.5%</td>
+                <td class="positive">+129.44</td>
+                <td class="positive"><b>+129.44</b></td>
+                <td>12944.0%</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </details>
+
+
+    <details id="ccy-USDSGD-sell" class="ccy-section">
+      <summary class="ccy-summary">
+        <span style="font-size:16px">📌</span> <b>USDSGD SELL</b>
+        &nbsp;-&nbsp; <span class="positive">$+39.35</span>
+        &nbsp;·&nbsp; 2 trades
+        &nbsp;·&nbsp; WR 100.0%
+        &nbsp;·&nbsp; 1 layers
+      </summary>
+
+      <div class="section">
+        <div class="section-header">
+          Part 1 · 組合概覽
+          <span class="badge">1 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>組合概覽說明</b><br>
+            顯示此 CCY×Direction 下每一層嘅完整統計。<br>
+            <span style="color:#2ecc71">綠色行</span> = A 級以上 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = D 級以下<br><br>
+            <b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br>
+            <b>EV$</b>: 預期盈虧 | <b>Odds</b>: 盈虧比 | <b>MFE/MAE</b>: 最大有利/不利波幅
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
+                <th>WR%</th><th>EV$</th><th>WinPip</th><th>LossPip</th>
+                <th>Odds$</th><th>OddsPip</th><th>MFE</th><th>MAE</th><th>MaxMAE</th>
+                <th>Hold(h)</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+<tr class="row-a">
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>83</td>
+                <td>2</td>
+                <td>2:0</td>
+                <td>100.0%</td>
+                <td class="positive">+19.68</td>
+                <td>29.1</td>
+                <td>0</td>
+                <td>999</td>
+                <td>999</td>
+                <td>29.8</td>
+                <td>15.2</td>
+                <td><b>19.6</b></td>
+                <td>48.6</td>
+                <td class="positive"><b>$+39.35</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 2 · MFE/MAE 散點分析
+          <span class="badge">每層一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>MFE/MAE 散點分析</b><br>
+            每層獨立嘅散點圖:X=MFE(最大有利波幅),Y=-MAE(最大不利波幅)。<br>
+            綠色 = 盈利交易 | 紅色 = 虧損交易<br>
+            Hover 可查看每筆交易詳情。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="scatter-grid">
+            <div class="scatter-card">
+              <div class="title"><b>L0.1</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=2) &nbsp; WR:100.0% EV:+19.68$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">22</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">8</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">16</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">17</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">11</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">25</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">5</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">34</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="279.9" cy="37.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="183.9" y="21.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="187.9" y="31.3" fill="#eee" font-size="7">#1 MFE:28.7 MAE:19.6 $20.51 L0.1 Hold:70.4h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="115.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="99.7" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="109.7" fill="#eee" font-size="7">#2 MFE:30.9 MAE:10.7 $18.84 L0.1 Hold:26.9h</text></g></g>
+</svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 3 · TP/SL 建議(原始值,不乘倍數)
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>TP/SL 說明</b><br>
+            <b>TP</b> = 該層平均 MFE(不乘倍數)<br>
+            <b>Soft SL</b> = 該層平均 MAE(不乘倍數)<br>
+            <b>Hard SL</b> = 該層歷史最大 MAE(不乘倍數)<br>
+            <b>R:R</b> = TP / Soft SL(≥1.5x 可接受,≥3.0x 優秀)
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="font-size:10px;color:#888;margin-bottom:8px;">
+            TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Max MAE &nbsp;|&nbsp; 全部原始值,不乘倍數
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>n</th>
+                <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>2</td>
+                <td class="positive">29.8</td>
+                <td style="color:#f39c12">15.2</td>
+                <td class="negative">19.6</td>
+                <td class="positive"><b>1.96x</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">📊 Soft SL vs Hard SL 條形圖</div>
+<svg viewBox="0 0 700 104" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="700" height="104" fill="#0a0a18" rx="6"/><line x1="245.0" y1="20" x2="245.0" y2="84" stroke="#1a1a2a" stroke-width="0.5"/><text x="245.0" y="16" fill="#555" font-size="7" text-anchor="middle">7</text><line x1="390.0" y1="20" x2="390.0" y2="84" stroke="#1a1a2a" stroke-width="0.5"/><text x="390.0" y="16" fill="#555" font-size="7" text-anchor="middle">15</text><line x1="535.0" y1="20" x2="535.0" y2="84" stroke="#1a1a2a" stroke-width="0.5"/><text x="535.0" y="16" fill="#555" font-size="7" text-anchor="middle">22</text><line x1="680.0" y1="20" x2="680.0" y2="84" stroke="#1a1a2a" stroke-width="0.5"/><text x="680.0" y="16" fill="#555" font-size="7" text-anchor="middle">30</text><text x="4" y="36" fill="#ccc" font-size="8">L0.1</text><text x="4" y="46" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="30.0" width="295.8" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="398.8" y="41" fill="#ccc" font-size="7">SL 15.2</text><rect x="100.0" y="45.0" width="381.5" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="484.5" y="56" fill="#ccc" font-size="7">Hard 19.6</text><rect x="100" y="86" width="10" height="8" fill="#f39c12" rx="1"/><text x="114" y="94" fill="#aaa" font-size="8">Soft SL</text><rect x="170" y="86" width="10" height="8" fill="#e74c3c" rx="1"/><text x="184" y="94" fill="#aaa" font-size="8">Hard SL</text></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 4 · 排行榜(A 級以上)
+          <span class="badge">1 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>排行榜說明</b><br>
+            此 CCY×Direction 內 A 級以上嘅層級,按評級同 EV 降序排列。<br>
+            評級基於 WR(25%) + EV(30%) + Odds(20%) + Count(15%) + Hold(10%)。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Rating</th><th>Layer</th><th>n</th>
+                <th>WR%</th><th>EV$</th><th>Odds$</th><th>OddsPip</th>
+                <th>MFE</th><th>MAE</th><th>Total$</th><th>Hold(h)</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>1</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L0.1</b></td>
+                <td>2</td>
+                <td>100.0%</td>
+                <td class="positive"><b>+19.68</b></td>
+                <td>999</td>
+                <td>999</td>
+                <td>29.8</td>
+                <td>15.2</td>
+                <td class="positive">+39.35</td>
+                <td>49</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 5 · 黑名單(高危層級)
+          <span class="badge">1 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>黑名單說明</b><br>
+            此 CCY×Direction 內 Danger Score ≥ 1 嘅層級。<br>
+            危險因素:負 P&L、低 WR、負 EV、低 Odds、樣本少、深層級。<br>
+            ⚠️ WARNING: 1-3 &nbsp;|&nbsp; 💀 DEADLY: &gt;3
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>危險度</th><th>Danger</th><th>Layer</th><th>Rating</th>
+                <th>n</th><th>WR%</th><th>EV$</th><th>OddsPip</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>1.0</b></td>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>2</td>
+                <td>100.0%</td>
+                <td class="positive">+19.68</td>
+                <td>999</td>
+                <td class="positive">$+39.35</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 6 · 恢復力分析
+          <span class="badge">每層恢復天數</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>恢復力說明</b><br>
+            如果該層被止損,需要幾多次最佳 EV 層交易先可以追回損失。<br>
+            🟢 100%勝率或≤4次 &nbsp;|&nbsp; 🟡 5-20次 &nbsp;|&nbsp; 🔴 &gt;20次或EV≤0
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>狀態</th><th>Layer</th><th>Rating</th><th>損失$</th>
+                <th>Best EV$</th><th>恢復次數</th><th>恢復天數</th><th>說明</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$10.00</td>
+                <td class="positive">+19.68</td>
+                <td><b>1</b></td>
+                <td>45天</td>
+                <td>100% WR</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 7 · 層級 TP/SL 盈利分析
+          <span class="badge">1/1 層盈利</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>層級 TP/SL 盈利分析說明</b><br>
+            基於 CCY 總覽統計,分析每層 TP/SL 是否有盈利邊緣。<br><br>
+            <b>TP/SL</b>: 該層實際 MFE(最大有利波幅)= TP 能力,MAE(最大不利波幅)= SL 風險<br>
+            <b>Edge</b>: WR × TP - (1-WR) × SL,正值 = 有盈利邊緣<br>
+            <b>vs CCY</b>: 與 CCY 平均嘅偏差百分比<br>
+            <span style="color:#2ecc71">綠色行</span> = 盈利層 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = 虧損層
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-bottom:8px">
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY WR</div><div style="color:#FFD700;font-size:14px;font-weight:bold">100.0%</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY EV$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+19.68</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY TP (Avg MFE)</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">29.8</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY SL (Avg MAE)</div><div style="color:#e74c3c;font-size:14px;font-weight:bold">15.2</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">盈利層數</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">1/1</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY Total$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+39.35</div></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>狀態</th><th>Trades</th><th>WR%</th>
+                <th>TP</th><th>SL</th><th>Hard SL</th><th>TP/SL比</th>
+                <th>Edge</th><th>vs CCY TP</th><th>vs CCY SL</th>
+                <th>EV$</th><th>Total$</th><th>盈利%</th>
+              </tr></thead>
+              <tbody>
+              <tr class="row-a">
+                <td><b>L0.1</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>2</td>
+                <td>100.0%</td>
+                <td style="color:#2ecc71">29.8</td>
+                <td style="color:#f39c12">15.2</td>
+                <td style="color:#e74c3c">19.6</td>
+                <td>1.96</td>
+                <td class="positive">+29.8</td>
+                <td style="color:#e74c3c">0.0%</td>
+                <td style="color:#e74c3c">0.0%</td>
+                <td class="positive">+19.68</td>
+                <td class="positive"><b>+39.35</b></td>
+                <td>1967.5%</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </details>
+
+
+    <div class="footer">
+        馬丁剖析法 V3 · 按 CCY×Direction 分組 · 數據說話,紀律至上 · Quant 📊
+    </div>
+</div>
+<script src="../sidebar.js"></script>
+</body>
+</html>
