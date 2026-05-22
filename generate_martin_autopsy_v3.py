@@ -585,51 +585,47 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
     max_abs_total_pip = max((abs(g['total_pips']) for g in bar_groups), default=1) or 1
     
     # ── SVG builders ──
-    def build_dollar_bar_svg(groups, max_pnl):
+    def build_merged_bar_svg(groups, max_pnl, max_pip):
+        """Combined $ + PIP bar chart — each row shows Total$ (thick) and Total PIP (thin)"""
         if not groups: return '<p style="color:#888;text-align:center;padding:20px">無數據</p>'
-        n = len(groups); svg_h = max(200, n*38+60); bar_h = 14; gap = 38; lm = 60; rm = 60; cw = 700; pw = cw-lm-rm; zx = lm+pw//2
+        n = len(groups); svg_h = max(200, n*42+70); gap = 42; lm = 70; rm = 70; cw = 780; pw = cw-lm-rm; zx = lm+pw//2
         svg = f'<svg viewBox="0 0 {cw} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
         svg += f'<rect width="{cw}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
-        svg += f'<line x1="{zx}" y1="30" x2="{zx}" y2="{svg_h-30}" stroke="#333" stroke-width="1"/>'
+        svg += f'<line x1="{zx}" y1="30" x2="{zx}" y2="{svg_h-35}" stroke="#333" stroke-width="1"/>'
         for frac in [0.25,0.5,0.75,1.0]:
-            gx=lm+pw*frac; svg += f'<line x1="{gx:.1f}" y1="30" x2="{gx:.1f}" y2="{svg_h-30}" stroke="#1a1a2a" stroke-width="0.5"/>'
-            gx2=lm+pw*(1-frac); svg += f'<line x1="{gx2:.1f}" y1="30" x2="{gx2:.1f}" y2="{svg_h-30}" stroke="#1a1a2a" stroke-width="0.5"/>'
-        svg += f'<text x="{lm}" y="18" fill="#2ecc71" font-size="9" text-anchor="start">-$</text>'
-        svg += f'<text x="{cw-rm}" y="18" fill="#2ecc71" font-size="9" text-anchor="end">+$</text>'
+            gx=lm+pw*frac; svg += f'<line x1="{gx:.1f}" y1="30" x2="{gx:.1f}" y2="{svg_h-35}" stroke="#1a1a2a" stroke-width="0.5"/>'
+            gx2=lm+pw*(1-frac); svg += f'<line x1="{gx2:.1f}" y1="30" x2="{gx2:.1f}" y2="{svg_h-35}" stroke="#1a1a2a" stroke-width="0.5"/>'
+        svg += f'<text x="{lm}" y="18" fill="#e74c3c" font-size="9" text-anchor="start">-$ / -PIP</text>'
+        svg += f'<text x="{cw-rm}" y="18" fill="#2ecc71" font-size="9" text-anchor="end">+$ / +PIP</text>'
         for i,g in enumerate(groups):
-            yb = 30+i*gap+10
-            svg += f'<text x="4" y="{yb+5}" fill="#ccc" font-size="9">{g["label"]}</text>'
-            pw_ = abs(g['total_pnl'])/max(max_pnl,1)*(pw/2); col = '#2ecc71' if g['total_pnl']>=0 else '#e74c3c'
-            bx = zx if g['total_pnl']>=0 else zx-pw_
-            svg += f'<rect x="{bx:.1f}" y="{yb-8}" width="{max(pw_,1):.1f}" height="{bar_h}" fill="{col}" rx="2" opacity="0.85"/>'
-            svg += f'<text x="{bx+pw_+3:.1f}" y="{yb+3}" fill="#ccc" font-size="8">${g["total_pnl"]:,.0f}</text>'
-            ww = abs(g['win_pip'])/max(max_abs_pip,1)*(pw/2)
-            svg += f'<rect x="{zx:.1f}" y="{yb-8-bar_h-1}" width="{max(ww,1):.1f}" height="{bar_h-2}" fill="#5dade2" rx="2" opacity="0.6"/>'
-            lw = abs(g['loss_pip'])/max(max_abs_pip,1)*(pw/2)
-            svg += f'<rect x="{zx-lw:.1f}" y="{yb-8-bar_h-1}" width="{max(lw,1):.1f}" height="{bar_h-2}" fill="#e67e22" rx="2" opacity="0.6"/>'
-        ly = svg_h-12
-        svg += f'<rect x="{lm}" y="{ly-8}" width="10" height="8" fill="#2ecc71" rx="1"/><text x="{lm+14}" y="{ly}" fill="#aaa" font-size="8">Total$(+)</text>'
-        svg += f'<rect x="{lm+70}" y="{ly-8}" width="10" height="8" fill="#e74c3c" rx="1"/><text x="{lm+84}" y="{ly}" fill="#aaa" font-size="8">Total$(-)</text>'
-        svg += f'<rect x="{lm+140}" y="{ly-8}" width="10" height="8" fill="#5dade2" rx="1"/><text x="{lm+154}" y="{ly}" fill="#aaa" font-size="8">WinPip</text>'
-        svg += f'<rect x="{lm+200}" y="{ly-8}" width="10" height="8" fill="#e67e22" rx="1"/><text x="{lm+214}" y="{ly}" fill="#aaa" font-size="8">LossPip</text>'
+            yb = 32+i*gap
+            # Label
+            svg += f'<text x="4" y="{yb+6}" fill="#ccc" font-size="9">{g["label"]}</text>'
+            # Dollar bar (thick, 16px)
+            dpw = abs(g['total_pnl'])/max(max_pnl,1)*(pw/2); dcol = '#2ecc71' if g['total_pnl']>=0 else '#e74c3c'
+            dbx = zx if g['total_pnl']>=0 else zx-dpw
+            svg += f'<rect x="{dbx:.1f}" y="{yb-4}" width="{max(dpw,1):.1f}" height="16" fill="{dcol}" rx="2" opacity="0.85"/>'
+            # Dollar value
+            dtx = dbx+dpw+3 if g['total_pnl']>=0 else dbx-3
+            anch = "start" if g['total_pnl']>=0 else "end"
+            svg += f'<text x="{dtx:.1f}" y="{yb+8}" fill="{dcol}" font-size="8" font-weight="bold" text-anchor="{anch}">${g["total_pnl"]:+,.0f}</text>'
+            # PIP bar (thin, 8px)
+            ppv = g.get('total_pips',0); ppw = abs(ppv)/max(max_pip,1)*(pw/2); pcol = '#5dade2' if ppv>=0 else '#e67e22'
+            pbx = zx if ppv>=0 else zx-ppw
+            svg += f'<rect x="{pbx:.1f}" y="{yb+14}" width="{max(ppw,1):.1f}" height="8" fill="{pcol}" rx="2" opacity="0.8"/>'
+            # PIP value
+            ptx = pbx+ppw+3 if ppv>=0 else pbx-3
+            svg += f'<text x="{ptx:.1f}" y="{yb+22}" fill="{pcol}" font-size="7" text-anchor="{anch}">{ppv:+.1f} pip</text>'
+        # Legend
+        ly = svg_h-10
+        svg += f'<rect x="{lm}" y="{ly-8}" width="10" height="8" fill="#2ecc71" rx="1"/><text x="{lm+14}" y="{ly}" fill="#aaa" font-size="8">盈利$</text>'
+        svg += f'<rect x="{lm+55}" y="{ly-8}" width="10" height="8" fill="#e74c3c" rx="1"/><text x="{lm+69}" y="{ly}" fill="#aaa" font-size="8">虧損$</text>'
+        svg += f'<rect x="{lm+120}" y="{ly-8}" width="10" height="4" fill="#5dade2" rx="1"/><text x="{lm+134}" y="{ly}" fill="#aaa" font-size="8">盈利PIP</text>'
+        svg += f'<rect x="{lm+195}" y="{ly-8}" width="10" height="4" fill="#e67e22" rx="1"/><text x="{lm+209}" y="{ly}" fill="#aaa" font-size="8">虧損PIP</text>'
         svg += '</svg>'
         return svg
-    
-    def build_pip_bar_svg(groups, max_pip):
-        if not groups: return '<p style="color:#888;text-align:center;padding:20px">無數據</p>'
-        n = len(groups); svg_h = max(180, n*32+50); bar_h = 14; gap = 32; lm = 60; rm = 40; cw = 700; pw = cw-lm-rm; zx = lm+pw//2
-        svg = f'<svg viewBox="0 0 {cw} {svg_h}" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg">'
-        svg += f'<rect width="{cw}" height="{svg_h}" fill="#0a0a18" rx="6"/>'
-        svg += f'<line x1="{zx}" y1="25" x2="{zx}" y2="{svg_h-25}" stroke="#333" stroke-width="1"/>'
-        for i,g in enumerate(groups):
-            yb = 25+i*gap+10
-            svg += f'<text x="4" y="{yb+4}" fill="#ccc" font-size="9">{g["label"]}</text>'
-            pv = g['total_pips']; pw_ = abs(pv)/max(max_pip,1)*(pw/2); col = '#2ecc71' if pv>=0 else '#e74c3c'
-            bx = zx if pv>=0 else zx-pw_
-            svg += f'<rect x="{bx:.1f}" y="{yb-7}" width="{max(pw_,1):.1f}" height="{bar_h}" fill="{col}" rx="2" opacity="0.85"/>'
-            svg += f'<text x="{bx+pw_+3:.1f}" y="{yb+4}" fill="#ccc" font-size="8">{pv:+.1f} pip</text>'
-        svg += '</svg>'
-        return svg
+
+    merged_svg = build_merged_bar_svg(bar_groups, max_abs_pnl, max_abs_total_pip)
     
     def build_layer_scatter(trade_details, title=""):
         """Per-layer scatter SVG: X=MFE, Y=-MAE"""
@@ -703,8 +699,7 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
         if ls['layer_idx'] > 5: d += 1
         return round(d, 1)
     
-    dollar_svg = build_dollar_bar_svg(bar_groups, max_abs_pnl)
-    pip_svg = build_pip_bar_svg(bar_groups, max_abs_total_pip)
+    # merged_svg is built by build_merged_bar_svg above
     
     # ── Build navigation links ──
     nav_links = ' '.join(
@@ -1242,17 +1237,22 @@ def generate_html(signal_id: str, trades: List[dict], layer_stats: Dict,
         </div>
     </div>
 
-    <!-- Global Bar Charts -->
+    <!-- Global Bar Chart (merged $ + PIP) -->
     <div class="section">
-        <div class="section-header">📊 全局盈虧概覽</div>
+        <div class="section-header">📊 全局盈虧概覽（金額 + PIP）
+            <i class="info-icon" tabindex="0">ℹ<span class="info-tip">
+                <b>盈虧概覽說明</b><br>
+                每個 CCY×Direction 顯示兩組數據：<br><br>
+                <b>金額條（粗）</b>：Total$ 盈虧金額<br>
+                綠色 = 盈利 | 紅色 = 虧損<br><br>
+                <b>PIP 條（細）</b>：Total PIP 盈虧<br>
+                藍色 = 盈利 PIP | 橙色 = 虧損 PIP<br><br>
+                每條 bar 旁邊顯示精確數值
+            </span></i>
+        </div>
         <div class="section-body">
             <div class="chart-container">
-                <div class="chart-title">Total$ 金額條形圖</div>
-                {dollar_svg}
-            </div>
-            <div class="chart-container" style="margin-top:12px">
-                <div class="chart-title">Total PIP 賺/蝕條形圖（綠=賺 · 紅=蝕）</div>
-                {pip_svg}
+                {merged_svg}
             </div>
         </div>
     </div>
