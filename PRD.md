@@ -304,18 +304,17 @@ DDE Score = max(0, 100 - 50 × avg_dd_ratio) × 0.2
 |---|------|------|
 | 1 | # | 排名序號 |
 | 2 | Signal | Signal ID |
-| 3 | Avg Score | DDE v3 平均分 |
-| 4 | ⭐⭐⭐⭐ | 評分 ≥ 80 嘅數量 |
-| 5 | ⭐⭐⭐⭐% | 高評分佔比 |
-| 6 | Trades | 總交易數 |
+| 3 | EA | EA 家族標籤 |
+| 4 | CCY | 貨幣對數量 |
+| 5 | DDE | DDE v4 平均分 |
+| 6 | CB | Clean Board%（全綠比） |
 | 7 | Win% | 勝率 |
-| 8 | PF | Profit Factor |
-| 9 | Total Profit | 總盈利（$） |
-| 10 | TF | 時間框架（M30/H1/H4/D1+） |
-| 11 | Cmp | 有效評分維度數 |
-| 12 | EA | EA 家族標籤 |
+| 8 | Trades | 總交易數 |
+| 9 | Profit | 總盈利（$）+ pips |
+| 10 | DD | 最大回撤（$） |
+| 11 | PF | Profit Factor |
+| 12 | TF | 時間框架 |
 | 13 | LV | 馬丁層數 |
-| 14 | Eq Max DD | 最大權益回撤 |
 
 **不顯示嘅欄位**（老闆確認）：
 - ❌ Bar（無意義）
@@ -655,7 +654,7 @@ trade_strategy_analyzer/
 |---|------|--------|------|
 | 1 | **CoP 勝率永遠 100%**（只看盈利交易） | Quant + Gemini | 評分被嚴重扭曲，20% 權重白送 |
 | 2 | **v3/v4 評分唔統一** | Quant + Coder | Signal Ranking 同 CCY Ranking 用唔同公式，結果唔互通 |
-| 3 | **dde_v4_scorer.py 仲用 pip-based LEVEL_RANGES** | Quant + Coder | 層級偵測已改 lot-based 但 scorer 未同步 |
+| 3 | ~~已修復 2026-05-25~~ | **dde_v4_scorer.py pip-based LEVEL_RANGES** → 已改為 lot-based，82% 信號分類錯咗，32 tests pass | Quant + Coder |
 | 4 | **DD 控制維度完全缺失** | King + Quant + Gemini | 對 $1K 帳戶係致命傷 |
 | 5 | **HTML string concatenation** | Coder + Gemini | 維護困難，改 UI 要改 Python |
 
@@ -870,8 +869,10 @@ Example: WR=60% → P(5連虧) = 1.0%, P(8連虧) = 0.07%
 
 | Phase | 時間 | 內容 | 優先級 |
 |-------|------|------|--------|
-| **Phase 0** | 1-2 天 | 修復 dde_v4_scorer.py LEVEL_RANGES（改 lot-based） | P0 |
-| **Phase 0** | 1-2 天 | 修復 CoP 勝率計算（改為基於全部交易） | P0 |
+| **Phase 0A** | ~~已完成 2026-05-25~~ | ✅ 修復 dde_v4_scorer.py LEVEL_RANGES（改 lot-based） | P0 |
+| **Phase 0B** | 待定 | 修復 CoP 勝率計算（改為基於全部交易）— 只影響已壞嘅 generate_symbol_ranking.py | P1 |
+| **Phase 0C** | ~~已完成 2026-05-25~~ | ✅ CCY Ranking 加入 $1K DD 六級制（S/A/B/C/D/F） | P0 |
+| **Phase 0D** | ~~已完成 2026-05-25~~ | ✅ EA 欄位移到 Signal 後面（兩個排名頁） | P0 |
 | **Phase 1** | 3-5 天 | 實作 DDE v5 統一評分 | P0 |
 | **Phase 1** | 3-5 天 | 新增 Max Drawdown Control 維度 | P0 |
 | **Phase 1** | 2-3 天 | EA_MAP 去重（單一 source of truth） | P1 |
