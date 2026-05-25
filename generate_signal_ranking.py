@@ -20,9 +20,9 @@ BASE_DIR = Path(__file__).parent
 SAMPLES_DIR = BASE_DIR / 'samples'
 OUTPUT_DIR = BASE_DIR / 'output'
 
-# Level ranges no longer used for lot-based detection (kept for reference)
+# DEPRECATED: LEVEL_RANGES was pip-based, no longer used for level classification.
 # Lot-based levels are computed from signal_lot_mapping.json via dde_v4_scorer.py
-LEVEL_RANGES = {
+_DEPRECATED_LEVEL_RANGES = {
     'L1': (0, 50),
     'L2': (50, 100),
     'L3': (100, 150),
