@@ -1,7 +1,8 @@
 # PRD：交易策略分析系統（Trade Strategy Analyzer）
 
-> **版本：** v0.7（Lot-Based 層級偵測 + 三合一整合 + Batch Regenerate）
-> **日期：** 2026-05-10
+> **版本：** v0.8（全面優化分析 — 四方 Agent 討論共識）
+> **日期：** 2026-05-25
+> **前一版本：** v0.7（2026-05-10）
 > **作者：** 丁蟹 + Alvin
 > **狀態：** 已實作，持續迭代中
 
@@ -638,3 +639,336 @@ trade_strategy_analyzer/
 | `assign_lot_level()` | SET-based lot→level 映射 |
 | `infer_levels_from_csv_lots()` | Fallback: CSV lots 推算層級 |
 | `analyze_by_levels_lotbased()` | 取代舊 `analyze_by_levels()` |
+
+---
+
+## 14. v0.8 全面優化分析（2026-05-25）— 四方 Agent 討論共識
+
+> 參與者：Quant Agent、King Agent、Coder Agent、Gemini Pro Hui（外部顧問）
+> 觸發原因：老闆要求全面優化 TSA 系統，特別關注 $1,000 小帳戶嘅實戰可用性同 DD 控制
+
+### 14.1 現狀問題匯總（四方共識）
+
+#### 🔴 P0 — 必須立即修復
+
+| # | 問題 | 發現者 | 影響 |
+|---|------|--------|------|
+| 1 | **CoP 勝率永遠 100%**（只看盈利交易） | Quant + Gemini | 評分被嚴重扭曲，20% 權重白送 |
+| 2 | **v3/v4 評分唔統一** | Quant + Coder | Signal Ranking 同 CCY Ranking 用唔同公式，結果唔互通 |
+| 3 | **dde_v4_scorer.py 仲用 pip-based LEVEL_RANGES** | Quant + Coder | 層級偵測已改 lot-based 但 scorer 未同步 |
+| 4 | **DD 控制維度完全缺失** | King + Quant + Gemini | 對 $1K 帳戶係致命傷 |
+| 5 | **HTML string concatenation** | Coder + Gemini | 維護困難，改 UI 要改 Python |
+
+#### 🟡 P1 — 高影響力改進
+
+| # | 問題 | 發現者 | 影響 |
+|---|------|--------|------|
+| 6 | v4 Risk/Reward 用錯公式（非真正 R:R） | Quant | 高 PF 但隱藏大虧損風險 |
+| 7 | Martin Layers 線性衰減太陡（WAL 2.0=33.3分） | Quant | 中度馬丁信號被過度懲罰 |
+| 8 | Holding Time 5% 權重太低 | Quant | 長持倉風險被忽視 |
+| 9 | 小樣本回退過度放大（n<10 可能全盈利拉高分數） | Quant | 高分但唔可靠 |
+| 10 | EA_MAP 重複定義 3 次 | Coder | 維護時容易唔一致 |
+| 11 | Pickle 作為中間格式（/tmp 重啟清空） | Coder | 強制執行順序、唔可靠 |
+| 12 | 無投資組合相關性分析 | King + Gemini | 可能揀咗高相關 CCY 放埋一齊 |
+
+#### 🟢 P2 — 長期改進
+
+| # | 問題 | 發現者 | 影響 |
+|---|------|--------|------|
+| 13 | 無 Walk-Forward Analysis | Gemini | 過擬合風險 |
+| 14 | 無 ML 信號品質預測 | Gemini | 長期競爭力 |
+| 15 | 無市場狀態偵測（Trending/Ranging） | Gemini | 唔適應市況 |
+| 16 | CCY Deep Analysis Rating 同 DDE 唔互通 | Quant | 兩套獨立評分 |
+
+### 14.2 評分系統優化 — DDE v5 統一方案（Quant 主導）
+
+#### 14.2.1 現有三套評分系統
+
+| 系統 | 用途 | 核心文件 |
+|------|------|----------|
+| DDE v3 | Symbol Ranking（按 CCY 篩選 Signal） | `generate_symbol_ranking.py` |
+| DDE v4 | Signal Ranking + CCY Ranking | `dde_v4_scorer.py` + ranking 腳本 |
+| Rating S+/S/A/B/C/D/E | CCY Deep Analysis（跨 Signal 聚合） | `generate_ccy_deep_analysis.py` |
+
+#### 14.2.2 DDE v5 統一評分維度（建議）
+
+| # | 維度 | 權重 | 計算方法 | 改動理由 |
+|---|------|------|----------|----------|
+| 1 | Adjusted Win Rate | 15% | `(WR - 50) / 40 × 100`，上限 100 | 簡化，移除 CoP 白送問題 |
+| 2 | Profit Factor | 20% | `gross_pips / loss_pips`，`clamp((PF-1)/3 × 100)` | 替代 Risk/Reward，PF 更穩健 |
+| 3 | Max Drawdown Control | 20% | `clamp((2000-abs_dd)/1800 × 100)`，>2000=0 | 新維度，小帳戶生死線 |
+| 4 | Martin Discipline | 20% | Sigmoid：`100/(1+exp(2×(WAL-2)))` | 修正線性衰減太陡 |
+| 5 | Sample Confidence | 15% | `(1-exp(-n/80)) × 100` | 替代 Trade Count，用指數衰減 |
+| 6 | Holding Efficiency | 10% | `total_pips / total_hold_hours`，percentile-based | 衡量時間效率 |
+
+**v5 公式框架：**
+```python
+def score_v5(trades, lot_layers=None):
+    n = len(trades)
+    if n < 30: return None  # 統一最低樣本閾值
+
+    # Raw metrics
+    wr_score = clamp((wr - 50) / 40 * 100)           # 50%=0, 90%=100
+    pf_score = clamp((pf - 1) / 3 * 100)              # PF=1→0, PF=4→100
+    dd_score = clamp((2000 - abs_dd) / 1800 * 100)    # 200pips DD→100, 2000+→0
+    ml_score = clamp(100 / (1 + math.exp(2 * (wal - 2))))  # WAL=1→88, WAL=2→50
+    sc_score = clamp((1 - math.exp(-n / 80)) * 100)   # n=80→63, n=200→92
+    he_score = clamp(pips_per_hour / 5 * 100)         # 5 pips/hr→100
+
+    final = wr_score*0.15 + pf_score*0.20 + dd_score*0.20 + ml_score*0.20 + sc_score*0.15 + he_score*0.10
+    return final
+```
+
+**Red Card 規則（統一）：**
+- Net Pips ≤ 0
+- Trade Count < 30
+- Max Loss Pips > 500（單筆）
+- Win Rate < 50%
+- Max DD > 2000 pips（新增）
+
+#### 14.2.3 小樣本處理優化
+
+**現狀問題：** n<30 用 global percentiles 回退，可能過度平滑。但 n<10 全盈利反而拉高分數。
+
+**建議方案 — Confidence Band 加權：**
+```python
+def sample_confidence(n, min_n=30):
+    if n >= min_n:
+        return min(1.0, 1.0 + math.log(n / min_n) / 10)  # n=300→1.15 bonus
+    return (n / min_n) ** 2  # 指數衰減：n=15→0.25, n=10→0.11
+```
+
+| 樣本數 | 置信度 | 效果 |
+|--------|--------|------|
+| 10 | 11% | 幾乎唔影響排名 |
+| 20 | 44% | 有限影響 |
+| 30 | 100% | 完全計入 |
+| 100 | 105% | 大樣本加成 |
+
+### 14.3 系統架構重構（Coder 主導）
+
+#### 14.3.1 建議模組化架構
+
+```
+tsa/
+├── config.py                 # 全局配置（EA_MAP, LEVEL_RANGES, paths）— 單一 source of truth
+├── models.py                 # 數據模型（dataclass/TypedDict）
+├── data/
+│   ├── csv_loader.py         # CSV 讀取（統一 read_csv_trades）
+│   ├── lot_mapping.py        # SET 文件解析 + lot→level 映射
+│   ├── ea_detector.py        # EA 偵測 + 映射（只定義一次）
+│   └── store.py              # SQLite 統一存儲接口
+├── scoring/
+│   ├── dde_v5.py             # score_v5 純函數（無 I/O、無 HTML）
+│   ├── layer_stats.py        # 層分析
+│   ├── tpsl.py               # TP/SL 建議
+│   └── blacklist.py          # 黑名單邏輯
+├── ranking/
+│   ├── signal.py             # Signal 排名邏輯
+│   ├── ccy.py                # CCY 排名邏輯
+│   └── symbol.py             # Symbol 排名邏輯
+├── render/
+│   ├── templates/            # Jinja2 .html 模板文件
+│   │   ├── _base.html
+│   │   ├── signal_ranking.html
+│   │   ├── ccy_ranking.html
+│   │   └── martin_autopsy.html
+│   └── *.py                  # 各頁面渲染器
+├── api/
+│   └── server.py             # FastAPI app
+└── cli.py                    # 統一 CLI 入口
+```
+
+#### 14.3.2 數據層優化
+
+**取代 Pickle → SQLite（tsa.db）：**
+
+```sql
+CREATE TABLE signal_scores (
+    signal_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    ea_type TEXT,
+    dde_v5_score REAL,
+    wr_score REAL, pf_score REAL, dd_score REAL,
+    ml_score REAL, sc_score REAL, he_score REAL,
+    red_card INTEGER DEFAULT 0,
+    computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(signal_id, symbol)
+);
+```
+
+**遷移策略（漸進式）：**
+1. Phase 1：新增 SQLite writer，保留 pickle fallback
+2. Phase 2：ranking 腳本改讀 SQLite
+3. Phase 3：移除 pickle 依賴
+
+#### 14.3.3 HTML 生成 — 引入 Jinja2
+
+**現狀：** 所有 HTML 用 f-string / string concatenation
+**建議：** Jinja2 模板，HTML 同 Python 完全分離
+
+#### 14.3.4 測試策略
+
+| 層級 | 覆蓋範圍 | 工具 |
+|------|----------|------|
+| Unit | 評分公式、層級偵測、EA 映射 | pytest |
+| Integration | CSV→Score→Output pipeline | pytest + fixture CSV |
+| Regression | Golden file 比對（已知結果） | pytest + snapshot |
+| Visual | HTML 報告渲染正確性 | 手動 + screenshot |
+
+### 14.4 實戰風險管理（King + Gemini 主導）
+
+#### 14.4.1 $1,000 帳戶風險框架
+
+**每筆交易最大風險：** 帳戶淨值 × 1-2%（$10-$20）
+**單一信號最大浮動虧損：** 帳戶淨值 × 10-15%（$100-$150）
+**全帳戶最大 DD：** 50%（$500）— 老闆硬性要求
+
+#### 14.4.2 馬丁風險量化
+
+**連續虧損 → 爆倉概率：**
+```
+P(連虧 k 次) = (1 - WR)^k
+Example: WR=60% → P(5連虧) = 1.0%, P(8連虧) = 0.07%
+```
+
+**馬丁層級 × 實際成本（以 DW LotMul×2.5 為例）：**
+| 層級 | Lot | 累計成本 | $1K 帳戶 % |
+|------|-----|----------|------------|
+| L1 | 0.01 | ~$10 | 1% |
+| L3 | 0.06 | ~$100 | 10% |
+| L5 | 0.39 | ~$700 | 70% |
+| L6+ | 0.97+ | >$1,500 | >150% 💀 |
+
+#### 14.4.3 多帳戶組合優化
+
+**相關性矩陣：** 用每日/每小時回報計算 Pearson correlation
+**組合構建：** 等權或風險平價（risk parity），避免高相關 CCY 集中
+**5 帳戶分配建議：** 每帳戶 2-3 個低相關 CCY
+
+### 14.5 進階分析建議（Gemini Pro Hui）
+
+#### 14.5.1 Walk-Forward Analysis
+
+- 將歷史數據分 12 個時期
+- 每步在 Period N 訓練/優化，在 Period N+1 測試
+- 模擬真實交易環境，大幅降低過擬合風險
+
+#### 14.5.2 市場狀態偵測
+
+- 用 ADX 或 ATR 分類 Trending/Ranging
+- 分析每個信號喺唔同市況下嘅表現
+- 推薦組合應加權向當前市況最適合嘅信號傾斜
+
+#### 14.5.3 ML 信號品質預測
+
+- 用 LightGBM / Logistic Regression 預測信號未來一週盈利概率
+- 特徵：近期 WR、DD、持倉時間、市場波動率
+- 長期目標，建立後可顯著提升系統價值
+
+### 14.6 實施路線圖
+
+| Phase | 時間 | 內容 | 優先級 |
+|-------|------|------|--------|
+| **Phase 0** | 1-2 天 | 修復 dde_v4_scorer.py LEVEL_RANGES（改 lot-based） | P0 |
+| **Phase 0** | 1-2 天 | 修復 CoP 勝率計算（改為基於全部交易） | P0 |
+| **Phase 1** | 3-5 天 | 實作 DDE v5 統一評分 | P0 |
+| **Phase 1** | 3-5 天 | 新增 Max Drawdown Control 維度 | P0 |
+| **Phase 1** | 2-3 天 | EA_MAP 去重（單一 source of truth） | P1 |
+| **Phase 2** | 5-7 天 | 架構重構：模組化 + Jinja2 模板 | P1 |
+| **Phase 2** | 3-5 天 | SQLite 取代 Pickle | P1 |
+| **Phase 2** | 2-3 天 | 投資組合相關性分析 | P1 |
+| **Phase 3** | 5-7 天 | Walk-Forward Analysis | P2 |
+| **Phase 3** | 7-10 天 | 市場狀態偵測 + ML 預測 | P2 |
+| **Phase 4** | 持續 | 自動化 Pipeline + CI/CD | P2 |
+
+### 14.7 關鍵共識同分歧
+
+#### 共識（四方一致）
+
+1. ✅ 評分系統必須統一（v3/v4/v5 → 一套公式）
+2. ✅ DD 控制必須加入評分維度（$1K 帳戶生死線）
+3. ✅ CoP 白送問題必須修復
+4. ✅ 小樣本處理必須改用置信度加權
+5. ✅ HTML 生成必須用模板引擎
+6. ✅ 數據存儲必須統一（SQLite）
+
+#### 分歧
+
+| 議題 | Quant | King | Coder | Gemini | 決定 |
+|------|-------|------|-------|--------|------|
+| PF vs Sharpe | PF 更穩健 | 兩者都要 | — | Sharpe 更專業 | **待定** |
+| v5 權重分配 | DD 20% | DD 應更高（25%） | — | 同意 Quant | **待老闆確認** |
+| 重構策略 | — | — | 漸進式 | 漸進式 | **共識：漸進式** |
+
+---
+
+### 14.8 實戰風險管理詳細方案（King 主導）
+
+> 完整報告見：`trade_strategy_analyzer/TSA_Risk_Management_Optimization.md`
+
+#### 14.8.1 $1K 帳戶 DD 六級制
+
+現有三級制（<$3K/$3-6K/$6K+）對 $1K 帳戶毫無分辨力（85% 信號都喺最細嗰級）。
+
+| 等級 | DD 上限 | 帳戶 % | 標籤 | 顏色 |
+|------|---------|--------|------|------|
+| S | ≤$50 | ≤5% | 極安全 | 🟢 |
+| A | ≤$100 | ≤10% | 安全 | 🟢 |
+| B | ≤$200 | ≤20% | 可控 | 🟡 |
+| C | ≤$350 | ≤35% | 注意 | 🟡 |
+| D | ≤$500 | ≤50% | 危險 | 🟠 |
+| F | >$500 | >50% | **拒絕** | 🔴 |
+
+**統計：** 71 信號中只有 42 個（59%）MaxDD 喺 $1K 可承受範圍（<$500）。
+
+#### 14.8.2 馬丁層級 × $1K 帳戶爆倉風險（DW ×2.5 為例）
+
+| 層級 | 累計手數 | $/pip | 300pip DD | 爆倉所需 pips |
+|------|----------|-------|-----------|---------------|
+| L1 | 0.01 | $0.10 | $30 | 10,000 |
+| L2 | 0.035 | $0.35 | $105 | 2,857 |
+| L3 | 0.098 | $0.98 | $293 | 1,020 |
+| L4 | 0.254 | $2.54 | **$761** | 394 |
+| L5 | 0.644 | $6.44 | **$1,932** | 155 |
+
+**$1K 帳戶最大層級限制：**
+- DW (×2.5): 最多 L3
+- SMA (×1.5): 最多 L4
+- MKD: 最多 L3
+- S10 (平注): 最多 L5
+
+#### 14.8.3 CCY 相關性分組
+
+| 群組 | 貨幣對 | 內部相關性 |
+|------|--------|-----------|
+| AUD 系 | AUDCAD, AUDUSD, AUDJPY, AUDCHF | 0.6-0.85 |
+| GBP 系 | GBPUSD, GBPJPY, GBPAUD, GBPCAD | 0.5-0.75 |
+| EUR 系 | EURUSD, EURGBP, EURAUD, EURJPY | 0.5-0.70 |
+| JPY 系 | USDJPY, EURJPY, GBPJPY, CHFJPY | 0.4-0.65 |
+
+**規則：** 同一群組最多選 2 個入組合。
+
+#### 14.8.4 即時可用嘅 5 帳戶組合
+
+**Buy：**
+1. S12962 EURUSD (MKD, 90.7分, DD $85)
+2. S16596 EURJPY (SMA/S10, 98.2分, DD $40)
+3. S33101 GBPCAD (DW, 80.9分, DD $63)
+
+**Sell：**
+4. S31593 USDCHF (DW, 84.0分, DD $108)
+5. S22278 GBPAUD (DW, 80.7分, DD $94)
+
+**組合總 DD：** $390 (39%) ✅ | CCY 群組充分分散
+
+#### 14.8.5 實戰執行流程
+
+1. TSA Ranking 篩選 → $1K DD 分級過濾 → 相關性排除 → 反向 DD 加權
+2. 生成 MT4 .set 參數建議（Base Lot + Max Levels + SL override）
+3. AlgoForest 設定 Copy Trade（CoP, wait=5-10 pips）
+4. 每日監控組合 DD（>25% 警告, >35% 建議平倉）
+
+---
+
+*此章節由丁蟹整合 Quant、King、Coder、Gemini Pro Hui 四方討論結果。日期：2026-05-25。*
