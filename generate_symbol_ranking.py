@@ -26,7 +26,10 @@ SAMPLES_DIR = BASE_DIR / 'samples'
 OUTPUT_DIR = BASE_DIR / 'output'
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-LEVEL_RANGES = {
+# DEPRECATED: LEVEL_RANGES was pip-based, no longer used for scoring.
+# See dde_v4_scorer.py for lot-based level classification.
+# NOTE: generate_symbol_ranking.py currently has broken imports (generate_all_levels_from_csv archived).
+_DEPRECATED_LEVEL_RANGES = {
     'L1': (0, 50),
     'L2': (50, 100),
     'L3': (100, 150),

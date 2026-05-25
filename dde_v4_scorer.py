@@ -343,7 +343,7 @@ if __name__ == '__main__':
     # Summary
     scored = [r for r in all_results if not r['red_card']]
     red = [r for r in all_results if r['red_card']]
-    print(f"\n📊 DDE v4 Results (pip-based):")
+    print(f"\n📊 DDE v4 Results (lot-based):")
     print(f"  Total rows: {len(all_results)}")
     print(f"  Scored: {len(scored)}")
     print(f"  Red card: {len(red)}")
