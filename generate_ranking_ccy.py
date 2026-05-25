@@ -52,6 +52,7 @@ def get_score_class(score):
 
 
 def get_dd_class(dd_value):
+    """DD classification — pips-based with $1K context."""
     abs_dd = abs(dd_value)
     if abs_dd < 500:
         return 'dd-g'
@@ -59,6 +60,33 @@ def get_dd_class(dd_value):
         return 'dd-y'
     else:
         return 'dd-r'
+
+
+def get_dd_1k_tier(max_dd_pips, symbol=''):
+    """
+    $1K account DD tier (King's 6-tier system).
+    Converts pips DD to approximate dollar DD for a $1,000 account.
+    Uses typical pip values per lot for different CCY groups.
+    """
+    abs_dd = abs(max_dd_pips)
+    # Approximate $/pip for 0.01 lot (standard micro lot)
+    # JPY pairs: ~$0.065/pip, Standard pairs: ~$0.10/pip, XAU: ~$0.01/pip
+    if 'JPY' in symbol:
+        dollar_per_pip = 0.065
+    elif 'XAU' in symbol or 'XAG' in symbol:
+        dollar_per_pip = 0.01  # XAU is quoted differently
+    else:
+        dollar_per_pip = 0.10  # Standard pairs like EURUSD, GBPUSD
+    
+    est_dollar_dd = abs_dd * dollar_per_pip
+    pct = est_dollar_dd / 1000 * 100
+    
+    if pct <= 5:    return ('S', '#4CAF50', '≤5%')     # ≤$50
+    elif pct <= 10: return ('A', '#8BC34A', '≤10%')    # ≤$100
+    elif pct <= 20: return ('B', '#CDDC39', '≤20%')    # ≤$200
+    elif pct <= 35: return ('C', '#FFC107', '≤35%')    # ≤$350
+    elif pct <= 50: return ('D', '#FF9800', '≤50%')    # ≤$500
+    else:           return ('F', '#F44336', '>50%')    # >$500
 
 
 def fmt_pips(val):
@@ -108,7 +136,7 @@ def generate_html(all_results):
                  sorted(red, key=lambda x: x['dde_v4'], reverse=True)
 
     # ── Table header HTML (reused across panels) ──
-    thead_html = '''<thead><tr><th data-col="idx" data-type="num">#<span class="arrow"></span></th><th data-col="signal" data-type="num">Signal<span class="arrow"></span></th><th data-col="symbol" data-type="str">CCY<span class="arrow"></span></th><th data-col="dde" data-type="num">DDE v4<span class="arrow"></span></th><th data-col="rr" data-type="num"><span class="tooltip" data-tip="Risk/Reward — 淨點數/最大虧損 (35%)">RR</span><span class="arrow"></span></th><th data-col="ml" data-type="num"><span class="tooltip" data-tip="Martin Layers — 馬丁層數 (25%)">ML</span><span class="arrow"></th><th data-col="wr" data-type="num"><span class="tooltip" data-tip="Win Rate — 勝率 ≥55%起計 (20%)">WR</span><span class="arrow"></span></th><th data-col="tc" data-type="num"><span class="tooltip" data-tip="Trade Count — 交易數量 ≥20起計 (15%)">TC</span><span class="arrow"></span></th><th data-col="ht" data-type="num"><span class="tooltip" data-tip="Holding Time — 平均持倉時間 (5%)">HT</span><span class="arrow"></span></th><th data-col="trades" data-type="num">Trades<span class="arrow"></span></th><th data-col="win" data-type="num">Win%<span class="arrow"></span></th><th data-col="pf" data-type="num">PF<span class="arrow"></span></th><th data-col="profit" data-type="num">Profit<span class="arrow"></span></th><th data-col="dd" data-type="num">Max DD<span class="arrow"></span></th><th data-col="wal" data-type="num">WAL<span class="arrow"></span></th><th data-col="ea" data-type="str">EA<span class="arrow"></span></th><th data-col="lv" data-type="str">LV<span class="arrow"></span></th></tr></thead>'''
+    thead_html = '''<thead><tr><th data-col="idx" data-type="num">#<span class="arrow"></span></th><th data-col="signal" data-type="num">Signal<span class="arrow"></span></th><th data-col="symbol" data-type="str">CCY<span class="arrow"></span></th><th data-col="dde" data-type="num">DDE v4<span class="arrow"></span></th><th data-col="rr" data-type="num"><span class="tooltip" data-tip="Risk/Reward — 淨點數/最大虧損 (35%)">RR</span><span class="arrow"></span></th><th data-col="ml" data-type="num"><span class="tooltip" data-tip="Martin Layers — 馬丁層數 (25%)">ML</span><span class="arrow"></th><th data-col="wr" data-type="num"><span class="tooltip" data-tip="Win Rate — 勝率 ≥55%起計 (20%)">WR</span><span class="arrow"></span></th><th data-col="tc" data-type="num"><span class="tooltip" data-tip="Trade Count — 交易數量 ≥20起計 (15%)">TC</span><span class="arrow"></span></th><th data-col="ht" data-type="num"><span class="tooltip" data-tip="Holding Time — 平均持倉時間 (5%)">HT</span><span class="arrow"></span></th><th data-col="trades" data-type="num">Trades<span class="arrow"></span></th><th data-col="win" data-type="num">Win%<span class="arrow"></span></th><th data-col="pf" data-type="num">PF<span class="arrow"></span></th><th data-col="profit" data-type="num">Profit<span class="arrow"></span></th><th data-col="dd" data-type="num">Max DD<span class="arrow"></span></th><th data-col="dd1k" data-type="str"><span class="tooltip" data-tip="$1K 帳戶 DD 風險等級：S≤5% / A≤10% / B≤20% / C≤35% / D≤50% / F>50%（爆倉）">$1K DD</span><span class="arrow"></span></th><th data-col="wal" data-type="num">WAL<span class="arrow"></span></th><th data-col="ea" data-type="str">EA<span class="arrow"></span></th><th data-col="lv" data-type="str">LV<span class="arrow"></span></th></tr></thead>'''
 
     def make_row(r, idx):
         """Generate a single table row."""
@@ -135,8 +163,11 @@ def generate_html(all_results):
         # DD
         dd_cell = f'<td class="{dd_cls}" data-val="{r["max_dd_pips"]}">{fmt_pips(r["max_dd_pips"])}</td>'
         if is_red and abs(r['max_dd_pips']) < 500:
-            # Red cards may not have data-val on DD
             dd_cell = f'<td class="{dd_cls}">{fmt_pips(r["max_dd_pips"])}</td>'
+
+        # $1K DD Tier
+        tier_letter, tier_color, tier_desc = get_dd_1k_tier(r['max_dd_pips'], r['symbol'])
+        tier_cell = f'<td><span style="background:{tier_color};color:#fff;padding:1px 6px;border-radius:3px;font-size:0.85em;font-weight:bold" title="$1K DD ≈ {tier_desc}">{tier_letter}</span></td>'
 
         # PF
         pf = r['pf']
@@ -164,6 +195,7 @@ def generate_html(all_results):
 <td data-val="{pf}">{pf_str}</td>
 {profit_cell}
 {dd_cell}
+{tier_cell}
 <td data-val="{wal_val}">{wal_str}</td>
 <td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{r['ea']}</span></td>
 <td>{r['lv']}</td>
