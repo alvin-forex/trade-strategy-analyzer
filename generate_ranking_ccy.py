@@ -136,7 +136,7 @@ def generate_html(all_results):
                  sorted(red, key=lambda x: x['dde_v4'], reverse=True)
 
     # ── Table header HTML (reused across panels) ──
-    thead_html = '''<thead><tr><th data-col="idx" data-type="num">#<span class="arrow"></span></th><th data-col="signal" data-type="num">Signal<span class="arrow"></span></th><th data-col="symbol" data-type="str">CCY<span class="arrow"></span></th><th data-col="dde" data-type="num">DDE v4<span class="arrow"></span></th><th data-col="rr" data-type="num"><span class="tooltip" data-tip="Risk/Reward — 淨點數/最大虧損 (35%)">RR</span><span class="arrow"></span></th><th data-col="ml" data-type="num"><span class="tooltip" data-tip="Martin Layers — 馬丁層數 (25%)">ML</span><span class="arrow"></th><th data-col="wr" data-type="num"><span class="tooltip" data-tip="Win Rate — 勝率 ≥55%起計 (20%)">WR</span><span class="arrow"></span></th><th data-col="tc" data-type="num"><span class="tooltip" data-tip="Trade Count — 交易數量 ≥20起計 (15%)">TC</span><span class="arrow"></span></th><th data-col="ht" data-type="num"><span class="tooltip" data-tip="Holding Time — 平均持倉時間 (5%)">HT</span><span class="arrow"></span></th><th data-col="trades" data-type="num">Trades<span class="arrow"></span></th><th data-col="win" data-type="num">Win%<span class="arrow"></span></th><th data-col="pf" data-type="num">PF<span class="arrow"></span></th><th data-col="profit" data-type="num">Profit<span class="arrow"></span></th><th data-col="dd" data-type="num">Max DD<span class="arrow"></span></th><th data-col="dd1k" data-type="str"><span class="tooltip" data-tip="$1K 帳戶 DD 風險等級：S≤5% / A≤10% / B≤20% / C≤35% / D≤50% / F>50%（爆倉）">$1K DD</span><span class="arrow"></span></th><th data-col="wal" data-type="num">WAL<span class="arrow"></span></th><th data-col="ea" data-type="str">EA<span class="arrow"></span></th><th data-col="lv" data-type="str">LV<span class="arrow"></span></th></tr></thead>'''
+    thead_html = '''<thead><tr><th data-col="idx" data-type="num">#<span class="arrow"></span></th><th data-col="signal" data-type="num">Signal<span class="arrow"></span></th><th data-col="ea" data-type="str">EA<span class="arrow"></span></th><th data-col="symbol" data-type="str">CCY<span class="arrow"></span></th><th data-col="dde" data-type="num">DDE v4<span class="arrow"></span></th><th data-col="rr" data-type="num"><span class="tooltip" data-tip="Risk/Reward — 淨點數/最大虧損 (35%)">RR</span><span class="arrow"></span></th><th data-col="ml" data-type="num"><span class="tooltip" data-tip="Martin Layers — 馬丁層數 (25%)">ML</span><span class="arrow"></th><th data-col="wr" data-type="num"><span class="tooltip" data-tip="Win Rate — 勝率 ≥55%起計 (20%)">WR</span><span class="arrow"></span></th><th data-col="tc" data-type="num"><span class="tooltip" data-tip="Trade Count — 交易數量 ≥20起計 (15%)">TC</span><span class="arrow"></span></th><th data-col="ht" data-type="num"><span class="tooltip" data-tip="Holding Time — 平均持倉時間 (5%)">HT</span><span class="arrow"></span></th><th data-col="trades" data-type="num">Trades<span class="arrow"></span></th><th data-col="win" data-type="num">Win%<span class="arrow"></span></th><th data-col="pf" data-type="num">PF<span class="arrow"></span></th><th data-col="profit" data-type="num">Profit<span class="arrow"></span></th><th data-col="dd" data-type="num">Max DD<span class="arrow"></span></th><th data-col="dd1k" data-type="str"><span class="tooltip" data-tip="$1K 帳戶 DD 風險等級：S≤5% / A≤10% / B≤20% / C≤35% / D≤50% / F>50%（爆倉）">$1K DD</span><span class="arrow"></span></th><th data-col="wal" data-type="num">WAL<span class="arrow"></span></th><th data-col="lv" data-type="str">LV<span class="arrow"></span></th></tr></thead>'''
 
     def make_row(r, idx):
         """Generate a single table row."""
@@ -186,6 +186,7 @@ def generate_html(all_results):
         return f'''<tr data-symbol="{r['symbol']}"{rc_cls}>
 <td data-val="{idx}.0">{idx}</td>
 <td><a href="https://signals.algoforest.com/signals/{r['signal_id']}">{r['signal_id']}</a> <a href="../detailed_comparison_all_levels_{r['signal_id']}.html">📊</a></td>
+<td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{r['ea']}</span></td>
 <td style="font-weight:bold;color:var(--primary)">{r['symbol']}</td>
 {dde_cell}
 <td data-val="{r["rr"]}">{r["rr"]:.0f}</td><td data-val="{r["ml"]}">{r["ml"]:.0f}</td>
@@ -197,7 +198,6 @@ def generate_html(all_results):
 {dd_cell}
 {tier_cell}
 <td data-val="{wal_val}">{wal_str}</td>
-<td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{r['ea']}</span></td>
 <td>{r['lv']}</td>
 </tr>
 '''

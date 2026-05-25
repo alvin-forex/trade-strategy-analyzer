@@ -330,9 +330,9 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 <div><div class="v">{avg_clean_pct:.0f}%</div><div class="l">Avg CB</div></div>
 </div>
 <div style="overflow-x:auto;width:100%"><table><thead><tr>
-<th>#</th><th>Signal</th><th>CCY</th><th>DDE</th><th>CB</th>
+<th>#</th><th>Signal</th><th>EA</th><th>CCY</th><th>DDE</th><th>CB</th>
 <th>Win%</th><th>Trades</th><th>Profit</th><th>DD</th><th>PF</th>
-<th>TF</th><th>LV</th><th>EA</th>
+<th>TF</th><th>LV</th>
 </tr></thead><tbody>
 '''
     
@@ -367,6 +367,7 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
         html += f'''<tr{row_class}>
 <td>{rank}</td>
 <td class="sig"><a href="{signal_page_url}" style="color:var(--accent);font-weight:bold;text-decoration:none">{signal_id}</a> <a href="{report_url}" title="Signal 深度分析" style="text-decoration:none;font-size:14px">📊</a> <a href="{martin_url}" title="馬丁剖析法" style="text-decoration:none;font-size:14px">🔍</a></td>
+<td>{ea_tags}</td>
 <td>{r['total_symbols']}</td>
 <td class="{score_cls}">{r['avg_score']}</td>
 <td class="p4">{r['clean_pct']}%</td>
@@ -377,7 +378,6 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 <td>{pf_str}</td>
 <td><span class="tf">{r['timeframe']}</span></td>
 <td class="m">{r['layer_info']}</td>
-<td>{ea_tags}</td>
 </tr>
 '''
     
