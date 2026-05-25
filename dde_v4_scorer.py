@@ -25,7 +25,10 @@ import pickle
 from pathlib import Path
 from collections import defaultdict
 
-LEVEL_RANGES = {
+# DEPRECATED: LEVEL_RANGES was pip-based, no longer used for level classification.
+# Level classification is now LOT-BASED only. See compute_layer_lot() and infer_levels_from_lots().
+# Kept for reference only — DO NOT USE in any scoring logic.
+_DEPRECATED_LEVEL_RANGES = {
     'L1': (0, 50),
     'L2': (50, 100),
     'L3': (100, 150),
@@ -69,26 +72,38 @@ def read_csv_trades(csv_path):
     return trades
 
 
-def compute_layer_net_profit(profit):
-    """Return layer name for a given net profit (fallback when no SET)."""
-    if profit < 50:
+def infer_levels_from_lots(trades_for_group):
+    """
+    Fallback: when no SET lot_layers available, infer levels from unique lot values.
+    Sort unique lots ascending; smallest = L1, second = L2, etc.
+    Trades with same lot → same level (e.g. flat-bet like S10 → all L1).
+    """
+    unique_lots = sorted(set(
+        round(t['lots'], 6)
+        for t in trades_for_group
+        if t.get('lots', 0) > 0
+    ))
+    if not unique_lots:
+        return {'_default': 'L1'}  # no lot data at all
+    if len(unique_lots) == 1:
+        return {unique_lots[0]: 'L1'}  # flat-bet
+    mapping = {}
+    for i, lot in enumerate(unique_lots):
+        mapping[lot] = f'L{min(i + 1, 9)}' if i < 8 else 'L9+'
+    return mapping
+
+
+def compute_layer_from_lot_fallback(trade_lot, lot_to_level):
+    """Map a trade's lot to level using inferred lot→level mapping."""
+    if not lot_to_level or trade_lot <= 0:
         return 'L1'
-    elif profit < 100:
-        return 'L2'
-    elif profit < 150:
-        return 'L3'
-    elif profit < 200:
-        return 'L4'
-    elif profit < 250:
-        return 'L5'
-    elif profit < 300:
-        return 'L6'
-    elif profit < 350:
-        return 'L7'
-    elif profit < 400:
-        return 'L8'
-    else:
-        return 'L9+'
+    # Find closest lot in mapping
+    best_lot = min(lot_to_level.keys(), key=lambda x: abs(x - trade_lot))
+    return lot_to_level[best_lot]
+
+
+# REMOVED: compute_layer_net_profit() — was incorrectly using net_profit to classify levels.
+# See BUG_pip_based_levels.md for details.
 
 
 def load_lot_mapping():
@@ -133,14 +148,19 @@ def score_v4(trades_for_symbol, lot_layers=None):
     avg_hold = sum(t['holding_hours'] for t in trades_for_symbol) / n
     max_loss_pip = max((t['max_loss_pips'] for t in trades_for_symbol), default=0)
     
-    # Martin layers: weighted average layer (lot-based)
+    # Martin layers: weighted average layer (STRICTLY lot-based)
+    # If no lot_layers provided, infer from unique lot values in this group
     layer_counts = defaultdict(int)
-    for t in trades_for_symbol:
-        if lot_layers:
+    if lot_layers:
+        for t in trades_for_symbol:
             lv = compute_layer_lot(t['lots'], lot_layers)
-        else:
-            lv = compute_layer_net_profit(t['net_profit'])
-        layer_counts[lv] += 1
+            layer_counts[lv] += 1
+    else:
+        # Fallback: infer levels from unique lot values in this symbol's trades
+        lot_to_level = infer_levels_from_lots(trades_for_symbol)
+        for t in trades_for_symbol:
+            lv = compute_layer_from_lot_fallback(t['lots'], lot_to_level)
+            layer_counts[lv] += 1
     # Convert level name to numeric: L1→1, L2→2, ..., L9+→9
     def lv_to_num(lv_name):
         if lv_name == 'L9+': return 9
@@ -268,8 +288,10 @@ if __name__ == '__main__':
         
         # Get lot layers for this signal
         lot_layers = None
-        if sid in lot_mapping:
+        if sid in lot_mapping and lot_mapping[sid].get('lot_layers'):
             lot_layers = [(lv, lot) for lv, lot in lot_mapping[sid].get('lot_layers', [])]
+        # NOTE: lot_layers is passed per-symbol; if None, score_v4 will
+        # auto-infer from unique lots in that symbol's trades (lot-based fallback)
         
         for sym, sym_trades in by_symbol.items():
             result = score_v4(sym_trades, lot_layers=lot_layers)
