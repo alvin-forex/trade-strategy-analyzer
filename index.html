@@ -116,13 +116,58 @@ svg text { font-family: -apple-system, sans-serif; }
 .param-item .pk { color: var(--primary); font-family: monospace; }
 .param-item .pv { color: var(--accent); font-weight: 600; font-family: monospace; }
 
-/* Tabs */
-.tabs { display: flex; gap: 0; border-bottom: 2px solid #e0e0e0; margin-bottom: 16px; overflow-x: auto; }
-.tab { padding: 10px 16px; cursor: pointer; font-size: 0.9em; font-weight: 600; color: var(--text2); border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
-.tab:hover { color: var(--primary); }
-.tab.active { color: var(--primary); border-bottom-color: var(--accent); }
+/* Tabs - Vertical Sidebar Layout */
+.tabs { display: flex; flex-direction: column; gap: 2px; width: 180px; min-width: 180px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding-right: 8px; }
+.tab { padding: 8px 12px; cursor: pointer; font-size: 0.82em; font-weight: 600; color: var(--text2); border-left: 3px solid transparent; border-radius: 0 6px 6px 0; transition: all 0.2s; white-space: nowrap; }
+.tab:hover { color: var(--primary); background: rgba(15,52,96,0.04); }
+.tab.active { color: var(--primary); border-left-color: var(--accent); background: rgba(15,52,96,0.08); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
+.tabs-layout { display: flex; gap: 20px; align-items: flex-start; }
+.tabs-content { flex: 1; min-width: 0; }
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .tabs-layout { flex-direction: column; }
+  .tabs { flex-direction: row; width: 100%; min-width: unset; position: static; max-height: unset; overflow-x: auto; overflow-y: hidden; gap: 0; border-bottom: 2px solid #e0e0e0; margin-bottom: 12px; padding-right: 0; }
+  .tab { padding: 8px 12px; font-size: 0.78em; border-left: none; border-bottom: 3px solid transparent; border-radius: 0; }
+  .tab.active { border-left-color: transparent; border-bottom-color: var(--accent); }
+  .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .param-grid { grid-template-columns: 1fr !important; }
+  .data-table { font-size: 0.75em; }
+  .card { padding: 12px; }
+  body { padding: 8px; }
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #64b5f6;
+    --accent: #e94560;
+    --bg: #0a0e17;
+    --card: #111520;
+    --text: #d0d0d0;
+    --text2: #888;
+    --green: #4CAF50;
+    --red: #FF5722;
+    --yellow: #FFC107;
+    --orange: #fd7e14;
+    --grade-a: #4CAF50;
+    --grade-b: #FFC107;
+    --grade-c: #fd7e14;
+    --grade-d: #FF5722;
+  }
+  .tab:hover { background: rgba(100,181,246,0.06); }
+  .tab.active { background: rgba(100,181,246,0.1); }
+  .card { border: 1px solid #1e2433; }
+  table { border-color: #1e2433; }
+  td { border-color: #1a1f2e; }
+  th { background: #111520; color: #64b5f6; }
+  .data-table tr:hover { background: #1a1f2e; }
+  select, input { background: #1a1f2e; color: #d0d0d0; border-color: #2a3040; }
+  .btn { border-color: #2a3040; }
+  .btn:hover { background: #283593; }
+}
 
 /* Footer */
 .footer { text-align: center; color: #aab; font-size: 0.78em; margin-top: 32px; padding: 16px 0; }
@@ -338,13 +383,20 @@ svg text { font-family: -apple-system, sans-serif; }
   <!-- Copy Grade -->
   <div class="card" id="copyGradeCard"></div>
 
+  <!-- Executive Summary -->
+  <div class="card" id="execSummaryCard" style="display:none">
+    <h2><span class="icon">📋</span> Executive Summary</h2>
+    <div id="execSummary"></div>
+  </div>
+
   <!-- Summary Stats -->
   <div class="card">
     <h2><span class="icon">📊</span> 摘要統計</h2>
     <div class="stats-grid" id="statsGrid"></div>
   </div>
 
-  <!-- Tabs -->
+  <!-- Tabs Layout -->
+  <div class="tabs-layout">
   <div class="tabs" id="mainTabs">
     <div class="tab active" data-tab="tab-equity">📈 收益曲線</div>
     <div class="tab" data-tab="tab-score">🎯 質量評分</div>
@@ -367,6 +419,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-set">⚙️ SET 參數</div>
     <div class="tab" data-tab="tab-archive">📁 歷史記錄</div>
   </div>
+  <div class="tabs-content">
 
   <div class="card tab-panel active" id="tab-equity">
     <div id="equityChart"></div>
@@ -484,7 +537,11 @@ svg text { font-family: -apple-system, sans-serif; }
     </div>
     <div id="archiveContent"><p style="color:#999">點擊「載入記錄」從本地 API 載入，或「匯入 JSON」匯入之前下載的分析檔案</p></div>
   </div>
-</div>
+  </div>
+  </div><!-- /tabs-content -->
+  </div><!-- /tabs-layout -->
+
+</div><!-- /results -->
 
 <p class="footer">🦀 Trade Strategy Analyzer <span id="versionLabel"></span> | <a href="https://github.com/alvin-forex/trade-strategy-analyzer/blob/main/CHANGELOG.md" target="_blank" style="color:var(--accent)">📋 版本日誌</a> | 純瀏覽器運算 · 無需伺服器</p>
 </div>
@@ -1362,6 +1419,9 @@ async function analyze() {
     $('downloadBtn').style.display='inline-block';
     $('saveArchiveBtn').style.display='inline-block';
 
+    // Render Executive Summary card
+    renderExecutiveSummary(overall, positions, layerStats, symbolStats, martinV3Data);
+
     // Auto-archive after analysis
     try { _doSaveArchive(positions, true); } catch(e) { console.warn('Auto-archive failed:', e); }
 
@@ -1404,6 +1464,154 @@ async function analyze() {
 }
 
 // === Renderers ===
+function renderMartinSummary(martinV3Data) {
+  if (!martinV3Data) return '';
+  const s = martinV3Data.summary;
+  const bl = martinV3Data.blacklist;
+  const aGrade = martinV3Data.aGradeLayers;
+  const recovery = martinV3Data.recovery;
+  
+  // Martin risk level
+  let riskLevel, riskColor, riskIcon;
+  if (s.blacklistCount === 0 && s.unrecoverableCount === 0 && s.negEvCount <= 1) {
+    riskLevel = '低風險'; riskColor = '#28a745'; riskIcon = '✅';
+  } else if (s.unrecoverableCount > 0 || s.blacklistCount >= 3) {
+    riskLevel = '高風險'; riskColor = '#dc3545'; riskIcon = '🔴';
+  } else {
+    riskLevel = '中等風險'; riskColor = '#FFC107'; riskIcon = '🟡';
+  }
+  
+  let html = `<div style="margin-top:12px;padding:12px;background:var(--bg-hover);border-radius:8px;border-left:4px solid ${riskColor}">`;
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <b style="font-size:0.95em">🎲 馬丁風險分析</b>
+    <span style="color:${riskColor};font-weight:bold;font-size:0.9em">${riskIcon} ${riskLevel}</span>
+  </div>`;
+  
+  // Quick stats row
+  html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:0.8em;margin-bottom:8px">`;
+  html += `<div style="text-align:center"><b>${s.totalLayers}</b><br><span style="color:var(--text2)">層級組合</span></div>`;
+  html += `<div style="text-align:center"><b style="color:#28a745">${s.posEvCount}</b><br><span style="color:var(--text2)">正EV層</span></div>`;
+  html += `<div style="text-align:center"><b style="color:#dc3545">${s.negEvCount}</b><br><span style="color:var(--text2)">負EV層</span></div>`;
+  html += `<div style="text-align:center"><b style="color:#28a745">${s.aGradeCount}</b><br><span style="color:var(--text2)">A級+層</span></div>`;
+  html += `</div>`;
+  
+  // Blacklist warnings
+  if (bl.length > 0) {
+    html += `<div style="font-size:0.8em;color:#dc3545;margin-bottom:4px">⚠️ 黑名單 (${bl.length}): `;
+    html += bl.slice(0, 3).map(b => `${b.symbol} ${b.direction} (${b.level})`).join(' · ');
+    if (bl.length > 3) html += ` +${bl.length - 3}更多`;
+    html += `</div>`;
+  }
+  
+  // A-grade recommendations
+  if (aGrade.length > 0) {
+    html += `<div style="font-size:0.8em;color:#28a745">⭐ A級+ (${aGrade.length}): `;
+    html += aGrade.slice(0, 3).map(a => `${a.symbol} ${a.direction} L${a.lots} (EV$${a.evDollar.toFixed(0)}, ${a.rating})`).join(' · ');
+    if (aGrade.length > 3) html += ` +${aGrade.length - 3}更多`;
+    html += `</div>`;
+  }
+  
+  // Recovery status
+  const unrecoverable = recovery.filter(r => r.status.includes('無法恢復'));
+  if (unrecoverable.length > 0) {
+    html += `<div style="font-size:0.8em;color:#dc3545">🔴 無法恢復: ${unrecoverable.map(r => r.symbol + ' ' + r.direction).join(' · ')}</div>`;
+  }
+  
+  html += `</div>`;
+  return html;
+}
+
+function renderExecutiveSummary(overall, positions, layerStats, symbolStats, martinV3Data) {
+  const card = $('execSummaryCard');
+  const el = $('execSummary');
+  if (!overall || !positions || !positions.length) { card.style.display='none'; return; }
+
+  const totalTrades = positions.length;
+  const wins = positions.filter(p => p.net_profit > 0).length;
+  const winRate = (wins / totalTrades * 100).toFixed(1);
+  const totalProfit = positions.reduce((s, p) => s + (p.net_profit || 0), 0);
+  const totalPips = positions.reduce((s, p) => s + (p.pips || 0), 0);
+  const maxDD = overall.maxDD || 0;
+  const pf = overall.profitFactor || 0;
+  const avgHolding = totalTrades > 0 ? (positions.reduce((s, p) => s + (p.holdingHours || 0), 0) / totalTrades).toFixed(1) : 0;
+  
+  // Layer analysis
+  const maxLayer = Math.max(...positions.map(p => p.layer || 1));
+  const layer1Only = positions.filter(p => (p.layer || 1) === 1).length;
+  const layer1Rate = (layer1Only / totalTrades * 100).toFixed(0);
+  
+  // Symbol count
+  const symbols = [...new Set(positions.map(p => p.symbol))];
+  const symbolCount = symbols.length;
+  
+  // Best/worst symbol
+  const symPnl = {};
+  positions.forEach(p => { symPnl[p.symbol] = (symPnl[p.symbol] || 0) + (p.net_profit || 0); });
+  const sortedSyms = Object.entries(symPnl).sort((a, b) => b[1] - a[1]);
+  const bestSym = sortedSyms[0];
+  const worstSym = sortedSyms[sortedSyms.length - 1];
+  
+  // Verdict
+  let verdict = '', verdictColor = '', verdictIcon = '';
+  const wr = parseFloat(winRate);
+  if (wr >= 70 && pf >= 1.5 && maxLayer <= 3) {
+    verdict = '首選 Copy'; verdictColor = '#28a745'; verdictIcon = '⭐⭐⭐';
+  } else if (wr >= 60 && pf >= 1.2) {
+    verdict = '可考慮 Copy'; verdictColor = '#FFC107'; verdictIcon = '⭐⭐';
+  } else if (wr >= 50) {
+    verdict = '觀察中'; verdictColor = '#fd7e14'; verdictIcon = '⭐';
+  } else {
+    verdict = '不建議 Copy'; verdictColor = '#dc3545'; verdictIcon = '⚠️';
+  }
+  
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:8px">
+        <div style="font-size:1.5em">${verdictIcon}</div>
+        <div style="font-size:1.2em;font-weight:bold;color:${verdictColor};margin:4px 0">${verdict}</div>
+        <div style="font-size:0.8em;color:var(--text2)">綜合評價</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="text-align:center;padding:8px;background:var(--bg-hover);border-radius:6px">
+          <div style="font-size:1.1em;font-weight:bold;color:#28a745">$${totalProfit.toFixed(0)}</div>
+          <div style="font-size:0.7em;color:var(--text2)">總盈虧</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg-hover);border-radius:6px">
+          <div style="font-size:1.1em;font-weight:bold">${winRate}%</div>
+          <div style="font-size:0.7em;color:var(--text2)">勝率</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg-hover);border-radius:6px">
+          <div style="font-size:1.1em;font-weight:bold;color:#dc3545">$${Math.abs(maxDD).toFixed(0)}</div>
+          <div style="font-size:0.7em;color:var(--text2)">最大回撤</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--bg-hover);border-radius:6px">
+          <div style="font-size:1.1em;font-weight:bold">${pf.toFixed(1)}</div>
+          <div style="font-size:0.7em;color:var(--text2)">盈虧比</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+      <div style="text-align:center;padding:6px;background:var(--bg-hover);border-radius:6px">
+        <div style="font-weight:bold">${totalTrades}</div><div style="font-size:0.7em;color:var(--text2)">交易數</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:var(--bg-hover);border-radius:6px">
+        <div style="font-weight:bold">${symbolCount}對</div><div style="font-size:0.7em;color:var(--text2)">貨幣對</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:var(--bg-hover);border-radius:6px">
+        <div style="font-weight:bold">${avgHolding}h</div><div style="font-size:0.7em;color:var(--text2)">平均持倉</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:var(--bg-hover);border-radius:6px">
+        <div style="font-weight:bold">${maxLayer}層</div><div style="font-size:0.7em;color:var(--text2)">最深層數</div>
+      </div>
+    </div>
+    ${bestSym ? `<div style="font-size:0.85em;color:var(--text2);padding:8px;background:var(--bg-hover);border-radius:6px;margin-bottom:12px">
+      💰 最強: <b style="color:#28a745">${bestSym[0]}</b> ($${bestSym[1].toFixed(0)}) ${worstSym && worstSym[0] !== bestSym[0] ? `| 💀 最弱: <b style="color:#dc3545">${worstSym[0]}</b> ($${worstSym[1].toFixed(0)})` : ''}
+    </div>` : ''}
+    ${renderMartinSummary(martinV3Data)}
+  `;
+  card.style.display = 'block';
+}
+
 function renderCopyGrade(g) {
   $('copyGradeCard').innerHTML = `
     <div class="copy-grade">
@@ -2640,7 +2848,7 @@ function calcMartinRisk(positions) {
   };
 }
 
-
+function renderMartinRisk(data) {
   if (!data) { $('martinAnalysis').innerHTML = '<p style="color:#999">數據不足</p>'; return; }
 
   const riskInfo = infoToggle('martin-risk', '<b>🎲 馬丁風險分析</b><br>深入分析馬丁格爾策略嘅逐層回歸表現、加倉效率、破產風險同資金效率。<br><b>回歸率</b> = 該層最終盈利倉位比例。Martin 策略嘅特徵係深層回歸率極高（L4+ 勝率遠高於 L1）。<br><b>破產風險</b>基於數據中最大層數評估：≤3 🟢、4-5 🟡、6-7 🔴、≥8 ⛔。');
