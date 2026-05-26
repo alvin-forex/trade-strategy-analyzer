@@ -689,60 +689,65 @@ trade_strategy_analyzer/
 | DDE v4 | Signal Ranking + CCY Ranking | `dde_v4_scorer.py` + ranking 腳本 |
 | Rating S+/S/A/B/C/D/E | CCY Deep Analysis（跨 Signal 聚合） | `generate_ccy_deep_analysis.py` |
 
-#### 14.2.2 DDE v5 統一評分維度（建議）
+#### 14.2.2 DDE v5 統一評分維度（✅ 老闆確認版 2026-05-26）
 
-| # | 維度 | 權重 | 計算方法 | 改動理由 |
+**設計原則：** 用最真實嘅交易數據，唔做歸一化扭曲。排名制解決不同維度數值範圍差異。
+
+| # | 維度 | 權重 | 計算方法 | 老闆決定 |
 |---|------|------|----------|----------|
-| 1 | Adjusted Win Rate | 15% | `(WR - 50) / 40 × 100`，上限 100 | 簡化，移除 CoP 白送問題 |
-| 2 | Profit Factor | 20% | `gross_pips / loss_pips`，`clamp((PF-1)/3 × 100)` | 替代 Risk/Reward，PF 更穩健 |
-| 3 | Max Drawdown Control | 20% | `clamp((2000-abs_dd)/1800 × 100)`，>2000=0 | 新維度，小帳戶生死線 |
-| 4 | Martin Discipline | 20% | Sigmoid：`100/(1+exp(2×(WAL-2)))` | 修正線性衰減太陡 |
-| 5 | Sample Confidence | 15% | `(1-exp(-n/80)) × 100` | 替代 Trade Count，用指數衰減 |
-| 6 | Holding Efficiency | 10% | `total_pips / total_hold_hours`，percentile-based | 衡量時間效率 |
+| 1 | Win Rate（真實勝率） | 15% | 真實勝率 × 100，唔加工 | ✅ 用最真實勝率，唔歸一化 |
+| 2 | Profit Factor | 20% | 平均盈利 pips / 平均 MAX LOSE pips（剔除 3σ 極端值） | ✅ 剔除極端值排除滑價因素 |
+| 3 | $1K DD%（真實 DD%） | 25% | 直接用真實 DD%，唔調整起始資金 | ✅ 方案A：用真實數據唔調整 |
+| 4 | Martin Discipline | 40% | WAL（Weighted Average Layer），沿用 v4 | ✅ 維持現有 |
+| ❌ | ~~交易量~~ | ~~刪除~~ | ~~不使用~~ | ❌ 老闆決定唔用 |
 
-**v5 公式框架：**
+**v5 排名制邏輯：**
 ```python
-def score_v5(trades, lot_layers=None):
-    n = len(trades)
-    if n < 30: return None  # 統一最低樣本閾值
+# 1. 所有 Signal×CCY 計算 4 個維度嘅真實數值
+# 2. 每個維度內排名（越高越好，DD/Martin 越細越好）
+# 3. 排名轉為百分位分數：percentile = (rank - 1) / (N - 1) × 100
+# 4. 加權求和
+def score_v5_batch(all_metrics):
+    wr_pcts = percentile_rank(all_metrics, 'wr_raw', higher_better=True)
+    pf_pcts = percentile_rank(all_metrics, 'pf_raw', higher_better=True)
+    dd_pcts = percentile_rank(all_metrics, 'dd_raw', higher_better=False)   # 越細越好
+    martin_pcts = percentile_rank(all_metrics, 'martin_raw', higher_better=False)  # 越細越好
 
-    # Raw metrics
-    wr_score = clamp((wr - 50) / 40 * 100)           # 50%=0, 90%=100
-    pf_score = clamp((pf - 1) / 3 * 100)              # PF=1→0, PF=4→100
-    dd_score = clamp((2000 - abs_dd) / 1800 * 100)    # 200pips DD→100, 2000+→0
-    ml_score = clamp(100 / (1 + math.exp(2 * (wal - 2))))  # WAL=1→88, WAL=2→50
-    sc_score = clamp((1 - math.exp(-n / 80)) * 100)   # n=80→63, n=200→92
-    he_score = clamp(pips_per_hour / 5 * 100)         # 5 pips/hr→100
-
-    final = wr_score*0.15 + pf_score*0.20 + dd_score*0.20 + ml_score*0.20 + sc_score*0.15 + he_score*0.10
-    return final
+    for m in all_metrics:
+        m['dde_v5'] = (
+            wr_pcts[m] * 0.15 +
+            pf_pcts[m] * 0.20 +
+            dd_pcts[m] * 0.25 +
+            martin_pcts[m] * 0.40
+        )
 ```
 
-**Red Card 規則（統一）：**
+**Profit Factor 計法（老闆指定）：**
+- PF = 平均盈利 pips / 平均 MAX LOSE pips
+- 剔除超過 3 個標準差嘅極端值（排除滑價等因素）
+- 樣本數 < 4 時唔剔除
+
+**Red Card 規則（沿用 v4）：**
 - Net Pips ≤ 0
-- Trade Count < 30
+- Trade Count < 20
 - Max Loss Pips > 500（單筆）
 - Win Rate < 50%
-- Max DD > 2000 pips（新增）
 
-#### 14.2.3 小樣本處理優化
+**實施文件：**
+- `dde_v5_scorer.py` — v5 核心計算引擎
+- `generate_signal_ranking_v5.py` — Signal 排名 HTML
+- `generate_ranking_ccy_v5.py` — CCY 排名 HTML
 
-**現狀問題：** n<30 用 global percentiles 回退，可能過度平滑。但 n<10 全盈利反而拉高分數。
+**測試結果（2026-05-26）：**
+- 972 Signal×CCY pairs
+- 525 scored, 447 red cards
+- Score range: 4.1 - 98.5
+- Top: 高勝率 + flat bet（WAL≈1.0）+ 低 DD
+- Bottom: 高 WAL（馬丁去到 L5）+ 大 DD + PF < 1
 
-**建議方案 — Confidence Band 加權：**
-```python
-def sample_confidence(n, min_n=30):
-    if n >= min_n:
-        return min(1.0, 1.0 + math.log(n / min_n) / 10)  # n=300→1.15 bonus
-    return (n / min_n) ** 2  # 指數衰減：n=15→0.25, n=10→0.11
-```
+#### 14.2.3 ~~小樣本處理優化~~（已改為排名制，唔需要）
 
-| 樣本數 | 置信度 | 效果 |
-|--------|--------|------|
-| 10 | 11% | 幾乎唔影響排名 |
-| 20 | 44% | 有限影響 |
-| 30 | 100% | 完全計入 |
-| 100 | 105% | 大樣本加成 |
+v5 改用排名制後，唔需要 Confidence Band 加權。排名制天然解決咗唔同維度嘅數值範圍差異問題。
 
 ### 14.3 系統架構重構（Coder 主導）
 
