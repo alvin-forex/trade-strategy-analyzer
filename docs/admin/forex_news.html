@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📰 外匯新聞 - TSA</title>
+<style>
+:root{--font-main:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif}
+[data-theme="dark"]{--bg:#0a0e17;--bg-card:#111520;--bg-hover:#1a1f2e;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--border:#1e2433}
+[data-theme="light"]{--bg:#f5f7fa;--bg-card:#ffffff;--bg-hover:#eef2f7;--text:#333;--text2:#666;--primary:#0f3460;--accent:#e94560;--border:#ddd}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-main);background:var(--bg);color:var(--text);padding:20px;max-width:1200px;margin:0 auto}
+h1{font-size:1.4em;color:var(--primary);margin-bottom:8px}
+.sub{color:var(--text2);font-size:0.85em;margin-bottom:20px}
+.news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.news-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;transition:transform .2s,box-shadow .2s}
+.news-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.news-card h3{font-size:1em;margin-bottom:8px;color:var(--primary)}
+.news-card .meta{font-size:0.8em;color:var(--text2);margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap}
+.news-card .meta span{display:inline-flex;align-items:center;gap:4px}
+.news-card .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:600}
+.tag-morning{background:#1a237e;color:#90caf9}
+.tag-evening{background:#b71c1c;color:#ef9a9a}
+.news-card .summary{font-size:0.9em;line-height:1.6;color:var(--text);margin-bottom:12px}
+.news-card a{color:var(--accent);text-decoration:none;font-weight:600;font-size:0.9em}
+.news-card a:hover{text-decoration:underline}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text2)}
+.empty-state .icon{font-size:3em;margin-bottom:12px}
+.section-title{font-size:1.1em;color:var(--primary);margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border}
+.loading{text-align:center;padding:40px;color:var(--text2)}
+.loading .spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.footer{text-align:center;color:var(--text2);font-size:0.75em;margin-top:30px;padding-top:12px;border-top:1px solid var(--border)}
+@media(max-width:600px){body{padding:12px}.news-grid{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="../sidebar.css">
+<script>
+(function(){
+  const saved=localStorage.getItem('tsa-theme');
+  const t=saved||'dark';
+  document.documentElement.setAttribute('data-theme',t);
+})();
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('tsa-theme',next);
+}
+</script>
+</head>
+<body>
+
+<h1>📰 外匯新聞</h1>
+<p class="sub">每日早晚盤外匯市場報告 · AUDCAD · EURCHF · XAUUSD</p>
+
+<div id="newsContainer">
+  <div class="loading">
+    <div class="spinner"></div>
+    <p style="margin-top:12px">載入新聞中...</p>
+  </div>
+</div>
+
+<div class="footer">
+  🦀 Trade Strategy Analyzer · 外匯新聞由系統自動生成
+</div>
+
+<script>
+// News data - static entries from generated reports
+// This will be updated by the cron job when reports are generated
+const NEWS_DATA = [
+  /* NEWS_ENTRIES_START */
+  /* NEWS_ENTRIES_END */
+];
+
+// Fallback: show available reports from /reports/ directory
+async function loadNews() {
+  const container = document.getElementById('newsContainer');
+
+  if (NEWS_DATA.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📭</div>
+        <h3>暫無新聞報告</h3>
+        <p>每日外匯報告會在以下時間自動生成：</p>
+        <p style="margin-top:8px"><strong>🕖 早盤報告</strong> 07:00 HKT</p>
+        <p><strong>🕕 晚盤報告</strong> 18:00 HKT</p>
+        <p style="margin-top:16px;font-size:0.85em">監控貨幣對：AUDCAD · EURCHF · XAUUSD</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Sort by date descending
+  NEWS_DATA.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  let html = '<div class="news-grid">';
+  NEWS_DATA.forEach(item => {
+    const tagClass = item.type === 'morning' ? 'tag-morning' : 'tag-evening';
+    const tagLabel = item.type === 'morning' ? '🌅 早盤' : '🌆 晚盤';
+    html += `
+      <div class="news-card">
+        <h3>${item.title}</h3>
+        <div class="meta">
+          <span class="tag ${tagClass}">${tagLabel}</span>
+          <span>📅 ${item.date}</span>
+          ${item.pairs ? `<span>💱 ${item.pairs}</span>` : ''}
+        </div>
+        <div class="summary">${item.summary}</div>
+        <a href="${item.url}" target="_blank">查看完整報告 →</a>
+      </div>
+    `;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+loadNews();
+</script>
+<script src="../sidebar.js"></script>
+</body>
+</html>
