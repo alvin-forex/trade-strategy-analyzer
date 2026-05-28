@@ -419,6 +419,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-set">⚙️ SET 參數</div>
     <div class="tab" data-tab="tab-archive">📁 歷史記錄</div>
     <div class="tab" data-tab="tab-v2tech">📊 V2 技術分析</div>
+    <div class="tab" data-tab="tab-news">📰 外匯新聞</div>
   </div>
   <div class="tabs-content">
 
@@ -555,6 +556,22 @@ svg text { font-family: -apple-system, sans-serif; }
     </div>
   </div>
 
+  <div class="card tab-panel" id="tab-news">
+    <h2><span class="icon">📰</span> 外匯新聞</h2>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-secondary" onclick="loadNewsLatest()">🔄 載入最新新聞</button>
+      <button class="btn btn-secondary" onclick="loadNewsHistory()">📅 歷史新聞</button>
+      <span id="newsStatus" style="font-size:0.85em;color:#999"></span>
+    </div>
+    <div id="newsContent">
+      <p style="color:#999">點擊「載入最新新聞」查看每日早晚外匯報告</p>
+    </div>
+    <div id="newsHistory" style="display:none">
+      <h3>歷史新聞記錄</h3>
+      <div id="newsHistoryList"></div>
+    </div>
+  </div>
+
   </div>
   </div><!-- /tabs-content -->
   </div><!-- /tabs-layout -->
@@ -566,8 +583,117 @@ svg text { font-family: -apple-system, sans-serif; }
 
 <script>
 // === App Version ===
-const APP_VERSION = 'v3.8';
-const APP_VERSION_DATE = '2026-04-27';
+const APP_VERSION = 'v3.9';
+const APP_VERSION_DATE = '2026-05-28';
+
+// === News Tab Functions ===
+async function loadNewsLatest() {
+    const status = document.getElementById('newsStatus');
+    const content = document.getElementById('newsContent');
+    status.textContent = '載入中...';
+    try {
+        const apiUrl = window._tradeApiUrl || '';
+        const res = await fetch(apiUrl + '/api/v2/latest');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'No data');
+        renderNewsSnapshot(data, content);
+        status.textContent = '✅ ' + data.snapshot_time;
+    } catch(e) {
+        // Fallback: show available reports
+        status.textContent = '⚠️ ' + e.message;
+        content.innerHTML = '<div style="background:#161b22;border-radius:8px;padding:16px">' +
+            '<h3 style="color:#58a6ff;border-left:3px solid #58a6ff;padding-left:8px">📰 外匯新聞報告</h3>' +
+            '<p style="color:#8b949e;margin-top:8px">新聞報告每日 07:00（早盤）同 18:00（晚盤）HKT 自動生成並發送 Telegram。</p>' +
+            '<p style="color:#8b949e">報告包含：市場總結、個別貨幣對分析、重要事件日程、技術指標。</p>' +
+            '<p style="color:#484f58;margin-top:12px;font-size:0.85em">需要 API server 運行中（localhost:8787）先可以載入歷史數據。</p></div>';
+    }
+}
+
+async function loadNewsHistory() {
+    const historyDiv = document.getElementById('newsHistory');
+    const listDiv = document.getElementById('newsHistoryList');
+    historyDiv.style.display = 'block';
+    try {
+        const apiUrl = window._tradeApiUrl || '';
+        const res = await fetch(apiUrl + '/api/v2/snapshots?limit=20');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error);
+        let html = '<table class="sortable"><thead><tr><th>時間</th><th>類型</th><th>操作</th></tr></thead><tbody>';
+        for (const s of data.snapshots) {
+            const typeLabel = s.snapshot_type === 'morning' ? '🌅 早盤' : '🌆 晚盤';
+            html += `<tr><td>${s.snapshot_time}</td><td>${typeLabel}</td><td><button class="btn btn-secondary" onclick="loadNewsById(${s.id})">查看</button></td></tr>`;
+        }
+        html += '</tbody></table>';
+        listDiv.innerHTML = html;
+    } catch(e) {
+        listDiv.innerHTML = '<p style="color:#f85149">載入失敗: ' + e.message + '</p>';
+    }
+}
+
+function renderNewsSnapshot(data, container) {
+    const newsJson = data.news_json ? JSON.parse(data.news_json) : [];
+    const eventsJson = data.events_json ? JSON.parse(data.events_json) : [];
+    const marketJson = data.market_glance_json ? JSON.parse(data.market_glance_json) : {};
+    const typeLabel = data.snapshot_type === 'morning' ? '🌅 早盤報告' : '🌆 晚盤報告';
+
+    let html = '<div style="margin-bottom:16px">';
+    html += '<h3 style="color:#58a6ff;border-left:3px solid #58a6ff;padding-left:8px;margin-bottom:8px">' + typeLabel + ' | ' + data.snapshot_time + '</h3>';
+
+    // Market glance
+    if (Object.keys(marketJson).length > 0) {
+        html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">';
+        for (const [label, info] of Object.entries(marketJson)) {
+            const color = info.direction === 'up' ? 'var(--green)' : info.direction === 'down' ? 'var(--red)' : 'var(--text2)';
+            const arrow = info.direction === 'up' ? '▲' : info.direction === 'down' ? '▼' : '—';
+            html += `<div style="background:#f8f9fa;border-radius:6px;padding:6px 10px;text-align:center;min-width:100px">` +
+                `<div style="font-size:0.75em;color:#666">${label}</div>` +
+                `<div style="font-size:1.1em;font-weight:bold">${info.value}</div>` +
+                `<div style="font-size:0.8em;color:${color}">${arrow} ${info.change}</div></div>`;
+        }
+        html += '</div>';
+    }
+
+    // News items
+    if (newsJson.length > 0) {
+        html += '<h4 style="color:var(--primary);margin:12px 0 8px">📰 新聞摘要</h4>';
+        for (const item of newsJson) {
+            html += `<div style="padding:8px 0;border-bottom:1px dotted #ddd"><div style="font-weight:600">${item.title || item}</div>`;
+            if (item.tags && item.tags.length > 0) {
+                for (const tag of item.tags) {
+                    const cls = tag.includes('利多') ? 'color:var(--green)' : tag.includes('利空') ? 'color:var(--red)' : 'color:var(--text2)';
+                    html += `<span style="display:inline-block;padding:1px 6px;margin:2px;border-radius:3px;font-size:0.8em;background:#f0f0f0;${cls}">${tag}</span>`;
+                }
+            }
+            html += '</div>';
+        }
+    }
+
+    // Events
+    if (eventsJson.length > 0) {
+        html += '<h4 style="color:var(--primary);margin:12px 0 8px">📅 重要事件日程</h4>';
+        html += '<table style="width:100%;font-size:0.9em"><thead><tr><th>時間</th><th>重要性</th><th>事件</th><th>預期</th><th>前值</th></tr></thead><tbody>';
+        for (const ev of eventsJson) {
+            html += `<tr><td>${ev.time}</td><td>${ev.importance}</td><td style="text-align:left;font-weight:600">${ev.event}</td><td>${ev.forecast}</td><td>${ev.previous}</td></tr>`;
+        }
+        html += '</tbody></table>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function loadNewsById(id) {
+    try {
+        const apiUrl = window._tradeApiUrl || '';
+        const res = await fetch(apiUrl + '/api/v2/snapshot/' + id);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error);
+        renderNewsSnapshot(data, document.getElementById('newsContent'));
+        document.getElementById('newsStatus').textContent = '✅ ' + data.snapshot_time;
+    } catch(e) {
+        document.getElementById('newsStatus').textContent = '❌ ' + e.message;
+    }
+}
 
 // === Cloudflare Tunnel API URL (auto-detect from URL param or use tunnel) ===
 window._tradeApiUrl = (function() {
