@@ -408,6 +408,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-market">🌐 市場語境</div>
     <div class="tab" data-tab="tab-regime">🔄 市況×策略</div>
     <div class="tab" data-tab="tab-compare">⚖️ 策略對比</div>
+    <div class="tab" data-tab="tab-symbol-drill">🔍 貨幣穿透</div>
     <div class="tab" data-tab="tab-copy">🏆 Copy 推薦</div>
     <div class="tab" data-tab="tab-volatility">📏 波幅分析</div>
     <div class="tab" data-tab="tab-martin">🎲 馬丁風險</div>
@@ -473,6 +474,19 @@ svg text { font-family: -apple-system, sans-serif; }
   <div class="card tab-panel" id="tab-compare">
     <h2><span class="icon">⚖️</span> 策略對比分析</h2>
     <div id="compareContent"><p style="color:#999;padding:20px">請上載第二份 CSV 以啟用對比分析</p></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-symbol-drill">
+    <h2><span class="icon">🔍</span> 貨幣對穿透分析</h2>
+    <div id="symbolDrillContent">
+      <div style="padding:16px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="symbolDrillInput" type="text" placeholder="輸入貨幣對（如 EURCHF）" style="flex:1;min-width:200px;padding:10px 14px;border:2px solid #c0c8d8;border-radius:8px;font-size:1em">
+          <button class="btn btn-primary" onclick="searchSymbolDrill()">🔍 搜尋</button>
+        </div>
+        <div id="symbolDrillResults" style="margin-top:16px"></div>
+      </div>
+    </div>
   </div>
 
   <div class="card tab-panel" id="tab-volatility">
@@ -570,7 +584,7 @@ svg text { font-family: -apple-system, sans-serif; }
 <script>
 // === App Version ===
 const APP_VERSION = 'v3.9';
-const APP_VERSION_DATE = '2026-05-28b';
+const APP_VERSION_DATE = '2026-05-28';
 
 // === News Tab Functions ===
 async function loadNewsLatest() {
@@ -4858,6 +4872,107 @@ function renderMiniPosTable(positions) {
 }
 
 // === 🔍 Symbol Drill ===
+async function searchSymbolDrill() {
+  const sym = ($('symbolDrillInput').value || '').toUpperCase().trim();
+  const el = $('symbolDrillResults');
+  if (!sym || sym.length < 6) {
+    el.innerHTML = '<p style="color:#999">請輸入完整貨幣對代碼（如 EURCHF）</p>';
+    return;
+  }
+  el.innerHTML = '<div class="mc-loading">搜尋中...</div>';
+
+  // 1. Search local API
+  let apiResults = [];
+  try {
+    const apiUrl = window._tradeApiUrl || 'http://localhost:8787';
+    const resp = await fetch(apiUrl + '/api/list?limit=100');
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.records) {
+        data.records.forEach(rec => {
+          let symStats = null;
+          try { symStats = typeof rec.symbols_summary === 'string' ? JSON.parse(rec.symbols_summary) : rec.symbols_summary; } catch(e) {}
+          if (symStats && symStats[sym]) {
+            const s = symStats[sym];
+            apiResults.push({
+              signal_id: rec.signal_id,
+              ea: rec.ea_name,
+              date: rec.analysis_date || rec.created_at,
+              positions: s.totalPositions,
+              winRate: s.winRate,
+              pf: s.profitFactor,
+              profit: s.totalProfit,
+              avgLayers: s.avgLayers,
+              grade: s._grade || '—'
+            });
+          }
+        });
+      }
+    }
+  } catch(e) {
+    console.warn('API not available:', e);
+  }
+
+  // 2. Current CSV data
+  const currentPositions = (window._lastAnalyzedPositions || []).filter(p => p.symbol === sym);
+
+  // 3. Render
+  renderSymbolDrillResults(el, sym, apiResults, currentPositions);
+}
+
+function renderSymbolDrillResults(el, symbol, apiResults, currentPositions) {
+  let html = '';
+
+  // Current CSV analysis
+  if (currentPositions.length > 0) {
+    const s = calcStats(currentPositions);
+    html += '<div style="background:#f0faf3;border-radius:10px;padding:16px;margin-bottom:16px">';
+    html += `<h3 style="color:var(--green);margin:0 0 8px">📊 當前 CSV — ${symbol}（${currentPositions.length} 倉位）</h3>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">`;
+    html += statBox(pct(s.winRate), '勝率', 'green');
+    html += statBox(fmt(s.profitFactor), 'PF', 'green');
+    html += statBox(fmtMoney(s.totalProfit), '總盈虧', s.totalProfit >= 0 ? 'green' : 'red');
+    html += statBox(fmt(s.avgLayers||0,1), '平均層數', 'neutral');
+    html += statBox(fmt(s.sharpe), 'Sharpe', 'neutral');
+    html += statBox(fmtMoney(s.maxDD), 'Max DD', 'red');
+    html += '</div></div>';
+  }
+
+  // API History
+  if (apiResults.length > 0) {
+    html += '<h3 style="color:var(--primary)">📁 歷史記錄（${apiResults.length} 筆）</h3>';
+    html += '<div class="table-wrap"><table class="data-table">';
+    html += '<tr><th>Signal</th><th>EA</th><th>日期</th><th>倉位數</th><th>勝率</th><th>PF</th><th>盈虧</th><th>平均層數</th></tr>';
+    apiResults.forEach(r => {
+      html += '<tr>';
+      html += `<td><b>${r.signal_id}</b></td>`;
+      html += `<td>${r.ea || '—'}</td>`;
+      html += `<td>${(r.date||'').slice(0,10)}</td>`;
+      html += `<td>${r.positions}</td>`;
+      html += `<td>${pct(r.winRate)}</td>`;
+      html += `<td>${fmt(r.pf)}</td>`;
+      html += `<td style="color:${(r.profit||0)>=0?'var(--green)':'var(--red)'}">${fmtMoney(r.profit)}</td>`;
+      html += `<td>${fmt(r.avgLayers||0,1)}</td>`;
+      html += '</tr>';
+    });
+    html += '</table></div>';
+  } else if (currentPositions.length === 0) {
+    html += '<div style="text-align:center;padding:24px;color:#999">';
+    html += '<div style="font-size:2em;margin-bottom:8px">🔍</div>';
+    html += `<div>未找到 ${symbol} 的分析記錄</div>`;
+    html += '<div style="font-size:0.85em;margin-top:4px">提示：上載更多 CSV 並分析後，數據會自動累積到歷史記錄</div>';
+    html += '</div>';
+  }
+
+  // API status
+  if (apiResults.length === 0 && currentPositions.length === 0) {
+    html += '<div style="background:#fff3e0;border-radius:8px;padding:12px;margin-top:12px;font-size:0.85em;color:#e65100">';
+    html += '⚠️ 本地 API 未連接或無數據。如需查詢歷史記錄，請確保 api_server.py 運行中（localhost:8787）。';
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
 
 function downloadReport() {
   // Generate self-contained report HTML on-the-fly
