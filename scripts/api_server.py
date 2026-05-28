@@ -22,6 +22,12 @@ from history_manager import (
     save_analysis, list_analyses, get_summary,
     compare_versions, get_trend, get_db
 )
+from v2_snapshot import (
+    save_snapshot as v2_save_snapshot,
+    list_snapshots as v2_list_snapshots,
+    get_snapshot as v2_get_snapshot,
+    get_latest as v2_get_latest,
+)
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -119,6 +125,64 @@ async def api_health():
     count = c.fetchone()['cnt']
     conn.close()
     return {"ok": True, "analyses": count}
+
+
+# ==============================
+# V2 Snapshot Endpoints
+# ==============================
+
+@app.post("/api/v2/snapshot")
+async def api_v2_save_snapshot(data: dict):
+    """Save V2 technical analysis snapshot."""
+    try:
+        snapshot_time = data.get('snapshot_time')
+        snapshot_type = data.get('snapshot_type')
+        csv_data = data.get('csv_data', '')
+        if not snapshot_time or not snapshot_type:
+            return JSONResponse({"ok": False, "error": "snapshot_time and snapshot_type required"}, status_code=400)
+
+        aid = v2_save_snapshot(
+            snapshot_time=snapshot_time,
+            snapshot_type=snapshot_type,
+            csv_data=csv_data,
+            ccy_power=data.get('ccy_power'),
+            pair_scores=data.get('pair_scores'),
+            report_path=data.get('report_path'),
+            market_glance=data.get('market_glance'),
+            events=data.get('events'),
+            news=data.get('news'),
+        )
+        return {"ok": True, "id": aid}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/v2/snapshots")
+async def api_v2_list_snapshots(limit: int = Query(10, ge=1, le=100)):
+    """List recent V2 snapshots."""
+    try:
+        snapshots = v2_list_snapshots(limit)
+        return {"ok": True, "snapshots": snapshots}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/v2/snapshot/{snapshot_id}")
+async def api_v2_get_snapshot(snapshot_id: int):
+    """Get specific V2 snapshot."""
+    s = v2_get_snapshot(snapshot_id)
+    if not s:
+        return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+    return {"ok": True, **s}
+
+
+@app.get("/api/v2/latest")
+async def api_v2_get_latest():
+    """Get latest V2 snapshot with full data."""
+    s = v2_get_latest()
+    if not s:
+        return JSONResponse({"ok": False, "error": "No snapshots available"}, status_code=404)
+    return {"ok": True, **s}
 
 
 if __name__ == '__main__':

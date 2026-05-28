@@ -418,6 +418,7 @@ svg text { font-family: -apple-system, sans-serif; }
     <div class="tab" data-tab="tab-positions">📋 倉位明細</div>
     <div class="tab" data-tab="tab-set">⚙️ SET 參數</div>
     <div class="tab" data-tab="tab-archive">📁 歷史記錄</div>
+    <div class="tab" data-tab="tab-v2tech">📊 V2 技術分析</div>
   </div>
   <div class="tabs-content">
 
@@ -537,6 +538,23 @@ svg text { font-family: -apple-system, sans-serif; }
     </div>
     <div id="archiveContent"><p style="color:#999">點擊「載入記錄」從本地 API 載入，或「匯入 JSON」匯入之前下載的分析檔案</p></div>
   </div>
+
+  <div class="card tab-panel" id="tab-v2tech">
+    <h2><span class="icon">📊</span> V2 技術分析</h2>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-secondary" onclick="loadV2Latest()">🔄 載入最新數據</button>
+      <button class="btn btn-secondary" onclick="loadV2History()">📅 歷史記錄</button>
+      <span id="v2Status" style="font-size:0.85em;color:#999"></span>
+    </div>
+    <div id="v2Content">
+      <p style="color:#999">點擊「載入最新數據」查看 V2 技術分析報告</p>
+    </div>
+    <div id="v2History" style="display:none">
+      <h3>歷史快照</h3>
+      <div id="v2HistoryList"></div>
+    </div>
+  </div>
+
   </div>
   </div><!-- /tabs-content -->
   </div><!-- /tabs-layout -->
@@ -5437,6 +5455,88 @@ document.addEventListener('DOMContentLoaded', () => {
   const vl = document.getElementById('versionLabel');
   if (vl) vl.textContent = APP_VERSION + ' (' + APP_VERSION_DATE + ')';
 });
+
+// === V2 Technical Analysis Tab ===
+async function loadV2Latest() {
+    const status = document.getElementById('v2Status');
+    const content = document.getElementById('v2Content');
+    status.textContent = '載入中...';
+    try {
+        const apiUrl = window._tradeApiUrl || '';
+        const res = await fetch(apiUrl + '/api/v2/latest');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'No data');
+        renderV2Snapshot(data, content);
+        status.textContent = '✅ ' + data.snapshot_time;
+    } catch(e) {
+        status.textContent = '❌ ' + e.message;
+        content.innerHTML = '<p style="color:#f85149">載入失敗: ' + e.message + '</p>';
+    }
+}
+
+async function loadV2History() {
+    const historyDiv = document.getElementById('v2History');
+    const listDiv = document.getElementById('v2HistoryList');
+    historyDiv.style.display = 'block';
+    try {
+        const apiUrl = window._tradeApiUrl || '';
+        const res = await fetch(apiUrl + '/api/v2/snapshots?limit=20');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error);
+        let html = '<table class="sortable"><thead><tr><th>時間</th><th>類型</th><th>貨幣對數</th><th>操作</th></tr></thead><tbody>';
+        for (const s of data.snapshots) {
+            html += '<tr><td>' + s.snapshot_time + '</td><td>' + s.snapshot_type + '</td><td>' + (s.pair_count || '—') + '</td><td><button class="btn btn-secondary" onclick="loadV2ById(' + s.id + ')">查看</button></td></tr>';
+        }
+        html += '</tbody></table>';
+        listDiv.innerHTML = html;
+    } catch(e) {
+        listDiv.innerHTML = '<p style="color:#f85149">載入失敗: ' + e.message + '</p>';
+    }
+}
+
+function renderV2Snapshot(data, container) {
+    const ccyPower = JSON.parse(data.ccy_power_json || '{}');
+    const pairScores = JSON.parse(data.pair_scores_json || '{}');
+
+    // CCY Power section
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
+    const ccyColors = {AUD:'#2196F3',CAD:'#4CAF50',CHF:'#FF9800',EUR:'#9C27B0',NZD:'#E91E63',GBP:'#F44336',USD:'#FF5722',JPY:'#FFEB3B',XAU:'#FFD700'};
+    const sortedCcy = Object.entries(ccyPower).sort((a,b) => b[1] - a[1]);
+    const maxP = Math.max(...Object.values(ccyPower), 1);
+    for (const [ccy, val] of sortedCcy) {
+        const color = ccyColors[ccy] || '#666';
+        html += '<div style="text-align:center;min-width:50px;padding:4px 6px;border-radius:4px;background:' + color + '18">';
+        html += '<div style="font-size:10px;font-weight:bold;color:' + color + '">' + ccy + '</div>';
+        html += '<div style="font-size:14px;font-weight:bold;color:' + color + '">' + val.toFixed(1) + '</div>';
+        html += '<div style="height:3px;border-radius:2px;margin-top:2px;background:' + color + ';width:' + Math.round(val/maxP*100) + '%"></div></div>';
+    }
+    html += '</div>';
+
+    // Pair scores table
+    html += '<table class="sortable"><thead><tr><th>Pair</th><th>技術分</th><th>方向</th></tr></thead><tbody>';
+    const sortedPairs = Object.entries(pairScores).sort((a,b) => b[1] - a[1]);
+    for (const [pair, score] of sortedPairs) {
+        const color = score >= 5 ? '#3fb950' : score >= 2 ? '#56d364' : score <= -5 ? '#f85149' : score <= -2 ? '#f85149' : '#484f58';
+        const dir = score >= 5 ? '⬆ 強多' : score >= 2 ? '↑ 偏多' : score > 0 ? '↑ 微多' : score <= -5 ? '⬇ 強空' : score <= -2 ? '↓ 偏空' : score < 0 ? '↓ 微空' : '— 中性';
+        html += '<tr><td style="font-weight:bold">' + pair + '</td><td style="color:' + color + ';font-weight:bold">' + (score >= 0 ? '+' : '') + score + '</td><td style="color:' + color + '">' + dir + '</td></tr>';
+    }
+    html += '</tbody></table>';
+
+    container.innerHTML = html;
+}
+
+async function loadV2ById(id) {
+    try {
+        const apiUrl = window._tradeApiUrl || '';
+        const res = await fetch(apiUrl + '/api/v2/snapshot/' + id);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error);
+        renderV2Snapshot(data, document.getElementById('v2Content'));
+        document.getElementById('v2Status').textContent = '✅ ' + data.snapshot_time;
+    } catch(e) {
+        document.getElementById('v2Status').textContent = '❌ ' + e.message;
+    }
+}
 </script>
 </body>
 </html>
