@@ -62,3 +62,4 @@ python generate_martin_autopsy_v3.py <csv_path> [--output OUTPUT_PATH]
 - 無外部依賴
 - 離線可用
 - 移動端友好
+# Fri May 29 09:47:34 HKT 2026
