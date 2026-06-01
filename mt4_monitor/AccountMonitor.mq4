@@ -5,16 +5,16 @@
 //+------------------------------------------------------------------+
 #property copyright "Alvin Forex System"
 #property link      ""
-#property version   "1.00"
+#property version   "1.10"
 #property strict
-#property description "MT4 Account Monitor - HTTP POST to Python service"
+#property description "MT4 Account Monitor - HTTP POST via WinInet (no WebRequest whitelist needed)"
 
 //+------------------------------------------------------------------+
 //| Input Parameters                                                  |
 //+------------------------------------------------------------------+
-input string   AccountLabel      = "";          // 自定義帳戶名稱（留空用預設）
+input string   AccountLabel      = "Vantage Live 11";  // 自定義帳戶名稱（留空用預設）
 input int      ExportInterval    = 30;          // 導出頻率（秒）
-input string   ApiUrl            = "http://localhost:8788"; // Python API 地址
+input string   ApiUrl            = "http://107.172.134.63:8788"; // Python API 地址
 input bool     EnableHTTP        = true;        // 啟用 HTTP POST（主通道）
 input bool     EnableCSV         = true;        // 啟用 CSV 導出（fallback）
 input string   CsvPrefix         = "monitor_";  // CSV 檔案前綴
@@ -347,40 +347,157 @@ string BuildHistoryJson()
 }
 
 //+------------------------------------------------------------------+
-//| HTTP POST to Python API                                            |
+//| WinInet DLL imports — 繞過 WebRequest 白名單限制                   |
+//+------------------------------------------------------------------+
+#import "WinINet.dll"
+   int InternetOpenA(string agent, int accessType, string proxy, string proxyBypass, int flags);
+   int InternetConnectA(int handle, string server, int port, string user, string pass, int service, int flags, int context);
+   int HttpOpenRequestA(int handle, string verb, string path, string version, string referrer, string& acceptTypes[], int flags, int context);
+   bool HttpSendRequestA(int handle, string headers, int headersLen, string body, int bodyLen);
+   bool InternetReadFile(int handle, string& buffer, int numBytes, int& bytesRead);
+   bool InternetCloseHandle(int handle);
+   bool HttpQueryInfoA(int handle, int infoLevel, string& buffer, int& bufferLen, int& index);
+#import
+
+// WinInet constants
+#define INTERNET_OPEN_TYPE_PRECONFIG  0
+#define INTERNET_SERVICE_HTTP         1
+#define INTERNET_FLAG_RELOAD          0x80000000
+#define INTERNET_FLAG_NO_CACHE_WRITE  0x04000000
+#define HTTP_QUERY_STATUS_CODE        19
+#define HTTP_QUERY_FLAG_NUMBER        0x20000000
+
+//+------------------------------------------------------------------+
+//| HTTP POST via WinInet — 不需要 WebRequest 白名單                    |
 //+------------------------------------------------------------------+
 bool HttpPost(string endpoint, string json)
 {
-   string url = ApiUrl + endpoint;
+   string fullUrl = ApiUrl + endpoint;
+   
+   // Parse URL: extract host, port, path
+   string host, path;
+   int port;
+   if(!ParseUrl(fullUrl, host, port, path))
+   {
+      Print("ERROR: Cannot parse URL: ", fullUrl);
+      return false;
+   }
+   
+   // Open internet session
+   int hInternet = InternetOpenA("AccountMonitor/1.10", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+   if(hInternet == 0)
+   {
+      Print("ERROR: InternetOpenA failed. Error: ", GetLastError());
+      return false;
+   }
+   
+   // Connect to server
+   int hConnect = InternetConnectA(hInternet, host, port, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+   if(hConnect == 0)
+   {
+      Print("ERROR: InternetConnectA failed. Error: ", GetLastError());
+      InternetCloseHandle(hInternet);
+      return false;
+   }
+   
+   // Open HTTP request
+   string acceptTypes[] = {"*/*", ""};
+   int hRequest = HttpOpenRequestA(hConnect, "POST", path, "HTTP/1.1", NULL, acceptTypes,
+      INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+   if(hRequest == 0)
+   {
+      Print("ERROR: HttpOpenRequestA failed. Error: ", GetLastError());
+      InternetCloseHandle(hConnect);
+      InternetCloseHandle(hInternet);
+      return false;
+   }
+   
+   // Send request with JSON body
    string headers = "Content-Type: application/json\r\n";
-   char   post[];
-   char   result[];
-   string resultHeaders;
-   int    timeout = 5000; // 5 秒 timeout
-   
-   // StringToCharArray 會自動加上 null terminator
-   StringToCharArray(json, post, 0, WHOLE_ARRAY, CP_UTF8);
-   // 移除最後的 null terminator
-   ArrayResize(post, ArraySize(post) - 1);
-   
-   int res = WebRequest("POST", url, headers, timeout, post, result, resultHeaders);
-   
-   if(res == -1)
+   bool sent = HttpSendRequestA(hRequest, headers, StringLen(headers), json, StringLen(json));
+   if(!sent)
    {
-      int err = GetLastError();
-      if(err == 4060)
-         Print("ERROR: WebRequest not allowed. Add '", ApiUrl, "' to Tools > Options > Expert Advisors > Allow WebRequest");
-      else
-         Print("ERROR: WebRequest failed. Code: ", err);
+      Print("ERROR: HttpSendRequestA failed. Error: ", GetLastError());
+      InternetCloseHandle(hRequest);
+      InternetCloseHandle(hConnect);
+      InternetCloseHandle(hInternet);
       return false;
    }
    
-   if(res != 200)
+   // Check HTTP status code
+   string statusBuf = "    ";  // 4 chars for DWORD
+   int statusBufLen = 4;
+   int statusIdx = 0;
+   int statusCode = 0;
+   
+   // Use HttpQueryInfo to get status code
+   string buf = "    ";
+   int bufLen = 4;
+   int idx = 0;
+   if(HttpQueryInfoA(hRequest, HTTP_QUERY_FLAG_NUMBER | HTTP_QUERY_STATUS_CODE, buf, bufLen, idx))
    {
-      Print("WARNING: HTTP ", res, " from ", endpoint);
+      // First 4 bytes of string = DWORD status code (little-endian)
+      ushort c1 = StringGetCharacter(buf, 0);
+      ushort c2 = StringGetCharacter(buf, 1);
+      statusCode = c1 + (c2 << 8);
+   }
+   
+   // Cleanup
+   InternetCloseHandle(hRequest);
+   InternetCloseHandle(hConnect);
+   InternetCloseHandle(hInternet);
+   
+   if(statusCode != 0 && statusCode != 200)
+   {
+      Print("WARNING: HTTP ", statusCode, " from ", endpoint);
       return false;
    }
    
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Parse URL into host, port, path                                    |
+//+------------------------------------------------------------------+
+bool ParseUrl(string url, string &host, int &port, string &path)
+{
+   // Expected format: http://hostname:port/path
+   string remaining = url;
+   
+   // Remove "http://"
+   if(StringFind(remaining, "http://") == 0)
+      remaining = StringSubstr(remaining, 7);
+   else if(StringFind(remaining, "https://") == 0)
+      remaining = StringSubstr(remaining, 8);
+     
+   // Split host and path
+   int slashPos = StringFind(remaining, "/");
+   string hostPort;
+   if(slashPos >= 0)
+   {
+      hostPort = StringSubstr(remaining, 0, slashPos);
+      path = StringSubstr(remaining, slashPos);
+   }
+   else
+   {
+      hostPort = remaining;
+      path = "/";
+   }
+   
+   // Split host and port
+   int colonPos = StringFind(hostPort, ":");
+   if(colonPos >= 0)
+   {
+      host = StringSubstr(hostPort, 0, colonPos);
+      port = (int)StringToInteger(StringSubstr(hostPort, colonPos + 1));
+   }
+   else
+   {
+      host = hostPort;
+      port = 80;
+   }
+   
+   if(host == "") return false;
    return true;
 }
 
