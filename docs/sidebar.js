@@ -4,6 +4,7 @@
   var path = window.location.pathname;
   var depth = '';
   if(path.includes('/admin/ccy/') || path.includes('/admin/ccy_power/')) depth='../../';
+  else if(path.includes('/admin/forex_reports/') || path.includes('/admin/forex_reports')) depth='../../';
   else if(path.includes('/admin/') || path.includes('/reports/')) depth='../';
 
   // Build sidebar HTML
