@@ -3,7 +3,7 @@
   // Determine depth for relative links
   var path = window.location.pathname;
   var depth = '';
-  if(path.includes('/admin/ccy/')) depth='../../';
+  if(path.includes('/admin/ccy/') || path.includes('/admin/ccy_power/')) depth='../../';
   else if(path.includes('/admin/') || path.includes('/reports/')) depth='../';
 
   // Build sidebar HTML
@@ -16,6 +16,7 @@
       <a href="${depth}index.html" class="sidebar-link" data-page="index"><span class="icon">🏠</span>首頁</a>
       <a href="${depth}admin/signal_ranking.html" class="sidebar-link" data-page="signal_ranking"><span class="icon">🏆</span>Signal 排名</a>
       <a href="${depth}admin/ccy_ranking.html" class="sidebar-link" data-page="ccy_ranking"><span class="icon">💱</span>CCY 排名</a>
+      <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
       <a href="${depth}admin/volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
       <div class="sidebar-sep"></div>
       <a href="${depth}admin/forex_news.html" class="sidebar-link" data-page="forex_news"><span class="icon">📰</span>外匯新聞</a>
@@ -56,6 +57,7 @@
     if(dp==='index' && (filename==='index' || filename==='dashboard')) link.classList.add('active');
     else if(dp==='signal_ranking' && (filename==='signal_ranking' || filename==='signal_ranking_dde_v4')) link.classList.add('active');
     else if(dp==='ccy_ranking' && filename==='ccy_ranking') link.classList.add('active');
+    else if(dp==='ccy_power' && (filename==='index' && path.includes('ccy_power'))) link.classList.add('active');
     else if(dp==='volatility' && (filename==='volatility' || filename==='ccy_timeframe_volatility')) link.classList.add('active');
     else if(dp==='deep' && (path.includes('/reports/signal_') || path.includes('Signal_Deep_Analysis'))) link.classList.add('active');
     else if(dp==='forex_news' && filename==='forex_news') link.classList.add('active');
