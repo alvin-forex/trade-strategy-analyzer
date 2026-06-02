@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔄 馬丁剖析法 V4 — Signal 12173</title>
+<style>
+:root{--font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px}
+[data-theme="dark"]{--bg:#0a0e17;--bg-card:#111520;--bg-hover:#1a1f2e;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--border:#1e2433;--th-bg:#111520}
+[data-theme="light"]{--bg:#f5f7fa;--bg-card:#fff;--bg-hover:#eef2f7;--text:#333;--text2:#666;--primary:#0f3460;--accent:#e94560;--green:#28a745;--red:#dc3545;--yellow:#ffc107;--border:#ddd;--th-bg:#eef2f7}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);padding:12px;max-width:1400px;margin:0 auto}
+h1{font-size:1.3em;color:var(--primary);margin-bottom:4px}
+h2{font-size:1.05em;color:var(--primary);margin:16px 0 8px}
+h3{font-size:0.95em;color:var(--accent);margin:12px 0 6px}
+.sub{color:var(--text2);font-size:0.85em;margin-bottom:12px}
+a{color:var(--accent);text-decoration:none;font-weight:bold}
+/* Theme toggle */
+.theme-btn{width:36px;height:36px;border:1px solid var(--border);border-radius:50%;background:var(--bg-card);color:var(--text);font-size:18px;cursor:pointer;flex-shrink:0}
+/* Stats bar */
+.stats-bar{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap}
+.stats-bar .v{font-size:1.3em;font-weight:bold;color:var(--primary)}
+.stats-bar .l{font-size:0.75em;color:var(--text2)}
+/* Date range controls */
+.date-controls{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px}
+.quick-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.quick-btns button{padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.85em}
+.quick-btns button.active{background:var(--primary);color:#000;border-color:var(--primary);font-weight:bold}
+.quick-btns button:hover{border-color:var(--primary)}
+.date-inputs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.date-inputs label{color:var(--text2);font-size:0.85em}
+.date-inputs input[type="date"]{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:0.9em}
+.date-inputs button{padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.8em}
+/* Range slider */
+.range-container{position:relative;height:40px;margin:4px 0}
+.range-track{position:absolute;top:18px;left:0;right:0;height:4px;background:var(--border);border-radius:2px}
+.range-fill{position:absolute;top:18px;height:4px;background:var(--primary);border-radius:2px}
+.range-handle{position:absolute;top:10px;width:20px;height:20px;background:var(--primary);border-radius:50%;cursor:grab;z-index:2;touch-action:none}
+.range-handle:active{cursor:grabbing}
+.range-labels{display:flex;justify-content:space-between;font-size:0.75em;color:var(--text2);margin-top:24px}
+/* Tables */
+table{width:100%;border-collapse:collapse;margin-bottom:8px}
+th{background:var(--th-bg);padding:6px 8px;text-align:left;border-bottom:2px solid var(--primary);color:var(--primary);font-size:0.8em;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{background:var(--bg-hover)}
+td{padding:5px 8px;border-bottom:1px solid var(--border);font-size:0.88em}
+tr:hover{background:var(--bg-card)}
+/* Sections (collapsible) */
+.section-toggle{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden}
+.section-header{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:0.95em}
+.section-header:hover{background:var(--bg-hover)}
+.section-header .arrow{transition:transform 0.2s;font-size:0.8em;color:var(--text2)}
+.section-header.open .arrow{transform:rotate(90deg)}
+.section-body{display:none;padding:10px 14px;border-top:1px solid var(--border)}
+.section-body.open{display:block}
+/* Rating colors */
+.rating-sp{color:#FFD700;font-weight:bold}.rating-s{color:#FFA500;font-weight:bold}.rating-a{color:var(--green);font-weight:bold}.rating-b{color:var(--accent);font-weight:bold}.rating-c{color:var(--yellow)}.rating-d{color:var(--red)}.rating-e{color:#999}
+/* PnL colors */
+.pnl-pos{color:var(--green);font-weight:bold}.pnl-neg{color:var(--red);font-weight:bold}
+/* TP/SL */
+.tp-suggestion{background:var(--bg-card);border:1px solid var(--green);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+.sl-danger{background:var(--bg-card);border:1px solid var(--red);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+.recovery-item{background:var(--bg-card);border:1px solid var(--yellow);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+/* Responsive */
+@media(max-width:768px){body{padding:8px;font-size:13px}.quick-btns button{padding:4px 8px;font-size:0.8em}.date-inputs{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+<h1>🔄 馬丁剖析法 V4</h1>
+<button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="切換主題">☀️</button>
+</div>
+<div class="sub" id="headerSub">Signal 12173 (MAN) · 載入中...</div>
+
+<!-- Date Range Controls -->
+<div class="date-controls" id="dateControls">
+<div style="color:var(--text2);font-size:0.85em;margin-bottom:6px">📅 時間範圍</div>
+<div class="quick-btns" id="quickBtns">
+<button data-range="1d">1日</button>
+<button data-range="1w">1週</button>
+<button data-range="1m">1月</button>
+<button data-range="3m">3月</button>
+<button data-range="6m">6月</button>
+<button data-range="1y">1年</button>
+<button data-range="all" class="active">全部</button>
+</div>
+<div class="date-inputs">
+<label>From:</label><input type="date" id="dateFrom">
+<label>To:</label><input type="date" id="dateTo">
+<button onclick="applyCustomDate()">套用</button>
+<button onclick="clearDateFilter()">清除</button>
+</div>
+<div class="range-container" id="rangeContainer">
+<div class="range-track"></div>
+<div class="range-fill" id="rangeFill"></div>
+<div class="range-handle" id="handleLeft" data-handle="left"></div>
+<div class="range-handle" id="handleRight" data-handle="right"></div>
+</div>
+<div class="range-labels"><span id="rangeMinLabel">—</span><span id="rangeMaxLabel">—</span></div>
+</div>
+
+<!-- Summary -->
+<div class="stats-bar" id="summaryBar"></div>
+
+<!-- Content -->
+<div id="content"></div>
+
+<script>
+/**
+ * Martin Autopsy V4 — Core Computation Engine
+ * 純 JavaScript 計算邏輯，唔加公式，只用 CSV 真實數據
+ */
+
+// ═══════════════════════════════════════════════════════
+// CSV Parser
+// ═══════════════════════════════════════════════════════
+
+function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return [];
+    
+    const headers = lines[0].split(',').map(h => h.trim());
+    const trades = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        if (values.length < headers.length) continue;
+        
+        const row = {};
+        headers.forEach((h, idx) => row[h] = values[idx]);
+        
+        const type = (row['Type'] || '').trim().toLowerCase();
+        if (type !== 'buy' && type !== 'sell') continue;
+        
+        const symbol = (row['Symbol'] || '').trim();
+        if (!symbol) continue;
+        
+        const trade = {
+            symbol,
+            direction: type,
+            lots: Math.abs(parseFloat(row['Lots']) || 0),
+            net_profit: parseFloat(row['Net Profit']) || 0,
+            net_pips: parseFloat(row['Net Pips']) || 0,
+            max_profit: parseFloat(row['Max Profit']) || 0,
+            max_loss: parseFloat(row['Max Loss']) || 0,
+            mfe: parseFloat(row['Max Pips']) || 0,
+            mae: Math.abs(parseFloat(row['Max Loss Pips']) || 0),
+            holding_hours: parseFloat(row['Holding Time (Hours)']) || 0,
+            commission: parseFloat(row['Commission']) || 0,
+            swap: parseFloat(row['Swap']) || 0,
+            comment: (row['Comment'] || '').trim(),
+            open_time: (row['Open Time'] || '').trim(),
+            close_time: (row['Close Time'] || '').trim(),
+            _openDate: null,  // parsed Date object
+        };
+        
+        // Parse date
+        try {
+            const parts = trade.open_time.split(/[/\s:]+/);
+            if (parts.length >= 6) {
+                trade._openDate = new Date(
+                    parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]),
+                    parseInt(parts[3]), parseInt(parts[4]), parseInt(parts[5])
+                );
+            }
+        } catch (e) {}
+        
+        trades.push(trade);
+    }
+    
+    return trades;
+}
+
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += ch;
+        }
+    }
+    result.push(current.trim());
+    return result;
+}
+
+// ═══════════════════════════════════════════════════════
+// Date Filtering
+// ═══════════════════════════════════════════════════════
+
+function filterByDateRange(trades, fromDate, toDate) {
+    if (!fromDate && !toDate) return trades;
+    
+    return trades.filter(t => {
+        if (!t._openDate) return false;
+        if (fromDate && t._openDate < fromDate) return false;
+        if (toDate && t._openDate > toDate) return false;
+        return true;
+    });
+}
+
+function getDateRange(trades) {
+    const dates = trades.filter(t => t._openDate).map(t => t._openDate.getTime());
+    if (dates.length === 0) return { min: null, max: null };
+    return {
+        min: new Date(Math.min(...dates)),
+        max: new Date(Math.max(...dates)),
+    };
+}
+
+// ═══════════════════════════════════════════════════════
+// Layer Assignment
+// ═══════════════════════════════════════════════════════
+
+function assignLayerIndex(lotsList) {
+    const unique = [...new Set(lotsList)].sort((a, b) => a - b);
+    const map = {};
+    unique.forEach((lot, idx) => map[lot] = idx + 1);
+    return map;
+}
+
+// ═══════════════════════════════════════════════════════
+// Core Stats Computation
+// ═══════════════════════════════════════════════════════
+
+function computeLayerStats(trades) {
+    // Group by (CCY, Direction)
+    const ccyDirMap = {};
+    for (const t of trades) {
+        const key = `${t.symbol}_${t.direction}`;
+        if (!ccyDirMap[key]) ccyDirMap[key] = [];
+        ccyDirMap[key].push(t);
+    }
+    
+    const results = {};
+    
+    for (const [ccyDirKey, ccyTrades] of Object.entries(ccyDirMap)) {
+        // Compute layer index
+        const lotsInGroup = [...new Set(ccyTrades.map(t => t.lots))].sort((a, b) => a - b);
+        const lotToIdx = {};
+        lotsInGroup.forEach((lot, idx) => lotToIdx[lot] = idx + 1);
+        const maxDepth = lotsInGroup.length;
+        
+        // Group by layer
+        const layerMap = {};
+        for (const t of ccyTrades) {
+            const label = `L${t.lots}`;
+            if (!layerMap[label]) layerMap[label] = [];
+            layerMap[label].push(t);
+        }
+        
+        for (const [layerLabel, lt] of Object.entries(layerMap)) {
+            const n = lt.length;
+            if (n === 0) continue;
+            
+            const wins = lt.filter(t => t.net_profit > 0);
+            const losses = lt.filter(t => t.net_profit <= 0);
+            const winCount = wins.length;
+            const lossCount = losses.length;
+            
+            const wr = n > 0 ? (winCount / n * 100) : 0;
+            const totalPnl = lt.reduce((s, t) => s + t.net_profit, 0);
+            const avgWin = winCount > 0 ? wins.reduce((s, t) => s + t.net_profit, 0) / winCount : 0;
+            const avgLoss = lossCount > 0 ? Math.abs(losses.reduce((s, t) => s + t.net_profit, 0) / lossCount) : 0;
+            
+            // Expected Value
+            const ev = (wr / 100 * avgWin) - ((1 - wr / 100) * avgLoss);
+            
+            const avgWinPips = winCount > 0 ? wins.reduce((s, t) => s + t.net_pips, 0) / winCount : 0;
+            const avgLossPips = lossCount > 0 ? Math.abs(losses.reduce((s, t) => s + t.net_pips, 0) / lossCount) : 0;
+            
+            const oddsDollar = avgLoss > 0 ? avgWin / avgLoss : 999;
+            const oddsPips = avgLossPips > 0 ? avgWinPips / avgLossPips : 999;
+            
+            const avgHold = lt.reduce((s, t) => s + t.holding_hours, 0) / n;
+            
+            // MFE/MAE
+            const mfeValues = lt.map(t => t.mfe);
+            const maeValues = lt.map(t => t.mae);
+            const sortedMfe = [...mfeValues].sort((a, b) => a - b);
+            const sortedMae = [...maeValues].sort((a, b) => a - b);
+            
+            const avgMfe = mfeValues.reduce((s, v) => s + v, 0) / n;
+            const maxMfe = Math.max(...mfeValues);
+            const medMfe = sortedMfe[Math.floor(n / 2)];
+            
+            const avgMae = maeValues.reduce((s, v) => s + v, 0) / n;
+            const maxMae = Math.max(...maeValues);
+            const medMae = sortedMae[Math.floor(n / 2)];
+            
+            const sampleLots = lt[0].lots;
+            const layerIdx = lotToIdx[sampleLots] || 1;
+            
+            const key = `${ccyDirKey}_${layerLabel}`;
+            results[key] = {
+                symbol: ccyDirKey.split('_')[0],
+                direction: ccyDirKey.split('_')[1],
+                layer_label: layerLabel,
+                lots: sampleLots,
+                layer_idx: layerIdx,
+                max_depth: maxDepth,
+                count: n,
+                win_count: winCount,
+                loss_count: lossCount,
+                wr: round2(wr),
+                total_pnl: round2(totalPnl),
+                ev: round2(ev),
+                avg_win: round2(avgWin),
+                avg_loss: round2(avgLoss),
+                avg_win_pips: round2(avgWinPips),
+                avg_loss_pips: round2(avgLossPips),
+                odds_dollar: oddsDollar < 100 ? round2(oddsDollar) : 999,
+                odds_pips: oddsPips < 100 ? round2(oddsPips) : 999,
+                avg_hold: round2(avgHold),
+                avg_mfe: round2(avgMfe),
+                max_mfe: round2(maxMfe),
+                med_mfe: round2(medMfe),
+                avg_mae: round2(avgMae),
+                max_mae: round2(maxMae),
+                med_mae: round2(medMae),
+                // Trade details for scatter plots
+                trade_details: lt.map(t => ({
+                    net_pips: t.net_pips,
+                    mfe: t.mfe,
+                    mae: t.mae,
+                    net_profit: t.net_profit,
+                    is_win: t.net_profit > 0,
+                    lots: t.lots,
+                    holding_hours: t.holding_hours,
+                })),
+            };
+        }
+    }
+    
+    return results;
+}
+
+// ═══════════════════════════════════════════════════════
+// Rating System
+// ═══════════════════════════════════════════════════════
+
+function computeRating(stats) {
+    const score = computeScore(stats);
+    if (score >= 85) return 'S+';
+    if (score >= 70) return 'S';
+    if (score >= 55) return 'A';
+    if (score >= 40) return 'B';
+    if (score >= 25) return 'C';
+    if (score >= 15) return 'D';
+    return 'E';
+}
+
+function computeScore(stats) {
+    const wr = stats.wr;
+    const ev = stats.ev;
+    const odds = Math.min(stats.odds_pips, stats.odds_dollar);
+    const count = stats.count;
+    const hold = stats.avg_hold;
+    
+    let score = 0;
+    
+    // WR (0-30)
+    score += wr >= 80 ? 30 : wr >= 70 ? 25 : wr >= 60 ? 18 : wr >= 50 ? 10 : Math.max(0, wr / 5);
+    // EV (0-30)
+    score += ev >= 20 ? 30 : ev >= 10 ? 25 : ev >= 5 ? 18 : ev >= 0 ? 10 : Math.max(0, 10 + ev / 2);
+    // Odds (0-20)
+    score += odds >= 2.0 ? 20 : odds >= 1.5 ? 15 : odds >= 1.0 ? 10 : Math.max(0, odds * 10);
+    // Count (0-15)
+    score += count >= 10 ? 15 : count >= 5 ? 12 : count >= 3 ? 8 : Math.max(0, count * 2);
+    // Hold (0-5)
+    score += hold <= 24 ? 5 : hold <= 72 ? 4 : hold <= 168 ? 3 : hold <= 360 ? 2 : 1;
+    
+    return Math.round(score * 10) / 10;
+}
+
+// ═══════════════════════════════════════════════════════
+// Summary Stats
+// ═══════════════════════════════════════════════════════
+
+function computeSummary(trades) {
+    const n = trades.length;
+    if (n === 0) return { count: 0, win_pct: 0, total_pnl: 0, symbols: 0, layers: 0, best_ccy: '', best_pnl: 0 };
+    
+    const wins = trades.filter(t => t.net_profit > 0).length;
+    const totalPnl = trades.reduce((s, t) => s + t.net_profit, 0);
+    const symbols = new Set(trades.map(t => t.symbol)).size;
+    const lots = new Set(trades.map(t => t.lots)).size;
+    
+    // Best CCY
+    const ccyPnl = {};
+    for (const t of trades) {
+        ccyPnl[t.symbol] = (ccyPnl[t.symbol] || 0) + t.net_profit;
+    }
+    let bestCcy = '';
+    let bestPnl = -Infinity;
+    for (const [ccy, pnl] of Object.entries(ccyPnl)) {
+        if (pnl > bestPnl) { bestPnl = pnl; bestCcy = ccy; }
+    }
+    
+    return {
+        count: n,
+        win_pct: round2(wins / n * 100),
+        total_pnl: round2(totalPnl),
+        symbols,
+        layers: lots,
+        best_ccy: bestCcy,
+        best_pnl: round2(bestPnl),
+    };
+}
+
+// ═══════════════════════════════════════════════════════
+// TP/SL Suggestions
+// ═══════════════════════════════════════════════════════
+
+function computeTPSL(layerStats) {
+    const suggestions = [];
+    for (const [key, s] of Object.entries(layerStats)) {
+        const rating = computeRating(s);
+        if (['S+', 'S', 'A'].includes(rating) && s.count >= 3) {
+            suggestions.push({
+                key,
+                symbol: s.symbol,
+                direction: s.direction,
+                layer: s.layer_label,
+                lots: s.lots,
+                rating,
+                score: computeScore(s),
+                wr: s.wr,
+                count: s.count,
+                // TP = 80% of avg MFE pips
+                suggest_tp: round2(s.avg_mfe * 0.8),
+                // SL = 120% of avg MAE pips  
+                suggest_sl: round2(s.avg_mae * 1.2),
+                avg_mfe: s.avg_mfe,
+                avg_mae: s.avg_mae,
+                max_mae: s.max_mae,
+            });
+        }
+    }
+    return suggestions.sort((a, b) => b.score - a.score);
+}
+
+// ═══════════════════════════════════════════════════════
+// Blacklist
+// ═══════════════════════════════════════════════════════
+
+function computeBlacklist(layerStats) {
+    const blacklist = [];
+    for (const [key, s] of Object.entries(layerStats)) {
+        const rating = computeRating(s);
+        if (['D', 'E'].includes(rating) && s.count >= 2) {
+            const dangerScore = (100 - computeScore(s)) + Math.abs(s.ev);
+            blacklist.push({
+                key,
+                symbol: s.symbol,
+                direction: s.direction,
+                layer: s.layer_label,
+                lots: s.lots,
+                rating,
+                score: computeScore(s),
+                danger_score: round2(dangerScore),
+                wr: s.wr,
+                ev: s.ev,
+                count: s.count,
+                total_pnl: s.total_pnl,
+                reason: getDangerReason(s),
+            });
+        }
+    }
+    return blacklist.sort((a, b) => b.danger_score - a.danger_score);
+}
+
+function getDangerReason(s) {
+    const reasons = [];
+    if (s.wr < 40) reasons.push('WR<40%');
+    if (s.ev < 0) reasons.push('EV<0');
+    if (s.total_pnl < -50) reasons.push('P&L<-50');
+    if (s.odds_dollar < 0.5) reasons.push('RR<0.5');
+    if (s.avg_hold > 360) reasons.push('Hold>15d');
+    return reasons.join(', ') || 'Underperforming';
+}
+
+// ═══════════════════════════════════════════════════════
+// Recovery Plan
+// ═══════════════════════════════════════════════════════
+
+function computeRecovery(layerStats) {
+    const recovery = [];
+    for (const [key, s] of Object.entries(layerStats)) {
+        const rating = computeRating(s);
+        if (['C', 'D', 'E'].includes(rating) && s.count >= 2) {
+            const topLayers = Object.values(layerStats)
+                .filter(x => x.symbol === s.symbol && x.direction === s.direction && ['S+', 'S', 'A', 'B'].includes(computeRating(x)))
+                .sort((a, b) => b.wr - a.wr);
+            
+            recovery.push({
+                key,
+                symbol: s.symbol,
+                direction: s.direction,
+                layer: s.layer_label,
+                rating,
+                wr: s.wr,
+                ev: s.ev,
+                count: s.count,
+                suggestion: topLayers.length > 0 
+                    ? `Reduce ${s.layer_label} (${s.lots} lots), reallocate to ${topLayers[0].layer_label} (${topLayers[0].lots} lots, WR ${topLayers[0].wr}%)`
+                    : `Consider disabling ${s.symbol} ${s.direction} at ${s.layer_label}`,
+            });
+        }
+    }
+    return recovery;
+}
+
+// ═══════════════════════════════════════════════════════
+// CCY×Direction Summary
+// ═══════════════════════════════════════════════════════
+
+function buildCCYDirectionSummary(layerStats) {
+    const ccyDirMap = {};
+    for (const [key, s] of Object.entries(layerStats)) {
+        const ccyDir = `${s.symbol}_${s.direction}`;
+        if (!ccyDirMap[ccyDir]) ccyDirMap[ccyDir] = [];
+        ccyDirMap[ccyDir].push(s);
+    }
+    
+    const summary = [];
+    for (const [ccyDir, layers] of Object.entries(ccyDirMap)) {
+        const totalPnl = layers.reduce((s, l) => s + l.total_pnl, 0);
+        const totalCount = layers.reduce((s, l) => s + l.count, 0);
+        const totalWins = layers.reduce((s, l) => s + l.win_count, 0);
+        const avgWr = totalCount > 0 ? totalWins / totalCount * 100 : 0;
+        
+        const ratings = layers.map(l => computeRating(l));
+        const bestRating = ratings.includes('S+') ? 'S+' : ratings.includes('S') ? 'S' : ratings.includes('A') ? 'A' : ratings.includes('B') ? 'B' : 'C';
+        
+        summary.push({
+            symbol: layers[0].symbol,
+            direction: layers[0].direction,
+            layers: layers.length,
+            total_pnl: round2(totalPnl),
+            total_count: totalCount,
+            avg_wr: round2(avgWr),
+            best_rating: bestRating,
+        });
+    }
+    
+    return summary.sort((a, b) => b.total_pnl - a.total_pnl);
+}
+
+// ═══════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════
+
+function round2(v) {
+    return Math.round(v * 100) / 100;
+}
+
+function fmtPnl(v) {
+    return v >= 0 ? `+${v.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1})}` 
+                  : v.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+}
+
+function ratingClass(r) {
+    const map = { 'S+': 'rating-sp', 'S': 'rating-s', 'A': 'rating-a', 'B': 'rating-b', 'C': 'rating-c', 'D': 'rating-d', 'E': 'rating-e' };
+    return map[r] || 'rating-e';
+}
+
+// Export for use
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { parseCSV, filterByDateRange, computeLayerStats, computeRating, computeScore, computeSummary, computeTPSL, computeBlacklist, computeRecovery, buildCCYDirectionSummary };
+}
+
+</script>
+<script>
+// ═══ Config ═══
+const SIGNAL_ID = '12173';
+const EA_TAG = 'MAN';
+const CSV_URL = '../downloads/forex-forest-signals-page-12173.csv';
+
+// ═══ State ═══
+let allTrades = [];
+let filteredTrades = [];
+let dateMin = null, dateMax = null;
+let rangeFrom = null, rangeTo = null;
+
+// ═══ Init ═══
+(function init() {
+    loadTheme();
+    document.getElementById('headerSub').textContent = `Signal ${SIGNAL_ID} (${EA_TAG}) · 載入中...`;
+    
+    fetch(CSV_URL)
+        .then(r => r.ok ? r.text() : Promise.reject('CSV load failed: ' + r.status))
+        .then(text => {
+            allTrades = parseCSV(text);
+            const dr = getDateRange(allTrades);
+            dateMin = dr.min;
+            dateMax = dr.max;
+            
+            if (!dateMin || !dateMax) {
+                document.getElementById('headerSub').textContent = `Signal ${SIGNAL_ID} — ❌ 冇交易數據`;
+                return;
+            }
+            
+            setupRangeSlider();
+            setupQuickButtons();
+            
+            filteredTrades = [...allTrades];
+            renderAll();
+        })
+        .catch(err => {
+            document.getElementById('headerSub').textContent = `Signal ${SIGNAL_ID} — ❌ ${err}`;
+        });
+})();
+
+// ═══ Theme ═══
+function loadTheme() {
+    const t = localStorage.getItem('tsa-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    document.getElementById('themeToggle').textContent = t === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('tsa-theme', next);
+    document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+
+// ═══ Quick Buttons ═══
+function setupQuickButtons() {
+    document.querySelectorAll('#quickBtns button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#quickBtns button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const range = btn.dataset.range;
+            const now = new Date();
+            let from = null;
+            
+            if (range === 'all') {
+                from = null;
+            } else if (range === '1d') from = new Date(now.getTime() - 86400000);
+            else if (range === '1w') from = new Date(now.getTime() - 7 * 86400000);
+            else if (range === '1m') from = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+            else if (range === '3m') from = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+            else if (range === '6m') from = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+            else if (range === '1y') from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            
+            rangeFrom = from;
+            rangeTo = null;
+            
+            // Update date inputs
+            document.getElementById('dateFrom').value = from ? fmtDate(from) : '';
+            document.getElementById('dateTo').value = '';
+            
+            updateRangeSliderHandles();
+            applyFilter();
+        });
+    });
+}
+
+function applyCustomDate() {
+    const fromVal = document.getElementById('dateFrom').value;
+    const toVal = document.getElementById('dateTo').value;
+    rangeFrom = fromVal ? new Date(fromVal) : null;
+    rangeTo = toVal ? new Date(toVal + 'T23:59:59') : null;
+    
+    document.querySelectorAll('#quickBtns button').forEach(b => b.classList.remove('active'));
+    
+    updateRangeSliderHandles();
+    applyFilter();
+}
+
+function clearDateFilter() {
+    rangeFrom = null;
+    rangeTo = null;
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    document.querySelectorAll('#quickBtns button').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-range="all"]').classList.add('active');
+    updateRangeSliderHandles();
+    applyFilter();
+}
+
+// ═══ Range Slider ═══
+function setupRangeSlider() {
+    const container = document.getElementById('rangeContainer');
+    const handleL = document.getElementById('handleLeft');
+    const handleR = document.getElementById('handleRight');
+    
+    document.getElementById('rangeMinLabel').textContent = fmtDate(dateMin);
+    document.getElementById('rangeMaxLabel').textContent = fmtDate(dateMax);
+    
+    // Init: left at 0%, right at 100%
+    setHandlePosition(handleL, 0);
+    setHandlePosition(handleR, 100);
+    updateFill();
+    
+    let dragging = null;
+    
+    function startDrag(e) {
+        dragging = e.target.dataset.handle;
+        e.preventDefault();
+    }
+    function onDrag(e) {
+        if (!dragging) return;
+        const rect = container.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let pct = Math.max(0, Math.min(100, (clientX - rect.left) / rect.width * 100));
+        
+        if (dragging === 'left') {
+            const rightPct = parseFloat(handleR.style.left) || 100;
+            pct = Math.min(pct, rightPct - 2);
+            setHandlePosition(handleL, pct);
+        } else {
+            const leftPct = parseFloat(handleL.style.left) || 0;
+            pct = Math.max(pct, leftPct + 2);
+            setHandlePosition(handleR, pct);
+        }
+        updateFill();
+        
+        // Compute date from pct
+        const totalMs = dateMax.getTime() - dateMin.getTime();
+        if (dragging === 'left') {
+            rangeFrom = new Date(dateMin.getTime() + (pct / 100) * totalMs);
+        } else {
+            rangeTo = new Date(dateMin.getTime() + (pct / 100) * totalMs);
+        }
+    }
+    function endDrag() {
+        if (!dragging) return;
+        dragging = null;
+        applyFilter();
+    }
+    
+    handleL.addEventListener('mousedown', startDrag);
+    handleR.addEventListener('mousedown', startDrag);
+    handleL.addEventListener('touchstart', startDrag, {passive: false});
+    handleR.addEventListener('touchstart', startDrag, {passive: false});
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('touchmove', onDrag, {passive: false});
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+}
+
+function setHandlePosition(handle, pct) {
+    handle.style.left = pct + '%';
+}
+
+function updateFill() {
+    const handleL = document.getElementById('handleLeft');
+    const handleR = document.getElementById('handleRight');
+    const fill = document.getElementById('rangeFill');
+    const left = parseFloat(handleL.style.left) || 0;
+    const right = parseFloat(handleR.style.left) || 100;
+    fill.style.left = left + '%';
+    fill.style.width = (right - left) + '%';
+}
+
+function updateRangeSliderHandles() {
+    if (!dateMin || !dateMax) return;
+    const totalMs = dateMax.getTime() - dateMin.getTime();
+    const handleL = document.getElementById('handleLeft');
+    const handleR = document.getElementById('handleRight');
+    
+    const leftPct = rangeFrom ? ((rangeFrom.getTime() - dateMin.getTime()) / totalMs * 100) : 0;
+    const rightPct = rangeTo ? ((rangeTo.getTime() - dateMin.getTime()) / totalMs * 100) : 100;
+    
+    setHandlePosition(handleL, Math.max(0, leftPct));
+    setHandlePosition(handleR, Math.min(100, rightPct));
+    updateFill();
+}
+
+// ═══ Apply Filter & Render ═══
+function applyFilter() {
+    filteredTrades = filterByDateRange(allTrades, rangeFrom, rangeTo);
+    renderAll();
+}
+
+function renderAll() {
+    const n = filteredTrades.length;
+    const summary = computeSummary(filteredTrades);
+    
+    // Header
+    const dateRange = getDateRange(filteredTrades);
+    const dateStr = dateRange.min ? `${fmtDate(dateRange.min)} – ${fmtDate(dateRange.max)}` : '—';
+    document.getElementById('headerSub').innerHTML = `Signal <a href="https://signals.algoforest.com/signals/${SIGNAL_ID}">${SIGNAL_ID}</a> (${EA_TAG}) · ${dateStr}`;
+    
+    // Summary bar
+    document.getElementById('summaryBar').innerHTML = `
+        <div><div class="v">${summary.count}</div><div class="l">交易筆數</div></div>
+        <div><div class="v">${summary.win_pct}%</div><div class="l">勝率</div></div>
+        <div><div class="v ${summary.total_pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fmtPnl(summary.total_pnl)}</div><div class="l">總 P&L</div></div>
+        <div><div class="v">${summary.symbols}</div><div class="l">CCY</div></div>
+        <div><div class="v">${summary.layers}</div><div class="l">層數</div></div>
+        <div><div class="v">${summary.best_ccy}</div><div class="l">最佳 CCY (${fmtPnl(summary.best_pnl)})</div></div>
+    `;
+    
+    // Compute stats
+    const layerStats = computeLayerStats(filteredTrades);
+    const ccySummary = buildCCYDirectionSummary(layerStats);
+    const tpsl = computeTPSL(layerStats);
+    const blacklist = computeBlacklist(layerStats);
+    const recovery = computeRecovery(layerStats);
+    
+    let html = '';
+    
+    // CCY×Direction sections
+    html += '<h2>📊 CCY × Direction 逐層分析</h2>';
+    for (const cs of ccySummary) {
+        const layers = Object.values(layerStats).filter(s => s.symbol === cs.symbol && s.direction === cs.direction);
+        layers.sort((a, b) => a.layer_idx - b.layer_idx);
+        
+        html += `<div class="section-toggle">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span>${cs.direction === 'buy' ? '▲' : '▼'} ${cs.symbol} ${cs.direction.toUpperCase()} — ${layers.length} 層 | WR ${cs.avg_wr}% | P&L ${fmtPnl(cs.total_pnl)} | ${cs.best_rating}</span>
+                <span class="arrow">▶</span>
+            </div>
+            <div class="section-body">
+                <table>
+                    <tr><th>Layer</th><th>Lots</th><th>#</th><th>WR%</th><th>EV$</th><th>P&L</th><th>Odds</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>Hold</th><th>Rating</th></tr>
+                    ${layers.map(l => {
+                        const r = computeRating(l);
+                        const sc = computeScore(l);
+                        return `<tr>
+                            <td>L${l.layer_idx}</td>
+                            <td>${l.lots}</td>
+                            <td>${l.count}</td>
+                            <td>${l.wr}%</td>
+                            <td>${fmtPnl(l.ev)}</td>
+                            <td class="${l.total_pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fmtPnl(l.total_pnl)}</td>
+                            <td>${l.odds_pips}x</td>
+                            <td>${l.avg_mfe}</td>
+                            <td>${l.avg_mae}</td>
+                            <td>${l.max_mae}</td>
+                            <td>${l.avg_hold}h</td>
+                            <td class="${ratingClass(r)}" title="Score: ${sc}">${r}</td>
+                        </tr>`;
+                    }).join('')}
+                </table>
+            </div>
+        </div>`;
+    }
+    
+    // TP/SL Suggestions
+    if (tpsl.length > 0) {
+        html += '<h2>✅ TP/SL 建議（A 級以上）</h2>';
+        for (const t of tpsl) {
+            html += `<div class="tp-suggestion">
+                <strong>${t.symbol} ${t.direction.toUpperCase()} ${t.layer}</strong> (${t.lots} lots) 
+                <span class="${ratingClass(t.rating)}">${t.rating}</span> | 
+                WR ${t.wr}% | ${t.count} 筆 | 
+                建議 TP: <span class="pnl-pos">${t.suggest_tp} pips</span> | 
+                建議 SL: <span class="pnl-neg">${t.suggest_sl} pips</span>
+            </div>`;
+        }
+    }
+    
+    // Blacklist
+    if (blacklist.length > 0) {
+        html += '<h2>🚫 黑名單（危險層數）</h2>';
+        for (const b of blacklist) {
+            html += `<div class="sl-danger">
+                <strong>${b.symbol} ${b.direction.toUpperCase()} ${b.layer}</strong> (${b.lots} lots) 
+                <span class="${ratingClass(b.rating)}">${b.rating}</span> | 
+                Danger: ${b.danger_score} | WR ${b.wr}% | EV ${fmtPnl(b.ev)} | P&L ${fmtPnl(b.total_pnl)} | 
+                <span style="color:var(--red)">${b.reason}</span>
+            </div>`;
+        }
+    }
+    
+    // Recovery
+    if (recovery.length > 0) {
+        html += '<h2>🔧 恢復計劃</h2>';
+        for (const r of recovery) {
+            html += `<div class="recovery-item">
+                <strong>${r.symbol} ${r.direction.toUpperCase()} ${r.layer}</strong> 
+                <span class="${ratingClass(r.rating)}">${r.rating}</span> | 
+                ${r.suggestion}
+            </div>`;
+        }
+    }
+    
+    document.getElementById('content').innerHTML = html;
+}
+
+function toggleSection(el) {
+    el.classList.toggle('open');
+    const body = el.nextElementSibling;
+    body.classList.toggle('open');
+}
+
+// ═══ Helpers ═══
+function fmtDate(d) {
+    if (!d) return '—';
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+</script>
+
+</body>
+</html>
