@@ -140,13 +140,16 @@ function setupQuickButtons(){
         btn.addEventListener('click',()=>{
             document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));
             btn.classList.add('active');
-            const range=btn.dataset.range; const now=new Date(); let from=null;
-            if(range==='all'){from=null;} else if(range==='1d')from=new Date(now.getTime()-86400000);
-            else if(range==='1w')from=new Date(now.getTime()-7*86400000);
-            else if(range==='1m')from=new Date(now.getFullYear(),now.getMonth()-1,now.getDate());
-            else if(range==='3m')from=new Date(now.getFullYear(),now.getMonth()-3,now.getDate());
-            else if(range==='6m')from=new Date(now.getFullYear(),now.getMonth()-6,now.getDate());
-            else if(range==='1y')from=new Date(now.getFullYear()-1,now.getMonth(),now.getDate());
+            const range=btn.dataset.range;
+            // Use CSV max date as reference, not current time
+            const ref=dateMax||new Date();
+            let from=null;
+            if(range==='all'){from=null;} else if(range==='1d')from=new Date(ref.getTime()-86400000);
+            else if(range==='1w')from=new Date(ref.getTime()-7*86400000);
+            else if(range==='1m')from=new Date(ref.getFullYear(),ref.getMonth()-1,ref.getDate());
+            else if(range==='3m')from=new Date(ref.getFullYear(),ref.getMonth()-3,ref.getDate());
+            else if(range==='6m')from=new Date(ref.getFullYear(),ref.getMonth()-6,ref.getDate());
+            else if(range==='1y')from=new Date(ref.getFullYear()-1,ref.getMonth(),ref.getDate());
             rangeFrom=from; rangeTo=null;
             document.getElementById('dateFrom').value=from?fmtDate(from):'';
             document.getElementById('dateTo').value='';
@@ -202,7 +205,7 @@ function renderAll(){
     let html='';
 
     // Global P&L Bar Chart
-    html+=buildGlobalBar(ccySum);
+    html+=buildGlobalBar(ccySum, ls);
 
     // CCY×Direction sections
     html+='<h2>📊 CCY × Direction 逐層分析 <span class="info">i<span class="tip"><b>逐層分析說明</b><br>每個 CCY×Direction 展開後顯示：<br><br><b>Part 1 組合概覽</b>：每層嘅完整統計<br><b>Part 2 MFE/MAE 圖表</b>：分開兩幅圖，hover 睇每筆交易詳情<br><b>Part 3 交易訂單</b>：點擊展開查看每筆交易明細<br><br><b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br><b>綠色行</b> = A 級以上 &nbsp;|&nbsp; <b>紅色行</b> = D 級以下</span></span></h2>';
@@ -241,19 +244,19 @@ function renderAll(){
         }
         html+=`</tbody></table></div>`;
 
-        // Part 2: MFE / MAE charts (separate)
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 2 · MFE / MAE 圖表 <span class="info">i<span class="tip"><b>圖表說明</b><br><b>MFE 圖</b>：每筆交易嘅最大有利波幅（點數）<br><b>MAE 圖</b>：每筆交易嘅最大不利波幅（點數）<br><br>綠色圓點 = 盈利交易 | 紅色圓點 = 虧損交易<br>Mouseover 顯示每筆交易詳情<br><br>MFE 越大 = 可設更高 TP<br>MAE 越大 = 需設更寬 SL</span></span></div>`;
+        // Part 2: Trade details expand (MOVED before MFE/MAE)
+        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 2 · 交易訂單明細 <span class="info">i<span class="tip"><b>交易訂單說明</b><br>點擊每層嘅「展開訂單」按鈕，可查看該層所有交易嘅完整資料。<br><br>方便你對比同核對每筆交易嘅實際數據。</span></span></div>`;
         for(const l of layers){
             const rat=computeRating(l);
             html+=`<div style="margin:6px 0 10px"><div style="font-size:0.82em;color:var(--text2);margin-bottom:2px"><b>${l.layer_label}</b> (${l.lots} lots) <span class="${ratingClass(rat)}">${rat}</span> | n=${l.count} | WR ${l.wr}%</div>`;
             html+=`<div class="chart-row">
-                <div class="chart-box"><h4>MFE (最大有利波幅)</h4><canvas id="mfe_${l.symbol}_${l.direction}_${l.lots}" height="160"></canvas></div>
-                <div class="chart-box"><h4>MAE (最大不利波幅)</h4><canvas id="mae_${l.symbol}_${l.direction}_${l.lots}" height="160"></canvas></div>
+                <div class="chart-box"><h4>MFE (最大有利波幅)</h4><canvas id="mfe_${l.symbol}_${l.direction}_${String(l.lots).replace(/\./g,'_')}" height="160"></canvas></div>
+                <div class="chart-box"><h4>MAE (最大不利波幅)</h4><canvas id="mae_${l.symbol}_${l.direction}_${String(l.lots).replace(/\./g,'_')}" height="160"></canvas></div>
             </div></div>`;
         }
 
-        // Part 3: Trade details expand
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 3 · 交易訂單明細 <span class="info">i<span class="tip"><b>交易訂單說明</b><br>點擊每層嘅「展開訂單」按鈕，可查看該層所有交易嘅完整資料。<br><br>方便你對比同核對每筆交易嘅實際數據。</span></span></div>`;
+        // Part 3: MFE / MAE charts (separate)
+        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 3 · MFE / MAE 圖表 <span class="info">i<span class="tip"><b>圖表說明</b><br><b>MFE 圖</b>：每筆交易嘅最大有利波幅（點數）<br><b>MAE 圖</b>：每筆交易嘅最大不利波幅（點數）<br><br>綠色圓點 = 盈利交易 | 紅色圓點 = 虧損交易<br>Mouseover 顯示每筆交易詳情<br><br>MFE 越大 = 可設更高 TP<br>MAE 越大 = 需設更寬 SL</span></span></div>`;
         for(const l of layers){
             const tid=`trades_${l.symbol}_${l.direction}_${l.lots}`.replace(/\./g,'_');
             html+=`<div class="trades-toggle" onclick="toggleTrades('${tid}',this)">📋 展開訂單 — ${l.layer_label} (${l.count} 筆)</div>
@@ -313,32 +316,50 @@ function toggleSec(el){el.classList.toggle('open');el.nextElementSibling.classLi
 function toggleTrades(id,btn){const p=document.getElementById(id);p.classList.toggle('open');btn.textContent=p.classList.contains('open')?'📋 收起訂單':'📋 展開訂單';}
 
 // ═══ Global Bar ═══
-function buildGlobalBar(ccySum){
+function buildGlobalBar(ccySum, ls){
     const top=ccySum.slice(0,20);
     const maxAbs=Math.max(...top.map(c=>Math.abs(c.total_pnl)),1);
-    const n=top.length, svgH=Math.max(200,n*36+50), gap=36, lm=60, rm=60, cw=820, pw=cw-lm-rm, zx=lm+pw/2;
+    const maxPips=Math.max(...top.map(c=>Math.abs(c.total_pips||0)),1);
+    const n=top.length, svgH=Math.max(200,n*36+50), gap=36, lm=80, rm=60, cw=900, pw=cw-lm-rm, zx=lm+pw/2;
     let svg=`<svg viewBox="0 0 ${cw} ${svgH}" style="width:100%;height:auto;font-family:var(--font)" xmlns="http://www.w3.org/2000/svg">`;
     svg+=`<rect width="${cw}" height="${svgH}" fill="var(--bg)" rx="6"/>`;
     svg+=`<line x1="${zx}" y1="30" x2="${zx}" y2="${svgH-20}" stroke="var(--brd)" stroke-width="1"/>`;
+    // Header legend
+    svg+=`<rect x="${lm}" y="${svgH-8}" width="10" height="8" fill="var(--grn)" rx="1"/><text x="${lm+14}" y="${svgH}" fill="#aaa" font-size="8">盈利$</text>`;
+    svg+=`<rect x="${lm+55}" y="${svgH-8}" width="10" height="8" fill="var(--red)" rx="1"/><text x="${lm+69}" y="${svgH}" fill="#aaa" font-size="8">虧損$</text>`;
+    svg+=`<rect x="${lm+120}" y="${svgH-8}" width="10" height="4" fill="#5dade2" rx="1"/><text x="${lm+134}" y="${svgH}" fill="#aaa" font-size="8">盈利PIP</text>`;
+    svg+=`<rect x="${lm+195}" y="${svgH-8}" width="10" height="4" fill="#e67e22" rx="1"/><text x="${lm+209}" y="${svgH}" fill="#aaa" font-size="8">虧損PIP</text>`;
     for(const c of top){
         const yb=30+top.indexOf(c)*gap+10;
+        const symId=`gbar_${c.symbol}_${c.direction}`;
+        // Symbol text (clickable)
+        svg+=`<a href="#ccy-${c.symbol}-${c.direction}" style="cursor:pointer"><text x="4" y="${yb+6}" fill="var(--pri)" font-size="9" font-weight="bold">${c.symbol} ${c.direction.toUpperCase().substr(0,1)}</text></a>`;
+        // $ bar
         const frac=Math.abs(c.total_pnl)/maxAbs;
         const bw=Math.max(frac*pw/2,1);
         const col=c.total_pnl>=0?'var(--grn)':'var(--red)';
         const bx=c.total_pnl>=0?zx:zx-bw;
-        svg+=`<text x="4" y="${yb+6}" fill="var(--text)" font-size="9">${c.symbol} ${c.direction.toUpperCase().substr(0,1)}</text>`;
         svg+=`<rect x="${bx}" y="${yb-4}" width="${bw}" height="16" fill="${col}" rx="2" opacity="0.85"/>`;
-        svg+=`<text x="${c.total_pnl>=0?zx+bw+4:zx-bw-4}" y="${yb+8}" fill="${col}" font-size="8" font-weight="bold" text-anchor="${c.total_pnl>=0?'start':'end'}">${fmtPnl(c.total_pnl)}</text>`;
+        const tx=c.total_pnl>=0?zx+bw+4:zx-bw-4;
+        svg+=`<text x="${tx}" y="${yb+8}" fill="${col}" font-size="8" font-weight="bold" text-anchor="${c.total_pnl>=0?'start':'end'}">${fmtPnl(c.total_pnl)}</text>`;
+        // Pips bar (thin)
+        const pips=c.total_pips||0;
+        const fracP=Math.abs(pips)/maxPips;
+        const pw2=Math.max(fracP*pw/2,1);
+        const colP=pips>=0?'#5dade2':'#e67e22';
+        const bxP=pips>=0?zx:zx-pw2;
+        svg+=`<rect x="${bxP}" y="${yb+14}" width="${pw2}" height="6" fill="${colP}" rx="1" opacity="0.8"/>`;
     }
     svg+=`</svg>`;
-    return `<div class="global-bar"><div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin-bottom:4px">📊 全局 P&L 分佈 <span class="info">i<span class="tip"><b>全局 P&L 分佈</b><br>顯示每個 CCY×Direction 嘅總盈虧。<br>綠色 = 盈利 | 紅色 = 虧損<br>按盈虧金額排序。</span></span></div>${svg}</div>`;
+    return `<div class="global-bar"><div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin-bottom:4px">📊 全局 P&L 分佈（$ + PIP） <span class="info">i<span class="tip"><b>全局 P&L 分佈</b><br>顯示每個 CCY×Direction 嘅總盈虧（$ + PIP）。<br>粗棒 = 金額 | 細棒 = Pips<br>綠色 = 盈利 | 紅色 = 虧損<br><br><b>點擊 Symbol 可跳到該分析</b></span></span></div>${svg}</div>`;
 }
 
 // ═══ Canvas Charts ═══
 function drawAllCharts(ls){
     for(const [key,s] of Object.entries(ls)){
-        drawScatter(`mfe_${s.symbol}_${s.direction}_${s.lots}`, s.trades, 'mfe', s);
-        drawScatter(`mae_${s.symbol}_${s.direction}_${s.lots}`, s.trades, 'mae', s);
+        const id=`${s.symbol}_${s.direction}_${String(s.lots).replace(/\./g,'_')}`;
+        drawScatter(`mfe_${id}`, s.trades, 'mfe', s);
+        drawScatter(`mae_${id}`, s.trades, 'mae', s);
     }
 }
 

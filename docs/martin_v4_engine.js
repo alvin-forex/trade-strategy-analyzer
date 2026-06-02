@@ -217,12 +217,13 @@ function buildCCYDirectionSummary(layerStats) {
     const summary = [];
     for (const [cd, layers] of Object.entries(map)) {
         const totalPnl = layers.reduce((s, l) => s + l.total_pnl, 0);
+        const totalPips = layers.reduce((s, l) => s + (l.total_pips||0), 0);
         const totalCount = layers.reduce((s, l) => s + l.count, 0);
         const totalWins = layers.reduce((s, l) => s + l.win_count, 0);
         const avgWr = totalCount > 0 ? totalWins / totalCount * 100 : 0;
         const ratings = layers.map(l => computeRating(l));
         const best = ratings.includes('S+') ? 'S+' : ratings.includes('S') ? 'S' : ratings.includes('A') ? 'A' : ratings.includes('B') ? 'B' : 'C';
-        summary.push({ symbol: layers[0].symbol, direction: layers[0].direction, layers: layers.length, total_pnl: r2(totalPnl), total_count: totalCount, avg_wr: r2(avgWr), best_rating: best });
+        summary.push({ symbol: layers[0].symbol, direction: layers[0].direction, layers: layers.length, total_pnl: r2(totalPnl), total_pips: r2(totalPips), total_count: totalCount, avg_wr: r2(avgWr), best_rating: best });
     }
     return summary.sort((a, b) => b.total_pnl - a.total_pnl);
 }
