@@ -24,6 +24,8 @@
       <div class="sidebar-sep"></div>
       <a href="${depth}admin/pivot_table.html" class="sidebar-link" data-page="pivot_table"><span class="icon">🔄</span>BUY/SELL 分析</a>
       <a href="${depth}admin/period_stats.html" class="sidebar-link" data-page="period_stats"><span class="icon">⏰</span>時間統計</a>
+      <a href="${depth}admin/mfe_mae.html" class="sidebar-link" data-page="mfe_mae"><span class="icon">📊</span>MFE/MAE 分析</a>
+      <a href="${depth}admin/history.html" class="sidebar-link" data-page="history"><span class="icon">💾</span>歷史備份</a>
     </div>
   `;
 
