@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔄 馬丁剖析法 V4 — Signal %%SIGNAL_ID%%</title>
+<style>
+:root{--font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px}
+[data-theme="dark"]{--bg:#0a0e17;--bg-card:#111520;--bg-hover:#1a1f2e;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--border:#1e2433;--th-bg:#111520}
+[data-theme="light"]{--bg:#f5f7fa;--bg-card:#fff;--bg-hover:#eef2f7;--text:#333;--text2:#666;--primary:#0f3460;--accent:#e94560;--green:#28a745;--red:#dc3545;--yellow:#ffc107;--border:#ddd;--th-bg:#eef2f7}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);padding:12px;max-width:1400px;margin:0 auto}
+h1{font-size:1.3em;color:var(--primary);margin-bottom:4px}
+h2{font-size:1.05em;color:var(--primary);margin:16px 0 8px}
+h3{font-size:0.95em;color:var(--accent);margin:12px 0 6px}
+.sub{color:var(--text2);font-size:0.85em;margin-bottom:12px}
+a{color:var(--accent);text-decoration:none;font-weight:bold}
+/* Theme toggle */
+.theme-btn{width:36px;height:36px;border:1px solid var(--border);border-radius:50%;background:var(--bg-card);color:var(--text);font-size:18px;cursor:pointer;flex-shrink:0}
+/* Stats bar */
+.stats-bar{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap}
+.stats-bar .v{font-size:1.3em;font-weight:bold;color:var(--primary)}
+.stats-bar .l{font-size:0.75em;color:var(--text2)}
+/* Date range controls */
+.date-controls{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px}
+.quick-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.quick-btns button{padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.85em}
+.quick-btns button.active{background:var(--primary);color:#000;border-color:var(--primary);font-weight:bold}
+.quick-btns button:hover{border-color:var(--primary)}
+.date-inputs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.date-inputs label{color:var(--text2);font-size:0.85em}
+.date-inputs input[type="date"]{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:0.9em}
+.date-inputs button{padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.8em}
+/* Range slider */
+.range-container{position:relative;height:40px;margin:4px 0}
+.range-track{position:absolute;top:18px;left:0;right:0;height:4px;background:var(--border);border-radius:2px}
+.range-fill{position:absolute;top:18px;height:4px;background:var(--primary);border-radius:2px}
+.range-handle{position:absolute;top:10px;width:20px;height:20px;background:var(--primary);border-radius:50%;cursor:grab;z-index:2;touch-action:none}
+.range-handle:active{cursor:grabbing}
+.range-labels{display:flex;justify-content:space-between;font-size:0.75em;color:var(--text2);margin-top:24px}
+/* Tables */
+table{width:100%;border-collapse:collapse;margin-bottom:8px}
+th{background:var(--th-bg);padding:6px 8px;text-align:left;border-bottom:2px solid var(--primary);color:var(--primary);font-size:0.8em;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{background:var(--bg-hover)}
+td{padding:5px 8px;border-bottom:1px solid var(--border);font-size:0.88em}
+tr:hover{background:var(--bg-card)}
+/* Sections (collapsible) */
+.section-toggle{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden}
+.section-header{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:0.95em}
+.section-header:hover{background:var(--bg-hover)}
+.section-header .arrow{transition:transform 0.2s;font-size:0.8em;color:var(--text2)}
+.section-header.open .arrow{transform:rotate(90deg)}
+.section-body{display:none;padding:10px 14px;border-top:1px solid var(--border)}
+.section-body.open{display:block}
+/* Rating colors */
+.rating-sp{color:#FFD700;font-weight:bold}.rating-s{color:#FFA500;font-weight:bold}.rating-a{color:var(--green);font-weight:bold}.rating-b{color:var(--accent);font-weight:bold}.rating-c{color:var(--yellow)}.rating-d{color:var(--red)}.rating-e{color:#999}
+/* PnL colors */
+.pnl-pos{color:var(--green);font-weight:bold}.pnl-neg{color:var(--red);font-weight:bold}
+/* TP/SL */
+.tp-suggestion{background:var(--bg-card);border:1px solid var(--green);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+.sl-danger{background:var(--bg-card);border:1px solid var(--red);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+.recovery-item{background:var(--bg-card);border:1px solid var(--yellow);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+/* Responsive */
+@media(max-width:768px){body{padding:8px;font-size:13px}.quick-btns button{padding:4px 8px;font-size:0.8em}.date-inputs{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+<h1>🔄 馬丁剖析法 V4</h1>
+<button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="切換主題">☀️</button>
+</div>
+<div class="sub" id="headerSub">Signal %%SIGNAL_ID%% (%%EA%%) · 載入中...</div>
+
+<!-- Date Range Controls -->
+<div class="date-controls" id="dateControls">
+<div style="color:var(--text2);font-size:0.85em;margin-bottom:6px">📅 時間範圍</div>
+<div class="quick-btns" id="quickBtns">
+<button data-range="1d">1日</button>
+<button data-range="1w">1週</button>
+<button data-range="1m">1月</button>
+<button data-range="3m">3月</button>
+<button data-range="6m">6月</button>
+<button data-range="1y">1年</button>
+<button data-range="all" class="active">全部</button>
+</div>
+<div class="date-inputs">
+<label>From:</label><input type="date" id="dateFrom">
+<label>To:</label><input type="date" id="dateTo">
+<button onclick="applyCustomDate()">套用</button>
+<button onclick="clearDateFilter()">清除</button>
+</div>
+<div class="range-container" id="rangeContainer">
+<div class="range-track"></div>
+<div class="range-fill" id="rangeFill"></div>
+<div class="range-handle" id="handleLeft" data-handle="left"></div>
+<div class="range-handle" id="handleRight" data-handle="right"></div>
+</div>
+<div class="range-labels"><span id="rangeMinLabel">—</span><span id="rangeMaxLabel">—</span></div>
+</div>
+
+<!-- Summary -->
+<div class="stats-bar" id="summaryBar"></div>
+
+<!-- Content -->
+<div id="content"></div>
+
+<script src="martin_v4_engine.js"></script>
+<script>
+// ═══ Config ═══
+const SIGNAL_ID = '%%SIGNAL_ID%%';
+const EA_TAG = '%%EA%%';
+const CSV_URL = '%%CSV_URL%%';
+
+// ═══ State ═══
+let allTrades = [];
+let filteredTrades = [];
+let dateMin = null, dateMax = null;
+let rangeFrom = null, rangeTo = null;
+
+// ═══ Init ═══
+(function init() {
+    loadTheme();
+    document.getElementById('headerSub').textContent = `Signal ${SIGNAL_ID} (${EA_TAG}) · 載入中...`;
+    
+    fetch(CSV_URL)
+        .then(r => r.ok ? r.text() : Promise.reject('CSV load failed: ' + r.status))
+        .then(text => {
+            allTrades = parseCSV(text);
+            const dr = getDateRange(allTrades);
+            dateMin = dr.min;
+            dateMax = dr.max;
+            
+            if (!dateMin || !dateMax) {
+                document.getElementById('headerSub').textContent = `Signal ${SIGNAL_ID} — ❌ 冇交易數據`;
+                return;
+            }
+            
+            setupRangeSlider();
+            setupQuickButtons();
+            
+            filteredTrades = [...allTrades];
+            renderAll();
+        })
+        .catch(err => {
+            document.getElementById('headerSub').textContent = `Signal ${SIGNAL_ID} — ❌ ${err}`;
+        });
+})();
+
+// ═══ Theme ═══
+function loadTheme() {
+    const t = localStorage.getItem('tsa-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    document.getElementById('themeToggle').textContent = t === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('tsa-theme', next);
+    document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+
+// ═══ Quick Buttons ═══
+function setupQuickButtons() {
+    document.querySelectorAll('#quickBtns button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#quickBtns button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const range = btn.dataset.range;
+            const now = new Date();
+            let from = null;
+            
+            if (range === 'all') {
+                from = null;
+            } else if (range === '1d') from = new Date(now.getTime() - 86400000);
+            else if (range === '1w') from = new Date(now.getTime() - 7 * 86400000);
+            else if (range === '1m') from = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+            else if (range === '3m') from = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+            else if (range === '6m') from = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+            else if (range === '1y') from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            
+            rangeFrom = from;
+            rangeTo = null;
+            
+            // Update date inputs
+            document.getElementById('dateFrom').value = from ? fmtDate(from) : '';
+            document.getElementById('dateTo').value = '';
+            
+            updateRangeSliderHandles();
+            applyFilter();
+        });
+    });
+}
+
+function applyCustomDate() {
+    const fromVal = document.getElementById('dateFrom').value;
+    const toVal = document.getElementById('dateTo').value;
+    rangeFrom = fromVal ? new Date(fromVal) : null;
+    rangeTo = toVal ? new Date(toVal + 'T23:59:59') : null;
+    
+    document.querySelectorAll('#quickBtns button').forEach(b => b.classList.remove('active'));
+    
+    updateRangeSliderHandles();
+    applyFilter();
+}
+
+function clearDateFilter() {
+    rangeFrom = null;
+    rangeTo = null;
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    document.querySelectorAll('#quickBtns button').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-range="all"]').classList.add('active');
+    updateRangeSliderHandles();
+    applyFilter();
+}
+
+// ═══ Range Slider ═══
+function setupRangeSlider() {
+    const container = document.getElementById('rangeContainer');
+    const handleL = document.getElementById('handleLeft');
+    const handleR = document.getElementById('handleRight');
+    
+    document.getElementById('rangeMinLabel').textContent = fmtDate(dateMin);
+    document.getElementById('rangeMaxLabel').textContent = fmtDate(dateMax);
+    
+    // Init: left at 0%, right at 100%
+    setHandlePosition(handleL, 0);
+    setHandlePosition(handleR, 100);
+    updateFill();
+    
+    let dragging = null;
+    
+    function startDrag(e) {
+        dragging = e.target.dataset.handle;
+        e.preventDefault();
+    }
+    function onDrag(e) {
+        if (!dragging) return;
+        const rect = container.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let pct = Math.max(0, Math.min(100, (clientX - rect.left) / rect.width * 100));
+        
+        if (dragging === 'left') {
+            const rightPct = parseFloat(handleR.style.left) || 100;
+            pct = Math.min(pct, rightPct - 2);
+            setHandlePosition(handleL, pct);
+        } else {
+            const leftPct = parseFloat(handleL.style.left) || 0;
+            pct = Math.max(pct, leftPct + 2);
+            setHandlePosition(handleR, pct);
+        }
+        updateFill();
+        
+        // Compute date from pct
+        const totalMs = dateMax.getTime() - dateMin.getTime();
+        if (dragging === 'left') {
+            rangeFrom = new Date(dateMin.getTime() + (pct / 100) * totalMs);
+        } else {
+            rangeTo = new Date(dateMin.getTime() + (pct / 100) * totalMs);
+        }
+    }
+    function endDrag() {
+        if (!dragging) return;
+        dragging = null;
+        applyFilter();
+    }
+    
+    handleL.addEventListener('mousedown', startDrag);
+    handleR.addEventListener('mousedown', startDrag);
+    handleL.addEventListener('touchstart', startDrag, {passive: false});
+    handleR.addEventListener('touchstart', startDrag, {passive: false});
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('touchmove', onDrag, {passive: false});
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+}
+
+function setHandlePosition(handle, pct) {
+    handle.style.left = pct + '%';
+}
+
+function updateFill() {
+    const handleL = document.getElementById('handleLeft');
+    const handleR = document.getElementById('handleRight');
+    const fill = document.getElementById('rangeFill');
+    const left = parseFloat(handleL.style.left) || 0;
+    const right = parseFloat(handleR.style.left) || 100;
+    fill.style.left = left + '%';
+    fill.style.width = (right - left) + '%';
+}
+
+function updateRangeSliderHandles() {
+    if (!dateMin || !dateMax) return;
+    const totalMs = dateMax.getTime() - dateMin.getTime();
+    const handleL = document.getElementById('handleLeft');
+    const handleR = document.getElementById('handleRight');
+    
+    const leftPct = rangeFrom ? ((rangeFrom.getTime() - dateMin.getTime()) / totalMs * 100) : 0;
+    const rightPct = rangeTo ? ((rangeTo.getTime() - dateMin.getTime()) / totalMs * 100) : 100;
+    
+    setHandlePosition(handleL, Math.max(0, leftPct));
+    setHandlePosition(handleR, Math.min(100, rightPct));
+    updateFill();
+}
+
+// ═══ Apply Filter & Render ═══
+function applyFilter() {
+    filteredTrades = filterByDateRange(allTrades, rangeFrom, rangeTo);
+    renderAll();
+}
+
+function renderAll() {
+    const n = filteredTrades.length;
+    const summary = computeSummary(filteredTrades);
+    
+    // Header
+    const dateRange = getDateRange(filteredTrades);
+    const dateStr = dateRange.min ? `${fmtDate(dateRange.min)} – ${fmtDate(dateRange.max)}` : '—';
+    document.getElementById('headerSub').innerHTML = `Signal <a href="https://signals.algoforest.com/signals/${SIGNAL_ID}">${SIGNAL_ID}</a> (${EA_TAG}) · ${dateStr}`;
+    
+    // Summary bar
+    document.getElementById('summaryBar').innerHTML = `
+        <div><div class="v">${summary.count}</div><div class="l">交易筆數</div></div>
+        <div><div class="v">${summary.win_pct}%</div><div class="l">勝率</div></div>
+        <div><div class="v ${summary.total_pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fmtPnl(summary.total_pnl)}</div><div class="l">總 P&L</div></div>
+        <div><div class="v">${summary.symbols}</div><div class="l">CCY</div></div>
+        <div><div class="v">${summary.layers}</div><div class="l">層數</div></div>
+        <div><div class="v">${summary.best_ccy}</div><div class="l">最佳 CCY (${fmtPnl(summary.best_pnl)})</div></div>
+    `;
+    
+    // Compute stats
+    const layerStats = computeLayerStats(filteredTrades);
+    const ccySummary = buildCCYDirectionSummary(layerStats);
+    const tpsl = computeTPSL(layerStats);
+    const blacklist = computeBlacklist(layerStats);
+    const recovery = computeRecovery(layerStats);
+    
+    let html = '';
+    
+    // CCY×Direction sections
+    html += '<h2>📊 CCY × Direction 逐層分析</h2>';
+    for (const cs of ccySummary) {
+        const layers = Object.values(layerStats).filter(s => s.symbol === cs.symbol && s.direction === cs.direction);
+        layers.sort((a, b) => a.layer_idx - b.layer_idx);
+        
+        html += `<div class="section-toggle">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span>${cs.direction === 'buy' ? '▲' : '▼'} ${cs.symbol} ${cs.direction.toUpperCase()} — ${layers.length} 層 | WR ${cs.avg_wr}% | P&L ${fmtPnl(cs.total_pnl)} | ${cs.best_rating}</span>
+                <span class="arrow">▶</span>
+            </div>
+            <div class="section-body">
+                <table>
+                    <tr><th>Layer</th><th>Lots</th><th>#</th><th>WR%</th><th>EV$</th><th>P&L</th><th>Odds</th><th>AvgMFE</th><th>AvgMAE</th><th>MaxMAE</th><th>Hold</th><th>Rating</th></tr>
+                    ${layers.map(l => {
+                        const r = computeRating(l);
+                        const sc = computeScore(l);
+                        return `<tr>
+                            <td>L${l.layer_idx}</td>
+                            <td>${l.lots}</td>
+                            <td>${l.count}</td>
+                            <td>${l.wr}%</td>
+                            <td>${fmtPnl(l.ev)}</td>
+                            <td class="${l.total_pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fmtPnl(l.total_pnl)}</td>
+                            <td>${l.odds_pips}x</td>
+                            <td>${l.avg_mfe}</td>
+                            <td>${l.avg_mae}</td>
+                            <td>${l.max_mae}</td>
+                            <td>${l.avg_hold}h</td>
+                            <td class="${ratingClass(r)}" title="Score: ${sc}">${r}</td>
+                        </tr>`;
+                    }).join('')}
+                </table>
+            </div>
+        </div>`;
+    }
+    
+    // TP/SL Suggestions
+    if (tpsl.length > 0) {
+        html += '<h2>✅ TP/SL 建議（A 級以上）</h2>';
+        for (const t of tpsl) {
+            html += `<div class="tp-suggestion">
+                <strong>${t.symbol} ${t.direction.toUpperCase()} ${t.layer}</strong> (${t.lots} lots) 
+                <span class="${ratingClass(t.rating)}">${t.rating}</span> | 
+                WR ${t.wr}% | ${t.count} 筆 | 
+                建議 TP: <span class="pnl-pos">${t.suggest_tp} pips</span> | 
+                建議 SL: <span class="pnl-neg">${t.suggest_sl} pips</span>
+            </div>`;
+        }
+    }
+    
+    // Blacklist
+    if (blacklist.length > 0) {
+        html += '<h2>🚫 黑名單（危險層數）</h2>';
+        for (const b of blacklist) {
+            html += `<div class="sl-danger">
+                <strong>${b.symbol} ${b.direction.toUpperCase()} ${b.layer}</strong> (${b.lots} lots) 
+                <span class="${ratingClass(b.rating)}">${b.rating}</span> | 
+                Danger: ${b.danger_score} | WR ${b.wr}% | EV ${fmtPnl(b.ev)} | P&L ${fmtPnl(b.total_pnl)} | 
+                <span style="color:var(--red)">${b.reason}</span>
+            </div>`;
+        }
+    }
+    
+    // Recovery
+    if (recovery.length > 0) {
+        html += '<h2>🔧 恢復計劃</h2>';
+        for (const r of recovery) {
+            html += `<div class="recovery-item">
+                <strong>${r.symbol} ${r.direction.toUpperCase()} ${r.layer}</strong> 
+                <span class="${ratingClass(r.rating)}">${r.rating}</span> | 
+                ${r.suggestion}
+            </div>`;
+        }
+    }
+    
+    document.getElementById('content').innerHTML = html;
+}
+
+function toggleSection(el) {
+    el.classList.toggle('open');
+    const body = el.nextElementSibling;
+    body.classList.toggle('open');
+}
+
+// ═══ Helpers ═══
+function fmtDate(d) {
+    if (!d) return '—';
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+</script>
+
+</body>
+</html>
