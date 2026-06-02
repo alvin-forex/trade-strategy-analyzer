@@ -52,7 +52,7 @@ Max Loss, Max Loss Pips, Magic Number, Comment, Holding Time (Hours), Holding Ti
 
 ### P1 — Short Term (3-5 days)
 
-#### P1-1: MFE/MAE Analysis
+#### P1-1: MFE/MAE Analysis ✅
 - **Script:** `generate_mfe_mae.py` (new)
 - **Page:** `/admin/mfe_mae.html`
 - **Data source:** `Max Profit` (MFE), `Max Loss` (MAE), `Max Pips`, `Max Loss Pips`
@@ -65,7 +65,7 @@ Max Loss, Max Loss Pips, Magic Number, Comment, Holding Time (Hours), Holding Ti
 - **Output:** HTML with inline SVG charts
 - **Difficulty:** Medium
 
-#### P1-2: History JSON Backup/Restore
+#### P1-2: History JSON Backup/Restore ✅
 - **Script:** `history_manager.py` (enhance existing)
 - **Page:** Integrated into existing pages
 - **Features:**
@@ -149,7 +149,7 @@ trade_strategy_analyzer/
 | HT column (ccy_ranking) | ✅ Done | `2c0f67a` |
 | P0-1 BUY/SELL Pivot | ✅ Done | `547cc7b` |
 | P0-2 Time Period Stats | ✅ Done | `547cc7b` |
-| P1-1 MFE/MAE | 🔲 Pending | — |
-| P1-2 History JSON | 🔲 Pending | — |
+| P1-1 MFE/MAE | ✅ Done | `69c7b87` |
+| P1-2 History JSON | ✅ Done | `69c7b87` |
 | P2-1 Bar OHLC | 🔲 Pending | — |
 | P2-2 Session Highlight | 🔲 Pending | — |

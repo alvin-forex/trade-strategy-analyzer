@@ -22,10 +22,7 @@
       <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
       <a href="${depth}admin/volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
       <div class="sidebar-sep"></div>
-      <a href="${depth}admin/pivot_table.html" class="sidebar-link" data-page="pivot_table"><span class="icon">🔄</span>BUY/SELL 分析</a>
-      <a href="${depth}admin/period_stats.html" class="sidebar-link" data-page="period_stats"><span class="icon">⏰</span>時間統計</a>
-      <a href="${depth}admin/mfe_mae.html" class="sidebar-link" data-page="mfe_mae"><span class="icon">📊</span>MFE/MAE 分析</a>
-      <a href="${depth}admin/history.html" class="sidebar-link" data-page="history"><span class="icon">💾</span>歷史備份</a>
+
     </div>
   `;
 

@@ -35,6 +35,7 @@ import math
 import pickle
 from pathlib import Path
 from collections import defaultdict
+from datetime import datetime
 
 
 # ─── Utilities ───
@@ -61,6 +62,17 @@ def read_csv_trades(csv_path):
                 holding_hours = float(row.get('Holding Time (Hours)', 0))
                 symbol = row.get('Symbol', '').strip()
 
+                max_profit = float(row.get('Max Profit', 0))
+                max_loss = abs(float(row.get('Max Loss', 0)))
+                max_pips = float(row.get('Max Pips', 0))
+
+                # Parse Open Time for time insights
+                _open_time = None
+                try:
+                    _open_time = datetime.strptime(row.get('Open Time', '').strip(), '%d/%m/%Y %H:%M:%S')
+                except:
+                    pass
+
                 trades.append({
                     'type': trade_type,
                     'lots': lots,
@@ -69,6 +81,10 @@ def read_csv_trades(csv_path):
                     'net_profit': net_profit,
                     'max_loss_pips': max_loss_pips,
                     'holding_hours': holding_hours,
+                    'max_profit': max_profit,       # MFE $
+                    'max_loss': max_loss,             # MAE $
+                    'max_pips': max_pips,             # MFE pips
+                    '_open_time': _open_time,         # For time analysis
                 })
             except (ValueError, TypeError):
                 continue
@@ -210,6 +226,43 @@ def compute_raw_metrics(trades_for_symbol, lot_layers=None):
     max_loss_pip = max((t['max_loss_pips'] for t in trades_for_symbol), default=0)
     avg_hold = sum(t['holding_hours'] for t in trades_for_symbol) / n
 
+    # --- BUY/SELL bias ---
+    buy_count = sum(1 for t in trades_for_symbol if t.get('type') == 'buy')
+    sell_count = sum(1 for t in trades_for_symbol if t.get('type') == 'sell')
+    buy_pct = buy_count / n * 100 if n else 0
+    sell_pct = sell_count / n * 100 if n else 0
+    bias = 'BUY' if buy_pct > 65 else ('SELL' if sell_pct > 65 else 'MIX')
+
+    # --- MFE/MAE ---
+    avg_mfe = sum(t.get('max_profit', 0) for t in trades_for_symbol) / n
+    avg_mae = sum(t.get('max_loss', 0) for t in trades_for_symbol) / n
+    avg_mfe_pips = sum(t.get('max_pips', 0) for t in trades_for_symbol) / n
+    avg_mae_pips = sum(t.get('max_loss_pips', 0) for t in trades_for_symbol) / n
+    mfe_mae_ratio = abs(avg_mfe / avg_mae) if avg_mae != 0 else 999.0
+    suggest_tp = round(avg_mfe_pips * 0.8, 1) if avg_mfe_pips > 0 else 0
+    suggest_sl = round(abs(avg_mae_pips) * 1.2, 1) if avg_mae_pips != 0 else 0
+
+    # --- Time insights ---
+    day_counts = defaultdict(int)
+    day_wins = defaultdict(int)
+    hour_counts = defaultdict(int)
+    hour_wins = defaultdict(int)
+    for t in trades_for_symbol:
+        try:
+            # Parse Open Time if available in raw trade
+            ot = t.get('_open_time')
+            if ot:
+                day_counts[ot.strftime('%a')] += 1
+                if t['net_pips'] > 0:
+                    day_wins[ot.strftime('%a')] += 1
+                hour_counts[ot.hour] += 1
+                if t['net_pips'] > 0:
+                    hour_wins[ot.hour] += 1
+        except:
+            pass
+    best_day = max(day_wins, key=lambda d: day_wins[d]/day_counts[d]*100 if day_counts.get(d, 0) > 0 else 0) if day_wins else '-'
+    worst_day = min(day_wins, key=lambda d: day_wins[d]/day_counts[d]*100 if day_counts.get(d, 0) > 0 else 0) if day_wins else '-'
+
     # --- Red card rules ---
     red_card = False
     red_reasons = []
@@ -248,6 +301,24 @@ def compute_raw_metrics(trades_for_symbol, lot_layers=None):
         'avg_profit_clean': round(avg_profit, 1),
         'avg_max_loss_clean': round(avg_max_loss, 1),
         'layers': dict(layer_counts),
+
+        # BUY/SELL bias
+        'buy_pct': round(buy_pct, 1),
+        'sell_pct': round(sell_pct, 1),
+        'bias': bias,
+
+        # MFE/MAE
+        'avg_mfe': round(avg_mfe, 1),
+        'avg_mae': round(avg_mae, 1),
+        'avg_mfe_pips': round(avg_mfe_pips, 1),
+        'avg_mae_pips': round(avg_mae_pips, 1),
+        'mfe_mae_ratio': round(mfe_mae_ratio, 2),
+        'suggest_tp': suggest_tp,
+        'suggest_sl': suggest_sl,
+
+        # Time insights
+        'best_day': best_day,
+        'worst_day': worst_day,
     }
 
 
