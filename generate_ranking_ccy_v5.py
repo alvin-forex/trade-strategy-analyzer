@@ -109,6 +109,7 @@ def generate_html(all_results):
 <th data-col="dd" data-type="num"><span class="tooltip" data-tip="Max Drawdown — 真實 DD (25%)">Max DD</span><span class="arrow"></span></th>
 <th data-col="wal" data-type="num"><span class="tooltip" data-tip="Weighted Avg Layer — 馬丁層數 (40%)">WAL</span><span class="arrow"></span></th>
 <th data-col="trades" data-type="num">Trades<span class="arrow"></span></th>
+<th data-col="ht" data-type="num"><span class="tooltip" data-tip="Holding Time — 平均持倉時間（小時）">HT</span><span class="arrow"></span></th>
 <th data-col="profit" data-type="num">Profit<span class="arrow"></span></th>
 <th data-col="wr_pct" data-type="num"><span class="tooltip" data-tip="WR 排名百分位">WR%</span><span class="arrow"></span></th>
 <th data-col="pf_pct" data-type="num"><span class="tooltip" data-tip="PF 排名百分位">PF%</span><span class="arrow"></span></th>
@@ -158,6 +159,7 @@ def generate_html(all_results):
 {dd_cell}
 <td data-val="{r["wal"]}">{r["wal"]:.2f}</td>
 <td data-val="{r["trades"]}">{r["trades"]:,}</td>
+<td data-val="{r.get("avg_hold", 0):.1f}">{r.get("avg_hold", 0):.1f}h</td>
 {profit_cell}
 <td data-val="{r["wr_pct"]}">{wr_pct}</td>
 <td data-val="{r["pf_pct"]}">{pf_pct}</td>
