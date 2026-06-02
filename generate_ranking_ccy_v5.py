@@ -111,11 +111,6 @@ def generate_html(all_results):
 <th data-col="trades" data-type="num">Trades<span class="arrow"></span></th>
 <th data-col="ht" data-type="num"><span class="tooltip" data-tip="Holding Time — 平均持倉時間（小時）">HT</span><span class="arrow"></span></th>
 <th data-col="profit" data-type="num">Profit<span class="arrow"></span></th>
-<th data-col="bias" data-type="str"><span class="tooltip" data-tip="BUY/SELL 偏向 — 超過65%為BUY或SELL">Bias</span><span class="arrow"></span></th>
-<th data-col="mfe_mae" data-type="num"><span class="tooltip" data-tip="MFE/MAE 比率 — 最大有利偏移 vs 最大不利偏移">M/R</span><span class="arrow"></span></th>
-<th data-col="tp" data-type="num"><span class="tooltip" data-tip="建議 TP (80% Avg MFE pips)">TP</span><span class="arrow"></span></th>
-<th data-col="sl" data-type="num"><span class="tooltip" data-tip="建議 SL (120% Avg MAE pips)">SL</span><span class="arrow"></span></th>
-<th data-col="best_day" data-type="str"><span class="tooltip" data-tip="最佳交易日">📅 Best</span><span class="arrow"></span></th>
 <th data-col="wr_pct" data-type="num"><span class="tooltip" data-tip="WR 排名百分位">WR%</span><span class="arrow"></span></th>
 <th data-col="pf_pct" data-type="num"><span class="tooltip" data-tip="PF 排名百分位">PF%</span><span class="arrow"></span></th>
 <th data-col="dd_pct" data-type="num"><span class="tooltip" data-tip="DD 排名百分位">DD%</span><span class="arrow"></span></th>
@@ -166,12 +161,6 @@ def generate_html(all_results):
 <td data-val="{r["trades"]}">{r["trades"]:,}</td>
 <td data-val="{r.get("avg_hold", 0):.1f}">{r.get("avg_hold", 0):.1f}h</td>
 {profit_cell}
-<td data-val="{r.get('buy_pct', 0)}" style="font-size:0.85em">{r.get('bias', '-')}
-  <span style=\"color:var(--green);font-size:0.75em\">{r.get('buy_pct', 0):.0f}%</span>/<span style=\"color:var(--red);font-size:0.75em\">{r.get('sell_pct', 0):.0f}%</span></td>
-<td data-val="{r.get('mfe_mae_ratio', 0)}" style=\"font-size:0.85em\">{r.get('mfe_mae_ratio', 0):.1f}</td>
-<td style=\"color:var(--green);font-size:0.85em\">{r.get('suggest_tp', 0):.0f}</td>
-<td style=\"color:var(--red);font-size:0.85em\">{r.get('suggest_sl', 0):.0f}</td>
-<td style=\"font-size:0.85em\">{r.get('best_day', '-')}</td>
 <td data-val="{r["wr_pct"]}">{wr_pct}</td>
 <td data-val="{r["pf_pct"]}">{pf_pct}</td>
 <td data-val="{r["dd_pct"]}">{dd_pct}</td>
