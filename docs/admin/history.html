@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💾 歷史備份</title>
+<link rel="stylesheet" href="../sidebar.css">
+<style>
+:root{--font-main:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif}
+[data-theme="dark"]{--bg:#0a0e17;--bg-card:#111520;--bg-hover:#1a1f2e;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--border:#1e2433;--th-bg:#111520}
+[data-theme="light"]{--bg:#f5f7fa;--bg-card:#ffffff;--bg-hover:#eef2f7;--text:#333;--text2:#666;--primary:#0f3460;--accent:#e94560;--green:#28a745;--red:#dc3545;--yellow:#ffc107;--border:#ddd;--th-bg:#eef2f7}
+*{transition:background-color .25s ease,color .25s ease,border-color .25s ease;margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-main);background:var(--bg);color:var(--text);padding:16px;max-width:1400px;margin:0 auto}
+h1{font-size:1.3em;margin-bottom:4px;color:var(--primary)}
+.sub{color:var(--text2);font-size:0.85em;margin-bottom:16px}
+.stats{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 18px;margin-bottom:16px;display:flex;gap:24px;flex-wrap:wrap}
+.stats .v{font-size:1.4em;font-weight:bold;color:var(--primary)}
+.stats .l{font-size:0.75em;color:var(--text2)}
+table{width:100%;border-collapse:collapse}
+th{background:var(--th-bg);padding:8px 10px;text-align:left;border-bottom:2px solid var(--primary);color:var(--primary);font-size:0.8em;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{background:var(--bg-hover)}
+td{padding:6px 10px;border-bottom:1px solid var(--border);font-size:0.88em}
+tr:hover{background:var(--bg-card)}
+a{color:var(--accent);text-decoration:none;font-weight:bold}
+a:hover{text-decoration:underline}
+.container{overflow-x:auto}
+.dd-g{color:var(--green);font-weight:bold}.dd-y{color:var(--yellow);font-weight:bold}.dd-r{color:var(--red);font-weight:bold}
+.import-box{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
+.import-box h3{color:var(--primary);font-size:0.95em;margin-bottom:8px}
+.import-box textarea{width:100%;height:60px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:8px;font-family:monospace;font-size:0.85em}
+.import-box button{margin-top:8px;padding:6px 14px;border:1px solid var(--primary);border-radius:4px;background:transparent;color:var(--primary);cursor:pointer;font-weight:bold}
+.import-box button:hover{background:var(--primary);color:var(--bg)}
+@media(max-width:768px){body{padding:8px;font-size:12px}}
+</style>
+<script>
+(function(){
+  const saved=localStorage.getItem('tsa-theme');
+  const t=saved||'dark';
+  document.documentElement.setAttribute('data-theme',t);
+  document.addEventListener('DOMContentLoaded',function(){
+    const btn=document.getElementById('theme-toggle');
+    if(btn)btn.textContent=t==='dark'?'☀️':'🌙';
+  });
+})();
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('tsa-theme',next);
+  document.getElementById('theme-toggle').textContent=next==='dark'?'☀️':'🌙';
+}
+function downloadJSON(signalId){
+  /* For GitHub Pages, we can't serve dynamic JSON. Instead, open the raw file. */
+  const url='https://raw.githubusercontent.com/alvin-forex/trade-strategy-analyzer/main/data/history/signal_'+signalId+'.json';
+  window.open(url,'_blank');
+}
+function importJSON(){
+  const ta=document.getElementById('importText');
+  const status=document.getElementById('importStatus');
+  try{
+    const data=JSON.parse(ta.value);
+    if(!data.signal_id)throw new Error('Missing signal_id');
+    status.textContent='✅ Valid JSON for signal '+data.signal_id+' ('+data.trade_count+' trades)';
+    status.style.color='var(--green)';
+    // Download as file
+    const blob=new Blob([ta.value],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='signal_'+data.signal_id+'.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    status.textContent='❌ '+e.message;
+    status.style.color='var(--red)';
+  }
+}
+function getCellValue(row,colIdx,type){
+  var cell=row.cells[colIdx];if(!cell)return type==='num'?0:'';
+  var dv=cell.getAttribute('data-val');
+  if(dv!==null)return type==='num'?parseFloat(dv):dv;
+  var text=cell.textContent.trim().replace(/[^0-9.\-]/g,'');
+  return type==='num'?(parseFloat(text)||0):cell.textContent.trim();
+}
+function sortTable(table,colIdx,type){
+  var tbody=table.tBodies[0];
+  var rows=Array.from(tbody.querySelectorAll('tr'));
+  var ths=table.querySelectorAll('thead th');
+  var dir=ths[colIdx].classList.contains('asc')?'desc':'asc';
+  ths.forEach(function(h){h.classList.remove('asc','desc')});
+  ths[colIdx].classList.add(dir);
+  rows.sort(function(a,b){
+    var va=getCellValue(a,colIdx,type);var vb=getCellValue(b,colIdx,type);
+    if(type==='num')return dir==='asc'?va-vb:vb-va;
+    return dir==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+  });
+  rows.forEach(function(r){tbody.appendChild(r)});
+}
+document.addEventListener('DOMContentLoaded',function(){
+  document.querySelectorAll('table[id^="tbl"]').forEach(function(table){
+    table.querySelectorAll('thead th').forEach(function(th,i){
+      th.addEventListener('click',function(){sortTable(table,i,th.getAttribute('data-type')||'str')});
+    });
+  });
+});
+</script>
+</head>
+<body>
+
+<div style="display:flex;align-items:center;gap:10px"><h1>💾 歷史備份</h1><button id="theme-toggle" onclick="toggleTheme()" title="切換亮/暗模式" style="width:36px;height:36px;border:1px solid var(--border);border-radius:50%;background:var(--bg-card);color:var(--text);font-size:18px;cursor:pointer;flex-shrink:0"></button></div>
+<div class="sub">2026-06-02 · 67 個 Signal 備份 · 158003 筆交易</div>
+
+<div class="stats">
+<div><div class="v">67</div><div class="l">已備份 Signals</div></div>
+<div><div class="v">158003</div><div class="l">總交易筆數</div></div>
+<div><div class="v">+3,122,723.0</div><div class="l">總 P&L ($)</div></div>
+</div>
+
+<div class="import-box">
+<h3>📥 還原備份</h3>
+<p style="color:var(--text2);font-size:0.85em;margin-bottom:8px">貼上 JSON 內容以還原歷史分析數據</p>
+<textarea id="importText" placeholder='貼上 signal JSON 內容...'></textarea>
+<button onclick="importJSON()">📥 還原</button>
+<span id="importStatus" style="margin-left:10px;font-size:0.85em"></span>
+</div>
+
+<div class="container"><table id="tbl-history"><thead><tr>
+<th data-col="0" data-type="num">#</th>
+<th data-col="1" data-type="num">Signal</th>
+<th data-col="2" data-type="str">EA</th>
+<th data-col="3" data-type="num">Trades</th>
+<th data-col="4" data-type="num">Win%</th>
+<th data-col="5" data-type="num">Total P&L</th>
+<th data-col="6" data-type="num">Total Pips</th>
+<th data-col="7" data-type="num">Avg Hold</th>
+<th data-col="8" data-type="num">CCY</th>
+<th data-col="9" data-type="num">Size</th>
+<th data-col="10" data-type="str">Action</th>
+</tr></thead><tbody><tr>
+<td>1</td>
+<td><a href="https://signals.algoforest.com/signals/5117">5117</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>30216</td>
+<td class="dd-y" data-val="63.933015620863124">63.9%</td>
+<td class="dd-g" data-val="557896.78">+557,896.8</td>
+<td data-val="-16705.0">-16705.0</td>
+<td>0.4h</td>
+<td>1</td>
+<td>17283 KB</td>
+<td>
+<button onclick="downloadJSON('5117')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>2</td>
+<td><a href="https://signals.algoforest.com/signals/11598">11598</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>5278</td>
+<td class="dd-y" data-val="68.22660098522168">68.2%</td>
+<td class="dd-g" data-val="194714.9">+194,714.9</td>
+<td data-val="29984.2">29984.2</td>
+<td>116.1h</td>
+<td>28</td>
+<td>3023 KB</td>
+<td>
+<button onclick="downloadJSON('11598')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>3</td>
+<td><a href="https://signals.algoforest.com/signals/17547">17547</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>1383</td>
+<td class="dd-g" data-val="82.646420824295">82.6%</td>
+<td class="dd-g" data-val="173022.98">+173,023.0</td>
+<td data-val="62860.1">62860.1</td>
+<td>166.9h</td>
+<td>28</td>
+<td>804 KB</td>
+<td>
+<button onclick="downloadJSON('17547')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>4</td>
+<td><a href="https://signals.algoforest.com/signals/27226">27226</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>28</td>
+<td class="dd-g" data-val="85.71428571428571">85.7%</td>
+<td class="dd-g" data-val="168974.45">+168,974.5</td>
+<td data-val="644.6">644.6</td>
+<td>0.1h</td>
+<td>1</td>
+<td>17 KB</td>
+<td>
+<button onclick="downloadJSON('27226')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>5</td>
+<td><a href="https://signals.algoforest.com/signals/20805">20805</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>2734</td>
+<td class="dd-y" data-val="63.09436722750549">63.1%</td>
+<td class="dd-g" data-val="127762.52">+127,762.5</td>
+<td data-val="593.8000000000001">593.8</td>
+<td>20.0h</td>
+<td>28</td>
+<td>1573 KB</td>
+<td>
+<button onclick="downloadJSON('20805')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>6</td>
+<td><a href="https://signals.algoforest.com/signals/21698">21698</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>13570</td>
+<td class="dd-g" data-val="71.98968312453943">72.0%</td>
+<td class="dd-g" data-val="127549.61">+127,549.6</td>
+<td data-val="107081.9">107081.9</td>
+<td>86.8h</td>
+<td>28</td>
+<td>7780 KB</td>
+<td>
+<button onclick="downloadJSON('21698')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>7</td>
+<td><a href="https://signals.algoforest.com/signals/22200">22200</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>132</td>
+<td class="dd-g" data-val="75.75757575757575">75.8%</td>
+<td class="dd-g" data-val="127470.31">+127,470.3</td>
+<td data-val="4145.9">4145.9</td>
+<td>228.2h</td>
+<td>8</td>
+<td>77 KB</td>
+<td>
+<button onclick="downloadJSON('22200')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>8</td>
+<td><a href="https://signals.algoforest.com/signals/31593">31593</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>1762</td>
+<td class="dd-g" data-val="79.39841089670828">79.4%</td>
+<td class="dd-g" data-val="117770.97">+117,771.0</td>
+<td data-val="52815.2">52815.2</td>
+<td>38.0h</td>
+<td>29</td>
+<td>1017 KB</td>
+<td>
+<button onclick="downloadJSON('31593')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>9</td>
+<td><a href="https://signals.algoforest.com/signals/4022">4022</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>1332</td>
+<td class="dd-g" data-val="76.65165165165165">76.7%</td>
+<td class="dd-g" data-val="106933.1">+106,933.1</td>
+<td data-val="2349.33">2349.3</td>
+<td>70.4h</td>
+<td>8</td>
+<td>760 KB</td>
+<td>
+<button onclick="downloadJSON('4022')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>10</td>
+<td><a href="https://signals.algoforest.com/signals/3291">3291</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>6407</td>
+<td class="dd-g" data-val="72.17106289995317">72.2%</td>
+<td class="dd-g" data-val="106784.11">+106,784.1</td>
+<td data-val="71606.5">71606.5</td>
+<td>45.1h</td>
+<td>29</td>
+<td>3717 KB</td>
+<td>
+<button onclick="downloadJSON('3291')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>11</td>
+<td><a href="https://signals.algoforest.com/signals/5001">5001</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>3545</td>
+<td class="dd-g" data-val="70.4654442877292">70.5%</td>
+<td class="dd-g" data-val="90089.76">+90,089.8</td>
+<td data-val="55835.7">55835.7</td>
+<td>141.3h</td>
+<td>28</td>
+<td>2041 KB</td>
+<td>
+<button onclick="downloadJSON('5001')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>12</td>
+<td><a href="https://signals.algoforest.com/signals/14158">14158</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>1191</td>
+<td class="dd-y" data-val="59.026028547439125">59.0%</td>
+<td class="dd-g" data-val="85612.23">+85,612.2</td>
+<td data-val="13737.1">13737.1</td>
+<td>85.5h</td>
+<td>29</td>
+<td>684 KB</td>
+<td>
+<button onclick="downloadJSON('14158')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>13</td>
+<td><a href="https://signals.algoforest.com/signals/32278">32278</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>408</td>
+<td class="dd-g" data-val="72.05882352941177">72.1%</td>
+<td class="dd-g" data-val="75731.86">+75,731.9</td>
+<td data-val="2741.7">2741.7</td>
+<td>45.5h</td>
+<td>3</td>
+<td>234 KB</td>
+<td>
+<button onclick="downloadJSON('32278')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>14</td>
+<td><a href="https://signals.algoforest.com/signals/3894">3894</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>5499</td>
+<td class="dd-y" data-val="63.775231860338245">63.8%</td>
+<td class="dd-g" data-val="61038.9">+61,038.9</td>
+<td data-val="26071.4">26071.4</td>
+<td>117.4h</td>
+<td>28</td>
+<td>3166 KB</td>
+<td>
+<button onclick="downloadJSON('3894')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>15</td>
+<td><a href="https://signals.algoforest.com/signals/16596">16596</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>7688</td>
+<td class="dd-g" data-val="99.31061394380853">99.3%</td>
+<td class="dd-g" data-val="60053.69">+60,053.7</td>
+<td data-val="135139.2">135139.2</td>
+<td>36.1h</td>
+<td>6</td>
+<td>4358 KB</td>
+<td>
+<button onclick="downloadJSON('16596')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>16</td>
+<td><a href="https://signals.algoforest.com/signals/11984">11984</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>861</td>
+<td class="dd-y" data-val="63.64692218350755">63.6%</td>
+<td class="dd-g" data-val="51283.05">+51,283.1</td>
+<td data-val="11108.3">11108.3</td>
+<td>71.0h</td>
+<td>16</td>
+<td>500 KB</td>
+<td>
+<button onclick="downloadJSON('11984')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>17</td>
+<td><a href="https://signals.algoforest.com/signals/16698">16698</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>967</td>
+<td class="dd-y" data-val="65.6670113753878">65.7%</td>
+<td class="dd-g" data-val="49299.99">+49,300.0</td>
+<td data-val="21080.7">21080.7</td>
+<td>223.1h</td>
+<td>27</td>
+<td>560 KB</td>
+<td>
+<button onclick="downloadJSON('16698')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>18</td>
+<td><a href="https://signals.algoforest.com/signals/10864">10864</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>9674</td>
+<td class="dd-y" data-val="65.898284060368">65.9%</td>
+<td class="dd-g" data-val="49172.6">+49,172.6</td>
+<td data-val="-3668.2999999999997">-3668.3</td>
+<td>20.9h</td>
+<td>26</td>
+<td>5699 KB</td>
+<td>
+<button onclick="downloadJSON('10864')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>19</td>
+<td><a href="https://signals.algoforest.com/signals/10843">10843</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>210</td>
+<td class="dd-g" data-val="80.0">80.0%</td>
+<td class="dd-g" data-val="45735.2">+45,735.2</td>
+<td data-val="3199.5">3199.5</td>
+<td>0.5h</td>
+<td>1</td>
+<td>123 KB</td>
+<td>
+<button onclick="downloadJSON('10843')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>20</td>
+<td><a href="https://signals.algoforest.com/signals/1980">1980</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>3393</td>
+<td class="dd-y" data-val="58.47332743884468">58.5%</td>
+<td class="dd-g" data-val="45619.56">+45,619.6</td>
+<td data-val="21398.69">21398.7</td>
+<td>86.7h</td>
+<td>10</td>
+<td>1951 KB</td>
+<td>
+<button onclick="downloadJSON('1980')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>21</td>
+<td><a href="https://signals.algoforest.com/signals/10344">10344</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>214</td>
+<td class="dd-g" data-val="80.8411214953271">80.8%</td>
+<td class="dd-g" data-val="44215.4">+44,215.4</td>
+<td data-val="3152.9">3152.9</td>
+<td>0.6h</td>
+<td>1</td>
+<td>125 KB</td>
+<td>
+<button onclick="downloadJSON('10344')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>22</td>
+<td><a href="https://signals.algoforest.com/signals/16706">16706</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>3375</td>
+<td class="dd-y" data-val="59.73333333333334">59.7%</td>
+<td class="dd-g" data-val="42783.58">+42,783.6</td>
+<td data-val="27295.8">27295.8</td>
+<td>197.7h</td>
+<td>28</td>
+<td>1952 KB</td>
+<td>
+<button onclick="downloadJSON('16706')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>23</td>
+<td><a href="https://signals.algoforest.com/signals/13790">13790</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>2109</td>
+<td class="dd-g" data-val="71.02892366050261">71.0%</td>
+<td class="dd-g" data-val="40245.64">+40,245.6</td>
+<td data-val="4545.5">4545.5</td>
+<td>60.3h</td>
+<td>4</td>
+<td>1211 KB</td>
+<td>
+<button onclick="downloadJSON('13790')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>24</td>
+<td><a href="https://signals.algoforest.com/signals/23617">23617</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>3545</td>
+<td class="dd-y" data-val="64.54160789844852">64.5%</td>
+<td class="dd-g" data-val="39349.06">+39,349.1</td>
+<td data-val="17865.3">17865.3</td>
+<td>24.0h</td>
+<td>12</td>
+<td>2026 KB</td>
+<td>
+<button onclick="downloadJSON('23617')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>25</td>
+<td><a href="https://signals.algoforest.com/signals/5275">5275</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>2444</td>
+<td class="dd-y" data-val="66.0392798690671">66.0%</td>
+<td class="dd-g" data-val="34689.57">+34,689.6</td>
+<td data-val="2115.8">2115.8</td>
+<td>29.4h</td>
+<td>5</td>
+<td>1418 KB</td>
+<td>
+<button onclick="downloadJSON('5275')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>26</td>
+<td><a href="https://signals.algoforest.com/signals/106">106</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>3181</td>
+<td class="dd-y" data-val="62.59038038352719">62.6%</td>
+<td class="dd-g" data-val="32741.27">+32,741.3</td>
+<td data-val="26613.23">26613.2</td>
+<td>125.0h</td>
+<td>9</td>
+<td>1832 KB</td>
+<td>
+<button onclick="downloadJSON('106')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>27</td>
+<td><a href="https://signals.algoforest.com/signals/17823">17823</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>300</td>
+<td class="dd-g" data-val="81.33333333333333">81.3%</td>
+<td class="dd-g" data-val="32270.54">+32,270.5</td>
+<td data-val="13963.4">13963.4</td>
+<td>237.5h</td>
+<td>6</td>
+<td>171 KB</td>
+<td>
+<button onclick="downloadJSON('17823')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>28</td>
+<td><a href="https://signals.algoforest.com/signals/16538">16538</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>4772</td>
+<td class="dd-g" data-val="75.25146689019279">75.3%</td>
+<td class="dd-g" data-val="28873.78">+28,873.8</td>
+<td data-val="30192.1">30192.1</td>
+<td>58.7h</td>
+<td>27</td>
+<td>2727 KB</td>
+<td>
+<button onclick="downloadJSON('16538')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>29</td>
+<td><a href="https://signals.algoforest.com/signals/537">537</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>1083</td>
+<td class="dd-y" data-val="69.89843028624192">69.9%</td>
+<td class="dd-g" data-val="24026.24">+24,026.2</td>
+<td data-val="10123.08">10123.1</td>
+<td>367.7h</td>
+<td>8</td>
+<td>619 KB</td>
+<td>
+<button onclick="downloadJSON('537')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>30</td>
+<td><a href="https://signals.algoforest.com/signals/12733">12733</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>47</td>
+<td class="dd-g" data-val="82.97872340425532">83.0%</td>
+<td class="dd-g" data-val="22457.9">+22,457.9</td>
+<td data-val="1417.1">1417.1</td>
+<td>60.3h</td>
+<td>2</td>
+<td>27 KB</td>
+<td>
+<button onclick="downloadJSON('12733')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>31</td>
+<td><a href="https://signals.algoforest.com/signals/22278">22278</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>505</td>
+<td class="dd-g" data-val="78.81188118811882">78.8%</td>
+<td class="dd-g" data-val="20432.34">+20,432.3</td>
+<td data-val="17484.1">17484.1</td>
+<td>60.6h</td>
+<td>4</td>
+<td>291 KB</td>
+<td>
+<button onclick="downloadJSON('22278')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>32</td>
+<td><a href="https://signals.algoforest.com/signals/30359">30359</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>140</td>
+<td class="dd-g" data-val="80.71428571428572">80.7%</td>
+<td class="dd-g" data-val="19407.94">+19,407.9</td>
+<td data-val="5580.5">5580.5</td>
+<td>92.3h</td>
+<td>3</td>
+<td>81 KB</td>
+<td>
+<button onclick="downloadJSON('30359')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>33</td>
+<td><a href="https://signals.algoforest.com/signals/14592">14592</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>6257</td>
+<td class="dd-g" data-val="72.78248361834744">72.8%</td>
+<td class="dd-g" data-val="19008.26">+19,008.3</td>
+<td data-val="7390.8">7390.8</td>
+<td>25.7h</td>
+<td>25</td>
+<td>3638 KB</td>
+<td>
+<button onclick="downloadJSON('14592')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>34</td>
+<td><a href="https://signals.algoforest.com/signals/8325">8325</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>803</td>
+<td class="dd-g" data-val="78.58032378580324">78.6%</td>
+<td class="dd-g" data-val="17771.04">+17,771.0</td>
+<td data-val="6277.5">6277.5</td>
+<td>42.1h</td>
+<td>16</td>
+<td>458 KB</td>
+<td>
+<button onclick="downloadJSON('8325')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>35</td>
+<td><a href="https://signals.algoforest.com/signals/14724">14724</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>825</td>
+<td class="dd-y" data-val="66.42424242424242">66.4%</td>
+<td class="dd-g" data-val="15863.24">+15,863.2</td>
+<td data-val="5898.4">5898.4</td>
+<td>138.9h</td>
+<td>14</td>
+<td>475 KB</td>
+<td>
+<button onclick="downloadJSON('14724')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>36</td>
+<td><a href="https://signals.algoforest.com/signals/31781">31781</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>442</td>
+<td class="dd-y" data-val="56.10859728506787">56.1%</td>
+<td class="dd-g" data-val="15842.31">+15,842.3</td>
+<td data-val="2211.0">2211.0</td>
+<td>70.7h</td>
+<td>19</td>
+<td>255 KB</td>
+<td>
+<button onclick="downloadJSON('31781')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>37</td>
+<td><a href="https://signals.algoforest.com/signals/11141">11141</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>3061</td>
+<td class="dd-y" data-val="61.48317543286508">61.5%</td>
+<td class="dd-g" data-val="15483.039999999999">+15,483.0</td>
+<td data-val="9298.0">9298.0</td>
+<td>80.2h</td>
+<td>12</td>
+<td>1766 KB</td>
+<td>
+<button onclick="downloadJSON('11141')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>38</td>
+<td><a href="https://signals.algoforest.com/signals/33101">33101</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>81</td>
+<td class="dd-g" data-val="90.12345679012346">90.1%</td>
+<td class="dd-g" data-val="15362.11">+15,362.1</td>
+<td data-val="5048.3">5048.3</td>
+<td>38.8h</td>
+<td>3</td>
+<td>47 KB</td>
+<td>
+<button onclick="downloadJSON('33101')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>39</td>
+<td><a href="https://signals.algoforest.com/signals/2351">2351</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>455</td>
+<td class="dd-y" data-val="68.57142857142857">68.6%</td>
+<td class="dd-g" data-val="14925.57">+14,925.6</td>
+<td data-val="7481.81">7481.8</td>
+<td>253.6h</td>
+<td>5</td>
+<td>263 KB</td>
+<td>
+<button onclick="downloadJSON('2351')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>40</td>
+<td><a href="https://signals.algoforest.com/signals/32541">32541</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>136</td>
+<td class="dd-g" data-val="86.02941176470588">86.0%</td>
+<td class="dd-g" data-val="14087.61">+14,087.6</td>
+<td data-val="7233.9">7233.9</td>
+<td>5.8h</td>
+<td>1</td>
+<td>80 KB</td>
+<td>
+<button onclick="downloadJSON('32541')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>41</td>
+<td><a href="https://signals.algoforest.com/signals/5566">5566</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>2524</td>
+<td class="dd-y" data-val="57.765451664025356">57.8%</td>
+<td class="dd-g" data-val="13708.560000000001">+13,708.6</td>
+<td data-val="1348.84">1348.8</td>
+<td>24.9h</td>
+<td>8</td>
+<td>1453 KB</td>
+<td>
+<button onclick="downloadJSON('5566')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>42</td>
+<td><a href="https://signals.algoforest.com/signals/13863">13863</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>2783</td>
+<td class="dd-y" data-val="62.630255120373704">62.6%</td>
+<td class="dd-g" data-val="13392.95">+13,393.0</td>
+<td data-val="88930885.41">88930885.4</td>
+<td>36.6h</td>
+<td>4</td>
+<td>1661 KB</td>
+<td>
+<button onclick="downloadJSON('13863')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>43</td>
+<td><a href="https://signals.algoforest.com/signals/17962">17962</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>558</td>
+<td class="dd-g" data-val="87.09677419354838">87.1%</td>
+<td class="dd-g" data-val="12394.64">+12,394.6</td>
+<td data-val="3917.9">3917.9</td>
+<td>21.0h</td>
+<td>15</td>
+<td>325 KB</td>
+<td>
+<button onclick="downloadJSON('17962')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>44</td>
+<td><a href="https://signals.algoforest.com/signals/13461">13461</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>1372</td>
+<td class="dd-g" data-val="75.36443148688046">75.4%</td>
+<td class="dd-g" data-val="12074.33">+12,074.3</td>
+<td data-val="11240.8">11240.8</td>
+<td>139.5h</td>
+<td>28</td>
+<td>776 KB</td>
+<td>
+<button onclick="downloadJSON('13461')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>45</td>
+<td><a href="https://signals.algoforest.com/signals/36511">36511</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>137</td>
+<td class="dd-g" data-val="84.67153284671532">84.7%</td>
+<td class="dd-g" data-val="10989.21">+10,989.2</td>
+<td data-val="5339.0">5339.0</td>
+<td>129.9h</td>
+<td>23</td>
+<td>80 KB</td>
+<td>
+<button onclick="downloadJSON('36511')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>46</td>
+<td><a href="https://signals.algoforest.com/signals/25668">25668</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>345</td>
+<td class="dd-g" data-val="80.0">80.0%</td>
+<td class="dd-g" data-val="10505.82">+10,505.8</td>
+<td data-val="2550.6">2550.6</td>
+<td>55.8h</td>
+<td>11</td>
+<td>197 KB</td>
+<td>
+<button onclick="downloadJSON('25668')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>47</td>
+<td><a href="https://signals.algoforest.com/signals/14341">14341</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>8498</td>
+<td class="dd-g" data-val="75.95904918804425">76.0%</td>
+<td class="dd-g" data-val="9918.77">+9,918.8</td>
+<td data-val="8971.9">8971.9</td>
+<td>24.3h</td>
+<td>28</td>
+<td>4947 KB</td>
+<td>
+<button onclick="downloadJSON('14341')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>48</td>
+<td><a href="https://signals.algoforest.com/signals/25830">25830</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>207</td>
+<td class="dd-g" data-val="72.46376811594203">72.5%</td>
+<td class="dd-g" data-val="9725.960000000001">+9,726.0</td>
+<td data-val="8746.2">8746.2</td>
+<td>82.2h</td>
+<td>4</td>
+<td>120 KB</td>
+<td>
+<button onclick="downloadJSON('25830')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>49</td>
+<td><a href="https://signals.algoforest.com/signals/32719">32719</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>248</td>
+<td class="dd-g" data-val="82.66129032258065">82.7%</td>
+<td class="dd-g" data-val="9581.85">+9,581.9</td>
+<td data-val="9572.800000000001">9572.8</td>
+<td>58.0h</td>
+<td>28</td>
+<td>142 KB</td>
+<td>
+<button onclick="downloadJSON('32719')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>50</td>
+<td><a href="https://signals.algoforest.com/signals/36338">36338</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>122</td>
+<td class="dd-g" data-val="81.9672131147541">82.0%</td>
+<td class="dd-g" data-val="8647.32">+8,647.3</td>
+<td data-val="3780.2">3780.2</td>
+<td>142.4h</td>
+<td>23</td>
+<td>72 KB</td>
+<td>
+<button onclick="downloadJSON('36338')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>51</td>
+<td><a href="https://signals.algoforest.com/signals/14581">14581</a></td>
+<td><span style="background:#880e4f;color:#f48fb1;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">GEM</span></td>
+<td>902</td>
+<td class="dd-g" data-val="71.84035476718404">71.8%</td>
+<td class="dd-g" data-val="7937.44">+7,937.4</td>
+<td data-val="2350.8">2350.8</td>
+<td>133.2h</td>
+<td>28</td>
+<td>514 KB</td>
+<td>
+<button onclick="downloadJSON('14581')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>52</td>
+<td><a href="https://signals.algoforest.com/signals/10437">10437</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>1732</td>
+<td class="dd-g" data-val="71.42032332563511">71.4%</td>
+<td class="dd-g" data-val="7332.269999999999">+7,332.3</td>
+<td data-val="34668.3">34668.3</td>
+<td>15.7h</td>
+<td>28</td>
+<td>1000 KB</td>
+<td>
+<button onclick="downloadJSON('10437')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>53</td>
+<td><a href="https://signals.algoforest.com/signals/34259">34259</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>1535</td>
+<td class="dd-g" data-val="83.45276872964169">83.5%</td>
+<td class="dd-g" data-val="7277.2">+7,277.2</td>
+<td data-val="8907.2">8907.2</td>
+<td>10.7h</td>
+<td>28</td>
+<td>876 KB</td>
+<td>
+<button onclick="downloadJSON('34259')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>54</td>
+<td><a href="https://signals.algoforest.com/signals/13798">13798</a></td>
+<td><span style="background:#004d40;color:#80cbc4;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">S10</span></td>
+<td>677</td>
+<td class="dd-y" data-val="60.118168389955684">60.1%</td>
+<td class="dd-g" data-val="6951.91">+6,951.9</td>
+<td data-val="2843.2">2843.2</td>
+<td>37.8h</td>
+<td>2</td>
+<td>397 KB</td>
+<td>
+<button onclick="downloadJSON('13798')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>55</td>
+<td><a href="https://signals.algoforest.com/signals/12962">12962</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>920</td>
+<td class="dd-g" data-val="81.95652173913044">82.0%</td>
+<td class="dd-g" data-val="6360.2699999999995">+6,360.3</td>
+<td data-val="3781.2">3781.2</td>
+<td>20.5h</td>
+<td>1</td>
+<td>529 KB</td>
+<td>
+<button onclick="downloadJSON('12962')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>56</td>
+<td><a href="https://signals.algoforest.com/signals/4200">4200</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>2302</td>
+<td class="dd-y" data-val="56.86359687228497">56.9%</td>
+<td class="dd-g" data-val="5863.39">+5,863.4</td>
+<td data-val="9378.7">9378.7</td>
+<td>51.0h</td>
+<td>4</td>
+<td>1312 KB</td>
+<td>
+<button onclick="downloadJSON('4200')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>57</td>
+<td><a href="https://signals.algoforest.com/signals/12173">12173</a></td>
+<td><span style="background:#4527a0;color:#b39ddb;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MAN</span></td>
+<td>237</td>
+<td class="dd-g" data-val="73.83966244725738">73.8%</td>
+<td class="dd-g" data-val="5742.0">+5,742.0</td>
+<td data-val="4970.0">4970.0</td>
+<td>166.4h</td>
+<td>2</td>
+<td>137 KB</td>
+<td>
+<button onclick="downloadJSON('12173')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>58</td>
+<td><a href="https://signals.algoforest.com/signals/1470">1470</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>1259</td>
+<td class="dd-y" data-val="67.51389992057189">67.5%</td>
+<td class="dd-g" data-val="5289.26">+5,289.3</td>
+<td data-val="3468.5">3468.5</td>
+<td>87.4h</td>
+<td>29</td>
+<td>716 KB</td>
+<td>
+<button onclick="downloadJSON('1470')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>59</td>
+<td><a href="https://signals.algoforest.com/signals/19849">19849</a></td>
+<td><span style="background:#0d47a1;color:#90caf9;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">Flash</span></td>
+<td>36</td>
+<td class="dd-g" data-val="86.11111111111111">86.1%</td>
+<td class="dd-g" data-val="5003.51">+5,003.5</td>
+<td data-val="1138.9">1138.9</td>
+<td>0.3h</td>
+<td>1</td>
+<td>21 KB</td>
+<td>
+<button onclick="downloadJSON('19849')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>60</td>
+<td><a href="https://signals.algoforest.com/signals/25260">25260</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>277</td>
+<td class="dd-g" data-val="80.86642599277978">80.9%</td>
+<td class="dd-g" data-val="4802.0199999999995">+4,802.0</td>
+<td data-val="717.1">717.1</td>
+<td>5.8h</td>
+<td>1</td>
+<td>157 KB</td>
+<td>
+<button onclick="downloadJSON('25260')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>61</td>
+<td><a href="https://signals.algoforest.com/signals/11889">11889</a></td>
+<td><span style="background:#1b5e20;color:#a5d6a7;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">SMA</span></td>
+<td>281</td>
+<td class="dd-g" data-val="72.59786476868328">72.6%</td>
+<td class="dd-g" data-val="4522.37">+4,522.4</td>
+<td data-val="4337.3">4337.3</td>
+<td>144.6h</td>
+<td>3</td>
+<td>162 KB</td>
+<td>
+<button onclick="downloadJSON('11889')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>62</td>
+<td><a href="https://signals.algoforest.com/signals/34574">34574</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>92</td>
+<td class="dd-g" data-val="70.65217391304348">70.7%</td>
+<td class="dd-g" data-val="3867.47">+3,867.5</td>
+<td data-val="1714.0">1714.0</td>
+<td>62.7h</td>
+<td>4</td>
+<td>53 KB</td>
+<td>
+<button onclick="downloadJSON('34574')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>63</td>
+<td><a href="https://signals.algoforest.com/signals/7999">7999</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>100</td>
+<td class="dd-r" data-val="0.0">0.0%</td>
+<td class="dd-g" data-val="2671.14">+2,671.1</td>
+<td data-val="0.0">0.0</td>
+<td>0.0h</td>
+<td>5</td>
+<td>53 KB</td>
+<td>
+<button onclick="downloadJSON('7999')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>64</td>
+<td><a href="https://signals.algoforest.com/signals/36397">36397</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>102</td>
+<td class="dd-g" data-val="83.33333333333334">83.3%</td>
+<td class="dd-g" data-val="2504.02">+2,504.0</td>
+<td data-val="4922.1">4922.1</td>
+<td>53.5h</td>
+<td>19</td>
+<td>59 KB</td>
+<td>
+<button onclick="downloadJSON('36397')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>65</td>
+<td><a href="https://signals.algoforest.com/signals/7919">7919</a></td>
+<td><span style="background:#e65100;color:#ffcc80;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">MKD</span></td>
+<td>40</td>
+<td class="dd-y" data-val="67.5">67.5%</td>
+<td class="dd-g" data-val="2325.87">+2,325.9</td>
+<td data-val="493.8">493.8</td>
+<td>92.5h</td>
+<td>2</td>
+<td>24 KB</td>
+<td>
+<button onclick="downloadJSON('7919')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>66</td>
+<td><a href="https://signals.algoforest.com/signals/20846">20846</a></td>
+<td><span style="background:#4a148c;color:#ce93d8;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">DW</span></td>
+<td>504</td>
+<td class="dd-g" data-val="73.80952380952381">73.8%</td>
+<td class="dd-g" data-val="980.43">+980.4</td>
+<td data-val="1597.1">1597.1</td>
+<td>55.3h</td>
+<td>12</td>
+<td>289 KB</td>
+<td>
+<button onclick="downloadJSON('20846')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr><tr>
+<td>67</td>
+<td><a href="https://signals.algoforest.com/signals/4734">4734</a></td>
+<td><span style="background:#333;color:var(--text2);padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">UNK</span></td>
+<td>160</td>
+<td class="dd-g" data-val="78.75">78.8%</td>
+<td class="dd-g" data-val="5.6343818499726694e-14">+0.0</td>
+<td data-val="7545.99">7546.0</td>
+<td>108.6h</td>
+<td>2</td>
+<td>92 KB</td>
+<td>
+<button onclick="downloadJSON('4734')" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--accent);cursor:pointer;font-size:0.8em">💾 下載</button>
+</td>
+</tr></tbody></table></div>
+
+</body></html>
