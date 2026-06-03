@@ -242,6 +242,73 @@ function fmtTime(h) {
     return `${r2(h/168)}w`;
 }
 
+// ═══ SET Data Display ═══
+function getSetConfigsForCCY(symbol, direction) {
+    if (!SET_DATA || !SET_DATA.set_files) return [];
+    const dir = direction.toLowerCase();
+    const results = [];
+    // Deduplicate by ea_type + symbol
+    const seen = new Set();
+    for (const sf of SET_DATA.set_files) {
+        if (sf.error) continue;
+        const sfSym = (sf.symbol || '').toUpperCase();
+        const sfDir = (sf.direction || '').toLowerCase();
+        // Match: same symbol, and direction is 'both' or matches
+        if (sfSym === symbol.toUpperCase() && (sfDir === 'both' || sfDir === dir)) {
+            const key = `${sf.ea_type}_${sfSym}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                results.push(sf);
+            }
+        }
+    }
+    return results;
+}
+
+function renderSetInfo(setConfigs) {
+    if (!setConfigs || setConfigs.length === 0) return '';
+    let html = '<div style="font-size:0.82em;color:var(--text2);margin:4px 0 8px;padding:6px 10px;background:var(--bg);border:1px solid var(--brd);border-radius:6px">';
+    html += '<span style="color:var(--acc);font-weight:bold">📋 SET 配置</span> ';
+    const parts = [];
+    for (const cfg of setConfigs) {
+        if (cfg.lot_mode === 'copy_trade') {
+            parts.push(`<span style="color:var(--pri)">${cfg.ea_name}</span> Copy: LV${cfg.start_lv}-${cfg.end_lv}`);
+        } else if (cfg.lots && cfg.lots.length > 0) {
+            const lotsStr = cfg.lots.slice(0, 6).map(l => l.toFixed(l < 0.1 ? 3 : 2)).join('→') + (cfg.lots.length > 6 ? '...' : '');
+            const psStr = cfg.pipsteps && cfg.pipsteps.length > 0 ? cfg.pipsteps.slice(0, 6).map(p => p.toFixed(0)).join('→') + (cfg.pipsteps.length > 6 ? '...' : '') : '—';
+            parts.push(`<span style="color:var(--pri)">${cfg.ea_name}</span> Lots: ${lotsStr} | PipStep: ${psStr}`);
+        } else if (cfg.lot_mode === 'fixed' && cfg.lots && cfg.lots.length === 1) {
+            parts.push(`<span style="color:var(--pri)">${cfg.ea_name}</span> Fixed: ${cfg.lots[0].toFixed(2)} lots`);
+        } else {
+            parts.push(`<span style="color:var(--pri)">${cfg.ea_name}</span>`);
+        }
+    }
+    html += parts.join(' | ');
+    html += '</div>';
+    return html;
+}
+
+function getSetLotForLayer(setConfigs, layerIdx, actualLot) {
+    """Get the SET-defined lot for a given layer index, for comparison."""
+    if (!setConfigs || setConfigs.length === 0) return null;
+    for (const cfg of setConfigs) {
+        if (cfg.lot_mode === 'copy_trade') continue;
+        if (cfg.lots && cfg.lots[layerIdx - 1] !== undefined) {
+            return cfg.lots[layerIdx - 1];
+        }
+    }
+    return null;
+}
+
+function fmtLotCompare(actualLot, setConfigs, layerIdx) {
+    const setLot = getSetLotForLayer(setConfigs, layerIdx, actualLot);
+    if (setLot === null || setLot === undefined) return `${actualLot}`;
+    const diff = Math.abs(actualLot - setLot);
+    if (diff < 0.001) return `${actualLot}`;
+    // Highlight mismatch
+    return `${actualLot} <span style="color:var(--yel);font-size:0.85em" title="SET 定義: ${setLot.toFixed(3)}">(SET:${setLot.toFixed(setLot < 0.1 ? 3 : 2)})</span>`;
+}
+
 // Export
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { parseCSV, filterByDateRange, computeLayerStats, computeRating, computeScore, computeSummary, computeBlacklist, buildCCYDirectionSummary };

@@ -246,6 +246,222 @@ def diff_to_dict(diff: SetDiff) -> dict:
     }
 
 
+# === Layer Config Extraction ===
+
+EA_NAME_PATTERNS = {
+    'MKD': ['MKD', 'MKD Pro', 'MKDPro'],
+    'DragonWave': ['DragonWave', 'Dragon Wave'],
+    'SMA': ['SMA', 'SMA Pro', 'SMAPro'],
+    'S10': ['S10'],
+    'Flash': ['Flash'],
+    'GeminiClient': ['GeminiClient', 'Gemini Client'],
+    'GeminiServer': ['GeminiServer', 'Gemini Server'],
+    'StableHelper': ['StableHelper', 'Stable Helper'],
+}
+
+def detect_ea_type(ea_name: str) -> str:
+    """Detect EA type from EA_NAME field."""
+    for ea_type, patterns in EA_NAME_PATTERNS.items():
+        for p in patterns:
+            if p.lower() in ea_name.lower():
+                return ea_type
+    return 'Unknown'
+
+
+def extract_symbol_from_filename(filename: str) -> str:
+    """Extract symbol from SET filename like (10437)DragonWavev2.10USDJPY_H1_TypeBoth_.set"""
+    m = re.match(r'\(\d+\).*?([A-Z]{6,}|XAUUSD|XAGUSD|US30|NAS100|US500)\b', filename)
+    if m:
+        return m.group(1)
+    return ''
+
+
+def extract_direction_from_filename(filename: str) -> str:
+    """Extract direction (Buy/Sell/Both) from SET filename."""
+    fl = filename.lower()
+    if 'typebuy' in fl or '_buy_' in fl:
+        return 'buy'
+    elif 'typesell' in fl or '_sell_' in fl:
+        return 'sell'
+    return 'both'
+
+
+def extract_layer_config(filepath: str) -> dict:
+    """
+    Extract layer configuration from a SET file.
+    Returns structured dict with lots sequence, pipstep sequence, and EA-specific params.
+    """
+    data = parse_set_file(filepath)
+    params = data.all_params
+    ea_name = data.ea_name
+    ea_type = detect_ea_type(ea_name)
+    symbol = data.ea_symbol or extract_symbol_from_filename(data.filename)
+    direction = extract_direction_from_filename(data.filename)
+
+    def pf(key, default=0.0):
+        """Parse float from params."""
+        try:
+            return float(params.get(key, default))
+        except (ValueError, TypeError):
+            return default
+
+    def pi(key, default=0):
+        """Parse int from params."""
+        try:
+            return int(float(params.get(key, default)))
+        except (ValueError, TypeError):
+            return default
+
+    result = {
+        'filename': data.filename,
+        'ea_name': ea_name,
+        'ea_type': ea_type,
+        'ea_version': data.ea_version,
+        'symbol': symbol,
+        'direction': direction,
+        'lot_mode': 'unknown',
+        'lots': [],
+        'pipsteps': [],
+        'params': {},
+    }
+
+    if ea_type == 'MKD':
+        # MKD v3: explicit lot1-lot5 + lot, PipStep1-5 + PipStep, plus S1/S2 sells
+        lots = []
+        pipsteps = []
+        # Buy levels (lot1-5, lot final)
+        for i in range(1, 6):
+            l = pf(f'lot{i}')
+            if l > 0:
+                lots.append(l)
+                ps = pf(f'PipStep{i}') if i > 1 else 0
+                pipsteps.append(ps)
+        # Final level
+        final_lot = pf('lot')
+        if final_lot > 0:
+            lots.append(final_lot)
+            pipsteps.append(pf('PipStep'))
+        result['lot_mode'] = 'explicit'
+        result['lots'] = lots
+        result['pipsteps'] = pipsteps
+        # Also store sell-side lots if present
+        sell_lots = []
+        for i in range(1, 3):
+            sl = pf(f'lotS{i}')
+            if sl > 0:
+                sell_lots.append(sl)
+        if sell_lots:
+            result['sell_lots'] = sell_lots
+        result['params'] = {f'lot{i}': pf(f'lot{i}') for i in range(1, 6) if pf(f'lot{i}') > 0}
+        result['params']['lot'] = pf('lot')
+        result['params'].update({f'PipStep{i}': pf(f'PipStep{i}') for i in range(1, 6) if pf(f'PipStep{i}') > 0})
+
+    elif ea_type == 'DragonWave':
+        # DragonWave: Lots + LotMul multiplier, PipStepMul
+        base_lot = pf('Lots')
+        lot_mul = pf('LotMul')
+        pip_step_mul = pf('PipStepMul')
+        # Calculate up to 8 levels
+        lots = [base_lot]
+        pipsteps = [0]
+        # PipStep default for DW: use the base PipStep if set, else typical is 50
+        base_pipstep = pf('PipStep') if pf('PipStep') > 0 else 50
+        for i in range(1, 8):
+            lots.append(round(base_lot * (lot_mul ** i), 4))
+            pipsteps.append(round(base_pipstep * (pip_step_mul ** (i - 1)) if pip_step_mul else base_pipstep, 1))
+        result['lot_mode'] = 'multiplier'
+        result['lots'] = lots
+        result['pipsteps'] = pipsteps
+        result['params'] = {'Lots': base_lot, 'LotMul': lot_mul, 'PipStepMul': pip_step_mul}
+
+    elif ea_type == 'SMA':
+        # SMA v3: EntryLot + lotExp, pipstep2-8, slInLevel
+        base_lot = pf('EntryLot')
+        lot_exp = pf('lotExp')
+        sl_in_level = pi('slInLevel')
+        # pipstep2-8
+        pipsteps = [0]  # LV1 has no pipstep
+        for i in range(2, 9):
+            ps = pf(f'pipstep{i}')
+            if ps > 0:
+                pipsteps.append(ps)
+        # Calculate lots: lot * lotExp^(i-1) up to slInLevel
+        n_levels = max(sl_in_level, len(pipsteps))
+        lots = [round(base_lot * (lot_exp ** i), 4) for i in range(n_levels)]
+        result['lot_mode'] = 'multiplier'
+        result['lots'] = lots
+        result['pipsteps'] = pipsteps[:n_levels]
+        result['params'] = {'EntryLot': base_lot, 'lotExp': lot_exp, 'slInLevel': sl_in_level}
+
+    elif ea_type == 'S10':
+        # S10 v3: fixed lotSize
+        lot_size = pf('lotSize')
+        result['lot_mode'] = 'fixed'
+        result['lots'] = [lot_size]
+        result['pipsteps'] = []
+        result['params'] = {'lotSize': lot_size}
+
+    elif ea_type == 'Flash':
+        # Flash v3: fixed Lot + CheckLevels, CheckDist
+        lot = pf('Lot')
+        check_levels = pi('CheckLevels')
+        check_dist = pf('CheckDist')
+        result['lot_mode'] = 'fixed'
+        result['lots'] = [lot] if lot > 0 else []
+        result['pipsteps'] = []
+        result['params'] = {'Lot': lot, 'CheckLevels': check_levels, 'CheckDist': check_dist}
+
+    elif ea_type in ('GeminiClient', 'GeminiServer'):
+        # Gemini: Copy trade with StartLv and EndLv
+        start_lv = pi('StartLv')
+        end_lv = pi('EndLv')
+        fix_lot = pf('FixLot')
+        lot_mul = pf('LotMul')
+        result['lot_mode'] = 'copy_trade'
+        result['lots'] = []
+        result['pipsteps'] = []
+        result['start_lv'] = start_lv
+        result['end_lv'] = end_lv
+        result['params'] = {'StartLv': start_lv, 'EndLv': end_lv, 'FixLot': fix_lot, 'LotMul': lot_mul}
+
+    elif ea_type == 'StableHelper':
+        result['lot_mode'] = 'helper'
+
+    return result
+
+
+def get_set_configs_for_signal(signal_id: str, set_dir: str = None) -> dict:
+    """
+    Get all SET file configs for a given signal ID.
+    Returns dict with signal_id and list of SET configs.
+    Skips StableHelper files.
+    """
+    if set_dir is None:
+        set_dir = str(Path(__file__).parent.parent / 'downloads' / 'set_files')
+    set_path = Path(set_dir)
+    sid = str(signal_id)
+    configs = []
+    for f in sorted(set_path.glob('*.set')):
+        m = re.match(r'\((\d+)\)', f.name)
+        if not m or m.group(1) != sid:
+            continue
+        try:
+            cfg = extract_layer_config(str(f))
+            if cfg.get('ea_type') == 'StableHelper':
+                continue
+            configs.append(cfg)
+        except Exception as e:
+            configs.append({
+                'filename': f.name, 'error': str(e),
+                'ea_name': '', 'ea_type': 'Unknown', 'symbol': '',
+                'direction': 'both', 'lot_mode': 'error', 'lots': [], 'pipsteps': [], 'params': {}
+            })
+    return {
+        'signal_id': int(sid) if sid.isdigit() else sid,
+        'set_files': configs
+    }
+
+
 # === CLI ===
 if __name__ == '__main__':
     import sys
