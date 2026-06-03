@@ -44,23 +44,26 @@ EA_OVERRIDES = {
 
 # Auto-detected EA mapping from SET file counts
 EA_MAP = {
-    'DW': ['10437','106','11984','12962','13790','16538','17547','20846','21698','22200','22278','25830','31593','32541','32719','34259','36338','36397','36511'],
-    'SMA': ['537','1470','1980','2351','5001','5275','5566','10864','11984','14581','14724','16698','17611','17823','19849','23617','30359','33101','34574'],
-    'MKD': ['8325','13461','14592','25260','25668','31781'],
+    'DW': ['10437','106','11984','12962','13790','16538','17547','20846','21698','22200','22278','25830','31593','32541','32719','34259','36338','36397','36511','19625','35434','35436'],
+    'SMA': ['537','1470','1980','5001','5275','5566','10864','11984','14581','14724','16698','17611','19849','23617','30359','33101','34574','2739','16777','35362'],
+    'SMAPro': ['2351','32278','32541','17823','31781'],
+    'MKD': ['13461','14592','25260','16266'],
+    'MKDPro': ['8325','25668','31781','3291','7919'],
     'S10': ['13798','16596'],
     'Flash': ['7919','11889','13863','14158','14341','16706','17962','20805','19849'],
-    'GEM': ['3291'],
+    'GC': ['10437','10864','32541'],
+    'GS': ['13461','1470','34574','36511'],
 }
 
 EA_NORMALIZE = {
     'DragonWave': 'DW', 'Dragon Wave': 'DW',
     'Flash': 'Flash',
-    'SMA': 'SMA', 'SMAPro': 'SMA', 'SMA Pro': 'SMA',
-    'MKD': 'MKD', 'MKDPro': 'MKD', 'MKD Pro': 'MKD',
+    'SMA': 'SMA', 'SMAPro': 'SMAPro', 'SMA Pro': 'SMAPro',
+    'MKD': 'MKD', 'MKDPro': 'MKDPro', 'MKD Pro': 'MKDPro',
     'S10': 'S10',
-    'GeminiClient': 'GEM', 'Gemini Client': 'GEM',
-    'GeminiServer': 'GEM', 'Gemini Server': 'GEM',
-    'StableHelper': 'Helper', 'Stable Helper': 'Helper',
+    'GeminiClient': 'GC', 'Gemini Client': 'GC',
+    'GeminiServer': 'GS', 'Gemini Server': 'GS',
+    'StableHelper': None, 'Stable Helper': None,
 }
 
 def auto_detect_ea_from_set(signal_id):
@@ -79,7 +82,7 @@ def auto_detect_ea_from_set(signal_id):
                 if ea_match:
                     ea_raw = re.sub(r'[\s_]?v?[\d.]+$', '', ea_match.group(1).strip().rstrip('_ '))
                     ea = EA_NORMALIZE.get(ea_raw, ea_raw)
-                    if ea != 'Helper':
+                    if ea is not None:
                         counts[ea] += 1
     if counts:
         return counts.most_common(1)[0][0]
@@ -102,7 +105,7 @@ def get_all_eas(signal_id):
                 if ea_match:
                     ea_raw = re.sub(r'[\s_]?v?[\d.]+$', '', ea_match.group(1).strip().rstrip('_ '))
                     ea = EA_NORMALIZE.get(ea_raw, ea_raw)
-                    if ea != 'Helper':
+                    if ea is not None:
                         counts[ea] += 1
     if counts:
         return [ea for ea, _ in counts.most_common()]
@@ -303,7 +306,10 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 .ea-MKD{{background:#e65100;color:#ffcc80}}
 .ea-S10{{background:#0d47a1;color:#90caf9}}
 .ea-Flash{{background:#880e4f;color:#f48fb1}}
-.ea-GEM{{background:#37474f;color:#b0bec5}}
+.ea-GC{{background:#0d47a1;color:#90caf9}}
+.ea-GS{{background:#1a237e;color:#9fa8da}}
+.ea-MKDPro{{background:#bf360c;color:#ffab91}}
+.ea-SMAPro{{background:#1b5e20;color:#c8e6c9}}
 .ea-STB{{background:#37474f;color:#b0bec5}}
 .ea-MAN{{background:#4527a0;color:#e8eaf6}}
 .dd-g{{color:var(--green)}}.dd-y{{color:var(--yellow)}}.dd-r{{color:var(--red)}}

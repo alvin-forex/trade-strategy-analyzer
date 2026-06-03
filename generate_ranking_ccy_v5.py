@@ -20,14 +20,17 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 DOCS_DIR.mkdir(exist_ok=True)
 
 EA_COLORS = {
-    'DW':    ('#4a148c', '#ce93d8'),
-    'SMA':   ('#1b5e20', '#a5d6a7'),
-    'MKD':   ('#e65100', '#ffcc80'),
-    'Flash': ('#0d47a1', '#90caf9'),
-    'S10':   ('#004d40', '#80cbc4'),
-    'GEM':   ('#880e4f', '#f48fb1'),
-    'MAN':   ('#4527a0', '#b39ddb'),
-    'UNK':   ('#333', 'var(--text2)'),
+    'DW':      ('#4a148c', '#ce93d8'),
+    'SMA':     ('#1b5e20', '#a5d6a7'),
+    'SMAPro':  ('#1b5e20', '#c8e6c9'),
+    'MKD':     ('#e65100', '#ffcc80'),
+    'MKDPro':  ('#bf360c', '#ffab91'),
+    'Flash':   ('#0d47a1', '#90caf9'),
+    'S10':     ('#004d40', '#80cbc4'),
+    'GC':      ('#0d47a1', '#90caf9'),
+    'GS':      ('#1a237e', '#9fa8da'),
+    'MAN':     ('#4527a0', '#b39ddb'),
+    'UNK':     ('#333', 'var(--text2)'),
 }
 
 

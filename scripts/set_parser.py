@@ -259,6 +259,35 @@ EA_NAME_PATTERNS = {
     'StableHelper': ['StableHelper', 'Stable Helper'],
 }
 
+EA_DISPLAY_ABBREV = {
+    'DragonWave': 'DW',
+    'MKD Pro': 'MKDPro',
+    'MKD': 'MKD',
+    'SMA Pro': 'SMAPro',
+    'SMA': 'SMA',
+    'Flash': 'Flash',
+    'S10': 'S10',
+    'Gemini Client': 'GC',
+    'Gemini Server': 'GS',
+    'StableHelper': None,  # 不顯示
+}
+
+
+def get_ea_display_name(ea_name: str) -> str:
+    """Return abbreviated EA display name, or '' for hidden EAs (StableHelper)."""
+    if not ea_name:
+        return ''
+    ea_lower = ea_name.lower()
+    # Match longest first to avoid partial matches (e.g. 'MKD Pro' before 'MKD')
+    for full_name, abbrev in sorted(EA_DISPLAY_ABBREV.items(), key=lambda x: -len(x[0])):
+        if full_name.lower() in ea_lower:
+            return abbrev if abbrev is not None else ''
+    # Fallback: strip version number
+    import re
+    cleaned = re.sub(r'\s*v?[\d.]+$', '', ea_name).strip()
+    return cleaned
+
+
 def detect_ea_type(ea_name: str) -> str:
     """Detect EA type from EA_NAME field."""
     for ea_type, patterns in EA_NAME_PATTERNS.items():
