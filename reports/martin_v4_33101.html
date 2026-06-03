@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../sidebar.css">
 <title>🔄 馬丁剖析法 V4 — Signal 33101</title>
 <style>
 :root{--font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px}
@@ -626,6 +627,31 @@ function renderAll(){
         }
         html+=`</tbody></table></div>`;
 
+        // Part 5: Ranking (A級以上)
+        const aPlus=layers.filter(l=>computeRating(l)>='A').sort((a,b)=>computeRating(b)>computeRating(a)?1:-1);
+        if(aPlus.length>0){
+            html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 5 · 排行榜（A級以上）<span class=\"info\">i<span class=\"tip\"><b>排行榜說明</b><br>此 CCY×Direction 內 A級以上嘅層級，按評級降序排列。</span></span></div>`;
+            html+=`<div style=\"overflow-x:auto\"><table><thead><tr><th>#</th><th>Rating</th><th>Layer</th><th>n</th><th>WR%</th><th>EV$</th><th>Odds$</th><th>MFE</th><th>MAE</th><th>Total$</th><th>Hold</th></tr></thead><tbody>`;
+            aPlus.forEach((l,i)=>{
+                const rat=computeRating(l);
+                const ev=l.net_profit/l.count;
+                html+=`<tr><td>${i+1}</td><td class=\"${ratingClass(rat)}\">${rat}</td><td><b>${l.layer_label}</b></td><td>${l.count}</td><td>${(l.win_rate||0).toFixed(1)}%</td><td class=\"pnl-pos\">${ev.toFixed(2)}</td><td>${l.odds||'—'}</td><td>${(l.avg_mfe||0).toFixed(1)}</td><td>${(l.avg_mae||0).toFixed(1)}</td><td class=\"${l.net_profit>=0?'pnl-pos':'pnl-neg'}\">${fmtPnl(l.net_profit)}</td><td>${(l.avg_hold||0).toFixed(1)}h</td></tr>`;
+            });
+            html+=`</tbody></table></div>`;
+        }
+
+        // Part 6: TP/SL Profitability Analysis
+        html+=`<div style=\"font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px\">Part 6 · 層級 TP/SL 盈利分析 <span class=\"info\">i<span class=\"tip\"><b>盈利邊緣說明</b><br>Edge = WR×TP - (1-WR)×SL<br>正值=有盈利邊緣，負值=虧損邊緣<br>綠色=盈利層 | 紅色=虧損層</span></span></div>`;
+        html+=`<div style=\"overflow-x:auto\"><table><thead><tr><th>Layer</th><th>Rating</th><th>狀態</th><th>n</th><th>WR%</th><th>TP</th><th>SL</th><th>HardSL</th><th>Edge</th><th>Total$</th></tr></thead><tbody>`;
+        layers.forEach(l=>{
+            const rat=computeRating(l);
+            const wr=l.win_rate||0, tp=l.avg_mfe||0, sl=l.avg_mae||0, hard=l.max_mae||0;
+            const edge=wr/100*tp - (1-wr/100)*sl;
+            const profitable=edge>=0;
+            html+=`<tr class=\"${profitable?'row-a':'row-d'}\"><td><b>${l.layer_label}</b></td><td class=\"${ratingClass(rat)}\">${rat}</td><td>${profitable?'✅':'❌'}</td><td>${l.count}</td><td>${wr.toFixed(1)}%</td><td class=\"pnl-pos\">${tp.toFixed(1)}</td><td>${sl.toFixed(1)}</td><td class=\"pnl-neg\">${hard.toFixed(1)}</td><td class=\"${profitable?'pnl-pos':'pnl-neg'}\">${edge>=0?'+'+edge.toFixed(1):edge.toFixed(1)}</td><td class=\"${l.net_profit>=0?'pnl-pos':'pnl-neg'}\">${fmtPnl(l.net_profit)}</td></tr>`;
+        });
+        html+=`</tbody></table></div>`;
+
         html+=`</div></div>`; // close sec-b, sec
     }
 
@@ -800,5 +826,6 @@ function drawScatter(canvasId, trades, mode, stats){
 
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
 </script>
+<script src="../sidebar.js"></script>
 </body>
 </html>
