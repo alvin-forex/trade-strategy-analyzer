@@ -134,7 +134,7 @@ tr:hover{background:var(--card)}
 
 <script src="martin_v4_engine.js"></script>
 <script>
-const SIGNAL_ID='%%SIGNAL_ID%%', EA_TAG='%%EA%%', CSV_URL='%%CSV_URL%%';
+const SIGNAL_ID='%%SIGNAL_ID%%', EA_TAG='%%EA%%', CSV_URL='%%CSV_URL%%', SET_DATA=%%SET_DATA%%;
 let allTrades=[], filteredTrades=[], dateMin=null, dateMax=null, rangeFrom=null, rangeTo=null;
 
 (function init(){
@@ -299,6 +299,10 @@ function renderAll(){
             <span>${cs.direction==='buy'?'▲':'▼'} ${cs.symbol} ${cs.direction.toUpperCase()} — ${layers.length} 層 | WR ${cs.avg_wr}% | P&L ${fmtPnl(cs.total_pnl)} | ${cs.best_rating}</span>
             <span class="arrow">▶</span></div><div class="sec-b">`;
 
+        // SET configuration info for this CCY×Direction
+        const setCfgs = getSetConfigsForCCY(cs.symbol, cs.direction);
+        html += renderSetInfo(setCfgs);;
+
         // Part 1: Layer stats table
         html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:8px 0 4px">Part 1 · 組合概覽 <span class="info">i<span class="tip"><b>欄位說明</b><br><b>WR%</b>：勝率<br><b>Net Pips</b>：總盈虧點數<br><b>最大 Win/Lose Pip</b>：平均每筆盈利/虧損點數<br><b>Odds</b>：盈虧比（WinPip/LosePip）<br><b>MFE</b>：最大有利波幅（TP 參考）<br><b>MAE</b>：最大不利波幅（SL 參考）<br><b>MaxMAE</b>：歷史最差（Hard SL）<br><b>Hold</b>：平均持倉時間</span></span></div>`;
         html+=`<div style="overflow-x:auto"><table><thead><tr>
@@ -310,6 +314,7 @@ function renderAll(){
         for(const l of layers){
             const rat=computeRating(l),sc=computeScore(l);
             const cls=rat==='S+'||rat==='S'||rat==='A'?' class="row-a"':rat==='D'||rat==='E'?' class="row-d"':'';
+            const lotDisplay = fmtLotCompare(l.lots, setCfgs, l.layer_idx);
             html+=`<tr${cls}>
                 <td><b>L${l.layer_idx}</b></td>
                 <td class="${ratingClass(rat)}" title="Score: ${sc}">${rat}</td>

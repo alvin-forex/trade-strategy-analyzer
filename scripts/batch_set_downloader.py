@@ -32,7 +32,7 @@ ALL_SIGNAL_IDS = [
 ALL_SIGNAL_IDS = sorted(set(ALL_SIGNAL_IDS))
 
 def get_ws_url():
-    req = urllib.request.Request("http://localhost:9223/json/list")
+    req = urllib.request.Request("http://localhost:9222/json/list")
     with urllib.request.urlopen(req, timeout=5) as resp:
         targets = json.loads(resp.read())
     for t in targets:

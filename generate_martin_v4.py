@@ -5,7 +5,11 @@ Creates one HTML per signal that loads CSV and renders client-side.
 """
 import os
 import sys
+import json
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent / 'scripts'))
+from set_parser import get_set_configs_for_signal
 
 BASE_DIR = Path(__file__).parent
 DOWNLOADS_DIR = BASE_DIR / 'downloads'
@@ -43,10 +47,16 @@ def generate_signal_page(signal_id, ea_tag, csv_filename):
     # CSV URL relative from docs/reports/ -> ../../downloads/ or via symlink docs/downloads/
     csv_url = f'../downloads/{csv_filename}'
     
+    # Get SET file configurations for this signal
+    set_dir = str(BASE_DIR / 'downloads' / 'set_files')
+    set_data = get_set_configs_for_signal(signal_id, set_dir)
+    set_json = json.dumps(set_data, ensure_ascii=False)
+    
     # Replace placeholders
     html = template.replace('%%SIGNAL_ID%%', signal_id)
     html = html.replace('%%EA%%', ea_tag)
     html = html.replace('%%CSV_URL%%', csv_url)
+    html = html.replace('%%SET_DATA%%', set_json)
     
     # Inline the engine JS (GitHub Pages friendly)
     html = html.replace('<script src="martin_v4_engine.js"></script>', f'<script>\n{engine_js}\n</script>')
