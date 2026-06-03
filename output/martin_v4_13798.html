@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../sidebar.css">
+<title>🔄 馬丁剖析法 V4 — Signal 13798</title>
+<style>
+:root{--font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px}
+[data-theme="dark"]{--bg:#0a0e17;--card:#111520;--hover:#1a1f2e;--text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;--brd:#1e2433;--th:#111520;--zebra:#151b28}
+[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--hover:#eef2f7;--text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107;--brd:#ddd;--th:#eef2f7;--zebra:#f0f4fa}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);padding:12px;max-width:1400px;margin:0 auto}
+h1{font-size:1.3em;color:var(--pri);margin-bottom:4px}
+h2{font-size:1.05em;color:var(--pri);margin:16px 0 8px}
+a{color:var(--acc);text-decoration:none;font-weight:bold}
+.theme-btn{width:36px;height:36px;border:1px solid var(--brd);border-radius:50%;background:var(--card);color:var(--text);font-size:18px;cursor:pointer;flex-shrink:0}
+/* Stats bar */
+.stats-bar{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap}
+.stats-bar .v{font-size:1.3em;font-weight:bold;color:var(--pri)}.stats-bar .l{font-size:0.75em;color:var(--text2)}
+/* Date controls */
+.date-controls{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:12px 16px;margin-bottom:12px}
+.quick-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.quick-btns button{padding:5px 12px;border:1px solid var(--brd);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.85em}
+.quick-btns button.active{background:var(--pri);color:#000;border-color:var(--pri);font-weight:bold}
+.quick-btns button:hover{border-color:var(--pri)}
+.date-inputs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.date-inputs label{color:var(--text2);font-size:0.85em}
+.date-inputs input[type="date"]{background:var(--bg);border:1px solid var(--brd);color:var(--text);padding:5px 8px;border-radius:6px;font-size:0.9em}
+.date-inputs button{padding:5px 10px;border:1px solid var(--brd);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.8em}
+.range-container{position:relative;height:40px;margin:4px 0}
+.range-track{position:absolute;top:18px;left:0;right:0;height:4px;background:var(--brd);border-radius:2px}
+.range-fill{position:absolute;top:18px;height:4px;background:var(--pri);border-radius:2px}
+.range-handle{position:absolute;top:10px;width:20px;height:20px;background:var(--pri);border-radius:50%;cursor:grab;z-index:2;touch-action:none}
+.range-handle:active{cursor:grabbing}
+.range-labels{display:flex;justify-content:space-between;font-size:0.75em;color:var(--text2);margin-top:24px}
+/* Sections */
+.sec{background:var(--card);border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;overflow:hidden}
+.sec-h{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:0.95em}
+.sec-h:hover{background:var(--hover)}
+.sec-h .arrow{transition:transform 0.2s;font-size:0.8em;color:var(--text2)}
+.sec-h.open .arrow{transform:rotate(90deg)}
+.sec-b{display:none;padding:10px 14px;border-top:1px solid var(--brd)}
+.sec-b.open{display:block}
+/* Info tooltip */
+.info{display:inline-block;margin-left:6px;width:16px;height:16px;border-radius:50%;background:var(--acc);color:#fff;font-size:10px;text-align:center;line-height:16px;cursor:help;position:relative}
+.info .tip{display:none;position:absolute;left:20px;top:-10px;z-index:100;background:var(--card);border:1px solid var(--brd);border-radius:6px;padding:10px;width:280px;font-size:0.85em;font-weight:normal;text-align:left;color:var(--text);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+.info:hover .tip,.info:focus .tip{display:block}
+/* Tables */
+table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:0.85em}
+th{background:var(--th);padding:5px 7px;text-align:left;border-bottom:2px solid var(--pri);color:var(--pri);font-size:0.8em;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{background:var(--hover)}
+td{padding:4px 7px;border-bottom:1px solid var(--brd);font-size:0.85em}
+tr:hover{background:var(--card)}
+.row-a{background:rgba(76,175,80,0.08)}.row-d{background:rgba(255,87,34,0.08)}
+/* Expand trades */
+.trades-toggle{color:var(--acc);cursor:pointer;font-size:0.8em;margin:4px 0;padding:3px 8px;border:1px solid var(--brd);border-radius:4px;display:inline-block;background:var(--bg)}
+.trades-toggle:hover{border-color:var(--acc)}
+.trades-panel{display:none;margin:6px 0;max-height:400px;overflow-y:auto}
+.trades-panel.open{display:block}
+.trades-panel table{font-size:0.78em}
+.trades-panel th{font-size:0.75em}
+/* Rating */
+.r-sp{color:#FFD700;font-weight:bold}.r-s{color:#FFA500;font-weight:bold}.r-a{color:var(--grn);font-weight:bold}.r-b{color:var(--acc);font-weight:bold}.r-c{color:var(--yel)}.r-d{color:var(--red)}.r-e{color:#999}
+.pnl-pos{color:var(--grn);font-weight:bold}.pnl-neg{color:var(--red);font-weight:bold}
+/* Charts */
+.chart-row{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}
+.chart-box{flex:1;min-width:300px;background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:8px}
+.chart-box h4{font-size:0.85em;color:var(--acc);margin-bottom:4px}
+.chart-box canvas{width:100%;height:180px}
+/* Blacklist / Recovery */
+.blk{background:var(--card);border:1px solid var(--red);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+.rec{background:var(--card);border:1px solid var(--yel);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+/* Global bar */
+.global-bar{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 14px;margin-bottom:12px;overflow-x:auto}
+.global-bar svg{width:100%;height:auto}
+/* Period Stats */
+.period-stats{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;overflow-x:auto}
+.period-stats table{width:100%;border-collapse:collapse;font-size:0.85em}
+.period-stats th{background:var(--th);padding:8px 10px;text-align:center;border:1px solid var(--brd);color:var(--pri);font-size:0.8em;white-space:nowrap}
+.period-stats td{padding:7px 10px;text-align:center;border:1px solid var(--brd);white-space:nowrap}
+.period-stats tbody tr:nth-child(even){background:var(--zebra)}
+.period-stats tbody tr:hover{background:var(--bg)}
+.period-stats .p-period{font-weight:bold;color:var(--acc)}
+.period-stats .p-pos{color:var(--grn);font-weight:bold}
+.period-stats .p-neg{color:var(--red);font-weight:bold}
+.period-stats .p-wr-good{color:var(--grn)}
+.period-stats .p-wr-bad{color:var(--red)}
+.period-stats tfoot td{font-weight:bold;border:1px solid var(--brd);background:var(--th)}
+/* Responsive */
+@media(max-width:768px){body{padding:8px;font-size:13px}.quick-btns button{padding:4px 8px;font-size:0.8em}.date-inputs{flex-direction:column;align-items:flex-start}.chart-row{flex-direction:column}}
+</style>
+</head>
+<body>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+<h1>🔄 馬丁剖析法 V4</h1>
+<button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="切換主題">☀️</button>
+</div>
+<div class="sub" id="headerSub">Signal 13798 (S10) · 載入中...</div>
+
+<!-- Date Range -->
+<div class="date-controls" id="dateControls">
+<div style="color:var(--text2);font-size:0.85em;margin-bottom:6px">
+📅 時間範圍
+<span class="info">i<span class="tip">選擇時間範圍後，所有分析會即時重新計算。<br><br><b>快速按鈕</b>：選擇預設時段<br><b>自訂日期</b>：手動輸入 From/To<br><b>拖拉 Bar</b>：拖動手柄選擇範圍</span></span>
+</div>
+<div class="quick-btns" id="quickBtns">
+<button data-range="1d">1日</button><button data-range="1w">1週</button><button data-range="1m">1月</button>
+<button data-range="3m">3月</button><button data-range="6m">6月</button><button data-range="1y">1年</button>
+<button data-range="all" class="active">全部</button>
+</div>
+<div class="date-inputs">
+<label>From:</label><input type="date" id="dateFrom">
+<label>To:</label><input type="date" id="dateTo">
+<button onclick="applyCustomDate()">套用</button>
+<button onclick="clearDateFilter()">清除</button>
+</div>
+<div class="range-container" id="rangeContainer">
+<div class="range-track"></div><div class="range-fill" id="rangeFill"></div>
+<div class="range-handle" id="handleLeft" data-handle="left"></div>
+<div class="range-handle" id="handleRight" data-handle="right"></div>
+</div>
+<div class="range-labels"><span id="rangeMinLabel">—</span><span id="rangeMaxLabel">—</span></div>
+</div>
+
+<!-- Period Stats -->
+<div class="sec"><div class="sec-h" onclick="toggleSec(this)"><span>📊 交易統計表</span><span class="arrow">▶</span></div><div class="sec-b" id="periodStatsBody"></div></div>
+
+<!-- Summary -->
+<div class="stats-bar" id="summaryBar"></div>
+
+<!-- Content -->
+<div id="content"></div>
+
+<script>
+/**
+ * Martin Autopsy V4.1 — Core Computation Engine
+ * 純 JavaScript 計算邏輯，唔加公式，只用 CSV 真實數據
+ */
+
+// ═══════════════════════════════════════════════════════
+// CSV Parser
+// ═══════════════════════════════════════════════════════
+
+function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim());
+    const trades = [];
+    for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        if (values.length < headers.length) continue;
+        const row = {};
+        headers.forEach((h, idx) => row[h] = values[idx]);
+        const type = (row['Type'] || '').trim().toLowerCase();
+        if (type !== 'buy' && type !== 'sell') continue;
+        const symbol = (row['Symbol'] || '').trim();
+        if (!symbol) continue;
+        const trade = {
+            symbol, direction: type,
+            lots: Math.abs(parseFloat(row['Lots']) || 0),
+            open_price: parseFloat(row['Open Price']) || 0,
+            close_price: parseFloat(row['Close Price']) || 0,
+            net_profit: parseFloat(row['Net Profit']) || 0,
+            net_pips: parseFloat(row['Net Pips']) || 0,
+            max_profit: parseFloat(row['Max Profit']) || 0,
+            max_loss: parseFloat(row['Max Loss']) || 0,
+            mfe: parseFloat(row['Max Pips']) || 0,
+            mae: Math.abs(parseFloat(row['Max Loss Pips']) || 0),
+            holding_hours: parseFloat(row['Holding Time (Hours)']) || 0,
+            commission: parseFloat(row['Commission']) || 0,
+            swap: parseFloat(row['Swap']) || 0,
+            comment: (row['Comment'] || '').trim(),
+            open_time: (row['Open Time'] || '').trim(),
+            close_time: (row['Close Time'] || '').trim(),
+            magic: parseInt(row['Magic Number']) || 0,
+            _openDate: null,
+        };
+        try {
+            const parts = trade.open_time.split(/[/\s:]+/);
+            if (parts.length >= 6) {
+                trade._openDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), parseInt(parts[3]), parseInt(parts[4]), parseInt(parts[5]));
+            }
+        } catch (e) {}
+        trades.push(trade);
+    }
+    return trades;
+}
+
+function parseCSVLine(line) {
+    const result = []; let current = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') inQ = !inQ;
+        else if (c === ',' && !inQ) { result.push(current.trim()); current = ''; }
+        else current += c;
+    }
+    result.push(current.trim());
+    return result;
+}
+
+// ═══════════════════════════════════════════════════════
+// Date Filtering
+// ═══════════════════════════════════════════════════════
+
+function filterByDateRange(trades, from, to) {
+    if (!from && !to) return trades;
+    return trades.filter(t => {
+        if (!t._openDate) return false;
+        if (from && t._openDate < from) return false;
+        if (to && t._openDate > to) return false;
+        return true;
+    });
+}
+
+function getDateRange(trades) {
+    const dates = trades.filter(t => t._openDate).map(t => t._openDate.getTime());
+    if (!dates.length) return { min: null, max: null };
+    return { min: new Date(Math.min(...dates)), max: new Date(Math.max(...dates)) };
+}
+
+// ═══════════════════════════════════════════════════════
+// Core Stats
+// ═══════════════════════════════════════════════════════
+
+function computeLayerStats(trades) {
+    const ccyDirMap = {};
+    for (const t of trades) {
+        const key = `${t.symbol}_${t.direction}`;
+        if (!ccyDirMap[key]) ccyDirMap[key] = [];
+        ccyDirMap[key].push(t);
+    }
+    const results = {};
+    for (const [ccyDirKey, ccyTrades] of Object.entries(ccyDirMap)) {
+        const lotsInGroup = [...new Set(ccyTrades.map(t => t.lots))].sort((a, b) => a - b);
+        const lotToIdx = {};
+        lotsInGroup.forEach((lot, idx) => lotToIdx[lot] = idx + 1);
+        const maxDepth = lotsInGroup.length;
+        const layerMap = {};
+        for (const t of ccyTrades) {
+            const label = `L${t.lots}`;
+            if (!layerMap[label]) layerMap[label] = [];
+            layerMap[label].push(t);
+        }
+        for (const [layerLabel, lt] of Object.entries(layerMap)) {
+            const n = lt.length;
+            if (n === 0) continue;
+            const wins = lt.filter(t => t.net_profit > 0);
+            const losses = lt.filter(t => t.net_profit <= 0);
+            const winCount = wins.length;
+            const lossCount = losses.length;
+            const wr = n > 0 ? (winCount / n * 100) : 0;
+            const totalPnl = lt.reduce((s, t) => s + t.net_profit, 0);
+            const totalPips = lt.reduce((s, t) => s + t.net_pips, 0);
+            const avgWinPips = winCount > 0 ? wins.reduce((s, t) => s + t.net_pips, 0) / winCount : 0;
+            const avgLossPips = lossCount > 0 ? Math.abs(losses.reduce((s, t) => s + t.net_pips, 0) / lossCount) : 0;
+            const oddsPips = avgLossPips > 0 ? avgWinPips / avgLossPips : 999;
+            const avgHold = lt.reduce((s, t) => s + t.holding_hours, 0) / n;
+            const mfeVals = lt.map(t => t.mfe);
+            const maeVals = lt.map(t => t.mae);
+            const avgMfe = mfeVals.reduce((s, v) => s + v, 0) / n;
+            const maxMfe = Math.max(...mfeVals);
+            const avgMae = maeVals.reduce((s, v) => s + v, 0) / n;
+            const maxMae = Math.max(...maeVals);
+            const sampleLots = lt[0].lots;
+            const layerIdx = lotToIdx[sampleLots] || 1;
+            const key = `${ccyDirKey}_${layerLabel}`;
+            results[key] = {
+                symbol: ccyDirKey.split('_')[0], direction: ccyDirKey.split('_')[1],
+                layer_label: layerLabel, lots: sampleLots, layer_idx: layerIdx, max_depth: maxDepth,
+                count: n, win_count: winCount, loss_count: lossCount,
+                wr: r2(wr), total_pnl: r2(totalPnl), total_pips: r2(totalPips),
+                avg_win_pips: r2(avgWinPips), avg_loss_pips: r2(avgLossPips),
+                odds_pips: oddsPips < 100 ? r2(oddsPips) : 999,
+                avg_hold: r2(avgHold),
+                avg_mfe: r2(avgMfe), max_mfe: r2(maxMfe),
+                avg_mae: r2(avgMae), max_mae: r2(maxMae),
+                trades: lt, // keep full trades for expand
+            };
+        }
+    }
+    return results;
+}
+
+// ═══════════════════════════════════════════════════════
+// Rating
+// ═══════════════════════════════════════════════════════
+
+function computeRating(s) {
+    const sc = computeScore(s);
+    if (sc >= 85) return 'S+'; if (sc >= 70) return 'S'; if (sc >= 55) return 'A';
+    if (sc >= 40) return 'B'; if (sc >= 25) return 'C'; if (sc >= 15) return 'D'; return 'E';
+}
+
+function computeScore(s) {
+    const wr = s.wr; const odds = Math.min(s.odds_pips, 999); const cnt = s.count; const hold = s.avg_hold;
+    let score = 0;
+    score += wr >= 80 ? 30 : wr >= 70 ? 25 : wr >= 60 ? 18 : wr >= 50 ? 10 : Math.max(0, wr / 5);
+    score += odds >= 2.0 ? 20 : odds >= 1.5 ? 15 : odds >= 1.0 ? 10 : Math.max(0, odds * 10);
+    score += cnt >= 10 ? 15 : cnt >= 5 ? 12 : cnt >= 3 ? 8 : Math.max(0, cnt * 2);
+    score += hold <= 24 ? 5 : hold <= 72 ? 4 : hold <= 168 ? 3 : hold <= 360 ? 2 : 1;
+    return Math.round(score * 10) / 10;
+}
+
+// ═══════════════════════════════════════════════════════
+// Summary / TP/SL / Blacklist / Recovery / CCY Summary
+// ═══════════════════════════════════════════════════════
+
+function computeSummary(trades) {
+    const n = trades.length;
+    if (n === 0) return { count: 0, win_pct: 0, total_pnl: 0, total_pips: 0, symbols: 0, layers: 0, best_ccy: '', best_pnl: 0 };
+    const wins = trades.filter(t => t.net_profit > 0).length;
+    const totalPnl = trades.reduce((s, t) => s + t.net_profit, 0);
+    const totalPips = trades.reduce((s, t) => s + t.net_pips, 0);
+    const symbols = new Set(trades.map(t => t.symbol)).size;
+    const lots = new Set(trades.map(t => t.lots)).size;
+    const ccyPnl = {};
+    for (const t of trades) ccyPnl[t.symbol] = (ccyPnl[t.symbol] || 0) + t.net_profit;
+    let bestCcy = '', bestPnl = -Infinity;
+    for (const [c, p] of Object.entries(ccyPnl)) { if (p > bestPnl) { bestPnl = p; bestCcy = c; } }
+    return { count: n, win_pct: r2(wins / n * 100), total_pnl: r2(totalPnl), total_pips: r2(totalPips), symbols, layers: lots, best_ccy: bestCcy, best_pnl: r2(bestPnl) };
+}
+
+function computeBlacklist(layerStats) {
+    const bl = [];
+    for (const [key, s] of Object.entries(layerStats)) {
+        const r = computeRating(s);
+        if (['D', 'E'].includes(r) && s.count >= 2) {
+            const danger = (100 - computeScore(s)) + Math.abs(s.total_pnl > 0 ? 0 : Math.abs(s.total_pnl) / 10);
+            bl.push({ key, symbol: s.symbol, direction: s.direction, layer: s.layer_label, lots: s.lots, rating: r, score: computeScore(s), danger_score: r2(danger), wr: s.wr, count: s.count, total_pnl: s.total_pnl, reason: getDangerReason(s) });
+        }
+    }
+    return bl.sort((a, b) => b.danger_score - a.danger_score);
+}
+
+function getDangerReason(s) {
+    const reasons = [];
+    if (s.wr < 40) reasons.push('WR<40%');
+    if (s.total_pnl < -50) reasons.push('P&L<-$50');
+    if (s.odds_pips < 0.5) reasons.push('RR<0.5');
+    if (s.avg_hold > 360) reasons.push('Hold>15d');
+    return reasons.join(', ') || 'Underperforming';
+}
+
+function buildCCYDirectionSummary(layerStats) {
+    const map = {};
+    for (const [key, s] of Object.entries(layerStats)) {
+        const cd = `${s.symbol}_${s.direction}`;
+        if (!map[cd]) map[cd] = [];
+        map[cd].push(s);
+    }
+    const summary = [];
+    for (const [cd, layers] of Object.entries(map)) {
+        const totalPnl = layers.reduce((s, l) => s + l.total_pnl, 0);
+        const totalPips = layers.reduce((s, l) => s + (l.total_pips||0), 0);
+        const totalCount = layers.reduce((s, l) => s + l.count, 0);
+        const totalWins = layers.reduce((s, l) => s + l.win_count, 0);
+        const avgWr = totalCount > 0 ? totalWins / totalCount * 100 : 0;
+        const ratings = layers.map(l => computeRating(l));
+        const best = ratings.includes('S+') ? 'S+' : ratings.includes('S') ? 'S' : ratings.includes('A') ? 'A' : ratings.includes('B') ? 'B' : 'C';
+        summary.push({ symbol: layers[0].symbol, direction: layers[0].direction, layers: layers.length, total_pnl: r2(totalPnl), total_pips: r2(totalPips), total_count: totalCount, avg_wr: r2(avgWr), best_rating: best });
+    }
+    return summary.sort((a, b) => b.total_pnl - a.total_pnl);
+}
+
+// ═══════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════
+function r2(v) { return Math.round(v * 100) / 100; }
+function fmtPnl(v) { return v >= 0 ? `+${v.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1})}` : v.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
+function ratingClass(r) { return ({ 'S+': 'r-sp', 'S': 'r-s', 'A': 'r-a', 'B': 'r-b', 'C': 'r-c', 'D': 'r-d', 'E': 'r-e' })[r] || 'r-e'; }
+function fmtDate(d) { if (!d) return '—'; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function fmtTime(h) {
+    if (h < 1) return `${r2(h*60)}m`;
+    if (h < 24) return `${r2(h)}h`;
+    if (h < 168) return `${r2(h/24)}d`;
+    return `${r2(h/168)}w`;
+}
+
+// ═══ SET Data Display ═══
+function getSetConfigsForCCY(symbol, direction) {
+    if (!SET_DATA || !SET_DATA.set_files) return [];
+    const dir = direction.toLowerCase();
+    const results = [];
+    // Deduplicate by ea_type + symbol
+    const seen = new Set();
+    for (const sf of SET_DATA.set_files) {
+        if (sf.error) continue;
+        const sfSym = (sf.symbol || '').toUpperCase();
+        const sfDir = (sf.direction || '').toLowerCase();
+        // Match: same symbol, and direction is 'both' or matches
+        if (sfSym === symbol.toUpperCase() && (sfDir === 'both' || sfDir === dir)) {
+            const key = `${sf.ea_type}_${sfSym}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                results.push(sf);
+            }
+        }
+    }
+    return results;
+}
+
+// EA Name Abbreviation Map
+var EA_DISPLAY_ABBREV = {
+    'DragonWave': 'DW', 'Dragon Wave': 'DW',
+    'MKD Pro': 'MKDPro', 'MKD': 'MKD',
+    'SMA Pro': 'SMAPro', 'SMA': 'SMA',
+    'Flash': 'Flash', 'S10': 'S10',
+    'Gemini Client': 'GC', 'Gemini Server': 'GS',
+    'StableHelper': ''
+};
+
+function abbreviateEaName(name) {
+    if (!name) return '';
+    var lower = name.toLowerCase();
+    // Match longest first to avoid partial matches
+    var keys = Object.keys(EA_DISPLAY_ABBREV).sort(function(a, b) { return b.length - a.length; });
+    for (var i = 0; i < keys.length; i++) {
+        if (lower.indexOf(keys[i].toLowerCase()) >= 0) return EA_DISPLAY_ABBREV[keys[i]];
+    }
+    // Fallback: strip version
+    return name.replace(/\s*v?[\d.]+$/, '').trim();
+}
+
+function renderSetInfo(setConfigs) {
+    if (!setConfigs || setConfigs.length === 0) return '';
+    let html = '<div style="font-size:0.82em;color:var(--text2);margin:4px 0 8px;padding:6px 10px;background:var(--bg);border:1px solid var(--brd);border-radius:6px">';
+    html += '<span style="color:var(--acc);font-weight:bold">📋 SET 配置</span> ';
+    const parts = [];
+    for (const cfg of setConfigs) {
+        if (cfg.lot_mode === 'copy_trade') {
+            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Copy: LV${cfg.start_lv}-${cfg.end_lv}`);
+        } else if (cfg.lots && cfg.lots.length > 0) {
+            const lotsStr = cfg.lots.slice(0, 6).map(l => l.toFixed(l < 0.1 ? 3 : 2)).join('→') + (cfg.lots.length > 6 ? '...' : '');
+            const psStr = cfg.pipsteps && cfg.pipsteps.length > 0 ? cfg.pipsteps.slice(0, 6).map(p => p.toFixed(0)).join('→') + (cfg.pipsteps.length > 6 ? '...' : '') : '—';
+            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Lots: ${lotsStr} | PipStep: ${psStr}`);
+        } else if (cfg.lot_mode === 'fixed' && cfg.lots && cfg.lots.length === 1) {
+            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Fixed: ${cfg.lots[0].toFixed(2)} lots`);
+        } else {
+            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span>`);
+        }
+    }
+    html += parts.join(' | ');
+    html += '</div>';
+    return html;
+}
+
+function getSetLotForLayer(setConfigs, layerIdx, actualLot) {
+    """Get the SET-defined lot for a given layer index, for comparison."""
+    if (!setConfigs || setConfigs.length === 0) return null;
+    for (const cfg of setConfigs) {
+        if (cfg.lot_mode === 'copy_trade') continue;
+        if (cfg.lots && cfg.lots[layerIdx - 1] !== undefined) {
+            return cfg.lots[layerIdx - 1];
+        }
+    }
+    return null;
+}
+
+function fmtLotCompare(actualLot, setConfigs, layerIdx) {
+    const setLot = getSetLotForLayer(setConfigs, layerIdx, actualLot);
+    if (setLot === null || setLot === undefined) return `${actualLot}`;
+    const diff = Math.abs(actualLot - setLot);
+    if (diff < 0.001) return `${actualLot}`;
+    // Highlight mismatch
+    return `${actualLot} <span style="color:var(--yel);font-size:0.85em" title="SET 定義: ${setLot.toFixed(3)}">(SET:${setLot.toFixed(setLot < 0.1 ? 3 : 2)})</span>`;
+}
+
+// Export
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { parseCSV, filterByDateRange, computeLayerStats, computeRating, computeScore, computeSummary, computeBlacklist, buildCCYDirectionSummary };
+}
+
+</script>
+<script>
+const SIGNAL_ID='13798', EA_TAG='S10', CSV_URL='../downloads/forex-forest-signals-page-13798.csv', SET_DATA={"signal_id": 13798, "set_files": [{"filename": "(13798)Flash v3.00XAUUSD_M30_Both_3642.set", "ea_name": "Flash v3.00", "ea_type": "Flash", "ea_version": "20250410", "symbol": "XAUUSD", "direction": "both", "lot_mode": "fixed", "lots": [0.7], "pipsteps": [], "params": {"Lot": 0.7, "CheckLevels": 11, "CheckDist": 2700.0}}, {"filename": "(13798)Flashv3.00XAUUSD_H1_Both_.set", "ea_name": "Flash v3.00", "ea_type": "Flash", "ea_version": "20250410", "symbol": "XAUUSD", "direction": "both", "lot_mode": "fixed", "lots": [0.1], "pipsteps": [], "params": {"Lot": 0.1, "CheckLevels": 11, "CheckDist": 2700.0}}, {"filename": "(13798)S10 v3.00USDJPY_H1_Both_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "USDJPY", "direction": "both", "lot_mode": "fixed", "lots": [0.15], "pipsteps": [], "params": {"lotSize": 0.15}}, {"filename": "(13798)S10 v3.00XAUUSD_M30_Buy_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "XAUUSD", "direction": "buy", "lot_mode": "fixed", "lots": [0.0], "pipsteps": [], "params": {"lotSize": 0.0}}, {"filename": "(13798)S10 v3.00XAUUSD_M30_Sell_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "XAUUSD", "direction": "sell", "lot_mode": "fixed", "lots": [0.1], "pipsteps": [], "params": {"lotSize": 0.1}}, {"filename": "(13798)S10v3.00USDJPY_H1_Both_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "USDJPY", "direction": "both", "lot_mode": "fixed", "lots": [0.15], "pipsteps": [], "params": {"lotSize": 0.15}}, {"filename": "(13798)S10v3.00USDJPY_H1_TypeBoth_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "USDJPY", "direction": "both", "lot_mode": "fixed", "lots": [0.15], "pipsteps": [], "params": {"lotSize": 0.15}}, {"filename": "(13798)S10v3.00XAUUSD_M30_Buy_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "XAUUSD", "direction": "buy", "lot_mode": "fixed", "lots": [0.0], "pipsteps": [], "params": {"lotSize": 0.0}}, {"filename": "(13798)S10v3.00XAUUSD_M30_Sell_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "XAUUSD", "direction": "sell", "lot_mode": "fixed", "lots": [0.1], "pipsteps": [], "params": {"lotSize": 0.1}}, {"filename": "(13798)S10v3.00XAUUSD_M30_TypeBuy_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "XAUUSD", "direction": "buy", "lot_mode": "fixed", "lots": [0.0], "pipsteps": [], "params": {"lotSize": 0.0}}, {"filename": "(13798)S10v3.00XAUUSD_M30_TypeSell_.set", "ea_name": "S10 v3.00", "ea_type": "S10", "ea_version": "20250805", "symbol": "XAUUSD", "direction": "sell", "lot_mode": "fixed", "lots": [0.1], "pipsteps": [], "params": {"lotSize": 0.1}}]};
+let allTrades=[], filteredTrades=[], dateMin=null, dateMax=null, rangeFrom=null, rangeTo=null;
+
+(function init(){
+    loadTheme();
+    document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} (${EA_TAG}) · 載入中...`;
+    fetch(CSV_URL).then(r=>r.ok?r.text():Promise.reject('CSV load failed: '+r.status)).then(text=>{
+        allTrades=parseCSV(text);
+        const dr=getDateRange(allTrades); dateMin=dr.min; dateMax=dr.max;
+        if(!dateMin||!dateMax){document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} — ❌ 冇交易數據`;return;}
+        setupRangeSlider(); setupQuickButtons();
+        filteredTrades=[...allTrades]; renderAll();
+    }).catch(err=>{document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} — ❌ ${err}`;});
+})();
+
+function loadTheme(){const t=localStorage.getItem('tsa-theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀️':'🌙';}
+function toggleTheme(){const c=document.documentElement.getAttribute('data-theme'),n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('tsa-theme',n);document.getElementById('themeToggle').textContent=n==='dark'?'☀️':'🌙';}
+
+function setupQuickButtons(){
+    document.querySelectorAll('#quickBtns button').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            const range=btn.dataset.range;
+            // Use CSV max date as reference, not current time
+            const ref=dateMax||new Date();
+            let from=null;
+            if(range==='all'){from=null;} else if(range==='1d')from=new Date(ref.getTime()-86400000);
+            else if(range==='1w')from=new Date(ref.getTime()-7*86400000);
+            else if(range==='1m')from=new Date(ref.getFullYear(),ref.getMonth()-1,ref.getDate());
+            else if(range==='3m')from=new Date(ref.getFullYear(),ref.getMonth()-3,ref.getDate());
+            else if(range==='6m')from=new Date(ref.getFullYear(),ref.getMonth()-6,ref.getDate());
+            else if(range==='1y')from=new Date(ref.getFullYear()-1,ref.getMonth(),ref.getDate());
+            rangeFrom=from; rangeTo=null;
+            document.getElementById('dateFrom').value=from?fmtDate(from):'';
+            document.getElementById('dateTo').value='';
+            updateRangeSliderHandles(); applyFilter();
+        });
+    });
+}
+function applyCustomDate(){rangeFrom=document.getElementById('dateFrom').value?new Date(document.getElementById('dateFrom').value):null;rangeTo=document.getElementById('dateTo').value?new Date(document.getElementById('dateTo').value+'T23:59:59'):null;document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));updateRangeSliderHandles();applyFilter();}
+function clearDateFilter(){rangeFrom=null;rangeTo=null;document.getElementById('dateFrom').value='';document.getElementById('dateTo').value='';document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));document.querySelector('[data-range="all"]').classList.add('active');updateRangeSliderHandles();applyFilter();}
+
+function setupRangeSlider(){
+    const ct=document.getElementById('rangeContainer'),hL=document.getElementById('handleLeft'),hR=document.getElementById('handleRight');
+    document.getElementById('rangeMinLabel').textContent=fmtDate(dateMin);document.getElementById('rangeMaxLabel').textContent=fmtDate(dateMax);
+    setHP(hL,0);setHP(hR,100);updateFill();
+    let dragging=null;
+    function startD(e){dragging=e.target.dataset.handle;e.preventDefault();}
+    function onD(e){if(!dragging)return;const rect=ct.getBoundingClientRect();const cx=e.touches?e.touches[0].clientX:e.clientX;let pct=Math.max(0,Math.min(100,(cx-rect.left)/rect.width*100));
+        if(dragging==='left'){pct=Math.min(pct,(parseFloat(hR.style.left)||100)-2);setHP(hL,pct);}else{pct=Math.max(pct,(parseFloat(hL.style.left)||0)+2);setHP(hR,pct);}
+        updateFill();const totalMs=dateMax.getTime()-dateMin.getTime();
+        if(dragging==='left')rangeFrom=new Date(dateMin.getTime()+(pct/100)*totalMs);else rangeTo=new Date(dateMin.getTime()+(pct/100)*totalMs);}
+    function endD(){if(!dragging)return;dragging=null;applyFilter();}
+    hL.addEventListener('mousedown',startD);hR.addEventListener('mousedown',startD);
+    hL.addEventListener('touchstart',startD,{passive:false});hR.addEventListener('touchstart',startD,{passive:false});
+    document.addEventListener('mousemove',onD);document.addEventListener('touchmove',onD,{passive:false});
+    document.addEventListener('mouseup',endD);document.addEventListener('touchend',endD);
+}
+function setHP(h,p){h.style.left=p+'%';}
+function updateFill(){const hL=document.getElementById('handleLeft'),hR=document.getElementById('handleRight'),f=document.getElementById('rangeFill');const l=parseFloat(hL.style.left)||0,r=parseFloat(hR.style.left)||100;f.style.left=l+'%';f.style.width=(r-l)+'%';}
+function updateRangeSliderHandles(){if(!dateMin||!dateMax)return;const t=dateMax.getTime()-dateMin.getTime();const l=rangeFrom?((rangeFrom.getTime()-dateMin.getTime())/t*100):0;const r=rangeTo?((rangeTo.getTime()-dateMin.getTime())/t*100):100;setHP(document.getElementById('handleLeft'),Math.max(0,l));setHP(document.getElementById('handleRight'),Math.min(100,r));updateFill();}
+
+function applyFilter(){filteredTrades=filterByDateRange(allTrades,rangeFrom,rangeTo);renderAll();}
+
+// ═══ PERIOD STATS ═══
+function computePeriodStats(trades, periodType){
+  if(!trades.length) return [];
+  const groups={};
+  trades.forEach(t=>{
+    if(!t._openDate) return;
+    let key;
+    if(periodType==='day') key=`${t._openDate.getDate()}/${t._openDate.getMonth()+1}`;
+    else if(periodType==='week'){const y=t._openDate.getFullYear();const w=getWeekNumber(t._openDate);key=`${y}-W${w}`;}
+    else {key=`${t._openDate.getFullYear()}-${String(t._openDate.getMonth()+1).padStart(2,'0')}`;}
+    if(!groups[key]) groups[key]={trades:[],buyCnt:0,sellCnt:0,pnlSum:0,swapSum:0,floating:null,wins:0};
+    groups[key].trades.push(t);
+    if(t.direction==='buy') groups[key].buyCnt++; else groups[key].sellCnt++;
+    groups[key].pnlSum+=t.net_profit;
+    groups[key].swapSum+=t.swap;
+    if(t.net_profit>=0) groups[key].wins++;
+    groups[key].floating=t.net_profit; // last trade floating
+  });
+  const rows=Object.entries(groups).sort((a,b)=>a[0]>b[0]?-1:1).slice(0,10);
+  let cumPnl=0;
+  const result=[];
+  for(let i=rows.length-1;i>=0;i--){ // reverse to accumulate equity
+    const [period,d]=rows[i];
+    cumPnl+=d.pnlSum;
+    result.unshift({period,trades:d.trades.length,buy:d.buyCnt,sell:d.sellCnt,
+      wr:((d.wins/d.trades.length)*100).toFixed(1),
+      pnl:d.pnlSum,floating:d.floating,swap:d.swapSum,
+      equity:cumPnl});
+  }
+  return result;
+}
+function getWeekNumber(d){const date=new Date(d.getTime());date.setHours(0,0,0,0);date.setDate(date.getDate()+3-(date.getDay()-1+7)%7);const week1=new Date(date.getFullYear(),0,4);return 1+Math.round(((date.getTime()-week1.getTime())/86400000-3+(week1.getDay()+6)%7)/7);}
+function fmtPnl(v){return(v>=0?'+'+(Math.abs(v)>=1000?(v/1000).toFixed(2)+'k':v.toFixed(2)):(Math.abs(v)>=1000?(v/1000).toFixed(2)+'k':v.toFixed(2)))+'$';}
+function fmtDate(d){return d?`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`:'—';}
+
+function buildPeriodStatsTable(periodType){
+  const stats=computePeriodStats(filteredTrades,periodType);
+  if(!stats.length) return '<div style="color:var(--text2);padding:10px">⚠️ 數據不足，無法生成統計表</div>'; 
+  const total={trades:0,buy:0,sell:0,wins:0,pnl:0,swap:0};
+  stats.forEach(s=>{total.trades+=s.trades;total.buy+=s.buy;total.sell+=s.sell;total.wins+=s.wr*s.trades/100;total.pnl+=s.pnl;total.swap+=s.swap;});
+  const totalWr=(total.wins/total.trades*100).toFixed(1);
+  let html='<div class="period-stats"><table><thead><tr><th>期間</th><th>交易數量</th><th>BUY</th><th>SELL</th><th>Win Rate</th><th>Net Profit</th><th>Floating</th><th>Swap</th><th>Equity</th></tr></thead><tbody>'; 
+  stats.forEach(s=>{
+    const wrCls=s.wr>=60?'p-wr-good':'p-wr-bad';
+    const pnlCls=s.pnl>=0?'p-pos':'p-neg';
+    const floatCls=s.floating>=0?'p-pos':'p-neg';
+    html+=`<tr><td class="p-period">${s.period}</td><td>${s.trades}</td><td>${s.buy}</td><td>${s.sell}</td><td class="${wrCls}">${s.wr}%</td><td class="${pnlCls}">${s.pnl>=0?'+'+s.pnl.toFixed(2):s.pnl.toFixed(2)}$</td><td class="${floatCls}">${s.floating>=0?'+'+s.floating.toFixed(2):s.floating.toFixed(2)}$</td><td>${s.swap>=0?'+'+s.swap.toFixed(2):s.swap.toFixed(2)}$</td><td>${s.equity.toFixed(2)}$</td></tr>`;
+  });
+  const totalPnlCls=total.pnl>=0?'p-pos':'p-neg';
+  html+=`<tfoot><tr><td><strong>總計</strong></td><td><strong>${total.trades}</strong></td><td><strong>${total.buy}</strong></td><td><strong>${total.sell}</strong></td><td><strong>${totalWr}%</strong></td><td class="${totalPnlCls}"><strong>${total.pnl>=0?'+'+total.pnl.toFixed(2):total.pnl.toFixed(2)}$</strong></td><td>—</td><td><strong>${total.swap>=0?'+'+total.swap.toFixed(2):total.swap.toFixed(2)}$</strong></td><td><strong>${total.pnl.toFixed(2)}$</strong></td></tr></tfoot></table></div>`; 
+  return html;
+}
+
+function getPeriodType(){
+  const active=document.querySelector('.quick-btns button.active');
+  if(!active) return 'month';
+  const r=active.dataset.range;
+  if(r==='1d'||r==='1w'||r==='1m') return 'day';
+  if(r==='3m'||r==='6m') return 'week';
+  return 'month';
+}
+
+// ═══ RENDER ═══
+function renderAll(){
+    const n=filteredTrades.length;
+    const summary=computeSummary(filteredTrades);
+    const dr=getDateRange(filteredTrades);
+    const dateStr=dr.min?`${fmtDate(dr.min)} – ${fmtDate(dr.max)}`:'—';
+    document.getElementById('headerSub').innerHTML=`Signal <a href="https://signals.algoforest.com/signals/${SIGNAL_ID}">${SIGNAL_ID}</a> (${EA_TAG}) · ${dateStr}`;
+    document.getElementById('summaryBar').innerHTML=`
+        <div><div class="v">${summary.count}</div><div class="l">交易筆數</div></div>
+        <div><div class="v">${summary.win_pct}%</div><div class="l">勝率</div></div>
+        <div><div class="v ${summary.total_pnl>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(summary.total_pnl)}</div><div class="l">總 P&L $</div></div>
+        <div><div class="v">${fmtPnl(summary.total_pips)}</div><div class="l">總 Pips</div></div>
+        <div><div class="v">${summary.symbols}</div><div class="l">CCY</div></div>
+        <div><div class="v">${summary.layers}</div><div class="l">層數</div></div>
+        <div><div class="v">${summary.best_ccy}</div><div class="l">最佳 (${fmtPnl(summary.best_pnl)})</div></div>`;
+
+    // Period Stats
+    document.getElementById('periodStatsBody').innerHTML=buildPeriodStatsTable(getPeriodType());
+
+    const ls=computeLayerStats(filteredTrades);
+    const ccySum=buildCCYDirectionSummary(ls);
+    const blacklist=computeBlacklist(ls);
+
+    let html='';
+
+    // Global P&L Bar Chart
+    html+=buildGlobalBar(ccySum, ls);
+
+    // CCY×Direction sections
+    html+='<h2>📊 CCY × Direction 逐層分析 <span class="info">i<span class="tip"><b>逐層分析說明</b><br>每個 CCY×Direction 展開後顯示：<br><br><b>Part 1 組合概覽</b>：每層嘅完整統計<br><b>Part 2 MFE/MAE 圖表</b>：分開兩幅圖，hover 睇每筆交易詳情<br><b>Part 3 交易訂單</b>：點擊展開查看每筆交易明細<br><br><b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br><b>綠色行</b> = A 級以上 &nbsp;|&nbsp; <b>紅色行</b> = D 級以下</span></span></h2>';
+
+    for(const cs of ccySum){
+        const layers=Object.values(ls).filter(s=>s.symbol===cs.symbol&&s.direction===cs.direction);
+        layers.sort((a,b)=>a.layer_idx-b.layer_idx);
+        html+=`<div class="sec"><div class="sec-h" onclick="toggleSec(this)">
+            <span>${cs.direction==='buy'?'▲':'▼'} ${cs.symbol} ${cs.direction.toUpperCase()} — ${layers.length} 層 | WR ${cs.avg_wr}% | P&L ${fmtPnl(cs.total_pnl)} | ${cs.best_rating}</span>
+            <span class="arrow">▶</span></div><div class="sec-b">`;
+
+        // SET configuration info for this CCY×Direction
+        const setCfgs = getSetConfigsForCCY(cs.symbol, cs.direction);
+        html += renderSetInfo(setCfgs);;
+
+        // Part 1: Layer stats table
+        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:8px 0 4px">Part 1 · 組合概覽 <span class="info">i<span class="tip"><b>欄位說明</b><br><b>WR%</b>：勝率<br><b>Net Pips</b>：總盈虧點數<br><b>最大 Win/Lose Pip</b>：平均每筆盈利/虧損點數<br><b>Odds</b>：盈虧比（WinPip/LosePip）<br><b>MFE</b>：最大有利波幅（TP 參考）<br><b>MAE</b>：最大不利波幅（SL 參考）<br><b>MaxMAE</b>：歷史最差（Hard SL）<br><b>Hold</b>：平均持倉時間</span></span></div>`;
+        html+=`<div style="overflow-x:auto"><table><thead><tr>
+            <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
+            <th>WR%</th><th>Net P&L $</th><th>Net Pips</th>
+            <th>Win Pip</th><th>Lose Pip</th><th>Odds</th>
+            <th>Avg MFE</th><th>Avg MAE</th><th>Max MAE</th>
+            <th>Hold</th></tr></thead><tbody>`;
+        for(const l of layers){
+            const rat=computeRating(l),sc=computeScore(l);
+            const cls=rat==='S+'||rat==='S'||rat==='A'?' class="row-a"':rat==='D'||rat==='E'?' class="row-d"':'';
+            const lotDisplay = fmtLotCompare(l.lots, setCfgs, l.layer_idx);
+            html+=`<tr${cls}>
+                <td><b>L${l.layer_idx}</b></td>
+                <td class="${ratingClass(rat)}" title="Score: ${sc}">${rat}</td>
+                <td>${sc}</td>
+                <td>${l.count}</td><td>${l.win_count}:${l.loss_count}</td>
+                <td>${l.wr}%</td>
+                <td class="${l.total_pnl>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(l.total_pnl)}</td>
+                <td class="${l.total_pips>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(l.total_pips)}</td>
+                <td>${l.avg_win_pips}</td><td>${l.avg_loss_pips}</td>
+                <td>${l.odds_pips}x</td>
+                <td>${l.avg_mfe}</td><td>${l.avg_mae}</td><td><b>${l.max_mae}</b></td>
+                <td>${fmtTime(l.avg_hold)}</td>
+            </tr>`;
+        }
+        html+=`</tbody></table></div>`;
+
+        // Part 2: Trade details expand (MOVED before MFE/MAE)
+        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 2 · 交易訂單明細 <span class="info">i<span class="tip"><b>交易訂單說明</b><br>點擊每層嘅「展開訂單」按鈕，可查看該層所有交易嘅完整資料。<br><br>方便你對比同核對每筆交易嘅實際數據。</span></span></div>`;
+        for(const l of layers){
+            const rat=computeRating(l);
+            html+=`<div style="margin:6px 0 10px"><div style="font-size:0.82em;color:var(--text2);margin-bottom:2px"><b>${l.layer_label}</b> (${l.lots} lots) <span class="${ratingClass(rat)}">${rat}</span> | n=${l.count} | WR ${l.wr}%</div>`;
+            html+=`<div class="chart-row">
+                <div class="chart-box"><h4>MFE (最大有利波幅)</h4><canvas id="mfe_${l.symbol}_${l.direction}_${String(l.lots).replace(/\./g,'_')}" height="160"></canvas></div>
+                <div class="chart-box"><h4>MAE (最大不利波幅)</h4><canvas id="mae_${l.symbol}_${l.direction}_${String(l.lots).replace(/\./g,'_')}" height="160"></canvas></div>
+            </div></div>`;
+        }
+
+        // Part 3: MFE / MAE charts (separate)
+        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 3 · MFE / MAE 圖表 <span class="info">i<span class="tip"><b>圖表說明</b><br><b>MFE 圖</b>：每筆交易嘅最大有利波幅（點數）<br><b>MAE 圖</b>：每筆交易嘅最大不利波幅（點數）<br><br>綠色圓點 = 盈利交易 | 紅色圓點 = 虧損交易<br>Mouseover 顯示每筆交易詳情<br><br>MFE 越大 = 可設更高 TP<br>MAE 越大 = 需設更寬 SL</span></span></div>`;
+        for(const l of layers){
+            const tid=`trades_${l.symbol}_${l.direction}_${l.lots}`.replace(/\./g,'_');
+            html+=`<div class="trades-toggle" onclick="toggleTrades('${tid}',this)">📋 展開訂單 — ${l.layer_label} (${l.count} 筆)</div>
+            <div class="trades-panel" id="${tid}"><table><thead><tr>
+                <th>#</th><th>Open Time</th><th>Type</th><th>Lots</th><th>Symbol</th>
+                <th>Open</th><th>Close</th><th>Pips</th><th>P&L $</th><th>MFE</th><th>MAE</th><th>Hold</th>
+            </tr></thead><tbody>`;
+            l.trades.forEach((t,i)=>{
+                html+=`<tr${t.net_profit>0?' class="row-a"':t.net_profit<-10?' class="row-d"':''}>
+                    <td>${i+1}</td><td>${t.open_time}</td><td>${t.direction}</td><td>${t.lots}</td><td>${t.symbol}</td>
+                    <td>${t.open_price}</td><td>${t.close_price}</td>
+                    <td class="${t.net_pips>=0?'pnl-pos':'pnl-neg'}">${t.net_pips}</td>
+                    <td class="${t.net_profit>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(t.net_profit)}</td>
+                    <td>${t.mfe}</td><td>${t.mae}</td><td>${fmtTime(t.holding_hours)}</td>
+                </tr>`;
+            });
+            html+=`</tbody></table></div>`;
+        }
+
+        // Part 4: TP/SL table
+        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 4 · TP/SL 建議（原始值） <span class="info">i<span class="tip"><b>TP/SL 說明</b><br><b>TP</b> = 該層平均 MFE（不乘倍數）<br><b>Soft SL</b> = 該層平均 MAE（不乘倍數）<br><b>Hard SL</b> = 該層歷史最大 MAE<br><b>R:R</b> = TP / Soft SL<br><br>R:R ≥ 1.5x 可接受 | ≥ 3.0x 優秀</span></span></div>`;
+        html+=`<div style="overflow-x:auto"><table><thead><tr>
+            <th>Layer</th><th>Rating</th><th>n</th>
+            <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
+        </tr></thead><tbody>`;
+        for(const l of layers){
+            const rat=computeRating(l);
+            const tp=l.avg_mfe, soft=l.avg_mae, hard=l.max_mae;
+            const rr=soft>0?tp/soft:0;
+            const rrCls=rr>=3?'pnl-pos':rr>=1.5?'':'pnl-neg';
+            html+=`<tr><td><b>${l.layer_label}</b></td>
+                <td class="${ratingClass(rat)}">${rat}</td><td>${l.count}</td>
+                <td class="pnl-pos">${tp} pip</td>
+                <td>${soft} pip</td><td class="pnl-neg">${hard} pip</td>
+                <td class="${rrCls}">${rr>0?rr.toFixed(2)+'x':'—'}</td></tr>`;
+        }
+        html+=`</tbody></table></div>`;
+
+        // Part 5: Ranking (A級以上)
+        const aPlus=layers.filter(l=>computeRating(l)>='A').sort((a,b)=>computeRating(b)>computeRating(a)?1:-1);
+        if(aPlus.length>0){
+            html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 5 · 排行榜（A級以上）<span class=\"info\">i<span class=\"tip\"><b>排行榜說明</b><br>此 CCY×Direction 內 A級以上嘅層級，按評級降序排列。</span></span></div>`;
+            html+=`<div style=\"overflow-x:auto\"><table><thead><tr><th>#</th><th>Rating</th><th>Layer</th><th>n</th><th>WR%</th><th>EV$</th><th>Odds$</th><th>MFE</th><th>MAE</th><th>Total$</th><th>Hold</th></tr></thead><tbody>`;
+            aPlus.forEach((l,i)=>{
+                const rat=computeRating(l);
+                const ev=l.total_pnl/l.count;
+                html+=`<tr><td>${i+1}</td><td class=\"${ratingClass(rat)}\">${rat}</td><td><b>${l.layer_label}</b></td><td>${l.count}</td><td>${(l.wr||0).toFixed(1)}%</td><td class=\"pnl-pos\">${ev.toFixed(2)}</td><td>${l.odds||'—'}</td><td>${(l.avg_mfe||0).toFixed(1)}</td><td>${(l.avg_mae||0).toFixed(1)}</td><td class=\"${l.total_pnl>=0?'pnl-pos':'pnl-neg'}\">${fmtPnl(l.total_pnl)}</td><td>${(l.avg_hold||0).toFixed(1)}h</td></tr>`;
+            });
+            html+=`</tbody></table></div>`;
+        }
+
+        // Part 6: TP/SL Profitability Analysis
+        html+=`<div style=\"font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px\">Part 6 · 層級 TP/SL 盈利分析 <span class=\"info\">i<span class=\"tip\"><b>盈利邊緣說明</b><br>Edge = WR×TP - (1-WR)×SL<br>正值=有盈利邊緣，負值=虧損邊緣<br>綠色=盈利層 | 紅色=虧損層</span></span></div>`;
+        html+=`<div style=\"overflow-x:auto\"><table><thead><tr><th>Layer</th><th>Rating</th><th>狀態</th><th>n</th><th>WR%</th><th>TP</th><th>SL</th><th>HardSL</th><th>Edge</th><th>Total$</th></tr></thead><tbody>`;
+        layers.forEach(l=>{
+            const rat=computeRating(l);
+            const wr=l.wr||0, tp=l.avg_mfe||0, sl=l.avg_mae||0, hard=l.max_mae||0;
+            const edge=wr/100*tp - (1-wr/100)*sl;
+            const profitable=edge>=0;
+            html+=`<tr class=\"${profitable?'row-a':'row-d'}\"><td><b>${l.layer_label}</b></td><td class=\"${ratingClass(rat)}\">${rat}</td><td>${profitable?'✅':'❌'}</td><td>${l.count}</td><td>${wr.toFixed(1)}%</td><td class=\"pnl-pos\">${tp.toFixed(1)}</td><td>${sl.toFixed(1)}</td><td class=\"pnl-neg\">${hard.toFixed(1)}</td><td class=\"${profitable?'pnl-pos':'pnl-neg'}\">${edge>=0?'+'+edge.toFixed(1):edge.toFixed(1)}</td><td class=\"${l.total_pnl>=0?'pnl-pos':'pnl-neg'}\">${fmtPnl(l.total_pnl)}</td></tr>`;
+        });
+        html+=`</tbody></table></div>`;
+
+        html+=`</div></div>`; // close sec-b, sec
+    }
+
+    // Blacklist
+    if(blacklist.length>0){
+        html+='<h2>🚫 黑名單（危險層數） <span class="info">i<span class="tip"><b>黑名單說明</b><br>D/E 級嘅層數，按危險分數排序。<br>建議考慮減少或停用呢啲層數。</span></span></h2>';
+        for(const b of blacklist){
+            html+=`<div class="blk"><strong>${b.symbol} ${b.direction.toUpperCase()} ${b.layer}</strong> (${b.lots} lots) <span class="${ratingClass(b.rating)}">${b.rating}</span> | Danger: ${b.danger_score} | WR ${b.wr}% | P&L ${fmtPnl(b.total_pnl)} | <span style="color:var(--red)">${b.reason}</span></div>`;
+        }
+    }
+
+    document.getElementById('content').innerHTML=html;
+
+    // Draw charts after DOM ready
+    requestAnimationFrame(()=>drawAllCharts(ls));
+}
+
+function toggleSec(el){el.classList.toggle('open');el.nextElementSibling.classList.toggle('open');}
+function toggleTrades(id,btn){const p=document.getElementById(id);p.classList.toggle('open');btn.textContent=p.classList.contains('open')?'📋 收起訂單':'📋 展開訂單';}
+
+// ═══ Global Bar ═══
+function buildGlobalBar(ccySum, ls){
+    const top=ccySum.slice(0,20);
+    const maxAbs=Math.max(...top.map(c=>Math.abs(c.total_pnl)),1);
+    const maxPips=Math.max(...top.map(c=>Math.abs(c.total_pips||0)),1);
+    const n=top.length, svgH=Math.max(200,n*36+50), gap=36, lm=80, rm=60, cw=900, pw=cw-lm-rm, zx=lm+pw/2;
+    let svg=`<svg viewBox="0 0 ${cw} ${svgH}" style="width:100%;height:auto;font-family:var(--font)" xmlns="http://www.w3.org/2000/svg">`;
+    svg+=`<rect width="${cw}" height="${svgH}" fill="var(--bg)" rx="6"/>`;
+    svg+=`<line x1="${zx}" y1="30" x2="${zx}" y2="${svgH-20}" stroke="var(--brd)" stroke-width="1"/>`;
+    // Header legend
+    svg+=`<rect x="${lm}" y="${svgH-8}" width="10" height="8" fill="var(--grn)" rx="1"/><text x="${lm+14}" y="${svgH}" fill="#aaa" font-size="8">盈利$</text>`;
+    svg+=`<rect x="${lm+55}" y="${svgH-8}" width="10" height="8" fill="var(--red)" rx="1"/><text x="${lm+69}" y="${svgH}" fill="#aaa" font-size="8">虧損$</text>`;
+    svg+=`<rect x="${lm+120}" y="${svgH-8}" width="10" height="4" fill="#5dade2" rx="1"/><text x="${lm+134}" y="${svgH}" fill="#aaa" font-size="8">盈利PIP</text>`;
+    svg+=`<rect x="${lm+195}" y="${svgH-8}" width="10" height="4" fill="#e67e22" rx="1"/><text x="${lm+209}" y="${svgH}" fill="#aaa" font-size="8">虧損PIP</text>`;
+    for(const c of top){
+        const yb=30+top.indexOf(c)*gap+10;
+        const symId=`gbar_${c.symbol}_${c.direction}`;
+        // Symbol text (clickable)
+        svg+=`<a href="#ccy-${c.symbol}-${c.direction}" style="cursor:pointer"><text x="4" y="${yb+6}" fill="var(--pri)" font-size="9" font-weight="bold">${c.symbol} ${c.direction.toUpperCase().substr(0,1)}</text></a>`;
+        // $ bar
+        const frac=Math.abs(c.total_pnl)/maxAbs;
+        const bw=Math.max(frac*pw/2,1);
+        const col=c.total_pnl>=0?'var(--grn)':'var(--red)';
+        const bx=c.total_pnl>=0?zx:zx-bw;
+        svg+=`<rect x="${bx}" y="${yb-4}" width="${bw}" height="16" fill="${col}" rx="2" opacity="0.85"/>`;
+        const tx=c.total_pnl>=0?zx+bw+4:zx-bw-4;
+        svg+=`<text x="${tx}" y="${yb+8}" fill="${col}" font-size="8" font-weight="bold" text-anchor="${c.total_pnl>=0?'start':'end'}">${fmtPnl(c.total_pnl)}</text>`;
+        // Pips bar (thin)
+        const pips=c.total_pips||0;
+        const fracP=Math.abs(pips)/maxPips;
+        const pw2=Math.max(fracP*pw/2,1);
+        const colP=pips>=0?'#5dade2':'#e67e22';
+        const bxP=pips>=0?zx:zx-pw2;
+        svg+=`<rect x="${bxP}" y="${yb+14}" width="${pw2}" height="6" fill="${colP}" rx="1" opacity="0.8"/>`;
+        // PIP value text
+        const ptx=pips>=0?zx+pw2+4:zx-pw2-4;
+        svg+=`<text x="${ptx}" y="${yb+21}" fill="${colP}" font-size="7" text-anchor="${pips>=0?'start':'end'}">${pips>=0?'+':''}${pips.toFixed(1)} pip</text>`;
+    }
+    svg+=`</svg>`;
+    return `<div class="global-bar"><div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin-bottom:4px">📊 全局 P&L 分佈（$ + PIP） <span class="info">i<span class="tip"><b>全局 P&L 分佈</b><br>顯示每個 CCY×Direction 嘅總盈虧（$ + PIP）。<br>粗棒 = 金額 | 細棒 = Pips<br>綠色 = 盈利 | 紅色 = 虧損<br><br><b>點擊 Symbol 可跳到該分析</b></span></span></div>${svg}</div>`;
+}
+
+// ═══ Canvas Charts ═══
+function drawAllCharts(ls){
+    for(const [key,s] of Object.entries(ls)){
+        const id=`${s.symbol}_${s.direction}_${String(s.lots).replace(/\./g,'_')}`;
+        drawScatter(`mfe_${id}`, s.trades, 'mfe', s);
+        drawScatter(`mae_${id}`, s.trades, 'mae', s);
+    }
+}
+
+function drawScatter(canvasId, trades, mode, stats){
+    const canvas=document.getElementById(canvasId);
+    if(!canvas) return;
+    const ctx=canvas.getContext('2d');
+    const dpr=window.devicePixelRatio||1;
+    const rect=canvas.getBoundingClientRect();
+    canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+    ctx.scale(dpr,dpr); const w=rect.width, h=rect.height;
+    const pad={t:15,r:15,b:25,l:35}; const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+
+    // Background
+    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0a0e17';
+    ctx.fillRect(0,0,w,h);
+
+    if(!trades||trades.length===0) return;
+
+    const vals=trades.map(t=>mode==='mfe'?t.mfe:t.mae);
+    const maxVal=Math.max(...vals,1);
+
+    // Grid
+    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--brd').trim()||'#1e2433';
+    ctx.lineWidth=0.5;
+    for(let i=0;i<=4;i++){
+        const y=pad.t+ph*(1-i/4);
+        ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+pw,y);ctx.stroke();
+        ctx.fillStyle='#555';ctx.font='9px sans-serif';ctx.textAlign='right';
+        ctx.fillText((maxVal*i/4).toFixed(0),pad.l-4,y+3);
+    }
+    // Axis label
+    ctx.fillStyle='#777';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(mode==='mfe'?'MFE (pips)':'MAE (pips)',pad.l+pw/2,h-2);
+
+    // Tooltip handling
+    let hoveredIdx=-1;
+    const dots=[]; // store dot positions
+
+    // Draw dots
+    trades.forEach((t,i)=>{
+        const x=pad.l+(i/(trades.length-1||1))*pw;
+        const v=mode==='mfe'?t.mfe:t.mae;
+        const y=pad.t+ph*(1-v/maxVal);
+        const isWin=t.net_profit>0;
+        dots.push({x,y,i,t,isWin});
+        ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);
+        ctx.fillStyle=isWin?'#4CAF50':'#FF5722';ctx.fill();
+    });
+
+    // Hover overlay
+    canvas.onmousemove=function(e){
+        const cr=canvas.getBoundingClientRect();
+        const mx=e.clientX-cr.left, my=e.clientY-cr.top;
+        let found=-1;
+        for(const d of dots){
+            if(Math.abs(mx-d.x)<8&&Math.abs(my-d.y)<8){found=d.i;break;}
+        }
+        if(found!==hoveredIdx){
+            hoveredIdx=found;
+            // Redraw
+            ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0a0e17';
+            ctx.fillRect(0,0,w,h);
+            // Grid
+            ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--brd').trim()||'#1e2433';
+            ctx.lineWidth=0.5;
+            for(let i=0;i<=4;i++){
+                const y=pad.t+ph*(1-i/4);
+                ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+pw,y);ctx.stroke();
+                ctx.fillStyle='#555';ctx.font='9px sans-serif';ctx.textAlign='right';
+                ctx.fillText((maxVal*i/4).toFixed(0),pad.l-4,y+3);
+            }
+            ctx.fillStyle='#777';ctx.font='10px sans-serif';ctx.textAlign='center';
+            ctx.fillText(mode==='mfe'?'MFE (pips)':'MAE (pips)',pad.l+pw/2,h-2);
+            // Dots
+            for(const d of dots){
+                ctx.beginPath();ctx.arc(d.x,d.y,d.i===found?5:2.5,0,Math.PI*2);
+                ctx.fillStyle=d.isWin?'#4CAF50':'#FF5722';ctx.fill();
+            }
+            // Tooltip
+            if(found>=0){
+                const d=dots.find(d=>d.i===found);
+                const t=d.t;
+                const lines=[
+                    `#${found+1} ${t.direction.toUpperCase()} ${t.symbol}`,
+                    `Lots: ${t.lots} | Pips: ${t.net_pips}`,
+                    `P&L: ${fmtPnl(t.net_profit)}`,
+                    `${mode==='mfe'?'MFE':'MAE'}: ${mode==='mfe'?t.mfe:t.mae}`,
+                    `Hold: ${fmtTime(t.holding_hours)}`
+                ];
+                const tw=140, th=lines.length*14+10;
+                let tx=d.x+10, ty=d.y-th/2;
+                if(tx+tw>w) tx=d.x-tw-10;
+                if(ty<0) ty=2; if(ty+th>h) ty=h-th-2;
+                ctx.fillStyle='rgba(20,20,40,0.92)';ctx.strokeStyle='var(--acc)';
+                ctx.lineWidth=1;roundRect(ctx,tx,ty,tw,th,4);ctx.fill();ctx.stroke();
+                ctx.fillStyle='#eee';ctx.font='10px sans-serif';ctx.textAlign='left';
+                lines.forEach((l,li)=>{ctx.fillText(l,tx+6,ty+14+li*14);});
+            }
+        }
+    };
+    canvas.onmouseleave=function(){hoveredIdx=-1;drawScatter(canvasId,trades,mode,stats);};
+}
+
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
+</script>
+<script src="../sidebar.js"></script>
+</body>
+</html>
