@@ -311,7 +311,7 @@ function renderSetInfo(setConfigs) {
 }
 
 function getSetLotForLayer(setConfigs, layerIdx, actualLot) {
-    """Get the SET-defined lot for a given layer index, for comparison."""
+    // Get the SET-defined lot for a given layer index, for comparison.
     if (!setConfigs || setConfigs.length === 0) return null;
     for (const cfg of setConfigs) {
         if (cfg.lot_mode === 'copy_trade') continue;
