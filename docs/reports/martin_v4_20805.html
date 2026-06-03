@@ -6,8 +6,8 @@
 <title>🔄 馬丁剖析法 V4 — Signal 20805</title>
 <style>
 :root{--font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px}
-[data-theme="dark"]{--bg:#0a0e17;--card:#111520;--hover:#1a1f2e;--text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;--brd:#1e2433;--th:#111520}
-[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--hover:#eef2f7;--text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107;--brd:#ddd;--th:#eef2f7}
+[data-theme="dark"]{--bg:#0a0e17;--card:#111520;--hover:#1a1f2e;--text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;--brd:#1e2433;--th:#111520;--zebra:#151b28}
+[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--hover:#eef2f7;--text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107;--brd:#ddd;--th:#eef2f7;--zebra:#f0f4fa}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--bg);color:var(--text);padding:12px;max-width:1400px;margin:0 auto}
 h1{font-size:1.3em;color:var(--pri);margin-bottom:4px}
@@ -73,6 +73,19 @@ tr:hover{background:var(--card)}
 /* Global bar */
 .global-bar{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 14px;margin-bottom:12px;overflow-x:auto}
 .global-bar svg{width:100%;height:auto}
+/* Period Stats */
+.period-stats{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;overflow-x:auto}
+.period-stats table{width:100%;border-collapse:collapse;font-size:0.85em}
+.period-stats th{background:var(--th);padding:8px 10px;text-align:center;border:1px solid var(--brd);color:var(--pri);font-size:0.8em;white-space:nowrap}
+.period-stats td{padding:7px 10px;text-align:center;border:1px solid var(--brd);white-space:nowrap}
+.period-stats tbody tr:nth-child(even){background:var(--zebra)}
+.period-stats tbody tr:hover{background:var(--bg)}
+.period-stats .p-period{font-weight:bold;color:var(--acc)}
+.period-stats .p-pos{color:var(--grn);font-weight:bold}
+.period-stats .p-neg{color:var(--red);font-weight:bold}
+.period-stats .p-wr-good{color:var(--grn)}
+.period-stats .p-wr-bad{color:var(--red)}
+.period-stats tfoot td{font-weight:bold;border:1px solid var(--brd);background:var(--th)}
 /* Responsive */
 @media(max-width:768px){body{padding:8px;font-size:13px}.quick-btns button{padding:4px 8px;font-size:0.8em}.date-inputs{flex-direction:column;align-items:flex-start}.chart-row{flex-direction:column}}
 </style>
@@ -108,6 +121,9 @@ tr:hover{background:var(--card)}
 </div>
 <div class="range-labels"><span id="rangeMinLabel">—</span><span id="rangeMaxLabel">—</span></div>
 </div>
+
+<!-- Period Stats -->
+<div class="sec"><div class="sec-h" onclick="toggleSec(this)"><span>📊 交易統計表</span><span class="arrow">▶</span></div><div class="sec-b" id="periodStatsBody"></div></div>
 
 <!-- Summary -->
 <div class="stats-bar" id="summaryBar"></div>
@@ -432,6 +448,68 @@ function updateRangeSliderHandles(){if(!dateMin||!dateMax)return;const t=dateMax
 
 function applyFilter(){filteredTrades=filterByDateRange(allTrades,rangeFrom,rangeTo);renderAll();}
 
+// ═══ PERIOD STATS ═══
+function computePeriodStats(trades, periodType){
+  if(!trades.length) return [];
+  const groups={};
+  trades.forEach(t=>{
+    if(!t._openDate) return;
+    let key;
+    if(periodType==='day') key=`${t._openDate.getDate()}/${t._openDate.getMonth()+1}`;
+    else if(periodType==='week'){const y=t._openDate.getFullYear();const w=getWeekNumber(t._openDate);key=`${y}-W${w}`;}
+    else {key=`${t._openDate.getFullYear()}-${String(t._openDate.getMonth()+1).padStart(2,'0')}`;}
+    if(!groups[key]) groups[key]={trades:[],buyCnt:0,sellCnt:0,pnlSum:0,swapSum:0,floating:null,wins:0};
+    groups[key].trades.push(t);
+    if(t.direction==='buy') groups[key].buyCnt++; else groups[key].sellCnt++;
+    groups[key].pnlSum+=t.net_profit;
+    groups[key].swapSum+=t.swap;
+    if(t.net_profit>=0) groups[key].wins++;
+    groups[key].floating=t.net_profit; // last trade floating
+  });
+  const rows=Object.entries(groups).sort((a,b)=>a[0]>b[0]?-1:1).slice(0,10);
+  let cumPnl=0;
+  const result=[];
+  for(let i=rows.length-1;i>=0;i--){ // reverse to accumulate equity
+    const [period,d]=rows[i];
+    cumPnl+=d.pnlSum;
+    result.unshift({period,trades:d.trades.length,buy:d.buyCnt,sell:d.sellCnt,
+      wr:((d.wins/d.trades.length)*100).toFixed(1),
+      pnl:d.pnlSum,floating:d.floating,swap:d.swapSum,
+      equity:cumPnl});
+  }
+  return result;
+}
+function getWeekNumber(d){const date=new Date(d.getTime());date.setHours(0,0,0,0);date.setDate(date.getDate()+3-(date.getDay()-1+7)%7);const week1=new Date(date.getFullYear(),0,4);return 1+Math.round(((date.getTime()-week1.getTime())/86400000-3+(week1.getDay()+6)%7)/7);}
+function fmtPnl(v){return(v>=0?'+'+(Math.abs(v)>=1000?(v/1000).toFixed(2)+'k':v.toFixed(2)):(Math.abs(v)>=1000?(v/1000).toFixed(2)+'k':v.toFixed(2)))+'$';}
+function fmtDate(d){return d?`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`:'—';}
+
+function buildPeriodStatsTable(periodType){
+  const stats=computePeriodStats(filteredTrades,periodType);
+  if(!stats.length) return '<div style="color:var(--text2);padding:10px">⚠️ 數據不足，無法生成統計表</div>'; 
+  const total={trades:0,buy:0,sell:0,wins:0,pnl:0,swap:0};
+  stats.forEach(s=>{total.trades+=s.trades;total.buy+=s.buy;total.sell+=s.sell;total.wins+=s.wr*s.trades/100;total.pnl+=s.pnl;total.swap+=s.swap;});
+  const totalWr=(total.wins/total.trades*100).toFixed(1);
+  let html='<div class="period-stats"><table><thead><tr><th>期間</th><th>交易數量</th><th>BUY</th><th>SELL</th><th>Win Rate</th><th>Net Profit</th><th>Floating</th><th>Swap</th><th>Equity</th></tr></thead><tbody>'; 
+  stats.forEach(s=>{
+    const wrCls=s.wr>=60?'p-wr-good':'p-wr-bad';
+    const pnlCls=s.pnl>=0?'p-pos':'p-neg';
+    const floatCls=s.floating>=0?'p-pos':'p-neg';
+    html+=`<tr><td class="p-period">${s.period}</td><td>${s.trades}</td><td>${s.buy}</td><td>${s.sell}</td><td class="${wrCls}">${s.wr}%</td><td class="${pnlCls}">${s.pnl>=0?'+'+s.pnl.toFixed(2):s.pnl.toFixed(2)}$</td><td class="${floatCls}">${s.floating>=0?'+'+s.floating.toFixed(2):s.floating.toFixed(2)}$</td><td>${s.swap>=0?'+'+s.swap.toFixed(2):s.swap.toFixed(2)}$</td><td>${s.equity.toFixed(2)}$</td></tr>`;
+  });
+  const totalPnlCls=total.pnl>=0?'p-pos':'p-neg';
+  html+=`<tfoot><tr><td><strong>總計</strong></td><td><strong>${total.trades}</strong></td><td><strong>${total.buy}</strong></td><td><strong>${total.sell}</strong></td><td><strong>${totalWr}%</strong></td><td class="${totalPnlCls}"><strong>${total.pnl>=0?'+'+total.pnl.toFixed(2):total.pnl.toFixed(2)}$</strong></td><td>—</td><td><strong>${total.swap>=0?'+'+total.swap.toFixed(2):total.swap.toFixed(2)}$</strong></td><td><strong>${total.pnl.toFixed(2)}$</strong></td></tr></tfoot></table></div>`; 
+  return html;
+}
+
+function getPeriodType(){
+  const active=document.querySelector('.quick-btns button.active');
+  if(!active) return 'month';
+  const r=active.dataset.range;
+  if(r==='1d'||r==='1w'||r==='1m') return 'day';
+  if(r==='3m'||r==='6m') return 'week';
+  return 'month';
+}
+
 // ═══ RENDER ═══
 function renderAll(){
     const n=filteredTrades.length;
@@ -447,6 +525,9 @@ function renderAll(){
         <div><div class="v">${summary.symbols}</div><div class="l">CCY</div></div>
         <div><div class="v">${summary.layers}</div><div class="l">層數</div></div>
         <div><div class="v">${summary.best_ccy}</div><div class="l">最佳 (${fmtPnl(summary.best_pnl)})</div></div>`;
+
+    // Period Stats
+    document.getElementById('periodStatsBody').innerHTML=buildPeriodStatsTable(getPeriodType());
 
     const ls=computeLayerStats(filteredTrades);
     const ccySum=buildCCYDirectionSummary(ls);
