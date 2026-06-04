@@ -11,13 +11,13 @@
 //+------------------------------------------------------------------+
 //| Input Parameters                                                  |
 //+------------------------------------------------------------------+
-input string   AccountLabel      = "";          // 自定義帳戶名稱（留空用預設）
-input int      CheckInterval     = 10;          // 檢查頻率（秒）
-input string   ApiUrl            = "http://localhost:8788"; // API 地址
-input bool     EnableHTTP        = false;       // 啟用 HTTP POST（需配置白名單）
-input bool     EnableCSV         = true;        // 啟用 CSV 事件日誌
-input bool     EnableIndicators  = true;        // 採集指標數據
-input bool     EnableStateLog    = true;        // 定期記錄帳戶狀態
+input string   AccountLabel      = "";          // Account label (empty = auto)
+input int      CheckInterval     = 10;          // Check interval (seconds)
+input string   ApiUrl            = "http://localhost:8788"; // API endpoint
+input bool     EnableHTTP        = false;       // Enable HTTP POST
+input bool     EnableCSV         = true;        // Enable CSV event log
+input bool     EnableIndicators  = true;        // Collect indicator data
+input bool     EnableStateLog    = true;        // Periodic state log
 
 //+------------------------------------------------------------------+
 //| Global Variables                                                  |
@@ -25,9 +25,9 @@ input bool     EnableStateLog    = true;        // 定期記錄帳戶狀態
 datetime g_lastCheck       = 0;
 string   g_accountId       = "";
 string   g_label           = "";
-int      g_knownTickets[];                        // 已知的持倉 ticket 列表
+int      g_knownTickets[];                        // Known position tickets
 int      g_knownTicketsSize = 0;
-int      g_stateCount       = 0;                  // 狀態導出計數器
+int      g_stateCount       = 0;                  // State export counter
 
 //+------------------------------------------------------------------+
 //| Expert initialization                                              |
@@ -40,13 +40,13 @@ int OnInit()
    
    EventSetTimer(CheckInterval);
    
-   // 初始化已知持倉（避免啟動時誤報）
+   // Init known positions (avoid false alerts on startup)
    SnapshotKnownPositions();
    
-   // 寫入啟動事件
+   // Write startup event
    WriteEvent("STARTUP", "", 0, "", 0, 0, 0, 0, 0, "", "", "");
    
-   // 寫入完整初始狀態
+   // Write initial state
    WriteAccountState();
    
    Print("AccountMonitor v2.00 started on ", g_label);
