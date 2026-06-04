@@ -242,9 +242,14 @@ def analyze_trade_event(event):
         elif stoch == 'OVERBOUGHT' and direction == 'SELL':
             reasons.append(f"🔷 隨機指標超買回落信號")
         
-        # EA identification from comment
-        comment = event.get('comment', '')
-        if 'TSR' in comment or 'Tiger' in comment:
+        # Detect manual vs EA trade
+        comment = event.get('comment', '').strip()
+        magic = event.get('magic', '0').strip()
+        is_manual = (not comment or comment in ('', '[sl]', '[tp]')) and magic in ('', '0')
+        
+        if is_manual:
+            reasons.append(f"✋ 手動操作（無 Magic Number / Comment）")
+        elif 'TSR' in comment or 'Tiger' in comment:
             reasons.append(f"🐯 EA: TSR/Tiger 策略")
         elif 'Dragon Wave' in comment or 'DW' in comment:
             reasons.append(f"🐉 EA: Dragon Wave 策略")
@@ -256,6 +261,8 @@ def analyze_trade_event(event):
             reasons.append(f"⚡ EA: Flash 策略")
         elif 'Gemini' in comment:
             reasons.append(f"♊ EA: Gemini 策略")
+        else:
+            reasons.append(f"🤖 EA 策略（Magic={magic}, Comment={comment}）"
     
     elif event['event_type'] == 'CLOSE_ORDER':
         reasons.append(f"💰 平倉結果：{event.get('extra', '')}")
@@ -274,9 +281,15 @@ def format_whatsapp_message(event, analysis):
     balance = event['balance']
     equity = event['equity']
     
+    # Detect manual trade for header
+    comment = event.get('comment', '').strip()
+    magic = event.get('magic', '0').strip()
+    is_manual = (not comment or comment in ('', '[sl]', '[tp]')) and magic in ('', '0')
+    
     if evt == 'NEW_ORDER':
         emoji = "🟢" if direction == "BUY" else "🔴"
-        header = f"{emoji} 新訂單偵測"
+        trade_type = "✋手動" if is_manual else "🤖EA"
+        header = f"{emoji} 新訂單偵測 [{trade_type}]"
     elif evt == 'CLOSE_ORDER':
         extra = event.get('extra', '')
         is_profit = '+' in extra and not extra.startswith('-')
@@ -297,11 +310,16 @@ def format_whatsapp_message(event, analysis):
     if evt == 'NEW_ORDER':
         sl = event.get('sl', '0')
         tp = event.get('tp', '0')
-        if sl and sl != '0.00000':
+        if sl and sl != '0.00000' and sl != '0':
             msg += f"🛡️ SL：{sl}\n"
-        if tp and tp != '0.00000':
+        if tp and tp != '0.00000' and tp != '0':
             msg += f"🎯 TP：{tp}\n"
-        msg += f"📝 Comment：{event.get('comment', '-')}\n"
+        if event.get('comment', '').strip() and event.get('comment', '').strip() not in ('[sl]', '[tp]'):
+            msg += f"📝 Comment：{event.get('comment', '-')}\n"
+        else:
+            msg += f"📝 Comment：（無）\n"
+        if magic and magic != '0':
+            msg += f"🔢 Magic：{magic}\n"
     
     if evt == 'CLOSE_ORDER':
         msg += f"📋 {event.get('extra', '')}\n"
