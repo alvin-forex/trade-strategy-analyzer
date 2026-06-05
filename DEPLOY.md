@@ -1,21 +1,23 @@
 # TSA 部署機制 — 必須遵守
 
-## ⚠️ 關鍵事實
+## ⚠️ 關鍵事實（2026-06-05 更正）
 
-**GitHub Pages 讀取 `main` 分支嘅 `docs/` 文件夾，唔係 root，唔係 gh-pages！**
+**GitHub Pages 讀取 `main` 分支嘅 ROOT 文件夾（`/`），唔係 `docs/`！**
+
+之前 DEPLOY.md 講錯咗，已於 2026-06-05 更正。
 
 ## 文件對應表
 
 | 你想改嘅嘢 | 改邊個文件 | 喺邊改 |
 |---|---|---|
-| TSA 分析工具（上載 CSV、所有 tabs） | `docs/index.html` | `main` branch |
-| Dashboard landing page | ~~已合併入 `docs/index.html`~~ | - |
-| Signal 排名頁面 | `docs/signal_ranking.html` | `main` branch |
-| CCY 排名頁面 | `docs/admin/ccy_ranking.html` | `main` branch |
-| 波幅排名頁面 | `docs/admin/symbol_ranking.html` | `main` branch |
-| 後台管理 | `docs/admin/index.html` | `main` branch |
-| V2/新聞報告 HTML | `scripts/forex_combined_report.py` 生成 | - |
-| EA / Python 腳本 | `scripts/*.py`, `MQL4/` | `main` branch |
+| TSA 分析工具（上載 CSV、所有 tabs） | `index.html` | `main` branch root |
+| Dashboard landing page | `dashboard.html` | `main` branch root |
+| Signal 排名頁面 | `signal_ranking.html` | `main` branch root |
+| CCY 排名頁面 | `admin/ccy_ranking.html` | `main` branch root |
+| 波幅排名頁面 | `admin/symbol_ranking.html` | `main` branch root |
+| 後台管理 | `admin/index.html` | `main` branch root |
+| Signal 分析報告 | `reports/index_{ID}.html` | `main` branch root |
+| Martin V4 報告 | `reports/martin_v4_{ID}.html` | `main` branch root |
 
 ## 部署流程（每次改動）
 
