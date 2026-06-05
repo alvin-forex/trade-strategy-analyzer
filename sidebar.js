@@ -21,6 +21,10 @@
       <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
       <a href="${depth}admin/forex_reports/index.html" class="sidebar-link" data-page="forex_reports"><span class="icon">📰</span>外匯報告</a>
       <div class="sidebar-sep"></div>
+      <a href="${depth}admin/pivot_table.html" class="sidebar-link" data-page="pivot"><span class="icon">📋</span>Martin 透視</a>
+      <a href="${depth}admin/period_stats.html" class="sidebar-link" data-page="period"><span class="icon">⏰</span>週期統計</a>
+      <a href="${depth}admin/mfe_mae.html" class="sidebar-link" data-page="mfe"><span class="icon">📈</span>MFE/MAE</a>
+      <div class="sidebar-sep"></div>
       <a href="${depth}admin/signal_ranking.html" class="sidebar-link" data-page="deep"><span class="icon">🔍</span>深度分析</a>
     </div>
   `;
@@ -62,6 +66,9 @@
     else if(dp==='volatility' && (filename==='volatility' || filename==='ccy_timeframe_volatility')) link.classList.add('active');
     else if(dp==='ccy_power' && (path.includes('/admin/ccy_power/') || filename==='ccy_power')) link.classList.add('active');
     else if(dp==='forex_reports' && (path.includes('/admin/forex_reports/') || filename==='forex_reports')) link.classList.add('active');
+    else if(dp==='pivot' && filename==='pivot_table') link.classList.add('active');
+    else if(dp==='period' && filename==='period_stats') link.classList.add('active');
+    else if(dp==='mfe' && filename==='mfe_mae') link.classList.add('active');
     else if(dp==='deep' && (path.includes('/reports/signal_') || path.includes('Signal_Deep_Analysis'))) link.classList.add('active');
     else if(dp!=='index' && dp!=='deep' && filename.includes(dp)) link.classList.add('active');
   });
