@@ -3,7 +3,8 @@
   // Determine depth for relative links
   var path = window.location.pathname;
   var depth = '';
-  if(path.includes('/admin/ccy/')) depth='../../';
+  if(path.includes('/admin/ccy_power/') || path.includes('/admin/forex_reports/')) depth='../../';
+  else if(path.includes('/admin/ccy/')) depth='../../';
   else if(path.includes('/admin/') || path.includes('/reports/')) depth='../';
 
   // Build sidebar HTML
