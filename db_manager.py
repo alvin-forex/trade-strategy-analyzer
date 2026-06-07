@@ -47,6 +47,7 @@ def init_database():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 signal_id TEXT NOT NULL,
                 symbol TEXT NOT NULL,
+                type TEXT NOT NULL DEFAULT 'mix',
                 strategy_version TEXT NOT NULL DEFAULT 'v5',
                 batch_run_id TEXT NOT NULL,
                 
@@ -120,7 +121,7 @@ def init_database():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_dde_signal ON dde_scores(signal_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_dde_symbol ON dde_scores(symbol)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_dde_batch ON dde_scores(batch_run_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_dde_sig_sym ON dde_scores(signal_id, symbol)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_dde_sig_sym ON dde_scores(signal_id, symbol, type)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_dde_sig_ver ON dde_scores(signal_id, strategy_version)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_dde_sym_ver ON dde_scores(symbol, strategy_version)')
         
@@ -193,7 +194,7 @@ def save_scores(results: List[Dict], version: str = 'v5', batch_run_id: Optional
             
             cursor.execute('''
                 INSERT INTO dde_scores (
-                    signal_id, symbol, strategy_version, batch_run_id,
+                    signal_id, symbol, type, strategy_version, batch_run_id,
                     dde_score, wr_pct, pf_pct, dd_pct, martin_pct,
                     wr_raw, pf_raw, dd_raw, martin_raw,
                     rr_score, ml_score, wr_score, tc_score, ht_score,
@@ -204,9 +205,9 @@ def save_scores(results: List[Dict], version: str = 'v5', batch_run_id: Optional
                     mfe_mae_ratio, suggest_tp, suggest_sl,
                     buy_pct, sell_pct, bias, best_day, worst_day,
                     analysis_date
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                r['signal_id'], r['symbol'], version, batch_run_id,
+                r['signal_id'], r['symbol'], r.get('type', 'mix'), version, batch_run_id,
                 r.get('dde_v5', r.get('dde_v4', 0)),
                 r.get('wr_pct', 0), r.get('pf_pct', 0), r.get('dd_pct', 0), r.get('martin_pct', 0),
                 r.get('wr_raw', r.get('win_rate', 0)), r.get('pf_raw', r.get('pf', 0)), r.get('dd_raw', r.get('max_dd_pips', 0)), r.get('martin_raw', r.get('wal', 0)),

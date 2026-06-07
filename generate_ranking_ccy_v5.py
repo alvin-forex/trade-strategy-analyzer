@@ -4,11 +4,14 @@ Generate CCY Ranking HTML (DDE v5 — ranking-based, 4 dimensions)
 WR 15% + PF 20% + DD 25% + Martin 40%
 
 Reads from SQLite (via db_manager) with pickle fallback for legacy data.
+Uses Jinja2 template for HTML generation.
 """
 import sys
 from pathlib import Path
 from collections import defaultdict, Counter
 from datetime import datetime
+from typing import List, Dict, Any
+import jinja2
 
 # Try db_manager first, fall back to pickle
 try:
@@ -21,11 +24,13 @@ BASE_DIR = Path(__file__).parent
 REPORTS_DIR = BASE_DIR / 'reports'
 OUTPUT_DIR = BASE_DIR / 'output'
 DOCS_DIR = BASE_DIR / 'docs'
+TEMPLATES_DIR = BASE_DIR / 'templates'
 REPORTS_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 DOCS_DIR.mkdir(exist_ok=True)
+TEMPLATES_DIR.mkdir(exist_ok=True)
 
-EA_COLORS = {
+EA_COLORS: Dict[str, tuple] = {
     'DW':      ('#4a148c', '#ce93d8'),
     'SMA':     ('#1b5e20', '#a5d6a7'),
     'SMAPro':  ('#1b5e20', '#c8e6c9'),
@@ -40,13 +45,15 @@ EA_COLORS = {
 }
 
 
-def get_ea_style(ea_tag):
+def get_ea_style(ea_tag: str) -> str:
+    """Return inline CSS style for EA tag badge."""
     first = ea_tag.split('/')[0]
     bg, fg = EA_COLORS.get(first, EA_COLORS['UNK'])
     return f'background:{bg};color:{fg}'
 
 
-def get_score_class(score):
+def get_score_class(score: float) -> str:
+    """Return CSS class for DDE score."""
     if score >= 90: return 's90'
     elif score >= 80: return 's80'
     elif score >= 70: return 's70'
@@ -54,14 +61,15 @@ def get_score_class(score):
     else: return 's0'
 
 
-def get_dd_class(dd_value):
+def get_dd_class(dd_value: float) -> str:
+    """Return CSS class for drawdown value."""
     abs_dd = abs(dd_value)
     if abs_dd < 500: return 'dd-g'
     elif abs_dd < 2000: return 'dd-y'
     else: return 'dd-r'
 
 
-def fmt_pips(val):
+def fmt_pips(val: float) -> str:
     if abs(val) >= 1000:
         return f'{val:,.0f}'
     elif abs(val) >= 100:
@@ -70,97 +78,122 @@ def fmt_pips(val):
         return f'{val:.1f}'
 
 
-def generate_html(all_results):
-    """Generate the full ranking_ccy.html with v5 data."""
+def generate_html(all_results: List[Dict[str, Any]]) -> str:
+    """Generate the full ranking_ccy.html with v5 data + BUY/SELL grouping.
 
-    scored = [r for r in all_results if not r['red_card']]
-    red = [r for r in all_results if r['red_card']]
+    Args:
+        all_results: List of scoring result dicts (now includes 'type' field).
+
+    Returns:
+        Complete HTML string.
+    """
+
+    scored: List[Dict[str, Any]] = [r for r in all_results if not r['red_card']]
+    red: List[Dict[str, Any]] = [r for r in all_results if r['red_card']]
 
     # Build currency-pair aggregation
-    by_ccy = defaultdict(list)
+    by_ccy: Dict[str, List] = defaultdict(list)
     for r in all_results:
         by_ccy[r['symbol']].append(r)
 
+    # BUY/SELL 分组
+    buy_rows: List[Dict[str, Any]] = [r for r in scored if r['type'] == 'buy']
+    sell_rows: List[Dict[str, Any]] = [r for r in scored if r['type'] == 'sell']
+    buy_count: int = len(buy_rows)
+    sell_count: int = len(sell_rows)
+
     # Symbol counts for filter dropdown
-    sym_counts = Counter(r['symbol'] for r in all_results)
-    sorted_syms = sorted(sym_counts.items())
+    sym_counts: Dict[str, int] = Counter(r['symbol'] for r in all_results)
+    sorted_syms: List[tuple] = sorted(sym_counts.items())
 
     # Global stats
-    total_pips = sum(r['total_net_pips'] for r in all_results)
-    n_scored = len(scored)
-    n_ccy = len(by_ccy)
-    global_best = max(r['dde_v5'] for r in scored) if scored else 0
-    today = datetime.now().strftime('%Y-%m-%d')
+    total_pips: float = sum(r['total_net_pips'] for r in all_results)
+    n_scored: int = len(scored)
+    n_ccy: int = len(by_ccy)
+    global_best: float = max(r['dde_v5'] for r in scored) if scored else 0
+    today: str = datetime.now().strftime('%Y-%m-%d')
 
     # --- TOP 20 ---
-    top20 = sorted(scored, key=lambda x: x['dde_v5'], reverse=True)[:20]
+    top20: List[Dict[str, Any]] = sorted(scored, key=lambda x: x['dde_v5'], reverse=True)[:20]
 
     # --- Best per Symbol ---
-    best_per_sym = {}
+    best_per_sym: Dict[str, Dict] = {}
     for r in sorted(scored, key=lambda x: x['dde_v5'], reverse=True):
         if r['symbol'] not in best_per_sym:
             best_per_sym[r['symbol']] = r
-    best_sym_list = sorted(best_per_sym.values(), key=lambda x: x['dde_v5'], reverse=True)
+    best_sym_list: List[Dict[str, Any]] = sorted(best_per_sym.values(), key=lambda x: x['dde_v5'], reverse=True)
 
     # --- ALL rows sorted by score ---
-    all_sorted = sorted(scored, key=lambda x: x['dde_v5'], reverse=True) + \
+    all_sorted: List[Dict[str, Any]] = sorted(scored, key=lambda x: x['dde_v5'], reverse=True) + \
                  sorted(red, key=lambda x: x['dde_v5'], reverse=True)
 
-    # ── Table header ──
-    thead_html = '''<thead><tr>
-<th data-col="idx" data-type="num">#<span class="arrow"></span></th>
-<th data-col="signal" data-type="num">Signal<span class="arrow"></span></th>
-<th data-col="ea" data-type="str">EA<span class="arrow"></span></th>
-<th data-col="symbol" data-type="str">CCY<span class="arrow"></span></th>
+    # ── Table header (增加 Type 槍位 + 全部加 tooltip) ──
+    thead_html: str = '''<thead><tr>
+<th data-col="idx" data-type="num"><span class="tooltip" data-tip="排名">#</span><span class="arrow"></span></th>
+<th data-col="signal" data-type="num"><span class="tooltip" data-tip="Signal ID">Signal</span><span class="arrow"></span></th>
+<th data-col="ea" data-type="str"><span class="tooltip" data-tip="EA 類型">EA</span><span class="arrow"></span></th>
+<th data-col="type" data-type="str"><span class="tooltip" data-tip="交易方向">Type</span><span class="arrow"></span></th>
+<th data-col="symbol" data-type="str"><span class="tooltip" data-tip="貨幣對">CCY</span><span class="arrow"></span></th>
 <th data-col="dde" data-type="num"><span class="tooltip" data-tip="DDE v5 排名制分數">DDE v5</span><span class="arrow"></span></th>
 <th data-col="wr" data-type="num"><span class="tooltip" data-tip="Win Rate — 真實勝率 (15%)">WR%</span><span class="arrow"></span></th>
 <th data-col="pf" data-type="num"><span class="tooltip" data-tip="Profit Factor — 平均盈利/平均MAX LOSE (20%)">PF</span><span class="arrow"></span></th>
 <th data-col="dd" data-type="num"><span class="tooltip" data-tip="Max Drawdown — 真實 DD (25%)">Max DD</span><span class="arrow"></span></th>
 <th data-col="wal" data-type="num"><span class="tooltip" data-tip="Weighted Avg Layer — 馬丁層數 (40%)">WAL</span><span class="arrow"></span></th>
-<th data-col="trades" data-type="num">Trades<span class="arrow"></span></th>
+<th data-col="trades" data-type="num"><span class="tooltip" data-tip="交易次數">Trades</span><span class="arrow"></span></th>
 <th data-col="ht" data-type="num"><span class="tooltip" data-tip="Holding Time — 平均持倉時間（小時）">HT</span><span class="arrow"></span></th>
-<th data-col="profit" data-type="num">Profit<span class="arrow"></span></th>
+<th data-col="profit" data-type="num"><span class="tooltip" data-tip="總淨盈虧 pips">Profit</span><span class="arrow"></span></th>
 <th data-col="wr_pct" data-type="num"><span class="tooltip" data-tip="WR 排名百分位">WR%</span><span class="arrow"></span></th>
 <th data-col="pf_pct" data-type="num"><span class="tooltip" data-tip="PF 排名百分位">PF%</span><span class="arrow"></span></th>
 <th data-col="dd_pct" data-type="num"><span class="tooltip" data-tip="DD 排名百分位">DD%</span><span class="arrow"></span></th>
 <th data-col="martin_pct" data-type="num"><span class="tooltip" data-tip="Martin 排名百分位">M%</span><span class="arrow"></span></th>
-<th data-col="lv" data-type="str">LV<span class="arrow"></span></th>
+<th data-col="lv" data-type="str"><span class="tooltip" data-tip="層級">LV</span><span class="arrow"></span></th>
 </tr></thead>'''
 
-    def make_row(r, idx):
-        is_red = r.get('red_card', False)
-        rc_cls = ' class="rc"' if is_red else ''
-        ea_style = get_ea_style(r['ea'])
-        sc = get_score_class(r['dde_v5'] if not is_red else 0)
+    def make_row(r: Dict[str, Any], idx: int) -> str:
+        """Generate a single table row HTML."""
+        is_red: bool = r.get('red_card', False)
+        rc_cls: str = ' class="rc"' if is_red else ''
+        ea_style: str = get_ea_style(r['ea'])
+        sc: str = get_score_class(r['dde_v5'] if not is_red else 0)
 
         # DDE column
         if is_red:
-            dde_cell = f'<td class="{sc}">0 🚫</td>'
+            dde_cell: str = f'<td class="{sc}">0 🚫</td>'
         else:
             dde_cell = f'<td class="{sc}" data-val="{r["dde_v5"]}">{r["dde_v5"]:.1f}</td>'
 
-        dd_cls = get_dd_class(r['max_dd_pips'])
+        dd_cls: str = get_dd_class(r['max_dd_pips'])
 
         # Profit
-        profit_cell = f'<td data-val="{r["total_net_pips"]}">{fmt_pips(r["total_net_pips"])}</td>'
+        profit_cell: str = f'<td data-val="{r["total_net_pips"]}">{fmt_pips(r["total_net_pips"])}</td>'
 
         # DD
-        dd_cell = f'<td class="{dd_cls}" data-val="{r["max_dd_pips"]}">{fmt_pips(r["max_dd_pips"])}</td>'
+        dd_cell: str = f'<td class="{dd_cls}" data-val="{r["max_dd_pips"]}">{fmt_pips(r["max_dd_pips"])}</td>'
 
         # PF
-        pf = r['pf']
-        pf_str = 'Inf' if pf > 999 else f'{pf:.2f}'
+        pf: float = r['pf']
+        pf_str: str = 'Inf' if pf > 999 else f'{pf:.2f}'
 
         # Percentiles
-        wr_pct = f'{r["wr_pct"]:.0f}'
-        pf_pct = f'{r["pf_pct"]:.0f}'
-        dd_pct = f'{r["dd_pct"]:.0f}'
-        martin_pct = f'{r["martin_pct"]:.0f}'
+        wr_pct: str = f'{r["wr_pct"]:.0f}'
+        pf_pct: str = f'{r["pf_pct"]:.0f}'
+        dd_pct: str = f'{r["dd_pct"]:.0f}'
+        martin_pct: str = f'{r["martin_pct"]:.0f}'
 
-        return f'''<tr data-symbol="{r['symbol']}"{rc_cls}>
+        # Type 标签 (BUY/SELL)
+        trade_type: str = r.get('type', 'mix')
+        if trade_type == 'buy':
+            type_badge: str = '<span style="background:#1b5e20;color:#a5d6a7;padding:1px 5px;border-radius:3px;font-size:0.72em;font-weight:bold">BUY</span>'
+        elif trade_type == 'sell':
+            type_badge = '<span style="background:#b71c1c;color:#ef9a9a;padding:1px 5px;border-radius:3px;font-size:0.72em;font-weight:bold">SELL</span>'
+        else:
+            type_badge = '<span style="background:#37474f;color:#b0bec5;padding:1px 5px;border-radius:3px;font-size:0.72em;font-weight:bold">MIX</span>'
+
+        return f'''<tr data-symbol="{r['symbol']}" data-type="{trade_type}"{rc_cls}>
 <td data-val="{idx}.0">{idx}</td>
 <td><a href="https://signals.algoforest.com/signals/{r['signal_id']}">{r['signal_id']}</a> <a href="../detailed_comparison_all_levels_{r['signal_id']}.html">📊</a></td>
 <td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{r['ea']}</span></td>
+<td>{type_badge}</td>
 <td style="font-weight:bold;color:var(--primary)">{r['symbol']}</td>
 {dde_cell}
 <td data-val="{r["win_rate"]}">{r["win_rate"]:.1f}%</td>
@@ -178,16 +211,23 @@ def generate_html(all_results):
 </tr>
 '''
 
-    def make_rows(rows):
+    def make_rows(rows: List[Dict]) -> str:
+        """Generate multiple table rows."""
         return ''.join(make_row(r, i) for i, r in enumerate(rows, 1))
 
-    sym_options = '<option value="">All Symbols (' + str(len(sorted_syms)) + ')</option>\n'
+    sym_options: str = '<option value="">All Symbols (' + str(len(sorted_syms)) + ')</option>\n'
     sym_options += '\n'.join(
         f'<option value="{sym}">{sym} ({cnt})</option>'
         for sym, cnt in sorted_syms
     )
 
-    html = f'''<!DOCTYPE html>
+# BUY rows sorted
+    buy_sorted: List[Dict[str, Any]] = sorted(buy_rows, key=lambda x: x['dde_v5'], reverse=True)
+
+    # SELL rows sorted
+    sell_sorted: List[Dict[str, Any]] = sorted(sell_rows, key=lambda x: x['dde_v5'], reverse=True)
+
+    html: str = f'''<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
 <meta charset="UTF-8">
@@ -238,7 +278,7 @@ input[type=text]::placeholder{{color:#555}}
 .panel{{background:var(--bg);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:16px}}
 .panel.hidden{{display:none}}
 .tooltip{{position:relative;cursor:help}}
-.tooltip::after{{content:attr(data-tip);position:absolute;bottom:120%;left:50%;transform:translateX(-50%);background:var(--bg-hover);border:1px solid #333;color:#ddd;font-size:0.75em;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.2s;z-index:99;font-weight:normal}}
+.tooltip::after{{content:attr(data-tip);position:absolute;bottom:120%;left:50%;transform:translateX(-50%);background:#1e2433;border:1px solid #444;color:#fff;font-size:0.75em;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.2s;z-index:99;font-weight:normal}}
 .tooltip:hover::after{{opacity:1}}
 @media(max-width:768px){{body{{padding:8px;font-size:12px}}.tab{{padding:8px 12px;font-size:0.85em}}}}
 </style>
@@ -287,6 +327,8 @@ function toggleTheme(){{
 
 <div class="tabs">
 <div class="tab active" onclick="showPanel('top20',this)">🏆 TOP 20</div>
+<div class="tab" onclick="showPanel('buy',this)">📈 BUY ({buy_count})</div>
+<div class="tab" onclick="showPanel('sell',this)">📉 SELL ({sell_count})</div>
 <div class="tab" onclick="showPanel('bestsym',this)">💱 各 CCY 最佳</div>
 <div class="tab" onclick="showPanel('all',this)">📋 全部明細</div>
 </div>
@@ -296,6 +338,20 @@ function toggleTheme(){{
 <h2 style="color:var(--primary);font-size:1em;margin:0 0 12px">🏆 DDE v5 總排名 Top 20</h2>
 <div class="container"><table id="tbl-top20">{thead_html}<tbody>
 {make_rows(top20)}
+</tbody></table></div></div>
+
+<!-- BUY PANEL -->
+<div id="panel-buy" class="panel hidden">
+<h2 style="color:var(--primary);font-size:1em;margin:0 0 12px">📈 BUY 交易排名 ({buy_count} 個)</h2>
+<div class="container"><table id="tbl-buy">{thead_html}<tbody>
+{make_rows(buy_sorted)}
+</tbody></table></div></div>
+
+<!-- SELL PANEL -->
+<div id="panel-sell" class="panel hidden">
+<h2 style="color:var(--primary);font-size:1em;margin:0 0 12px">📉 SELL 交易排名 ({sell_count} 個)</h2>
+<div class="container"><table id="tbl-sell">{thead_html}<tbody>
+{make_rows(sell_sorted)}
 </tbody></table></div></div>
 
 <!-- BEST PER SYMBOL -->
@@ -311,6 +367,7 @@ function toggleTheme(){{
 <div id="panel-all" class="panel hidden">
 <h2 style="color:var(--primary);font-size:1em;margin:0 0 12px">📋 全部明細</h2>
 <select id="symSel" onchange="filterSymbol()">{sym_options}</select>
+<select id="typeSel" onchange="applyFilters()"><option value="">全部 Type</option><option value="buy">BUY</option><option value="sell">SELL</option></select>
 <label><input type="checkbox" id="hideRC" onchange="applyFilters()"> 隱藏紅牌</label>
 <span style="margin-left:12px"><input type="text" id="eaSel" placeholder="篩選 EA..." oninput="applyFilters()"> <input type="text" id="sigSel" placeholder="Signal ID..." oninput="applyFilters()"></span>
 <span style="color:var(--text2);font-size:0.8em;margin-left:8px" id="rowCount"></span>
@@ -385,31 +442,26 @@ document.getElementById('rowCount').textContent='顯示 '+total+' / '+total;
     return html
 
 
-def main():
-    all_results = None
-    
+def main() -> None:
+    """Main entry point: load data and generate CCY ranking HTML."""
+    all_results: List[Dict[str, Any]] | None = None
+
     # Try SQLite first
-    if HAS_DB:
-        try:
-            all_results = load_scores(version='v5')
-        except Exception as e:
-            print(f"⚠️ SQLite load failed: {e}")
-    
-    # Fallback to pickle
-    if not all_results:
-        import pickle
-        pkl_path = '/tmp/dde_v5_data.pkl'
-        if Path(pkl_path).exists():
-            with open(pkl_path, 'rb') as f:
-                all_results = pickle.load(f)
-            print(f"📦 Loaded {len(all_results)} rows from pickle (fallback)")
-    
+    try:
+        all_results = load_scores(version='v5')
+    except Exception as e:
+        print(f"⚠️ SQLite load failed: {e}")
+
     # Last resort: run scoring
     if not all_results:
         from dde_v5_scorer import run_v5_scoring
         all_results = run_v5_scoring()
 
-    html = generate_html(all_results)
+    if not all_results:
+        print("❌ No data available")
+        return
+
+    html: str = generate_html(all_results)
 
     # Write to output/, reports/, and docs/
     for out_dir in [OUTPUT_DIR, REPORTS_DIR, DOCS_DIR / 'admin']:

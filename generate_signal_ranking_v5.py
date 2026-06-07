@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""
-Generate Signal Ranking HTML (DDE v5 — 4 dimensions, ranking-based)
+"""Generate Signal Ranking HTML (DDE v5 — 4 dimensions, ranking-based).
+
 WR 15% + PF 20% + DD 25% + Martin 40%
 
 Changes from v4:
@@ -16,18 +16,19 @@ import re
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
+from typing import List, Dict, Any
 
 sys.path.insert(0, str(Path(__file__).parent / 'scripts'))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dde_v5_scorer import run_v5_scoring, get_ea
 
-BASE_DIR = Path(__file__).parent
-SAMPLES_DIR = BASE_DIR / 'samples'
-OUTPUT_DIR = BASE_DIR / 'output'
-DOCS_DIR = BASE_DIR / 'docs'
+BASE_DIR: Path = Path(__file__).parent
+SAMPLES_DIR: Path = BASE_DIR / 'samples'
+OUTPUT_DIR: Path = BASE_DIR / 'output'
+DOCS_DIR: Path = BASE_DIR / 'docs'
 
-EA_COLORS = {
+EA_COLORS: Dict[str, tuple] = {
     'DW':      ('#4a148c', '#ce93d8'),
     'SMA':     ('#1b5e20', '#a5d6a7'),
     'SMAPro':  ('#1b5e20', '#c8e6c9'),
@@ -41,14 +42,14 @@ EA_COLORS = {
     'UNK':     ('#333', 'var(--text2)'),
 }
 
-EA_OVERRIDES = {
+EA_OVERRIDES: Dict[str, str] = {
     '10344': 'Flash',
     '12173': 'SMA',
     '7999': 'MKD',
     '38678': 'DW',
 }
 
-EA_MAP = {
+EA_MAP: Dict[str, List[str]] = {
     'DW': ['10437','106','11984','12962','13790','16538','17547','20846','21698','22200','22278','25830','31593','32541','32719','34259','36338','36397','36511','19625','35434','35436'],
     'SMA': ['537','1470','1980','5001','5275','5566','10864','11984','14581','14724','16698','17611','19849','23617','30359','33101','34574','2739','16777','35362','5636'],
     'SMAPro': ['2351','32278','32541','17823','31781','14158'],
@@ -61,13 +62,15 @@ EA_MAP = {
 }
 
 
-def get_ea_style(ea_tag):
+def get_ea_style(ea_tag: str) -> str:
+    """Return inline CSS style for EA tag badge."""
     first = ea_tag.split('/')[0]
     bg, fg = EA_COLORS.get(first, EA_COLORS['UNK'])
     return f'background:{bg};color:{fg}'
 
 
-def get_score_class(score):
+def get_score_class(score: float) -> str:
+    """Return CSS class for DDE score."""
     if score >= 90: return 's90'
     elif score >= 80: return 's80'
     elif score >= 70: return 's70'
@@ -75,31 +78,38 @@ def get_score_class(score):
     else: return 's0'
 
 
-def get_dd_class(dd_value):
+def get_dd_class(dd_value: float) -> str:
+    """Return CSS class for drawdown value."""
     abs_dd = abs(dd_value)
     if abs_dd < 500: return 'dd-g'
     elif abs_dd < 2000: return 'dd-y'
     else: return 'dd-r'
 
 
-def generate_html(all_results):
-    """
-    Generate Signal Ranking HTML (v5).
+def generate_html(all_results: List[Dict[str, Any]]) -> str:
+    """Generate Signal Ranking HTML (v5).
+
     Aggregates per-Signal: average v5 score across all CCY pairs.
+
+    Args:
+        all_results: List of scoring result dicts from dde_v5_scorer.
+
+    Returns:
+        Complete HTML string.
     """
 
     # Separate scored vs red card
-    scored = [r for r in all_results if not r['red_card']]
-    red = [r for r in all_results if r['red_card']]
+    scored: List[Dict[str, Any]] = [r for r in all_results if not r['red_card']]
+    red: List[Dict[str, Any]] = [r for r in all_results if r['red_card']]
 
     # Aggregate per signal
-    by_signal = defaultdict(list)
+    by_signal: Dict[str, List[Dict]] = defaultdict(list)
     for r in all_results:
         by_signal[r['signal_id']].append(r)
 
-    signal_stats = []
+    signal_stats: List[Dict[str, Any]] = []
     for sid, rows in by_signal.items():
-        valid_rows = [r for r in rows if not r['red_card']]
+        valid_rows: List[Dict] = [r for r in rows if not r['red_card']]
         if not valid_rows:
             # All red cards
             signal_stats.append({
@@ -144,37 +154,37 @@ def generate_html(all_results):
         })
 
     signal_stats.sort(key=lambda x: x['avg_v5'], reverse=True)
-    total_signals = len(signal_stats)
+    total_signals: int = len(signal_stats)
 
-    scored_stats = [s for s in signal_stats if s['clean_symbols'] > 0]
-    avg_score = round(sum(s['avg_v5'] for s in scored_stats) / len(scored_stats), 1) if scored_stats else 0
-    best_score = scored_stats[0]['avg_v5'] if scored_stats else 0
-    worst_score = scored_stats[-1]['avg_v5'] if scored_stats else 0
-    avg_clean_pct = round(sum(s['clean_pct'] for s in scored_stats) / len(scored_stats)) if scored_stats else 0
-    today = datetime.now().strftime('%Y-%m-%d')
+    scored_stats: List[Dict[str, Any]] = [s for s in signal_stats if s['clean_symbols'] > 0]
+    avg_score: float = round(sum(s['avg_v5'] for s in scored_stats) / len(scored_stats), 1) if scored_stats else 0
+    best_score: float = scored_stats[0]['avg_v5'] if scored_stats else 0
+    worst_score: float = scored_stats[-1]['avg_v5'] if scored_stats else 0
+    avg_clean_pct: float = round(sum(s['clean_pct'] for s in scored_stats) / len(scored_stats)) if scored_stats else 0
+    today: str = datetime.now().strftime('%Y-%m-%d')
 
     # Build rows
-    def make_rows(stats_list):
-        rows_html = ''
+    def make_rows(stats_list: List[Dict[str, Any]]) -> str:
+        rows_html: str = ''
         for i, s in enumerate(stats_list, 1):
-            rank = ''
-            row_class = ''
+            rank: str = ''
+            row_class: str = ''
             if i == 1: rank = '🥇'; row_class = ' class="top3"'
             elif i == 2: rank = '🥈'; row_class = ' class="top3"'
             elif i == 3: rank = '🥉'; row_class = ' class="top3"'
             else: rank = str(i)
 
-            score_cls = get_score_class(s['avg_v5'])
-            ea_style = get_ea_style(s['ea'])
-            dd_cls = get_dd_class(s['max_dd_pips'])
+            score_cls: str = get_score_class(s['avg_v5'])
+            ea_style: str = get_ea_style(s['ea'])
+            dd_cls: str = get_dd_class(s['max_dd_pips'])
 
-            pf_str = 'Inf' if s['pf'] > 999 else f'{s["pf"]:.2f}'
-            wr_str = f'{s["win_rate"]:.1f}%'
-            pips_str = f'{s["total_net_pips"]:,.0f}'
-            dd_str = f'{s["max_dd_pips"]:,.0f}'
-            wal_str = f'{s["wal"]:.2f}'
+            pf_str: str = 'Inf' if s['pf'] > 999 else f'{s["pf"]:.2f}'
+            wr_str: str = f'{s["win_rate"]:.1f}%'
+            pips_str: str = f'{s["total_net_pips"]:,.0f}'
+            dd_str: str = f'{s["max_dd_pips"]:,.0f}'
+            wal_str: str = f'{s["wal"]:.2f}'
 
-            clean_icon = '✅' if s['clean_pct'] >= 80 else ('⚠️' if s['clean_pct'] >= 50 else '🚫')
+            clean_icon: str = '✅' if s['clean_pct'] >= 80 else ('⚠️' if s['clean_pct'] >= 50 else '🚫')
 
             rows_html += f'''<tr{row_class}>
 <td>{rank}</td>
@@ -193,7 +203,7 @@ def generate_html(all_results):
 '''
         return rows_html
 
-    thead_html = '''<thead><tr>
+    thead_html: str = '''<thead><tr>
 <th data-col="idx" data-type="num">#<span class="arrow"></span></th>
 <th data-col="signal" data-type="num">Signal<span class="arrow"></span></th>
 <th data-col="ea" data-type="str">EA<span class="arrow"></span></th>
@@ -343,34 +353,35 @@ document.querySelectorAll('table[id^="tbl"]').forEach(function(table) {{
     return html
 
 
-def main():
+def main() -> None:
+    """Main entry point: run v5 scoring and generate ranking HTML."""
     print("=" * 60)
     print("🦀 Signal Ranking Generator — DDE v5 (4 Dimensions, Ranking-based)")
     print("=" * 60)
 
     # Run v5 scoring (which saves to SQLite)
-    all_results = run_v5_scoring()
+    all_results: List[Dict[str, Any]] = run_v5_scoring()
 
     if not all_results:
         print("❌ No results")
         return
 
     # Generate HTML
-    html = generate_html(all_results)
+    html: str = generate_html(all_results)
 
     # Write outputs
-    output_path = OUTPUT_DIR / 'signal_ranking_dde_v5.html'
+    output_path: Path = OUTPUT_DIR / 'signal_ranking_dde_v5.html'
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html)
 
     # Also write to docs/ for GitHub Pages
     DOCS_DIR.mkdir(exist_ok=True)
-    docs_path = DOCS_DIR / 'signal_ranking_dde_v5.html'
+    docs_path: Path = DOCS_DIR / 'signal_ranking_dde_v5.html'
     with open(docs_path, 'w', encoding='utf-8') as f:
         f.write(html)
 
     # Also create signal_ranking.html (main alias)
-    docs_alias = DOCS_DIR / 'signal_ranking.html'
+    docs_alias: Path = DOCS_DIR / 'signal_ranking.html'
     with open(docs_alias, 'w', encoding='utf-8') as f:
         f.write(html)
 

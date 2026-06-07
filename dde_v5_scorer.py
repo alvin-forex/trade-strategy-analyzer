@@ -323,9 +323,9 @@ def compute_raw_metrics(trades_for_symbol, lot_layers=None):
 
 # ─── Ranking Engine ───
 
-def compute_percentile_ranks(all_metrics, dimension_key, reverse=False):
+def compute_percentile_ranks_v2(all_metrics, dimension_key, reverse=False):
     """
-    Compute percentile rank for a dimension across all Signal×CCY.
+    Compute percentile rank for a dimension across all Signal×CCY×Type.
 
     Args:
         all_metrics: list of dicts with raw metric values
@@ -333,28 +333,27 @@ def compute_percentile_ranks(all_metrics, dimension_key, reverse=False):
         reverse: if True, lower values rank higher (for DD, Martin)
 
     Returns:
-        dict mapping (signal_id, symbol) → percentile score (0-100)
+        dict mapping (signal_id, symbol, type) → percentile score (0-100)
     """
     # Filter out red cards for ranking
-    valid = [(m['signal_id'], m['symbol'], m[dimension_key])
+    valid = [(m['signal_id'], m['symbol'], m['type'], m[dimension_key])
              for m in all_metrics if not m['red_card']]
 
     if len(valid) <= 1:
-        # Only 1 or 0 valid entries
         result = {}
-        for sid, sym, val in valid:
-            result[(sid, sym)] = 50.0  # neutral
+        for sid, sym, typ, val in valid:
+            result[(sid, sym, typ)] = 50.0
         return result
 
     # Sort by dimension value
-    valid.sort(key=lambda x: x[2], reverse=not reverse)
+    valid.sort(key=lambda x: x[3], reverse=not reverse)
     n = len(valid)
 
     # Compute percentile: (rank - 1) / (N - 1) × 100
     result = {}
-    for i, (sid, sym, val) in enumerate(valid):
+    for i, (sid, sym, typ, val) in enumerate(valid):
         pct = i / (n - 1) * 100
-        result[(sid, sym)] = round(pct, 2)
+        result[(sid, sym, typ)] = round(pct, 2)
 
     return result
 
@@ -371,12 +370,11 @@ def score_v5_batch(all_metrics):
         list of dicts with v5 scores added
     """
     # Compute percentile ranks for each dimension
-    #越高越好的維度: reverse=True (升序, 最大排最後=100%)
-    #越細越好的維度: reverse=False (降序, 最細排最後=100%)
-    wr_pcts = compute_percentile_ranks(all_metrics, 'wr_raw', reverse=True)       # 越高越好
-    pf_pcts = compute_percentile_ranks(all_metrics, 'pf_raw', reverse=True)       # 越高越好
-    dd_pcts = compute_percentile_ranks(all_metrics, 'dd_raw', reverse=False)      # 越細越好
-    martin_pcts = compute_percentile_ranks(all_metrics, 'martin_raw', reverse=False)  # 越細越好
+    # Key 改为 (signal_id, symbol, type) 三维度
+    wr_pcts = compute_percentile_ranks_v2(all_metrics, 'wr_raw', reverse=True)
+    pf_pcts = compute_percentile_ranks_v2(all_metrics, 'pf_raw', reverse=True)
+    dd_pcts = compute_percentile_ranks_v2(all_metrics, 'dd_raw', reverse=False)
+    martin_pcts = compute_percentile_ranks_v2(all_metrics, 'martin_raw', reverse=False)
 
     # Weights (老闆拍板)
     W_WR = 0.15
@@ -386,7 +384,7 @@ def score_v5_batch(all_metrics):
 
     results = []
     for m in all_metrics:
-        key = (m['signal_id'], m['symbol'])
+        key = (m['signal_id'], m['symbol'], m['type'])
 
         wr_pct = wr_pcts.get(key, 0)
         pf_pct = pf_pcts.get(key, 0)
@@ -468,21 +466,24 @@ def run_v5_scoring():
         if not trades:
             continue
 
-        by_symbol = defaultdict(list)
+        # 按 (symbol, type) 双维度分组 - BUY/SELL分开评分
+        by_sym_type = defaultdict(list)
         for t in trades:
-            by_symbol[t['symbol']].append(t)
+            key = (t['symbol'], t['type'])  # (symbol, 'buy'/'sell')
+            by_sym_type[key].append(t)
 
         lot_layers = None
         if sid in lot_mapping and lot_mapping[sid].get('lot_layers'):
             lot_layers = [(lv, lot) for lv, lot in lot_mapping[sid].get('lot_layers', [])]
 
-        for sym, sym_trades in by_symbol.items():
-            metrics = compute_raw_metrics(sym_trades, lot_layers=lot_layers)
+        for (sym, trade_type), sym_type_trades in by_sym_type.items():
+            metrics = compute_raw_metrics(sym_type_trades, lot_layers=lot_layers)
             if metrics is None:
                 continue
 
             metrics['signal_id'] = sid
             metrics['symbol'] = sym
+            metrics['type'] = trade_type  # 新增: buy/sell 标识
             metrics['ea'] = ea_tag
 
             # Layer display string
