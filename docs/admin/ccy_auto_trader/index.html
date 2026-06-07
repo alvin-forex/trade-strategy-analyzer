@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCY Power Auto Trader - 實驗記錄</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d29;
+            --bg-card: #1e2130;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --blue: #3b82f6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 1.5rem;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header h1 { font-size: 1.5rem; }
+        .header .subtitle { color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem; }
+        .status-badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .status-running { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+        .status-stopped { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+        }
+        .stat-card .label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .stat-card .value.green { color: var(--green); }
+        .stat-card .value.red { color: var(--red); }
+        .stat-card .value.yellow { color: var(--yellow); }
+        .stat-card .value.blue { color: var(--blue); }
+        .section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        th, td {
+            padding: 0.6rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th { color: var(--text-secondary); font-weight: 500; }
+        .trade-buy { color: var(--green); }
+        .trade-sell { color: var(--red); }
+        .pair-cell { font-weight: 600; }
+        .spread-high { color: var(--green); }
+        .spread-low { color: var(--red); }
+        .mode-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+        }
+        .mode-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .mode-dot.signal { background: var(--yellow); }
+        .mode-dot.trading { background: var(--green); }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+        .refresh-btn {
+            padding: 0.5rem 1rem;
+            background: var(--blue);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .refresh-btn:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🦀 CCY Power Auto Trader</h1>
+            <div class="subtitle">課程策略驗證實驗 | 最強 vs 最弱 + MTF 確認</div>
+        </div>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="mode-indicator">
+                <span class="mode-dot signal"></span>
+                <span>信號模式</span>
+            </div>
+            <span class="status-badge status-stopped">等待數據</span>
+            <button class="refresh-btn" onclick="loadData()">🔄 重新加載</button>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="label">總信號數</div>
+            <div class="value blue" id="total-signals">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">BUY 信號</div>
+            <div class="value green" id="buy-signals">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">SELL 信號</div>
+            <div class="value red" id="sell-signals">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">平均強弱差距</div>
+            <div class="value yellow" id="avg-spread">0.00</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">最常交易貨幣對</div>
+            <div class="value" id="top-pair">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">實驗開始時間</div>
+            <div class="value" style="font-size: 0.9rem;" id="start-time">--</div>
+        </div>
+    </div>
+
+    <!-- 信號記錄 -->
+    <div class="section">
+        <div class="section-title">📋 信號記錄</div>
+        <div id="trade-table-container">
+            <div class="empty-state">
+                <div class="icon">⏳</div>
+                <div>等待星期一市場開盤...</div>
+                <div style="font-size: 0.8rem; margin-top: 0.5rem;">EA 將自動記錄信號到 CSV 文件</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 策略說明 -->
+    <div class="section">
+        <div class="section-title">📖 實驗策略（基於 CCY Power 課程）</div>
+        <table>
+            <tr><th style="width: 200px;">規則</th><th>實現方式</th></tr>
+            <tr><td>最強 vs 最弱</td><td>自動找出 9 個貨幣中最強和最弱，配對交易</td></tr>
+            <tr><td>最小差距</td><td>強弱差距 < 3.0 不做（避免橫盤）</td></tr>
+            <tr><td>MTF 確認</td><td>D1 EMA50>200 + H4 EMA50>200 + H1 價格>EMA20</td></tr>
+            <tr><td>時間過濾</td><td>只做歐盤(14-22)/美盤(21-23)高流動時段</td></tr>
+            <tr><td>止損</td><td>ATR(14) × 2.0 動態止損</td></tr>
+            <tr><td>止盈</td><td>TP1=1:1.5（50%平倉），TP2=1:2.5（全平）</td></tr>
+            <tr><td>風險管理</td><td>每筆風險 = 帳戶淨值 1%</td></tr>
+        </table>
+    </div>
+
+    <script>
+        // Demo data for preview
+        const demoData = [
+            { time: '2026-06-09 14:30', type: 'SIGNAL', pair: 'USDJPY', dir: 'BUY', lots: '0.10', price: '148.500', sl: '148.200', tp: '149.100', strongest: 'USD(8.5)', weakest: 'JPY(2.1)', spread: '6.40' },
+            { time: '2026-06-09 16:15', type: 'SIGNAL', pair: 'GBPUSD', dir: 'SELL', lots: '0.08', price: '1.2700', sl: '1.2750', tp: '1.2625', strongest: 'GBP(7.8)', weakest: 'USD(1.8)', spread: '6.00' },
+        ];
+
+        function renderTable(data) {
+            const container = document.getElementById('trade-table-container');
+            if (data.length === 0) {
+                container.innerHTML = `<div class="empty-state">
+                    <div class="icon">⏳</div>
+                    <div>等待星期一市場開盤...</div>
+                    <div style="font-size: 0.8rem; margin-top: 0.5rem;">EA 將自動記錄信號到 CSV 文件</div>
+                </div>`;
+                return;
+            }
+
+            let html = `<table>
+                <thead><tr>
+                    <th>時間</th><th>類型</th><th>貨幣對</th><th>方向</th>
+                    <th>手數</th><th>價格</th><th>止損</th><th>止盈</th>
+                    <th>最強/最弱</th><th>差距</th>
+                </tr></thead><tbody>`;
+
+            data.forEach(row => {
+                html += `<tr>
+                    <td>${row.time}</td>
+                    <td><span class="trade-${row.dir.toLowerCase()}">${row.type}</span></td>
+                    <td class="pair-cell">${row.pair}</td>
+                    <td class="trade-${row.dir.toLowerCase()}">${row.dir}</td>
+                    <td>${row.lots}</td>
+                    <td>${row.price}</td>
+                    <td>${row.sl}</td>
+                    <td>${row.tp}</td>
+                    <td>💪 ${row.strongest}<br>💤 ${row.weakest}</td>
+                    <td class="${parseFloat(row.spread) > 5 ? 'spread-high' : 'spread-low'}">${row.spread}</td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            // Update stats
+            document.getElementById('total-signals').textContent = data.length;
+            document.getElementById('buy-signals').textContent = data.filter(r => r.dir === 'BUY').length;
+            document.getElementById('sell-signals').textContent = data.filter(r => r.dir === 'SELL').length;
+            document.getElementById('avg-spread').textContent = (data.reduce((sum, r) => sum + parseFloat(r.spread), 0) / data.length).toFixed(2);
+
+            // Find top pair
+            const pairCounts = {};
+            data.forEach(r => { pairCounts[r.pair] = (pairCounts[r.pair] || 0) + 1; });
+            const topPair = Object.entries(pairCounts).sort((a, b) => b[1] - a[1])[0];
+            document.getElementById('top-pair').textContent = topPair ? topPair[0] : '--';
+
+            // Start time
+            document.getElementById('start-time').textContent = data[data.length - 1]?.time?.slice(0, 10) || '--';
+        }
+
+        function loadData() {
+            // Try to load from API first, fallback to demo
+            fetch('/api/ccy_power/trade_history')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.trades.length > 0) {
+                        renderTable(data.trades);
+                        document.querySelector('.status-badge').className = 'status-badge status-running';
+                        document.querySelector('.status-badge').textContent = '運行中';
+                    } else {
+                        renderTable(demoData); // Preview
+                    }
+                })
+                .catch(() => renderTable(demoData));
+        }
+
+        // Initial load
+        window.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>
