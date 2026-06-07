@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCY Power Multi-TF Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../sidebar.css">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-blue: #3b82f6;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+        }
+        body { margin-left: 260px; }
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-connected {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+        .status-disconnected {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+        }
+        .tf-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 1024px) {
+            .tf-grid { grid-template-columns: 1fr; }
+        }
+        .tf-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            transition: all 0.2s;
+        }
+        .tf-card:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 1px var(--accent-blue), 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+        .tf-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .tf-label {
+            font-size: 1.125rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .tf-label i { color: var(--accent-blue); }
+        .tf-timestamp {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .currency-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .currency-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 1rem;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.15s;
+        }
+        .currency-item:hover {
+            border-color: var(--accent-blue);
+            background: rgba(15, 23, 42, 0.8);
+        }
+        .currency-name {
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            min-width: 40px;
+        }
+        .currency-value {
+            font-size: 1.1rem;
+            font-weight: 800;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            min-width: 60px;
+            text-align: right;
+        }
+        /* Heatmap */
+        .heatmap-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .heatmap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .heatmap-legend {
+            display: flex;
+            gap: 1rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+        .legend-dot.strong { background: var(--accent-green); }
+        .legend-dot.neutral { background: var(--accent-yellow); }
+        .legend-dot.weak { background: var(--accent-red); }
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: auto repeat(3, 1fr);
+            gap: 0.25rem;
+        }
+        .heatmap-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: 'SF Mono', monospace;
+            transition: all 0.2s;
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .heatmap-cell.currency-label {
+            background: transparent;
+            justify-content: flex-start;
+            padding-left: 0.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-radius: 0;
+        }
+        .heatmap-cell.tf-label {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+        .heatmap-cell.strong {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .heatmap-cell.neutral {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-yellow);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        .heatmap-cell.weak {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .currency-bar-container {
+            flex: 1;
+            margin: 0 1rem;
+            height: 6px;
+            background: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .currency-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        .strong { color: var(--accent-green); }
+        .strong .currency-bar-fill { background: var(--accent-green); }
+        .neutral { color: var(--accent-yellow); }
+        .neutral .currency-bar-fill { background: var(--accent-yellow); }
+        .weak { color: var(--accent-red); }
+        .weak .currency-bar-fill { background: var(--accent-red); }
+        .rank-badge {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.625rem;
+            font-weight: 800;
+        }
+        .summary-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            font-family: 'SF Mono', monospace;
+        }
+        .summary-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        .pulse-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .pulse-green { background: var(--accent-green); }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar-container"></div>
+    <script src="../../sidebar.js"></script>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <i class="fas fa-chart-line text-3xl" style="color: var(--accent-blue)"></i>
+                <div>
+                    <div class="header-title">CCY Power Multi-TF</div>
+                    <div class="text-sm" style="color: var(--text-secondary)">Real-time Currency Strength Monitor</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="status-badge" class="status-badge status-disconnected">
+                    <i class="fas fa-circle text-xs mr-1"></i>Disconnected
+                </span>
+                <span id="last-update" class="text-sm" style="color: var(--text-secondary)">
+                    --:--:--
+                </span>
+                <button onclick="refreshData()" class="px-3 py-1 rounded-lg text-sm font-medium transition hover:bg-slate-700" style="background: var(--accent-blue); color: white;">
+                    <i class="fas fa-sync-alt mr-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Heatmap -->
+        <div class="heatmap-card">
+            <div class="heatmap-header">
+                <div class="tf-label"><i class="fas fa-th"></i> MTF Heatmap</div>
+                <div class="heatmap-legend">
+                    <span class="legend-item"><span class="legend-dot strong"></span>Strong</span>
+                    <span class="legend-item"><span class="legend-dot neutral"></span>Neutral</span>
+                    <span class="legend-item"><span class="legend-dot weak"></span>Weak</span>
+                </div>
+            </div>
+            <div class="heatmap-grid" id="heatmap-grid"></div>
+        </div>
+
+        <!-- Summary Bar -->
+        <div class="summary-bar">
+            <div class="summary-item">
+                <div class="summary-value strong" id="strongest-currency">--</div>
+                <div class="summary-label">Strongest</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value weak" id="weakest-currency">--</div>
+                <div class="summary-label">Weakest</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value" style="color: var(--accent-blue)" id="spread-value">--</div>
+                <div class="summary-label">Spread</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value" style="color: var(--text-secondary)" id="total-currencies">9</div>
+                <div class="summary-label">Currencies</div>
+            </div>
+        </div>
+
+        <!-- TF Cards -->
+        <div class="tf-grid">
+            <div class="tf-card">
+                <div class="tf-header">
+                    <div class="tf-label"><i class="fas fa-calendar-day"></i> D1</div>
+                    <div class="tf-timestamp" id="d1-ts">--</div>
+                </div>
+                <div class="currency-list" id="d1-grid"></div>
+            </div>
+            <div class="tf-card">
+                <div class="tf-header">
+                    <div class="tf-label"><i class="fas fa-clock"></i> H4</div>
+                    <div class="tf-timestamp" id="h4-ts">--</div>
+                </div>
+                <div class="currency-list" id="h4-grid"></div>
+            </div>
+            <div class="tf-card">
+                <div class="tf-header">
+                    <div class="tf-label"><i class="fas fa-hourglass-half"></i> H1</div>
+                    <div class="tf-timestamp" id="h1-ts">--</div>
+                </div>
+                <div class="currency-list" id="h1-grid"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>CCY Power Dashboard v1.0 | Data Source: MT4 ForexDataExporter EA (v4.12)</p>
+            <p>Buffer indices: 0, 2, 3, 4 | Last verified: 2026-06-07 20:34 HKT</p>
+        </div>
+    </div>
+
+    <script>
+        const CURRENCIES = ['NZD', 'AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'USD', 'XAU'];
+        const MAX_VALUE = 10;
+        let ws = null;
+        let currentData = null;
+
+        function getStatusClass(value) {
+            if (value >= 6) return 'strong';
+            if (value >= 4) return 'neutral';
+            return 'weak';
+        }
+
+        function renderCurrencyGrid(containerId, data) {
+            const container = document.getElementById(containerId);
+            if (!container || !data) return;
+            
+            container.innerHTML = '';
+            const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+            
+            sorted.forEach(([currency, value], index) => {
+                const statusClass = getStatusClass(value);
+                const barWidth = Math.min(100, (value / MAX_VALUE) * 100);
+                const rank = index + 1;
+                
+                const item = document.createElement('div');
+                item.className = `currency-item ${statusClass}`;
+                item.innerHTML = `
+                    <span style="color: var(--text-secondary); font-size: 0.75rem; min-width: 20px;">#${rank}</span>
+                    <span class="currency-name">${currency}</span>
+                    <div class="currency-bar-container">
+                        <div class="currency-bar-fill" style="width: ${barWidth}%"></div>
+                    </div>
+                    <span class="currency-value">${value.toFixed(2)}</span>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function updateSummary(data) {
+            if (!data || !data.D1) return;
+            
+            const entries = Object.entries(data.D1);
+            const sorted = entries.sort((a, b) => b[1] - a[1]);
+            
+            document.getElementById('strongest-currency').textContent = sorted[0][0];
+            document.getElementById('weakest-currency').textContent = sorted[sorted.length - 1][0];
+            document.getElementById('spread-value').textContent = (sorted[0][1] - sorted[sorted.length - 1][1]).toFixed(2);
+        }
+
+        function updateTimestamps(ts) {
+            document.getElementById('d1-ts').textContent = ts;
+            document.getElementById('h4-ts').textContent = ts;
+            document.getElementById('h1-ts').textContent = ts;
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString('en-HK', { hour12: false });
+        }
+
+        function renderHeatmap(data) {
+            if (!data) return;
+            const container = document.getElementById('heatmap-grid');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            // Header row: TF labels
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'heatmap-cell';
+            container.appendChild(emptyCell);
+            
+            ['D1', 'H4', 'H1'].forEach(tf => {
+                const cell = document.createElement('div');
+                cell.className = 'heatmap-cell tf-label';
+                cell.textContent = tf;
+                container.appendChild(cell);
+            });
+            
+            // Currency rows
+            const sorted = Object.entries(data.D1).sort((a, b) => b[1] - a[1]);
+            
+            sorted.forEach(([currency, _]) => {
+                // Currency label
+                const labelCell = document.createElement('div');
+                labelCell.className = 'heatmap-cell currency-label';
+                labelCell.textContent = currency;
+                container.appendChild(labelCell);
+                
+                // TF values
+                ['D1', 'H4', 'H1'].forEach(tf => {
+                    const value = data[tf][currency];
+                    const statusClass = getStatusClass(value);
+                    const cell = document.createElement('div');
+                    cell.className = `heatmap-cell ${statusClass}`;
+                    cell.textContent = value.toFixed(2);
+                    container.appendChild(cell);
+                });
+            });
+        }
+
+        function updateData(data) {
+            currentData = data;
+            renderHeatmap(data);
+            renderCurrencyGrid('d1-grid', data.D1);
+            renderCurrencyGrid('h4-grid', data.H4);
+            renderCurrencyGrid('h1-grid', data.H1);
+            updateSummary(data);
+            updateTimestamps(data.ts);
+            
+            const badge = document.getElementById('status-badge');
+            badge.className = 'status-badge status-connected';
+            badge.innerHTML = '<i class="fas fa-circle text-xs mr-1 pulse-dot pulse-green"></i>Connected';
+        }
+
+        function connectWebSocket() {
+            // ZeroMQ PUB-SUB bridge or WebSocket endpoint
+            const wsUrl = 'ws://localhost:8787/ws/ccy_power';
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'ccy_power_multi') {
+                        updateData(data);
+                    }
+                } catch (e) {
+                    console.error('Invalid data:', e);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                const badge = document.getElementById('status-badge');
+                badge.className = 'status-badge status-disconnected';
+                badge.innerHTML = '<i class="fas fa-circle text-xs mr-1"></i>Disconnected';
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket closed');
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        function refreshData() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('{"type": "request_update"}');
+            } else {
+                connectWebSocket();
+            }
+        }
+
+        // Demo data for testing (remove in production)
+        function loadDemoData() {
+            const demoData = {
+                type: 'ccy_power_multi',
+                ts: '2026-06-07 20:34',
+                D1: { NZD: 2.25, AUD: 6.25, CAD: 8.50, CHF: 4.35, EUR: 5.80, GBP: 3.90, JPY: 7.15, USD: 1.80, XAU: 9.20 },
+                H4: { NZD: 2.25, AUD: 6.25, CAD: 8.50, CHF: 4.35, EUR: 5.80, GBP: 3.90, JPY: 7.15, USD: 1.80, XAU: 9.20 },
+                H1: { NZD: 2.25, AUD: 6.25, CAD: 8.50, CHF: 4.35, EUR: 5.80, GBP: 3.90, JPY: 7.15, USD: 1.80, XAU: 9.20 }
+            };
+            updateData(demoData);
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            loadDemoData();
+            connectWebSocket();
+        });
+    </script>
+</body>
+</html>
