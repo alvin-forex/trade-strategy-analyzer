@@ -180,6 +180,10 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
         dd_pct: str = f'{r["dd_pct"]:.0f}'
         martin_pct: str = f'{r["martin_pct"]:.0f}'
 
+        # Signal链接：AlgoForest + 🔍 马丁报告 (V4)
+        martin_link: str = f"../reports/martin_final_{r['signal_id']}.html"
+        signal_cell: str = f'<td><a href="https://signals.algoforest.com/signals/{r["signal_id"]}">{r["signal_id"]}</a> <a href="{martin_link}" title="馬丁剖析 V4">🔍</a></td>'
+
         # Type 标签 (BUY/SELL)
         trade_type: str = r.get('type', 'mix')
         if trade_type == 'buy':
@@ -191,7 +195,10 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
 
         return f'''<tr data-symbol="{r['symbol']}" data-type="{trade_type}"{rc_cls}>
 <td data-val="{idx}.0">{idx}</td>
-<td><a href="https://signals.algoforest.com/signals/{r['signal_id']}">{r['signal_id']}</a> <a href="../detailed_comparison_all_levels_{r['signal_id']}.html">📊</a></td>
+{signal_cell}
+<td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{r['ea']}</span></td>
+<td>{type_badge}</td>
+<td style="font-weight:bold;color:var(--primary)">{r['symbol']}</td>
 <td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{r['ea']}</span></td>
 <td>{type_badge}</td>
 <td style="font-weight:bold;color:var(--primary)">{r['symbol']}</td>
@@ -233,6 +240,7 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>💱 CCY 排名 (v5)</title>
+<link rel="stylesheet" href="../sidebar.css">
 <style>
 :root{{--font-main:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px;--shadow:0 2px 8px rgba(0,0,0,0.12)}}
 [data-theme="dark"]{{--bg:#0a0e17;--bg-card:#111520;--bg-hover:#1a1f2e;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--orange:#fd7e14;--border:#1e2433;--th-bg:#111520;--nav-bg:transparent}}
@@ -278,7 +286,7 @@ input[type=text]::placeholder{{color:#555}}
 .panel{{background:var(--bg);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:16px}}
 .panel.hidden{{display:none}}
 .tooltip{{position:relative;cursor:help}}
-.tooltip::after{{content:attr(data-tip);position:absolute;bottom:120%;left:50%;transform:translateX(-50%);background:#1e2433;border:1px solid #444;color:#fff;font-size:0.75em;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.2s;z-index:99;font-weight:normal}}
+.tooltip::after{{content:attr(data-tip);position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;background:#1e2433;border:1px solid #444;color:#fff;font-size:0.75em;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.2s;z-index:9999;font-weight:normal;box-shadow:0 4px 12px rgba(0,0,0,0.5)}}
 .tooltip:hover::after{{opacity:1}}
 @media(max-width:768px){{body{{padding:8px;font-size:12px}}.tab{{padding:8px 12px;font-size:0.85em}}}}
 </style>
@@ -437,6 +445,7 @@ function filterSymbol(){{applyFilters();}}
 var total=document.querySelectorAll('#tbl tbody tr').length;
 document.getElementById('rowCount').textContent='顯示 '+total+' / '+total;
 </script>
+<script src="../sidebar.js"></script>
 </body></html>'''
 
     return html
