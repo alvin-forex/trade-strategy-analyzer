@@ -199,9 +199,6 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
 <td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{r['ea']}</span></td>
 <td>{type_badge}</td>
 <td style="font-weight:bold;color:var(--primary)">{r['symbol']}</td>
-<td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{r['ea']}</span></td>
-<td>{type_badge}</td>
-<td style="font-weight:bold;color:var(--primary)">{r['symbol']}</td>
 {dde_cell}
 <td data-val="{r["win_rate"]}">{r["win_rate"]:.1f}%</td>
 <td data-val="{pf}">{pf_str}</td>
