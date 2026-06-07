@@ -21,7 +21,6 @@ import csv
 import re
 import json
 import sys
-import pickle
 from pathlib import Path
 from collections import defaultdict
 
@@ -352,9 +351,18 @@ if __name__ == '__main__':
         print(f"  Score range: {min(scores)} - {max(scores)}")
         print(f"  Average: {round(sum(scores)/len(scores), 1)}")
     
-    # Save
-    with open('/tmp/dde_v4_data.pkl', 'wb') as f:
-        pickle.dump(all_results, f)
+    # Save to SQLite via db_manager
+    from db_manager import save_scores
+    batch_id = save_scores(all_results, version='v4')
+    print(f"   Batch ID: {batch_id}")
+    # Legacy: also save pickle for backward compat
+    try:
+        import pickle
+        with open('/tmp/dde_v4_data.pkl', 'wb') as f:
+            pickle.dump(all_results, f)
+        print(f"   (Legacy pickle also saved)")
+    except Exception:
+        pass
     
     # Top 10
     scored.sort(key=lambda x: x['dde_v4'], reverse=True)

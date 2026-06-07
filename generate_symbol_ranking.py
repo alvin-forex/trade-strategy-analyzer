@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Generate Symbol-based Signal Ranking HTML (DDE v3 Copy Strategy)
-- Symbol-centric: user selects a currency pair, sees all signals ranked by performance ON THAT PAIR
-- Each row = 1 Signal × 1 Symbol
-- Stores results in SQLite via version_tracker for historical comparison
+Generate Symbol-based Signal Ranking HTML (DDE v5 — ranking-based, 4 dimensions)
+WR 15% + PF 20% + DD 25% + Martin 40%
+
+Symbol-centric: user selects a currency pair, sees all signals ranked by performance ON THAT PAIR
+Each row = 1 Signal × 1 Symbol
+
+Uses dde_v5_scorer for scoring, config.py for EA classification.
 """
 import sys
 import os
@@ -13,62 +16,27 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).parent / 'scripts'))
-sys.path.insert(0, str(Path(__file__).parent))
-
-from generate_all_levels_from_csv import analyze_trades_from_csv, analyze_by_levels
-from version_tracker import (get_connection, init_tables, upsert_ranking,
-                              get_symbols, get_rankings_for_symbol,
-                              get_version_summary)
-
 BASE_DIR = Path(__file__).parent
-SAMPLES_DIR = BASE_DIR / 'samples'
+sys.path.insert(0, str(BASE_DIR))
+
+from dde_v5_scorer import (
+    read_csv_trades, compute_raw_metrics, score_v5_batch,
+    load_lot_mapping
+)
+from config import EA_MAP, EA_FULL_NAMES, get_ea_type, get_ea_full_name
+
+# Directories
 OUTPUT_DIR = BASE_DIR / 'output'
+SAMPLES_DIR = BASE_DIR / 'samples'
+DOWNLOADS_DIR = BASE_DIR / 'downloads'
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# DEPRECATED: LEVEL_RANGES was pip-based, no longer used for scoring.
-# See dde_v4_scorer.py for lot-based level classification.
-# NOTE: generate_symbol_ranking.py currently has broken imports (generate_all_levels_from_csv archived).
-_DEPRECATED_LEVEL_RANGES = {
-    'L1': (0, 50),
-    'L2': (50, 100),
-    'L3': (100, 150),
-    'L4': (150, 200), 'L5': (200, 250), 'L6': (250, 300), 'L7': (300, 350), 'L8': (350, 400), 'L9+': (400, float('inf'))
-}
-
-# EA type mapping (from generate_signal_ranking.py)
-EA_MAP = {
-    'DW': ['10437','11984','13790','17547','21698','22200','22278','25830','30359','31781','32719','3291','33101','31593','34574','36338','36397','36511','34259','20846','16538'],
-    'SMA': ['106','1980','2351','32278','32541','5001','5275','537','5566','11889','13863','14724','16596','16698','16706','17611','17823','10864','14158'],
-    'MKD': ['12962','13461','14341','14592','1470','17962','20805','23617','25668','25260','8325','7919'],
-    'S10': ['13798','16596'],
-    'Flash': ['19849'],
-    'GEM': ['14581'],
-}
-
-EA_FULL_NAMES = {
-    'DW': 'DragonWare',
-    'SMA': 'SMA_EA',
-    'MKD': 'MKD_Scalper',
-    'S10': 'S10_Strategy',
-    'Flash': 'Flash_Scalper',
-    'GEM': 'GEM_Trader',
-    'UNK': 'Unknown',
-}
-
-def get_ea_type(signal_id):
-    for ea_type, signals in EA_MAP.items():
-        if signal_id in signals:
-            return ea_type
-    return 'UNK'
-
-def get_ea_full_name(ea_type):
-    return EA_FULL_NAMES.get(ea_type, ea_type)
 
 def get_layer_info(avg_layers):
     if avg_layers == 0:
         return '0LV'
     return f'{int(round(avg_layers))}LV'
+
 
 def get_dd_class(dd_value):
     """Pip-based DD thresholds: 500 / 2000 pips"""
@@ -79,6 +47,7 @@ def get_dd_class(dd_value):
         return 'dd-y'
     else:
         return 'dd-r'
+
 
 def get_score_class(score):
     if score >= 90:
@@ -92,93 +61,60 @@ def get_score_class(score):
     else:
         return 's0'
 
-def compute_symbol_score(signal_id, symbol_trades):
+
+def compute_all_rankings(strategy_version='v5'):
     """
-    Compute DDE v3 score for a specific signal × symbol combination.
-    Per-level analysis using CoP + CoL.
-    Returns avg of all non-zero weighted_scores.
+    Compute symbol-based rankings for all signals using DDE v5 scoring.
+
+    v5 uses ranking-based scoring across 4 dimensions:
+    - Win Rate (15%): real win rate from ALL trades (not just profitable ones)
+    - Profit Factor (20%): avg profit pips / avg max lose pips
+    - $1K DD% (25%): real drawdown
+    - Martin Discipline (40%): WAL + layer analysis
+
+    Returns (symbol_rankings, all_results, batch_run_id)
     """
-    lr = analyze_by_levels(symbol_trades, LEVEL_RANGES)
+    lot_mapping = load_lot_mapping()
+    print(f"📦 Lot mapping loaded: {len(lot_mapping)} signals")
 
-    all_scores = []
-    star4 = 0
-    breakdown = {'trigger': [], 'alpha': [], 'dde': []}
+    # Collect CSVs with dedup
+    all_csvs = {}
+    for csv_file in sorted(SAMPLES_DIR.glob('forex-forest-signals-page-*.csv')):
+        m = re.search(r'(\d+)', csv_file.stem)
+        if m:
+            all_csvs[m.group(1)] = csv_file
+    if DOWNLOADS_DIR.exists():
+        for csv_file in sorted(DOWNLOADS_DIR.glob('forex-forest-signals-page-*.csv')):
+            m = re.search(r'(\d+)', csv_file.stem)
+            if m and m.group(1) not in all_csvs:
+                all_csvs[m.group(1)] = csv_file
 
-    for level_name, ld in lr.items():
-        if ld.get('stats', {}).get('count', 0) == 0:
-            continue
-        for strategy in ['copy_on_profit', 'copy_on_lose']:
-            sdata = ld.get(strategy, {})
-            for wp, wp_data in sdata.items():
-                score = wp_data.get('weighted_score', 0)
-                rating = wp_data.get('rating', '')
-                if score > 0:
-                    all_scores.append(score)
-                    if '⭐⭐⭐⭐' in rating:
-                        star4 += 1
-                    # Collect breakdown
-                    sd = wp_data.get('score_details', {})
-                    if isinstance(sd, dict):
-                        breakdown['trigger'].append(sd.get('trigger_rate', ''))
-                        breakdown['alpha'].append(sd.get('alpha_profit', ''))
-                        breakdown['dde'].append(sd.get('dde', ''))
+    print(f"📄 CSV signals: {len(all_csvs)}")
 
-    if not all_scores:
-        return None
-
-    avg_score = round(sum(all_scores) / len(all_scores), 1)
-
-    return {
-        'avg_score': avg_score,
-        'star4_count': star4,
-        'cmp_total': len(all_scores),
-        'star4_pct': round(star4 / len(all_scores) * 100),
-        'breakdown': breakdown,
-    }
-
-
-def compute_all_rankings(strategy_version='v1'):
-    """Compute symbol-based rankings for all signals."""
+    # Load batch_analysis_results.json for additional metadata if available
     batch_data_path = OUTPUT_DIR / 'batch_analysis_results.json'
-    if not batch_data_path.exists():
-        print("❌ batch_analysis_results.json not found")
-        return {}
+    batch_lookup = {}
+    if batch_data_path.exists():
+        with open(batch_data_path) as f:
+            batch_data = json.load(f)
+        batch_lookup = {str(r['signal_id']): r for r in batch_data}
 
-    with open(batch_data_path) as f:
-        batch_data = json.load(f)
-
-    batch_lookup = {str(r['signal_id']): r for r in batch_data}
     batch_run_id = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-    # symbol -> [ranking_records]
-    symbol_rankings = defaultdict(list)
-    all_results = []
-
+    # Step 1: Compute raw metrics for all Signal×CCY pairs
+    all_metrics = []
     seen_ids = set()
-    total = len(batch_data)
+    total = len(all_csvs)
 
-    for i, rec in enumerate(batch_data):
-        sid = str(rec['signal_id'])
+    for i, (sid, csv_file) in enumerate(sorted(all_csvs.items())):
         if sid in seen_ids:
             continue
         seen_ids.add(sid)
 
         print(f"[{i+1}/{total}] Signal {sid}...", end=' ', flush=True)
 
-        # Find CSV
-        csv_path = None
-        for pattern in [f'forex-forest-signals-page-{sid}.csv', f'forex-forest-signals-page-{sid} (2).csv']:
-            p = SAMPLES_DIR / pattern
-            if p.exists():
-                csv_path = p
-                break
-
-        if not csv_path:
-            print("NO CSV")
-            continue
-
-        # Parse trades
-        trades = analyze_trades_from_csv(str(csv_path))
+        ea_type = get_ea_type(sid)
+        trades = read_csv_trades(str(csv_file))
         if not trades:
             print("NO TRADES")
             continue
@@ -186,104 +122,101 @@ def compute_all_rankings(strategy_version='v1'):
         # Group by symbol
         by_symbol = defaultdict(list)
         for t in trades:
-            sym = t.get('symbol', t.get('currency', 'UNKNOWN'))
-            by_symbol[sym].append(t)
+            by_symbol[t['symbol']].append(t)
 
-        ea_type = get_ea_type(sid)
-        tf = rec.get('timeframe', '')
-        layers = get_layer_info(rec.get('avg_layers', 0))
+        # Get lot layers for this signal
+        lot_layers = None
+        if sid in lot_mapping and lot_mapping[sid].get('lot_layers'):
+            lot_layers = [(lv, lot) for lv, lot in lot_mapping[sid].get('lot_layers', [])]
+
         sym_count = len(by_symbol)
         scored = 0
 
         for sym, sym_trades in by_symbol.items():
-            score_data = compute_symbol_score(sid, sym_trades)
-            if not score_data:
+            metrics = compute_raw_metrics(sym_trades, lot_layers=lot_layers)
+            if metrics is None:
                 continue
 
+            metrics['signal_id'] = sid
+            metrics['symbol'] = sym
+            metrics['ea_type'] = ea_type
+            metrics['ea_full'] = get_ea_full_name(ea_type)
+
+            # Layer display
+            layer_names = []
+            for ln in sorted(set(metrics['layers'].keys()),
+                            key=lambda x: (99 if x == 'L9+' else int(x[1:]))):
+                if metrics['layers'].get(ln, 0) > 0:
+                    layer_names.append(ln)
+            metrics['lv'] = '+'.join(layer_names) if layer_names else '-'
+
+            # Timeframe from batch data if available
+            rec = batch_lookup.get(sid, {})
+            metrics['timeframe'] = rec.get('timeframe', '')
+            metrics['avg_layers'] = rec.get('avg_layers', 0)
+
+            all_metrics.append(metrics)
             scored += 1
-
-            # Per-symbol stats
-            sym_wins = sum(1 for t in sym_trades if t.get('net_pips', 0) > 0)
-            sym_win_rate = (sym_wins / len(sym_trades) * 100) if sym_trades else 0
-            sym_profit = sum(t.get('net_pips', 0) for t in sym_trades)
-            sym_losses = [t.get('net_pips', 0) for t in sym_trades if t.get('net_pips', 0) < 0]
-            sym_wins_list = [t.get('net_pips', 0) for t in sym_trades if t.get('net_pips', 0) > 0]
-            total_wins = sum(sym_wins_list)
-            total_losses = abs(sum(sym_losses))
-            sym_pf = (total_wins / total_losses) if total_losses > 0 else (999.0 if total_wins > 0 else 0)
-
-            # Max DD for this symbol's trades
-            running = 0
-            peak = 0
-            sym_dd = 0
-            for t in sorted(sym_trades, key=lambda x: x.get('close_time', '')):
-                running += t.get('net_pips', 0)
-                if running > peak:
-                    peak = running
-                dd = running - peak
-                if dd < sym_dd:
-                    sym_dd = dd
-
-            record = {
-                'signal_id': sid,
-                'symbol': sym,
-                'strategy_version': strategy_version,
-                'analysis_date': datetime.now().strftime('%Y-%m-%d'),
-                'avg_score': score_data['avg_score'],
-                'star4_count': score_data['star4_count'],
-                'star4_pct': score_data['star4_pct'],
-                'total_comparisons': score_data['cmp_total'],
-                'trades': len(sym_trades),
-                'win_rate': round(sym_win_rate, 1),
-                'profit_factor': round(sym_pf, 1),
-                'total_profit': round(sym_profit, 0),
-                'timeframe': tf,
-                'ea_type': ea_type,
-                'ea_full': get_ea_full_name(ea_type),
-                'layers': layers,
-                'eq_max_dd': round(sym_dd, 0),
-                'score_breakdown': score_data['breakdown'],
-                'batch_run_id': batch_run_id,
-            }
-
-            symbol_rankings[sym].append(record)
-            all_results.append(record)
 
         print(f"{sym_count} symbols, {scored} scored")
 
+    if not all_metrics:
+        print("❌ No metrics computed")
+        return None
+
+    # Step 2: Batch score using v5 ranking system
+    print(f"\n📊 Computing v5 scores for {len(all_metrics)} Signal×CCY pairs...")
+    scored_results = score_v5_batch(all_metrics)
+
+    # Step 3: Organize by symbol
+    symbol_rankings = defaultdict(list)
+    all_results = []
+
+    for r in scored_results:
+        record = {
+            'signal_id': r['signal_id'],
+            'symbol': r['symbol'],
+            'strategy_version': strategy_version,
+            'analysis_date': datetime.now().strftime('%Y-%m-%d'),
+            'avg_score': r['dde_v5'],
+            'dde_v5': r['dde_v5'],
+            'red_card': r['red_card'],
+            'red_reasons': r.get('red_reasons', []),
+            # v5 dimension scores
+            'wr_pct': r['wr_pct'],
+            'pf_pct': r['pf_pct'],
+            'dd_pct': r['dd_pct'],
+            'martin_pct': r['martin_pct'],
+            # Raw metrics
+            'win_rate': r['win_rate'],
+            'profit_factor': round(r['pf'], 1),
+            'total_profit': r['total_net_pips'],
+            'trades': r['trades'],
+            'wal': r['wal'],
+            'max_dd_pips': r['max_dd_pips'],
+            # Metadata
+            'timeframe': r.get('timeframe', ''),
+            'ea_type': r.get('ea_type', 'UNK'),
+            'ea_full': r.get('ea_full', 'UNK'),
+            'layers': get_layer_info(r.get('avg_layers', 0)),
+            'lv': r.get('lv', '-'),
+            'eq_max_dd': round(-r['max_dd_pips'], 0),
+            'batch_run_id': batch_run_id,
+            # Backward compat
+            'star4_count': 0,
+            'star4_pct': 0,
+            'total_comparisons': r['trades'],
+            'score_breakdown': {
+                'trigger': f"WR {r['win_rate']:.0f}%",
+                'alpha': f"PF {r['pf']:.2f}",
+                'dde': f"DD {r['max_dd_pips']:.0f}",
+            },
+        }
+
+        symbol_rankings[r['symbol']].append(record)
+        all_results.append(record)
+
     return symbol_rankings, all_results, batch_run_id
-
-
-def save_to_db(all_results, strategy_version='v1'):
-    """Save all ranking results to SQLite."""
-    conn = get_connection()
-    init_tables(conn)
-
-    for r in all_results:
-        upsert_ranking(
-            conn=conn,
-            signal_id=r['signal_id'],
-            symbol=r['symbol'],
-            strategy_version=r['strategy_version'],
-            analysis_date=r['analysis_date'],
-            avg_score=r['avg_score'],
-            star4_count=r['star4_count'],
-            star4_pct=r['star4_pct'],
-            total_comparisons=r['total_comparisons'],
-            trades=r['trades'],
-            win_rate=r['win_rate'],
-            profit_factor=r['profit_factor'],
-            total_profit=r['total_profit'],
-            timeframe=r['timeframe'],
-            ea_type=r['ea_type'],
-            layers=r['layers'],
-            eq_max_dd=r['eq_max_dd'],
-            score_breakdown=r['score_breakdown'],
-            batch_run_id=r['batch_run_id'],
-        )
-
-    conn.close()
-    print(f"✅ Saved {len(all_results)} records to DB (version={strategy_version})")
 
 
 def generate_html(symbol_rankings):
@@ -297,10 +230,10 @@ def generate_html(symbol_rankings):
     total_records = sum(len(v) for v in symbol_rankings.values())
     total_signals = len(set(r['signal_id'] for v in symbol_rankings.values() for r in v))
 
-    all_scores = [r['avg_score'] for v in symbol_rankings.values() for r in v]
-    global_avg = round(sum(all_scores) / len(all_scores), 1) if all_scores else 0
-    global_best = max(all_scores) if all_scores else 0
-    global_worst = min(all_scores) if all_scores else 0
+    valid_scores = [r['avg_score'] for v in symbol_rankings.values()
+                    for r in v if not r.get('red_card')]
+    global_avg = round(sum(valid_scores) / len(valid_scores), 1) if valid_scores else 0
+    global_best = max(valid_scores) if valid_scores else 0
 
     now = datetime.now().strftime('%Y-%m-%d %H:%M')
 
@@ -309,7 +242,7 @@ def generate_html(symbol_rankings):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Symbol Ranking - DDE v3 Copy Strategy</title>
+<title>Symbol Ranking - DDE v5</title>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0e17;color:#d0d0d0;padding:12px;font-size:13px}}
@@ -327,11 +260,12 @@ h1{{font-size:1.2em;margin-bottom:2px;color:#FFD700}}
 .sum .l{{font-size:0.7em;color:#666}}
 .sym-header{{font-size:1.1em;color:#FFD700;margin:16px 0 8px;padding:6px 10px;background:#111520;border-left:3px solid #FFD700;border-radius:0 4px 4px 0}}
 .sym-count{{color:#666;font-size:0.8em;margin-left:8px}}
-table{{width:100%;min-width:900px;border-collapse:collapse;margin-bottom:8px}}
+table{{width:100%;min-width:1000px;border-collapse:collapse;margin-bottom:8px}}
 th{{background:#111520;padding:6px 8px;text-align:left;border-bottom:2px solid #FFD700;color:#FFD700;font-size:0.8em;white-space:nowrap}}
 td{{padding:5px 8px;text-align:left;border-bottom:1px solid #1a1f2e}}
 tr:hover{{background:#111520}}
 tr.top3{{background:rgba(255,215,0,0.03)}}
+tr.red-card{{opacity:0.5}}
 .sig{{color:#64b5f6;font-weight:bold}}
 .s90{{color:#4CAF50;font-weight:bold}}.s80{{color:#8BC34A;font-weight:bold}}.s70{{color:#FFC107;font-weight:bold}}.s60{{color:#FF9800;font-weight:bold}}.s0{{color:#FF5722;font-weight:bold}}
 .p4{{color:#4CAF50}}
@@ -343,6 +277,7 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
 .ea-S10{{background:#0d47a1;color:#90caf9}}.ea-Flash{{background:#880e4f;color:#f48fb1}}.ea-GEM{{background:#37474f;color:#b0bec5}}
 .ea-UNK{{background:#37474f;color:#b0bec5}}
 .dd-g{{color:#4CAF50}}.dd-y{{color:#FFC107}}.dd-r{{color:#FF5722}}
+.dim{{font-size:0.75em;color:#888}}
 .no-data{{color:#555;font-style:italic;padding:20px;text-align:center}}
 @media(max-width:768px){{body{{font-size:11px}}th,td{{padding:3px 5px}}}}
 .hidden{{display:none}}
@@ -354,11 +289,11 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <a href="../signal_ranking.html" style="color:#666;text-decoration:none;font-size:.88em;font-weight:600;padding:4px 10px;border-radius:6px">🏆 Signal 排名</a>
     <a href="./ccy_ranking.html" style="color:#666;text-decoration:none;font-size:.88em;font-weight:600;padding:4px 10px;border-radius:6px">💱 CCY 排名</a>
-    <a href="./symbol_ranking.html" style="color:#FFD700;text-decoration:none;font-size:.88em;font-weight:600;padding:4px 10px;border-radius:6px;background:#1a1f2e">📊 波幅波</a>
+    <a href="./symbol_ranking.html" style="color:#FFD700;text-decoration:none;font-size:.88em;font-weight:600;padding:4px 10px;border-radius:6px;background:#1a1f2e">📊 Symbol</a>
   </div>
 </div>
-<h1>📊 Symbol Ranking - DDE v3 Copy Strategy</h1>
-<div class="sub">Trigger 40% + Alpha Capture 40% + DDE 20% | {total_signals} signals × {len(sorted_symbols)} symbols | {total_records} pairs | {now}</div>
+<h1>📊 Symbol Ranking - DDE v5</h1>
+<div class="sub">WR 15% + PF 20% + DD 25% + Martin 40% | {total_signals} signals × {len(sorted_symbols)} symbols | {total_records} pairs | {now}</div>
 
 <div class="controls">
 <label for="symSelect">💱 貨幣對:</label>
@@ -371,10 +306,6 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
         html += f'<option value="{sym}">{sym} ({cnt} signals)</option>\n'
 
     html += '''</select>
-<label for="versionSelect">📋 版本:</label>
-<select id="versionSelect" onchange="filterSymbol()">
-<option value="v1">v1</option>
-</select>
 <button class="btn" onclick="exportCSV()">📥 Export</button>
 <span class="info" id="filterInfo"></span>
 </div>
@@ -413,7 +344,6 @@ function filterSymbol() {
 
     sections.forEach(function(s) {
         if (sym === '__ALL__') {
-            // Show only top 10
             var allSyms = sections;
             var shown = 0;
             allSyms.forEach(function(ss, idx) {
@@ -439,7 +369,7 @@ function filterSymbol() {
 function exportCSV() {
     var sym = document.getElementById('symSelect').value;
     var visible = document.querySelectorAll('.sym-section:not(.hidden)');
-    var csv = 'Rank,Signal,Symbol,Avg Score,⭐⭐⭐⭐,⭐⭐⭐⭐%,Trades,Win%,PF,Profit,TF,EA,LV,Eq Max DD\\n';
+    var csv = 'Rank,Signal,Symbol,Score,Win%,PF,P&L,Trades,WAL,DD,TF,EA,LV\\n';
     visible.forEach(function(s) {
         var rows = s.querySelectorAll('tbody tr');
         rows.forEach(function(row, idx) {
@@ -450,15 +380,14 @@ function exportCSV() {
                 csv += cells[5].textContent.trim() + ',' + cells[6].textContent.trim() + ',';
                 csv += cells[7].textContent.trim() + ',' + cells[8].textContent.trim() + ',';
                 csv += cells[9].textContent.trim() + ',' + cells[10].textContent.trim() + ',';
-                csv += cells[11].textContent.trim() + ',' + cells[12].textContent.trim() + ',';
-                csv += cells[13].textContent.trim() + '\\n';
+                csv += cells[11].textContent.trim() + ',' + cells[12].textContent.trim() + '\\n';
             }
         });
     });
     var blob = new Blob([csv], {type: 'text/csv'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = 'symbol_ranking_' + (sym === '__ALL__' ? 'all' : sym) + '.csv';
+    a.href = url; a.download = 'symbol_ranking_v5_' + (sym === '__ALL__' ? 'all' : sym) + '.csv';
     a.click(); URL.revokeObjectURL(url);
 }
 filterSymbol();
@@ -471,14 +400,15 @@ filterSymbol();
 def generate_symbol_table(sym, rankings):
     """Generate an HTML table for one symbol."""
     cnt = len(rankings)
-    avg_sc = round(sum(r['avg_score'] for r in rankings) / cnt, 1) if cnt else 0
+    valid_scores = [r['avg_score'] for r in rankings if not r.get('red_card')]
+    avg_sc = round(sum(valid_scores) / len(valid_scores), 1) if valid_scores else 0
 
     html = f'''<div class="sym-section" data-symbol="{sym}">
 <div class="sym-header">💱 {sym} <span class="sym-count">({cnt} signals | avg {avg_sc})</span></div>
 <div style="overflow-x:auto;width:100%"><table><thead><tr>
-<th>#</th><th>Signal</th><th>Symbol</th><th>Avg</th><th>⭐⭐⭐⭐</th><th>⭐⭐⭐⭐%</th>
-<th>#</th><th>Win%</th><th>PF</th><th>P&L</th><th>TF</th>
-<th>EA</th><th>LV</th><th>DD</th>
+<th>#</th><th>Signal</th><th>Symbol</th><th>Score</th>
+<th>Win%</th><th>PF</th><th>P&L</th><th>#</th>
+<th>WAL</th><th>DD</th><th>TF</th><th>EA</th><th>LV</th>
 </tr></thead><tbody>
 '''
 
@@ -494,6 +424,10 @@ def generate_symbol_table(sym, rankings):
         else:
             rank = str(i)
 
+        if r.get('red_card'):
+            row_class = ' class="red-card"'
+            rank = '🚫'
+
         score_cls = get_score_class(r['avg_score'])
         ea_cls = f'ea-{r["ea_type"]}'
         dd_cls = get_dd_class(r['eq_max_dd'])
@@ -504,21 +438,24 @@ def generate_symbol_table(sym, rankings):
 
         profit_cls = 'g' if r['total_profit'] >= 0 else 'r'
 
+        # Dimension breakdown tooltip
+        dim_info = (f"WR%={r['wr_pct']:.0f} PF%={r['pf_pct']:.0f} "
+                    f"DD%={r['dd_pct']:.0f} Martin%={r['martin_pct']:.0f}")
+
         html += f'''<tr{row_class}>
-<td>{rank}</td>
+<td title="{dim_info}">{rank}</td>
 <td class="sig"><a href="https://signals.algoforest.com/signals/{r['signal_id']}" style="color:#64b5f6;font-weight:bold;text-decoration:none">{r['signal_id']}</a> <a href="../reports/index_{r['signal_id']}.html" style="text-decoration:none;font-size:14px" title="深度分析">📊</a> <a href="../reports/Signal_Deep_Analysis_{r['signal_id']}.html" style="text-decoration:none;font-size:14px" title="馬丁剖析法">🔍</a></td>
 <td>{r['symbol']}</td>
-<td class="{score_cls}">{r['avg_score']}</td>
-<td class="p4">{r['star4_count']}</td>
-<td class="p4">{r['star4_pct']}%</td>
-<td>{r['trades']:,}</td>
+<td class="{score_cls}" title="{dim_info}">{r['avg_score']}</td>
 <td>{r['win_rate']:.1f}%</td>
 <td>{pf_str}</td>
-<td class="{profit_cls}">{r['total_profit']:,.0f} pips</td>
+<td class="{profit_cls}">{r['total_profit']:,.0f}p</td>
+<td>{r['trades']:,}</td>
+<td class="m">{r['wal']:.2f}</td>
+<td class="m {dd_cls}">{r['eq_max_dd']:,.0f}</td>
 <td><span class="tf">{r['timeframe']}</span></td>
 <td><span class="ea-tag {ea_cls}">{ea_full}</span></td>
 <td class="m">{r['layers']}</td>
-<td class="m {dd_cls}">{r['eq_max_dd']:,.0f} pips</td>
 </tr>
 '''
 
@@ -528,14 +465,13 @@ def generate_symbol_table(sym, rankings):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Symbol-based Signal Ranking Generator')
-    parser.add_argument('--version', default='v1', help='Strategy version label (default: v1)')
-    parser.add_argument('--no-db', action='store_true', help='Skip saving to database')
+    parser = argparse.ArgumentParser(description='Symbol-based Signal Ranking Generator (DDE v5)')
+    parser.add_argument('--version', default='v5', help='Strategy version label (default: v5)')
     parser.add_argument('--no-html', action='store_true', help='Skip generating HTML')
     args = parser.parse_args()
 
     print("=" * 60)
-    print("🦀 Symbol Ranking Generator - DDE v3 Copy Strategy")
+    print("🦀 Symbol Ranking Generator - DDE v5")
     print("=" * 60)
 
     result = compute_all_rankings(strategy_version=args.version)
@@ -549,21 +485,29 @@ def main():
     print(f"\n📊 Summary:")
     print(f"   Total symbols: {len(symbol_rankings)}")
     print(f"   Total Signal×Symbol records: {len(all_results)}")
-    top_syms = sorted(symbol_rankings.keys(),
-                      key=lambda s: max(r['avg_score'] for r in symbol_rankings[s]),
-                      reverse=True)[:5]
-    for sym in top_syms:
-        best = max(symbol_rankings[sym], key=lambda x: x['avg_score'])
-        print(f"   {sym}: best={best['avg_score']} (Signal {best['signal_id']})")
 
-    # Save to DB
-    if not args.no_db:
-        save_to_db(all_results, strategy_version=args.version)
+    valid = [r for r in all_results if not r.get('red_card')]
+    red = [r for r in all_results if r.get('red_card')]
+    print(f"   Valid: {len(valid)}, Red cards: {len(red)}")
+
+    top_syms = []
+    for sym in symbol_rankings.keys():
+        valid_for_sym = [r for r in symbol_rankings[sym] if not r.get('red_card')]
+        if valid_for_sym:
+            best_score = max(r['avg_score'] for r in valid_for_sym)
+            top_syms.append((sym, best_score))
+    top_syms.sort(key=lambda x: x[1], reverse=True)
+    top_syms = [sym for sym, _ in top_syms[:5]]
+    for sym in top_syms:
+        best = max((r for r in symbol_rankings[sym] if not r.get('red_card')),
+                   key=lambda x: x['avg_score'], default=None)
+        if best:
+            print(f"   {sym}: best={best['avg_score']} (Signal {best['signal_id']}, WR={best['win_rate']:.0f}%)")
 
     # Generate HTML
     if not args.no_html:
         html = generate_html(symbol_rankings)
-        output_path = OUTPUT_DIR / 'symbol_ranking_dde_v3.html'
+        output_path = OUTPUT_DIR / 'symbol_ranking_dde_v5.html'
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html)
         print(f"\n✅ HTML: {output_path} ({len(html):,} bytes)")

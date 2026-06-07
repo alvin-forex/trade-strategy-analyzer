@@ -11,27 +11,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'scripts'))
 from set_parser import get_set_configs_for_signal
 
+# Import EA configuration from centralized config
+from config import EA_MAP, get_ea_type as get_ea_tag
+
 BASE_DIR = Path(__file__).parent
-DOWNLOADS_DIR = BASE_DIR / 'downloads'
-DOCS_DIR = BASE_DIR / 'docs'
-REPORTS_DIR = BASE_DIR / 'reports'
-OUTPUT_DIR = BASE_DIR / 'output'
-
-EA_MAP = {
-    'DW': ['10437','11984','13790','17547','21698','22200','22278','25830','30359','31781','32719','3291','33101','31593','34574','36338','36397','36511','34259','20846','16538','19625','35434','35436'],
-    'SMA': ['106','1980','2351','32278','32541','5001','5275','537','5566','11889','13863','14724','16596','16698','16706','17611','17823','10864','14158','5636','2739','16777','35362'],
-    'MKD': ['12962','13461','14341','14592','1470','17962','20805','23617','25668','25260','8325','7919','16266'],
-    'S10': ['13798','16596'],
-    'Flash': ['19849'],
-    'GEM': ['14581'],
-    'MAN': ['12173'],
-}
-
-def get_ea_tag(signal_id):
-    s = str(signal_id)
-    for ea, ids in EA_MAP.items():
-        if s in ids: return ea
-    return 'UNK'
 
 
 def generate_signal_page(signal_id, ea_tag, csv_filename):

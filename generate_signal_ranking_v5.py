@@ -13,7 +13,6 @@ import sys
 import os
 import json
 import re
-import pickle
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
@@ -349,7 +348,7 @@ def main():
     print("🦀 Signal Ranking Generator — DDE v5 (4 Dimensions, Ranking-based)")
     print("=" * 60)
 
-    # Run v5 scoring
+    # Run v5 scoring (which saves to SQLite)
     all_results = run_v5_scoring()
 
     if not all_results:
