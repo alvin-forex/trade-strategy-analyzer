@@ -1298,6 +1298,90 @@ tr.top3{background:rgba(255,215,0,0.03)}
 <td class="m">AUDUSD, EURCAD, EURGBP, USDCAD</td>
 </tr>
 </table></div><script>
+// === C改善: Enhanced UI/UX (CCY Filter, DDE Range, Quick Nav, Export) ===
+(function(){
+var tbl=document.getElementById('tbl');if(!tbl)return;
+var tbody=tbl.querySelector('tbody'),thead=tbl.querySelector('thead');
+var rows=Array.from(tbody.querySelectorAll('tr'));
+
+// === 1. CCY Filter ===
+var ccySet=new Set();
+rows.forEach(function(r){var c=r.children[2];if(c){var v=c.textContent.trim();if(v)ccySet.add(v)}});
+var ccySel=document.createElement('select');
+ccySel.id='ccyFilter';
+ccySel.style.cssText='background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:14px;margin-left:8px';
+var ccyOpt=document.createElement('option');ccyOpt.value='';ccyOpt.textContent='全部 EA ('+ccySet.size+')';ccySel.appendChild(ccyOpt);
+Array.from(ccySet).sort().forEach(function(ccy){var o=document.createElement('option');o.value=ccy;o.textContent=ccy;ccySel.appendChild(o)});
+var eaSel=document.getElementById('eaFilter');
+if(eaSel&&eaSel.parentNode)eaSel.parentNode.insertBefore(ccySel,eaSel.nextSibling);
+
+// === 2. DDE Range ===
+var ddeWrap=document.createElement('div');
+ddeWrap.style.cssText='display:flex;align-items:center;gap:4px;margin-left:10px;font-size:0.8em;color:var(--text2)';
+var ddeMin=document.createElement('input');ddeMin.type='number';ddeMin.id='ddeMin';ddeMin.placeholder='0';ddeMin.min=0;ddeMin.max=100;ddeMin.style.cssText='width:50px;background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px;font-size:11px';
+var ddeMax=document.createElement('input');ddeMax.type='number';ddeMax.id='ddeMax';ddeMax.placeholder='100';ddeMax.min=0;ddeMax.max=100;ddeMax.style.cssText='width:50px;background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px;font-size:11px';
+ddeWrap.appendChild(document.createTextNode('DDE:'));
+ddeWrap.appendChild(ddeMin);ddeWrap.appendChild(document.createTextNode('-'));ddeWrap.appendChild(ddeMax);
+if(eaSel&&eaSel.parentNode)eaSel.parentNode.appendChild(ddeWrap);
+
+// === 3. Quick Nav ===
+var navWrap=document.createElement('div');navWrap.style.cssText='display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap';
+var navBtns=[
+{id:'navTop10',label:'🏆 Top10',fn:function(r){return parseInt(r.children[0].textContent.replace(/[🥇🥈🥉]/g,''))<=10}},
+{id:'navA',label:'⭐ A級',fn:function(r){return r.children[4]&&r.children[4].textContent.trim()==='A'}},
+{id:'navB',label:'✓ B級',fn:function(r){return r.children[4]&&r.children[4].textContent.trim()==='B'}},
+{id:'navAll',label:'📊 全部',fn:function(r){return true}}
+];
+navBtns.forEach(function(btn){
+var b=document.createElement('button');b.id=btn.id;b.textContent=btn.label;
+b.style.cssText='background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600';
+b.onclick=function(){
+var search=document.getElementById('searchInput'),ea=document.getElementById('eaFilter'),ccy=document.getElementById('ccyFilter');
+if(search)search.value='';if(ea)ea.value='';if(ccy)ccy.value='';ddeMin.value='';ddeMax.value='';
+rows.forEach(function(r){r.style.display=btn.fn(r)?'':'none'});
+updateCount();
+navWrap.querySelectorAll('button').forEach(function(bb){bb.style.background='var(--bg-card)';bb.style.color='var(--text)'});
+b.style.background='var(--primary)';b.style.color='var(--bg)';};
+navWrap.appendChild(b);
+});
+var tblWrap=document.getElementById('tbl');
+if(tblWrap&&tblWrap.parentNode)tblWrap.parentNode.insertBefore(navWrap,tblWrap);
+
+// === 4. Export CSV ===
+var expBtn=document.createElement('button');
+expBtn.id='exportCSV';expBtn.textContent='📥 導出CSV';
+expBtn.style.cssText='background:var(--accent);border:none;color:#fff;padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;margin-left:10px';
+expBtn.onclick=function(){
+var csv=[],headers=[];
+thead.querySelectorAll('th').forEach(function(th){headers.push(th.textContent.trim().split('\n')[0])});
+csv.push(headers.join(','));
+rows.filter(function(r){return r.style.display!==''}).forEach(function(r){
+var row=[];
+for(var i=0;i<r.children.length;i++){var v=r.children[i].textContent.trim().replace(/[🥇🥈🥉]/g,'').replace(/\$/g,'').replace(/pips/g,'').replace(/,/g,'');if(v.includes(','))v='"'+v+'"';row.push(v)}
+csv.push(row.join(','));
+});
+var blob=new Blob([csv.join('\n')],{type:'text/csv;charset=utf-8;'});
+var link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='signal_ranking_'+new Date().toISOString().slice(0,10)+'.csv';link.click();
+};
+if(eaSel&&eaSel.parentNode)eaSel.parentNode.appendChild(expBtn);
+
+// === Helper: get DDE value ===
+function getDDE(r){var c=r.children[3];if(!c)return 0;return parseFloat(c.textContent.replace(/[^0-9.]/g,''))||0;}
+
+function updateCount(){
+var shown=rows.filter(function(r){return r.style.display!==''}).length;
+var countEl=document.getElementById('rowCount');if(countEl)countEl.textContent='顯示 '+shown+' / '+rows.length;
+}
+
+// Store for main script
+window._ccySel=ccySel;
+window._ddeMin=ddeMin;
+window._ddeMax=ddeMax;
+window._updateCount=updateCount;
+window._getDDE=getDDE;
+})();
+</script>
+<script>
 // === Sort & Filter for Signal Ranking ===
 (function(){
 var tbl=document.getElementById('tbl');if(!tbl)return;
@@ -1320,13 +1404,19 @@ function pv(cell,col,type){
 function applyFilter(){
   var q=(search?search.value:'').toLowerCase();
   var ea=eaSel?eaSel.value:'';
+  var ccy=window._ccySel?window._ccySel.value:'';
+  var ddeMinV=window._ddeMin?parseFloat(window._ddeMin.value)||0:0;
+  var ddeMaxV=window._ddeMax?parseFloat(window._ddeMax.value)||100:100;
   var shown=0;
   rows.forEach(function(r){
     var txt=r.textContent.toLowerCase();
     var mq=!q||txt.includes(q);
     var me=!ea||r.children[12].textContent.trim().includes(ea);
-    r.style.display=(mq&&me)?'':'none';
-    if(mq&&me)shown++;
+    var mc=!ccy||r.children[2].textContent.trim().includes(ccy);
+    var dde=window._getDDE(r);
+    var md=dde>=ddeMinV&&dde<=ddeMaxV;
+    r.style.display=(mq&&me&&mc&&md)?'':'none';
+    if(mq&&me&&mc&&md)shown++;
   });
   if(countEl)countEl.textContent='顯示 '+shown+' / '+rows.length;
 }
@@ -1348,6 +1438,9 @@ thead.querySelectorAll('th').forEach(function(th,i){
 });
 if(search)search.addEventListener('input',applyFilter);
 if(eaSel)eaSel.addEventListener('change',applyFilter);
+if(window._ccySel)window._ccySel.addEventListener('change',applyFilter);
+if(window._ddeMin)window._ddeMin.addEventListener('input',applyFilter);
+if(window._ddeMax)window._ddeMax.addEventListener('input',applyFilter);
 applyFilter();
 })();
 </script>
