@@ -32,7 +32,6 @@ import re
 import json
 import sys
 import math
-import pickle
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
@@ -515,9 +514,18 @@ def run_v5_scoring():
         print(f"  Score range: {min(scores)} - {max(scores)}")
         print(f"  Average: {round(sum(scores)/len(scores), 1)}")
 
-    # Save pickle
-    with open('/tmp/dde_v5_data.pkl', 'wb') as f:
-        pickle.dump(scored_results, f)
+    # Save to SQLite via db_manager
+    from db_manager import save_scores
+    batch_id = save_scores(scored_results, version='v5')
+    print(f"   Batch ID: {batch_id}")
+    # Legacy: also save pickle for backward compat
+    try:
+        import pickle
+        with open('/tmp/dde_v5_data.pkl', 'wb') as f:
+            pickle.dump(scored_results, f)
+        print(f"   (Legacy pickle also saved)")
+    except Exception:
+        pass
 
     # Top 10
     valid.sort(key=lambda x: x['dde_v5'], reverse=True)

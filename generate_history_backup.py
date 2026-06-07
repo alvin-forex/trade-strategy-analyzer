@@ -22,28 +22,12 @@ REPORTS_DIR = BASE_DIR / 'reports'
 for d in [OUTPUT_DIR, DOCS_DIR, REPORTS_DIR, DOCS_DIR / 'admin', HISTORY_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
-EA_MAP = {
-    'DW': ['10437','11984','13790','17547','21698','22200','22278','25830','30359','31781','32719','3291','33101','31593','34574','36338','36397','36511','34259','20846','16538'],
-    'SMA': ['106','1980','2351','32278','32541','5001','5275','537','5566','11889','13863','14724','16596','16698','16706','17611','17823','10864','14158','5636'],
-    'MKD': ['12962','13461','14341','14592','1470','17962','20805','23617','25668','25260','8325','7919'],
-    'S10': ['13798','16596'],
-    'Flash': ['19849'],
-    'GEM': ['14581'],
-    'MAN': ['12173'],
-}
-
-EA_COLORS = {
-    'DW': ('#4a148c', '#ce93d8'), 'SMA': ('#1b5e20', '#a5d6a7'),
-    'MKD': ('#e65100', '#ffcc80'), 'Flash': ('#0d47a1', '#90caf9'),
-    'S10': ('#004d40', '#80cbc4'), 'GEM': ('#880e4f', '#f48fb1'),
-    'MAN': ('#4527a0', '#b39ddb'), 'UNK': ('#333', 'var(--text2)'),
-}
+# Import EA configuration from centralized config
+from config import EA_MAP, EA_COLORS, get_ea_type
 
 def get_ea_tag(sid):
-    s = str(sid)
-    for ea, ids in EA_MAP.items():
-        if s in ids: return ea
-    return 'UNK'
+    """Alias for get_ea_type for backward compatibility."""
+    return get_ea_type(sid)
 
 def get_ea_style(ea):
     bg, fg = EA_COLORS.get(ea, EA_COLORS['UNK'])
