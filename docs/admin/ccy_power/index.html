@@ -294,6 +294,93 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.4; }
         }
+        
+        /* Timeline Card */
+        .timeline-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .timeline-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .timeline-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .range-btn {
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .range-btn:hover, .range-btn.active {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+        .timeline-market-labels {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .market-label {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.3rem;
+        }
+        .market-label.asian { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .market-label.european { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .market-label.american { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .timeline-grid {
+            display: grid;
+            gap: 2px;
+            min-height: 200px;
+        }
+        .timeline-loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+        .timeline-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .play-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+        .play-btn:hover { background: #2563eb; }
+        .current-time { color: var(--text-secondary); font-size: 0.8rem; }
+        
         .footer {
             text-align: center;
             padding: 1.5rem;
@@ -339,6 +426,34 @@
                 </div>
             </div>
             <div class="heatmap-grid" id="heatmap-grid"></div>
+        </div>
+
+        <!-- 时间轴热力图 -->
+        <div class="timeline-card">
+            <div class="timeline-header">
+                <div class="timeline-title">
+                    <i class="fas fa-clock"></i>
+                    <span>CCY Power Timeline</span>
+                </div>
+                <div class="timeline-controls">
+                    <button class="range-btn active" data-range="24h">24hr</button>
+                    <button class="range-btn" data-range="3d">3天</button>
+                    <button class="range-btn" data-range="7d">7天</button>
+                    <button class="range-btn" data-range="30d">30天</button>
+                </div>
+            </div>
+            <div class="timeline-market-labels">
+                <span class="market-label asian">🇦 亚盘 (07-16)</span>
+                <span class="market-label european">🇪 欧盘 (14-23)</span>
+                <span class="market-label american">🇺 美盘 (20-05)</span>
+            </div>
+            <div class="timeline-grid" id="timeline-grid">
+                <div class="timeline-loading">正在加载历史数据...</div>
+            </div>
+            <div class="timeline-footer">
+                <button class="play-btn" id="play-timeline"><i class="fas fa-play"></i> 播放动画</button>
+                <span class="current-time" id="timeline-current-time">--</span>
+            </div>
         </div>
 
         <!-- Summary Bar -->
@@ -557,11 +672,150 @@
             };
             updateData(demoData);
         }
-
+        
+        // === 时间轴功能 ===
+        let timelineData = [];
+        let currentRange = '24h';
+        let isPlaying = false;
+        let playInterval = null;
+        
+        function getHoursFromRange(range) {
+            const map = { '24h': 24, '3d': 72, '7d': 168, '30d': 720 }; 
+            return map[range] || 24;
+        }
+        
+        function loadTimelineData(range) {
+            currentRange = range;
+            const hours = getHoursFromRange(range);
+            const grid = document.getElementById('timeline-grid');
+            grid.innerHTML = '<div class="timeline-loading">正在加载历史数据...</div>';
+            
+            // 先用 demo 数据渲染
+            loadTimelineDemoData(range);
+            
+            // TODO: 调用 API 获取真实历史数据
+            // fetch(`/api/ccy_power/timeline?hours=${hours}`)
+            //     .then(res => res.json())
+            //     .then(data => renderTimelineGrid(data));
+        }
+        
+        function loadTimelineDemoData(range) {
+            const hours = getHoursFromRange(range);
+            const currencies = ['XAU', 'CAD', 'JPY', 'AUD', 'EUR', 'CHF', 'GBP', 'NZD', 'USD'];
+            const now = new Date();
+            
+            // 生成 demo 时间轴数据
+            timelineData = [];
+            for (let h = hours - 1; h >= 0; h--) {
+                const ts = new Date(now - h * 3600000);
+                const hour = ts.getHours();
+                
+                // 模拟不同时段的变化
+                const baseValues = { XAU: 9.2, CAD: 8.5, JPY: 7.15, AUD: 6.25, EUR: 5.8, CHF: 4.35, GBP: 3.9, NZD: 2.25, USD: 1.8 }; 
+                const variation = Math.sin(hour / 24 * Math.PI * 2) * 1.5; // 随时间变化
+                
+                const values = {}; currencies.forEach(c => {
+                    values[c] = Math.max(0.5, Math.min(9.5, baseValues[c] + variation + (Math.random() - 0.5) * 0.5));
+                });
+                
+                timelineData.push({ timestamp: ts, currencies: values, hour: hour });
+            }
+            
+            renderTimelineGrid(timelineData, range);
+        }
+        
+        function renderTimelineGrid(data, range) {
+            const grid = document.getElementById('timeline-grid');
+            const currencies = ['XAU', 'CAD', 'JPY', 'AUD', 'EUR', 'CHF', 'GBP', 'NZD', 'USD'];
+            
+            // 根据时间范围调整列数
+            const cols = range === '24h' ? 24 : range === '3d' ? 72 : range === '7d' ? 168 : 720;
+            const displayCols = Math.min(cols, data.length); // 限制显示列数
+            const step = Math.ceil(data.length / Math.min(displayCols, 48)); // 每隔几个取一个
+            
+            grid.style.gridTemplateColumns = `${60}px repeat(${Math.ceil(data.length / step)}, minmax(24px, 1fr))`; 
+            grid.style.gridTemplateRows = `auto repeat(${currencies.length}, 24px)`; 
+            
+            // 时间轴 header
+            grid.innerHTML = '<div class="timeline-header-cell" style="padding: 4px; font-size: 0.7rem;">时间</div>'; 
+            for (let i = 0; i < data.length; i += step) {
+                const ts = data[i].timestamp;
+                const timeLabel = ts.toLocaleTimeString('zh-Hant', { hour: '2-digit' });
+                grid.innerHTML += `<div class="timeline-time-cell" style="font-size: 0.65rem; text-align: center; padding: 2px;">${timeLabel}</div>`; 
+            }
+            
+            // 货币行
+            currencies.forEach(currency => {
+                // 货币名称
+                grid.innerHTML += `<div class="timeline-currency-cell" style="font-size: 0.75rem; padding: 2px 8px; font-weight: 500;">${currency}</div>`; 
+                
+                // 时间轴格子
+                for (let i = 0; i < data.length; i += step) {
+                    const value = data[i].currencies[currency] || 0; const hour = data[i].hour;
+                    const cls = getStatusClass(value);
+                    const marketBg = getMarketBackground(hour);
+                    
+                    grid.innerHTML += `<div class="timeline-cell ${cls}" 
+                        style="width: 100%; height: 24px; ${marketBg} border-radius: 2px;" 
+                        title="${data[i].timestamp.toLocaleString()} - ${currency}: ${value.toFixed(2)}"></div>`; 
+                }
+            });
+        }
+        
+        function getMarketBackground(hour) {
+            // 亚盘 (07-16), 欧盘 (14-23), 美盘 (20-05)
+            if (hour >= 7 && hour < 16) return 'background: rgba(245, 158, 11, 0.1);';
+            if (hour >= 14 && hour < 23) return 'background: rgba(59, 130, 246, 0.1);';
+            if (hour >= 20 || hour < 5) return 'background: rgba(16, 185, 129, 0.1);';
+            return '';
+        }
+        
+        function playTimelineAnimation() {
+            if (isPlaying) {
+                clearInterval(playInterval); isPlaying = false;
+                document.getElementById('play-timeline').innerHTML = '<i class="fas fa-play"></i> 播放动画';
+                return;
+            }
+            
+            if (timelineData.length === 0) return;
+            
+            isPlaying = true;
+            document.getElementById('play-timeline').innerHTML = '<i class="fas fa-pause"></i> 停止播放';
+            
+            let index = 0;
+            playInterval = setInterval(() => {
+                if (index >= timelineData.length) index = 0;
+                
+                const data = timelineData[index]; 
+                document.getElementById('timeline-current-time').textContent = 
+                    data.timestamp.toLocaleString('zh-Hant');
+                
+                // 更新主热力图（可选）
+                updateData({ ts: data.timestamp.toLocaleString(), D1: data.currencies, H4: data.currencies, H1: data.currencies });
+                
+                index++; 
+            }, 200);
+        }
+        
         // Initialize
         window.addEventListener('DOMContentLoaded', () => {
             loadDemoData();
             connectWebSocket();
+            
+            // 时间轴初始化
+            loadTimelineData('24h');
+            
+            // 时间范围按钮事件
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active')); 
+                    btn.classList.add('active');
+                    loadTimelineData(btn.dataset.range);
+                });
+            });
+            
+            // 播放按钮事件
+            document.getElementById('play-timeline').addEventListener('click', playTimelineAnimation); 
         });
     </script>
 </body>
