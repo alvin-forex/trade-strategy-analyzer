@@ -653,7 +653,9 @@
         }
         
         function loadCurrentFromAPI() {
-            fetch('http://localhost:8788/api/ccy_power/current')
+            // Try GitHub Pages JSON first (works from anywhere)
+            const base = new URL('.', window.location.href).href;
+            fetch(base + 'data.json?t=' + Date.now())
                 .then(res => res.json())
                 .then(result => {
                     if (result.success && result.data) {
@@ -667,7 +669,25 @@
                         });
                     }
                 })
-                .catch(e => console.error('REST API fallback failed:', e));
+                .catch(e => {
+                    console.warn('GitHub Pages data.json failed, trying localhost:', e);
+                    // Fallback to localhost API
+                    fetch('http://localhost:8788/api/ccy_power/current')
+                        .then(res => res.json())
+                        .then(result => {
+                            if (result.success && result.data) {
+                                const d = result.data;
+                                updateData({
+                                    type: 'ccy_power_multi',
+                                    ts: result.timestamp,
+                                    D1: d.D1 || {},
+                                    H4: d.H4 || {},
+                                    H1: d.H1 || {}
+                                });
+                            }
+                        })
+                        .catch(e2 => console.error('All data sources failed:', e2));
+                });
         }
 
         function refreshData() {
@@ -680,14 +700,9 @@
 
         // Demo data for testing (remove in production)
         function loadDemoData() {
-            const demoData = {
-                type: 'ccy_power_multi',
-                ts: '2026-06-07 20:34',
-                D1: { NZD: 2.25, AUD: 6.25, CAD: 8.50, CHF: 4.35, EUR: 5.80, GBP: 3.90, JPY: 7.15, USD: 1.80, XAU: 9.20 },
-                H4: { NZD: 2.25, AUD: 6.25, CAD: 8.50, CHF: 4.35, EUR: 5.80, GBP: 3.90, JPY: 7.15, USD: 1.80, XAU: 9.20 },
-                H1: { NZD: 2.25, AUD: 6.25, CAD: 8.50, CHF: 4.35, EUR: 5.80, GBP: 3.90, JPY: 7.15, USD: 1.80, XAU: 9.20 }
-            };
-            updateData(demoData);
+            // Demo data only used as last resort placeholder
+            // Real data loaded from data.json via loadCurrentFromAPI()
+            loadCurrentFromAPI();
         }
         
         // === 时间轴功能 ===
