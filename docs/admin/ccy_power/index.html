@@ -655,9 +655,14 @@
         function loadCurrentFromAPI() {
             // Try GitHub Pages JSON first (works from anywhere)
             const base = new URL('.', window.location.href).href;
+            console.log('[CCY] Fetching data.json from', base);
             fetch(base + 'data.json?t=' + Date.now())
-                .then(res => res.json())
+                .then(res => {
+                    console.log('[CCY] data.json response:', res.status);
+                    return res.json();
+                })
                 .then(result => {
+                    console.log('[CCY] data.json parsed, success:', result.success);
                     if (result.success && result.data) {
                         const d = result.data;
                         updateData({
@@ -667,10 +672,13 @@
                             H4: d.H4 || {},
                             H1: d.H1 || {}
                         });
+                        console.log('[CCY] updateData called OK');
+                    } else {
+                        console.warn('[CCY] data.json invalid:', result);
                     }
                 })
                 .catch(e => {
-                    console.warn('GitHub Pages data.json failed, trying localhost:', e);
+                    console.error('[CCY] data.json fetch failed:', e);
                     // Fallback to localhost API
                     fetch('http://localhost:8788/api/ccy_power/current')
                         .then(res => res.json())
@@ -686,7 +694,7 @@
                                 });
                             }
                         })
-                        .catch(e2 => console.error('All data sources failed:', e2));
+                        .catch(e2 => console.error('[CCY] All data sources failed:', e2));
                 });
         }
 
@@ -855,8 +863,11 @@
         
         // Initialize
         window.addEventListener('DOMContentLoaded', () => {
-            loadDemoData();
-            connectWebSocket();
+            loadCurrentFromAPI();
+            // Don't connect WebSocket from GitHub Pages - localhost unreachable
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                connectWebSocket();
+            }
             
             // 时间轴初始化
             loadTimelineData('24h');
