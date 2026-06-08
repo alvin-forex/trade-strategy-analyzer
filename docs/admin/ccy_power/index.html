@@ -388,6 +388,7 @@
             font-size: 0.75rem;
         }
     </style>
+<script>window.__CCY_POWER_DATA__ = {"success": true, "timestamp": "2026.06.09 07:40", "data": {"D1": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}, "H4": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}, "H1": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}};</script>
 </head>
 <body>
     <div id="sidebar-container"></div>
@@ -653,16 +654,25 @@
         }
         
         function loadCurrentFromAPI() {
-            // Try GitHub Pages JSON first (works from anywhere)
+            // Priority 1: inline data injected at build time
+            if (window.__CCY_POWER_DATA__ && window.__CCY_POWER_DATA__.success) {
+                const result = window.__CCY_POWER_DATA__;
+                const d = result.data;
+                updateData({
+                    type: 'ccy_power_multi',
+                    ts: result.timestamp,
+                    D1: d.D1 || {},
+                    H4: d.H4 || {},
+                    H1: d.H1 || {}
+                });
+                console.log('[CCY] Loaded inline data OK, ts:', result.timestamp);
+                return;
+            }
+            // Priority 2: fetch data.json
             const base = new URL('.', window.location.href).href;
-            console.log('[CCY] Fetching data.json from', base);
             fetch(base + 'data.json?t=' + Date.now())
-                .then(res => {
-                    console.log('[CCY] data.json response:', res.status);
-                    return res.json();
-                })
+                .then(res => res.json())
                 .then(result => {
-                    console.log('[CCY] data.json parsed, success:', result.success);
                     if (result.success && result.data) {
                         const d = result.data;
                         updateData({
@@ -672,14 +682,12 @@
                             H4: d.H4 || {},
                             H1: d.H1 || {}
                         });
-                        console.log('[CCY] updateData called OK');
-                    } else {
-                        console.warn('[CCY] data.json invalid:', result);
+                        console.log('[CCY] Loaded from data.json OK');
                     }
                 })
                 .catch(e => {
-                    console.error('[CCY] data.json fetch failed:', e);
-                    // Fallback to localhost API
+                    console.error('[CCY] data.json failed:', e);
+                    // Priority 3: localhost API (only works locally)
                     fetch('http://localhost:8788/api/ccy_power/current')
                         .then(res => res.json())
                         .then(result => {
