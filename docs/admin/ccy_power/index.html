@@ -509,7 +509,7 @@
     </div>
 
     <script>
-        const CURRENCIES = ['NZD', 'AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'USD', 'XAU'];
+        const CURRENCIES = ['EUR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF', 'XAU', 'JPY', 'USD'];
         const MAX_VALUE = 10;
         let ws = null;
         let currentData = null;
@@ -620,13 +620,14 @@
         }
 
         function connectWebSocket() {
-            // ZeroMQ PUB-SUB bridge or WebSocket endpoint
             const wsUrl = 'ws://localhost:8787/ws/ccy_power';
             
             ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
                 console.log('WebSocket connected');
+                // Also load history from REST API
+                loadCurrentFromAPI();
             };
             
             ws.onmessage = (event) => {
@@ -641,16 +642,32 @@
             };
             
             ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                const badge = document.getElementById('status-badge');
-                badge.className = 'status-badge status-disconnected';
-                badge.innerHTML = '<i class="fas fa-circle text-xs mr-1"></i>Disconnected';
+                console.error('WebSocket error, falling back to REST API');
+                loadCurrentFromAPI();
             };
             
             ws.onclose = () => {
-                console.log('WebSocket closed');
+                console.log('WebSocket closed, retrying in 5s');
                 setTimeout(connectWebSocket, 5000);
             };
+        }
+        
+        function loadCurrentFromAPI() {
+            fetch('http://localhost:8788/api/ccy_power/current')
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success && result.data) {
+                        const d = result.data;
+                        updateData({
+                            type: 'ccy_power_multi',
+                            ts: result.timestamp,
+                            D1: d.D1 || {},
+                            H4: d.H4 || {},
+                            H1: d.H1 || {}
+                        });
+                    }
+                })
+                .catch(e => console.error('REST API fallback failed:', e));
         }
 
         function refreshData() {
@@ -688,15 +705,39 @@
             currentRange = range;
             const hours = getHoursFromRange(range);
             const grid = document.getElementById('timeline-grid');
-            grid.innerHTML = '<div class="timeline-loading">正在加载历史数据...</div>';
+            grid.innerHTML = '<div class="timeline-loading">Loading history...</div>';
             
-            // 先用 demo 数据渲染
-            loadTimelineDemoData(range);
-            
-            // TODO: 调用 API 获取真实历史数据
-            // fetch(`/api/ccy_power/timeline?hours=${hours}`)
-            //     .then(res => res.json())
-            //     .then(data => renderTimelineGrid(data));
+            // Try real API first
+            fetch(`http://localhost:8788/api/ccy_power/timeline?hours=${hours}`)
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success && result.timeline) {
+                        const data = result.timeline;
+                        // Convert API data to timeline format
+                        timelineData = [];
+                        for (const tf of ['D1', 'H4', 'H1']) {
+                            if (data[tf]) {
+                                data[tf].forEach(entry => {
+                                    timelineData.push({
+                                        timestamp: entry.timestamp,
+                                        currencies: entry.currencies,
+                                        hour: parseInt(entry.timestamp.split(' ')[1].split(':')[0])
+                                    });
+                                });
+                            }
+                        }
+                        if (timelineData.length > 0) {
+                            renderTimelineGrid(timelineData, range);
+                            return;
+                        }
+                    }
+                    // Fallback to demo data
+                    loadTimelineDemoData(range);
+                })
+                .catch(e => {
+                    console.error('Timeline API failed, using demo:', e);
+                    loadTimelineDemoData(range);
+                });
         }
         
         function loadTimelineDemoData(range) {
