@@ -738,35 +738,59 @@
             const grid = document.getElementById('timeline-grid');
             grid.innerHTML = '<div class="timeline-loading">Loading history...</div>';
             
-            // Try real API first
+            // Priority 1: inline data
+            if (window.__CCY_TIMELINE_DATA__ && window.__CCY_TIMELINE_DATA__.success) {
+                _processTimelineAPI(window.__CCY_TIMELINE_DATA__, range);
+                return;
+            }
+            // Priority 2: fetch timeline.json from same origin
+            const base = new URL('.', window.location.href).href;
+            fetch(base + 'timeline.json?t=' + Date.now())
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success && result.timeline) {
+                        _processTimelineAPI(result, range);
+                    } else {
+                        _loadTimelineFallback(range, hours);
+                    }
+                })
+                .catch(() => _loadTimelineFallback(range, hours));
+        }
+
+        function _processTimelineAPI(result, range) {
+            const data = result.timeline;
+            timelineData = [];
+            for (const tf of ['D1', 'H4', 'H1']) {
+                if (data[tf]) {
+                    data[tf].forEach(entry => {
+                        timelineData.push({
+                            timestamp: entry.timestamp,
+                            currencies: entry.currencies,
+                            hour: parseInt(entry.timestamp.split(' ')[1].split(':')[0])
+                        });
+                    });
+                }
+            }
+            if (timelineData.length > 0) {
+                renderTimelineGrid(timelineData, range);
+            } else {
+                loadTimelineDemoData(range);
+            }
+        }
+
+        function _loadTimelineFallback(range, hours) {
+            // Try localhost API (only works locally)
             fetch(`http://localhost:8788/api/ccy_power/timeline?hours=${hours}`)
                 .then(res => res.json())
                 .then(result => {
                     if (result.success && result.timeline) {
-                        const data = result.timeline;
-                        // Convert API data to timeline format
-                        timelineData = [];
-                        for (const tf of ['D1', 'H4', 'H1']) {
-                            if (data[tf]) {
-                                data[tf].forEach(entry => {
-                                    timelineData.push({
-                                        timestamp: entry.timestamp,
-                                        currencies: entry.currencies,
-                                        hour: parseInt(entry.timestamp.split(' ')[1].split(':')[0])
-                                    });
-                                });
-                            }
-                        }
-                        if (timelineData.length > 0) {
-                            renderTimelineGrid(timelineData, range);
-                            return;
-                        }
+                        _processTimelineAPI(result, range);
+                    } else {
+                        loadTimelineDemoData(range);
                     }
-                    // Fallback to demo data
-                    loadTimelineDemoData(range);
                 })
                 .catch(e => {
-                    console.error('Timeline API failed, using demo:', e);
+                    console.error('Timeline all sources failed:', e);
                     loadTimelineDemoData(range);
                 });
         }
