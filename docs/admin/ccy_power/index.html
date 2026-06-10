@@ -887,36 +887,33 @@
             const grid = document.getElementById('timeline-grid');
             const currencies = ['XAU', 'CAD', 'JPY', 'AUD', 'EUR', 'CHF', 'GBP', 'NZD', 'USD'];
             
-            // 根据时间范围调整列数
-            // Always show 24 columns, use last 24 entries
-            const show = data.slice(-24);
-            const pad = 24 - show.length;
+            // Build a map: hour (0-23) -> data entry (use last 24h of data)
+            const lastEntries = data.slice(-24);
+            const byHour = {};
+            lastEntries.forEach(entry => {
+                const h = typeof entry.timestamp === 'string' ? parseInt(entry.timestamp.split(' ')[1]) : entry.hour;
+                byHour[h] = entry;  // last entry per hour wins
+            });
             
             grid.style.gridTemplateColumns = '36px repeat(24, 14px)';
             grid.style.gridTemplateRows = '18px repeat(' + currencies.length + ', 18px)';
             
-            // Header row
+            // Header row: fixed 0-23
             let html = '<div style="font-size:0.5rem;padding:1px 2px;">HKT</div>';
-            for (let i = 0; i < 24; i++) {
-                const idx = i - pad;
-                if (idx >= 0 && show[idx]) {
-                    const h = typeof show[idx].timestamp === 'string' ? parseInt(show[idx].timestamp.split(' ')[1]) : show[idx].hour;
-                    html += '<div style="font-size:0.5rem;text-align:center;padding:1px;">' + h + '</div>';
-                } else {
-                    html += '<div style="font-size:0.5rem;text-align:center;padding:1px;color:#475569;">-</div>';
-                }
+            for (let h = 0; h < 24; h++) {
+                html += '<div style="font-size:0.5rem;text-align:center;padding:1px;">' + h + '</div>';
             }
             
-            // Currency rows
+            // Currency rows: lookup by hour
             currencies.forEach(ccy => {
                 html += '<div style="font-size:0.55rem;padding:0 2px;font-weight:600;">' + ccy + '</div>';
-                for (let i = 0; i < 24; i++) {
-                    const idx = i - pad;
-                    if (idx >= 0 && show[idx]) {
-                        const v = show[idx].currencies[ccy] || 0;
-                        const allVals = currencies.map(c => show[idx].currencies[c] || 0);
+                for (let h = 0; h < 24; h++) {
+                    const entry = byHour[h];
+                    if (entry) {
+                        const v = entry.currencies[ccy] || 0;
+                        const allVals = currencies.map(c => entry.currencies[c] || 0);
                         const cls = getRankClass(v, allVals);
-                        html += '<div class="timeline-cell ' + cls + ' session-' + getSession(show[idx].hour) + '" style="width:100%;height:18px;border-radius:2px;" title="' + show[idx].timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
+                        html += '<div class="timeline-cell ' + cls + ' session-' + getSession(h) + '" style="width:100%;height:18px;border-radius:2px;" title="' + entry.timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
                     } else {
                         html += '<div style="width:100%;height:18px;background:#1e293b;border-radius:2px;"></div>';
                     }
