@@ -375,7 +375,9 @@
         .timeline-cell.r7 { background: #fb923c; }
         .timeline-cell.r8 { background: #ef4444; }
         .timeline-cell.r9 { background: #b91c1c; }  /* weakest */
-        /* Session indicator is now a bottom color bar, not cell borders */
+        .timeline-cell.session-asia { box-shadow: inset 0 0 0 2px rgba(245,158,11,0.6); }
+        .timeline-cell.session-europe { box-shadow: inset 0 0 0 2px rgba(59,130,246,0.6); }
+        .timeline-cell.session-us { box-shadow: inset 0 0 0 2px rgba(16,185,129,0.6); }
             color: var(--text2);
         }
         .timeline-footer {
@@ -491,7 +493,7 @@
         <!-- Heatmap -->
         <div class="heatmap-card">
             <div class="heatmap-header">
-                <div class="tf-label"><i class="fas fa-th"></i> Current Strength</div>
+                <div class="tf-label"><i class="fas fa-th"></i> MTF Heatmap</div>
                 <div class="heatmap-legend">
                     <span class="legend-item" style="display:flex;align-items:center;gap:4px;">
                         <span style="display:inline-flex;height:10px;border-radius:2px;overflow:hidden;">
@@ -501,7 +503,7 @@
                             <span style="width:14px;background:#fb923c"></span>
                             <span style="width:14px;background:#b91c1c"></span>
                         </span>
-                        <span style="font-size:0.7rem;color:var(--text2)">Strong → Weak (single TF)</span>
+                        <span style="font-size:0.7rem;color:var(--text2)">Strong → Weak</span>
                     </span>
                 </div>
             </div>
@@ -518,6 +520,8 @@
                 <div class="timeline-controls">
                     <button class="range-btn active" data-range="24h">24hr</button>
                     <button class="range-btn" data-range="3d">3D</button>
+                    <button class="range-btn" data-range="7d">7D</button>
+                    <button class="range-btn" data-range="30d">30D</button>
                 </div>
             </div>
             <div class="timeline-market-labels">
@@ -654,44 +658,37 @@
             
             container.innerHTML = '';
             
-            // Header: just one column since D1=H4=H1
+            // Header row: TF labels
             const emptyCell = document.createElement('div');
             emptyCell.className = 'heatmap-cell';
             container.appendChild(emptyCell);
-            const valHeader = document.createElement('div');
-            valHeader.className = 'heatmap-cell tf-label';
-            valHeader.textContent = 'Power';
-            container.appendChild(valHeader);
-            const rankHeader = document.createElement('div');
-            rankHeader.className = 'heatmap-cell tf-label';
-            rankHeader.textContent = 'Rank';
-            container.appendChild(rankHeader);
             
-            // Currency rows - sorted by value
+            ['D1', 'H4', 'H1'].forEach(tf => {
+                const cell = document.createElement('div');
+                cell.className = 'heatmap-cell tf-label';
+                cell.textContent = tf;
+                container.appendChild(cell);
+            });
+            
+            // Currency rows
             const sorted = Object.entries(data.D1).sort((a, b) => b[1] - a[1]);
             
-            sorted.forEach(([currency, _], idx) => {
+            sorted.forEach(([currency, _]) => {
                 // Currency label
                 const labelCell = document.createElement('div');
                 labelCell.className = 'heatmap-cell currency-label';
                 labelCell.textContent = currency;
                 container.appendChild(labelCell);
                 
-                // Value
-                const value = data.D1[currency];
-                const statusClass = getStatusClass(value);
-                const cell = document.createElement('div');
-                cell.className = 'heatmap-cell ' + statusClass;
-                cell.textContent = value.toFixed(2);
-                container.appendChild(cell);
-                
-                // Rank
-                const rankCell = document.createElement('div');
-                rankCell.className = 'heatmap-cell';
-                rankCell.textContent = '#' + (idx + 1);
-                rankCell.style.color = 'var(--text2)';
-                rankCell.style.fontSize = '0.7rem';
-                container.appendChild(rankCell);
+                // TF values
+                ['D1', 'H4', 'H1'].forEach(tf => {
+                    const value = data[tf][currency];
+                    const statusClass = getStatusClass(value);
+                    const cell = document.createElement('div');
+                    cell.className = `heatmap-cell ${statusClass}`;
+                    cell.textContent = value.toFixed(2);
+                    container.appendChild(cell);
+                });
             });
         }
 
@@ -919,24 +916,13 @@
             const currencies = ['XAU', 'CAD', 'JPY', 'AUD', 'EUR', 'CHF', 'GBP', 'NZD', 'USD'];
             
             if (range === '24h') {
-                // 24h: fixed 0-23 columns, fill missing hours with nearest available data
-                const lastEntries = data.slice(-30); // get more than 24 to have overlap
+                // 24h: fixed 0-23 columns, lookup by hour from last 24 entries
+                const lastEntries = data.slice(-24);
                 const byHour = {};
                 lastEntries.forEach(entry => {
                     const h = typeof entry.timestamp === 'string' ? parseInt(entry.timestamp.split(' ')[1]) : entry.hour;
                     byHour[h] = entry;
                 });
-                // Fill gaps: use the last known entry's data for missing hours
-                const filledByHour = {};
-                let lastKnown = null;
-                for (let h = 0; h < 24; h++) {
-                    if (byHour[h]) { filledByHour[h] = byHour[h]; lastKnown = byHour[h]; }
-                    else if (lastKnown) { filledByHour[h] = Object.assign({}, lastKnown, { _gap: true }); }
-                }
-                // Backward fill for hours before first data
-                let firstKnown = null;
-                for (let h = 23; h >= 0; h--) { if (byHour[h]) { firstKnown = byHour[h]; break; } }
-                if (firstKnown) { for (let h = 0; h < 24; h++) { if (!filledByHour[h]) filledByHour[h] = Object.assign({}, firstKnown, { _gap: true }); } }
                 
                 grid.style.gridTemplateColumns = '36px repeat(24, 14px)';
                 grid.style.gridTemplateRows = '18px repeat(' + currencies.length + ', 18px)';
@@ -949,30 +935,17 @@
                 currencies.forEach(ccy => {
                     html += '<div style="font-size:0.55rem;padding:0 2px;font-weight:600;">' + ccy + '</div>';
                     for (let h = 0; h < 24; h++) {
-                        const entry = filledByHour[h];
+                        const entry = byHour[h];
                         if (entry) {
                             const v = entry.currencies[ccy] || 0;
                             const allVals = currencies.map(c => entry.currencies[c] || 0);
                             const cls = getRankClass(v, allVals);
-                            const opacity = entry._gap ? 'opacity:0.4;' : '';
-                            html += '<div class="timeline-cell ' + cls + '" style="width:100%;height:18px;border-radius:2px;' + opacity + '" title="' + entry.timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
+                            html += '<div class="timeline-cell ' + cls + ' session-' + getSession(h) + '" style="width:100%;height:18px;border-radius:2px;" title="' + entry.timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
                         } else {
-                            html += '<div style="width:100%;height:18px;background:var(--bg);border-radius:2px;"></div>';
+                            html += '<div style="width:100%;height:18px;background:#1e293b;border-radius:2px;"></div>';
                         }
                     }
                 });
-                // Session color bar at bottom
-                html += '<div></div>'; // empty corner
-                for (let h = 0; h < 24; h++) {
-                    const session = getSession(h);
-                    const color = session === 'asia' ? '#f59e0b' : session === 'europe' ? '#3b82f6' : session === 'us' ? '#10b981' : 'transparent';
-                    html += '<div style="height:4px;background:' + color + ';border-radius:1px;"></div>';
-                }
-                // Session labels row
-                html += '<div></div>';
-                html += '<div style="grid-column:2/9;font-size:0.5rem;color:#f59e0b;text-align:center;padding-top:2px;">亞盤 07-16</div>';
-                html += '<div style="grid-column:9/24;font-size:0.5rem;color:#3b82f6;text-align:center;padding-top:2px;">歐盤 14-23</div>';
-                html += '<div style="grid-column:22/26;font-size:0.5rem;color:#10b981;text-align:center;padding-top:2px;">美盤</div>';
                 grid.innerHTML = html;
                 
             } else {
@@ -1010,16 +983,12 @@
                         const v = entry.currencies[ccy] || 0;
                         const allVals = currencies.map(c => entry.currencies[c] || 0);
                         const cls = getRankClass(v, allVals);
-                        html += '<div class="timeline-cell ' + cls + '" style="width:100%;height:18px;border-radius:2px;" title="' + entry.timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
+                        // Add session marker from timestamp hour
+                        const tsHour = typeof entry.timestamp === 'string' ? parseInt(entry.timestamp.split(' ')[1]) : 0;
+                        const session = getSession(tsHour);
+                        const sessionCls = session ? ' session-' + session : '';
+                        html += '<div class="timeline-cell ' + cls + sessionCls + '" style="width:100%;height:18px;border-radius:2px;" title="' + entry.timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
                     });
-                });
-                // Session color bar at bottom for 3D
-                html += '<div></div>';
-                show.forEach(entry => {
-                    const tsHour = typeof entry.timestamp === 'string' ? parseInt(entry.timestamp.split(' ')[1]) : 0;
-                    const session = getSession(tsHour);
-                    const color = session === 'asia' ? '#f59e0b' : session === 'europe' ? '#3b82f6' : session === 'us' ? '#10b981' : 'var(--border)';
-                    html += '<div style="height:4px;background:' + color + ';border-radius:1px;"></div>';
                 });
                 grid.innerHTML = html;
             }
