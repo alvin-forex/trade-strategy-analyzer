@@ -953,18 +953,20 @@
                 // 3d=72h, 7d=168h, 30d=720h - show all H1 entries compressed
                 const maxHours = getHoursFromRange(range);
                 let show = data.slice(-maxHours);
-                // Auto-calculate cell width to fit container (account for 1px gap)
-                const containerW = grid.parentElement ? grid.parentElement.clientWidth - 44 : 340;
-                const gapSize = show.length > 100 ? 1 : 2; // tighter gap for dense grids
-                const gapTotal = (show.length) * gapSize;
-                let cellW = Math.max(2, Math.floor((containerW - gapTotal) / Math.max(show.length, 1)));
-                // If total grid exceeds container, sample to fit
-                const totalEst = 36 + show.length * (cellW + gapSize);
-                if (totalEst > containerW && show.length > 24) {
-                    const maxFit = Math.floor((containerW - 36) / (2 + gapSize));
-                    const step = Math.ceil(show.length / maxFit);
+                // Container width minus label column (36px) and safety margin
+                const parentW = grid.parentElement ? grid.parentElement.clientWidth : 340;
+                const availW = parentW - 36; // available for data cells only
+                // Target: all cells + gaps must fit in availW
+                // cellW * N + gapSize * (N-1) <= availW
+                // For dense grids, use 1px gap
+                const gapSize = show.length > 80 ? 1 : 2;
+                let cellW = Math.max(2, Math.floor((availW - (show.length - 1) * gapSize) / show.length));
+                // If cells too small (<2px), sample entries to fit
+                if (cellW < 2) {
+                    const maxCols = Math.floor(availW / (2 + gapSize));
+                    const step = Math.ceil(show.length / maxCols);
                     show = show.filter((_, i) => i % step === 0 || i === show.length - 1);
-                    cellW = Math.max(2, Math.floor((containerW - 36 - show.length * gapSize) / show.length));
+                    cellW = Math.max(2, Math.floor((availW - (show.length - 1) * gapSize) / show.length));
                 }
                 
                 grid.style.gridTemplateColumns = '36px repeat(' + show.length + ', ' + cellW + 'px)';
