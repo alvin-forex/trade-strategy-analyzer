@@ -107,6 +107,28 @@
     /* Latest time badge */
     .latest-time-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.15); border: 1px solid var(--accent); color: var(--accent); font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 0.3rem; margin-left: 0.5rem; }
     .footer { text-align: center; padding: 1.5rem; color: var(--text2); font-size: 0.75rem; }
+    /* Pairs table */
+    .pairs-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .pairs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem; }
+    .pairs-controls { display: flex; gap: 0.5rem; align-items: center; }
+    .pairs-select { padding: 0.4rem 0.6rem; border-radius: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); font-size: 0.75rem; cursor: pointer; }
+    .pairs-table-wrap { overflow-x: auto; }
+    .pairs-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .pairs-table th { padding: 0.5rem 0.4rem; text-align: center; color: var(--text2); font-weight: 600; font-size: 0.7rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .pairs-table td { padding: 0.45rem 0.4rem; text-align: center; border-bottom: 1px solid rgba(51,65,85,0.3); white-space: nowrap; font-family: 'SF Mono','Fira Code',monospace; font-size: 0.72rem; }
+    .pairs-table tr:hover td { background: var(--bg-hover); }
+    .pairs-table .pair-name { font-weight: 700; text-align: left; padding-left: 0.6rem; color: var(--text); }
+    .bias-strong-buy { color: #059669; font-weight: 700; }
+    .bias-buy { color: #10b981; }
+    .bias-neutral { color: var(--text2); }
+    .bias-sell { color: #fb923c; }
+    .bias-strong-sell { color: #b91c1c; font-weight: 700; }
+    .rsi-ob { color: #ef4444; }
+    .rsi-os { color: #10b981; }
+    .signal-bar { display: inline-block; width: 40px; height: 4px; border-radius: 2px; vertical-align: middle; }
+    .signal-pos { background: var(--green); }
+    .signal-neg { background: var(--red); }
+    .signal-zero { background: var(--border); }
     @media (max-width: 768px) {
         body { margin-left: 0 !important; }
         .dashboard-container { padding: 0.5rem; }
@@ -200,8 +222,32 @@
             <div class="tf-card"><div class="tf-header"><div class="tf-label"><i class="fas fa-clock"></i> H4</div><div class="tf-timestamp" id="h4-ts">--</div></div><div class="currency-list" id="h4-grid"></div></div>
             <div class="tf-card"><div class="tf-header"><div class="tf-label"><i class="fas fa-hourglass-half"></i> H1</div><div class="tf-timestamp" id="h1-ts">--</div></div><div class="currency-list" id="h1-grid"></div></div>
         </div>
+        <!-- 29 Pairs Technical Analysis -->
+        <div class="pairs-card">
+            <div class="pairs-header">
+                <div class="tf-label"><i class="fas fa-table"></i> 29 Pairs Technical Analysis</div>
+                <div class="pairs-controls">
+                    <select id="pairs-tf-select" class="pairs-select">
+                        <option value="D1">D1</option>
+                        <option value="H4">H4</option>
+                        <option value="H1">H1</option>
+                    </select>
+                    <button id="pairs-sort-signal" class="range-btn active" onclick="sortPairs('signal')">Signal</button>
+                    <button id="pairs-sort-rsi" class="range-btn" onclick="sortPairs('rsi')">RSI</button>
+                    <button id="pairs-sort-atr" class="range-btn" onclick="sortPairs('atr')">ATR</button>
+                </div>
+            </div>
+            <div class="pairs-table-wrap">
+                <table class="pairs-table" id="pairs-table">
+                    <thead><tr>
+                        <th>Pair</th><th>Price</th><th>Chg</th><th>RSI</th><th>MACD</th><th>EMA Trend</th><th>ATR</th><th>BB Pos</th><th>Signal</th><th>Bias</th>
+                    </tr></thead>
+                    <tbody id="pairs-tbody"><tr><td colspan="10" style="text-align:center;padding:1rem;color:var(--text2)">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
         <div class="footer">
-            <p>CCY Power Dashboard v1.1 | Data Source: MT4 ForexDataExporter EA</p>
+            <p>CCY Power Dashboard v1.2 | Data Source: MT4 ForexDataExporter EA (v5.01)</p>
             <p>Last verified: 2026-06-10 HKT</p>
         </div>
     </div>
@@ -305,10 +351,62 @@
             updateLatestBadge(range); renderSessionBar(range);
         }
 
+        // === 29 Pairs Analysis ===
+        let pairsData = null, pairsSortBy = 'signal', pairsTF = 'D1';
+        function loadPairsData() {
+            const base = new URL('.',window.location.href).href;
+            fetch(base+'pairs.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.pairs){pairsData=r.pairs;renderPairs();}}).catch(()=>{});
+        }
+        function sortPairs(by) {
+            pairsSortBy = by;
+            document.getElementById('pairs-sort-signal').className='range-btn'+(by==='signal'?' active':'');
+            document.getElementById('pairs-sort-rsi').className='range-btn'+(by==='rsi'?' active':'');
+            document.getElementById('pairs-sort-atr').className='range-btn'+(by==='atr'?' active':'');
+            renderPairs();
+        }
+        function renderPairs() {
+            if (!pairsData) return;
+            const tf = document.getElementById('pairs-tf-select').value;
+            const tbody = document.getElementById('pairs-tbody');
+            let entries = Object.entries(pairsData).map(([sym,data])=>({sym,data:data[tf]||{}})).filter(e=>e.data.c);
+            
+            if (pairsSortBy==='signal') entries.sort((a,b)=>(b.data.signal||0)-(a.data.signal||0));
+            else if (pairsSortBy==='rsi') entries.sort((a,b)=>(b.data.rsi||0)-(a.data.rsi||0));
+            else if (pairsSortBy==='atr') entries.sort((a,b)=>(b.data.atr||0)-(a.data.atr||0));
+            
+            let html='';
+            entries.forEach(({sym,data})=>{
+                const bias = data.bias||'Neutral';
+                const biasCls = bias==='Strong Buy'?'bias-strong-buy':bias==='Buy'?'bias-buy':bias==='Sell'?'bias-sell':bias==='Strong Sell'?'bias-strong-sell':'bias-neutral';
+                const rsiCls = data.rsi>70?'rsi-ob':data.rsi<30?'rsi-os':'';
+                const emaTrend = data.ema20>data.ema50>data.ema200?'↑↑ Bull':data.ema20<data.ema50<data.ema200?'↓↓ Bear':'→ Mix';
+                const bbPos = ((data.c-data.bb_l)/(data.bb_u-data.bb_l)*100).toFixed(0);
+                const sig = data.signal||0;
+                const sigCls = sig>0?'signal-pos':sig<0?'signal-neg':'signal-zero';
+                const sigW = Math.min(40,Math.abs(sig)*6);
+                const dp = sym==='XAUUSD'||sym.includes('JPY')?2:5;
+                html+='<tr>'+
+                    '<td class="pair-name">'+sym+'</td>'+
+                    '<td>'+data.c.toFixed(dp)+'</td>'+
+                    '<td style="color:'+(data.change>0?'var(--green)':'var(--red)')+'">'+(data.change>0?'+':'')+data.change+'</td>'+
+                    '<td class="'+rsiCls+'">'+(data.rsi||0).toFixed(1)+'</td>'+
+                    '<td style="color:'+(data.macd_h>0?'var(--green)':'var(--red)')+'">'+(data.macd_h>0?'▲':'▼')+' '+(data.macd_h||0).toFixed(dp)+'</td>'+
+                    '<td>'+emaTrend+'</td>'+
+                    '<td>'+(data.atr||0).toFixed(dp)+'</td>'+
+                    '<td>'+bbPos+'%</td>'+
+                    '<td><span class="signal-bar '+sigCls+'" style="width:'+sigW+'px"></span> '+sig+'</td>'+
+                    '<td class="'+biasCls+'">'+bias+'</td>'+
+                    '</tr>';
+            });
+            tbody.innerHTML = html || '<tr><td colspan="10" style="text-align:center;padding:1rem;color:var(--text2)">No data</td></tr>';
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             loadCurrentFromAPI();
             if(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1') connectWebSocket();
             loadTimelineData('24h');
+            loadPairsData();
+            document.getElementById('pairs-tf-select').addEventListener('change',renderPairs);
             document.querySelectorAll('.range-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadTimelineData(btn.dataset.range);});});
         });
     </script>
