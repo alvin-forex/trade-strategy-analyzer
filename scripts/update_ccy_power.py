@@ -15,21 +15,50 @@ TIMELINE_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/ad
 DB_PATH = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/data/ccy_power_history.db"
 
 def read_csv():
-    """Read latest forex_data.csv and extract CCY Power + OHLC data"""
+    """Read latest CCY Power data from ccy_power_v2 DB (Pipeline 2).
+    Falls back to forex_data.csv if DB is empty.
+    Pipeline 2 = CCY Power Indicator → ccy_power_history.csv → ccy_power_v2 DB
+    This gives per-TF distinct values, unlike EA's forex_data.csv (same values all TFs).
+    """
+    import sqlite3 as sq3
+    
+    CCY_NAMES = ["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD", "USD", "XAU"]
+    
+    # Try ccy_power_v2 first (has real per-TF distinct values)
+    if os.path.exists(DB_PATH):
+        try:
+            conn = sq3.connect(DB_PATH)
+            c = conn.cursor()
+            data = {}
+            for tf in ['D1', 'H4', 'H1']:
+                c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU
+                             FROM ccy_power_v2 WHERE timeframe=? ORDER BY timestamp DESC LIMIT 1''', (tf,))
+                row = c.fetchone()
+                if row:
+                    vals = {}
+                    for i, name in enumerate(CCY_NAMES):
+                        vals[name] = round(float(row[1+i]), 4) if row[1+i] else 0
+                    data[tf] = vals
+            conn.close()
+            if len(data) >= 2:  # At least 2 TFs with distinct data
+                print(f"[OK] Using ccy_power_v2 DB: {len(data)} TFs with distinct values")
+                return data, []
+        except Exception as e:
+            print(f"[WARN] ccy_power_v2 read failed: {e}")
+    
+    # Fallback: forex_data.csv (EA output, may have same values across TFs)
     if not os.path.exists(CSV_PATH):
         print(f"ERROR: CSV not found: {CSV_PATH}")
         return None
     
-    data = {}  # tf -> {ccy_name: value}
+    data = {}
     all_rows = []
-    
     with open(CSV_PATH, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
             all_rows.append(row)
             tf = row.get('timeframe', '')
             if tf not in data:
-                # Extract CCY Power from first row of each TF
                 ccy = {}
                 for i in range(1, 10):
                     name = row.get(f'ccy_{i}_name', '').strip()
@@ -38,7 +67,7 @@ def read_csv():
                         ccy[name] = float(val)
                 if ccy:
                     data[tf] = ccy
-    
+    print(f"[WARN] Fallback to forex_data.csv (values may be identical across TFs)")
     return data, all_rows
 
 def update_data_json(ccy_data):
@@ -58,14 +87,25 @@ def update_data_json(ccy_data):
         print(f"  {tf}: {', '.join(f'{k}={v:.1f}' for k,v in top)}")
 
 def save_to_db(ccy_data):
-    """Save CCY Power data to SQLite for timeline history"""
+    """Save CCY Power data to ccy_power_v3 for timeline history.
+    Skip if data came from v2 DB (already has correct per-TF data).
+    Only write if at least 2 TFs have different values.
+    """
     import sqlite3
+    
+    # Check if values are identical across TFs (EA bug)
+    tf_vals = list(ccy_data.values())
+    if len(tf_vals) >= 2:
+        first = tf_vals[0]
+        all_same = all(v == first for v in tf_vals[1:])
+        if all_same:
+            print("[SKIP] ccy_power_v3: values identical across TFs (EA bug), skipping")
+            return
     
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Create table if not exists
     c.execute('''CREATE TABLE IF NOT EXISTS ccy_power_v3
                  (timestamp TEXT, timeframe TEXT,
                   AUD REAL, CAD REAL, CHF REAL, EUR REAL, GBP REAL,
@@ -90,23 +130,19 @@ def save_to_db(ccy_data):
     
     conn.commit()
     
-    # Keep only last 7 days (168 hourly entries)
-    c.execute("DELETE FROM ccy_power_v3 WHERE timestamp < ?", 
-              (datetime.now().replace(hour=0, minute=0).strftime("%Y.%m.%d ") + "00:00",))
-    conn.commit()
-    
-    # Keep only last 30 days for daily
-    # Actually let's just keep 7 days of data
+    # Keep only last 30 days
     from datetime import timedelta
-    cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y.%m.%d %H:%M")
+    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y.%m.%d %H:%M")
     c.execute("DELETE FROM ccy_power_v3 WHERE timestamp < ?", (cutoff,))
     conn.commit()
     
     conn.close()
-    print(f"[OK] DB updated: {count} TF entries")
+    print(f"[OK] ccy_power_v3 updated: {count} TF entries")
 
 def update_timeline_json():
-    """Generate timeline.json from DB"""
+    """Generate timeline.json from both ccy_power_v2 and ccy_power_v3 DBs.
+    Prefer ccy_power_v2 (Pipeline 2, real per-TF data) over v3 (may be identical).
+    """
     import sqlite3
     
     if not os.path.exists(DB_PATH):
@@ -116,30 +152,61 @@ def update_timeline_json():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
+    # Try v2 first for real per-TF timeline
+    v2_count = 0
     timeline = {}
     for tf in ['D1', 'H4', 'H1']:
-        c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU 
-                     FROM ccy_power_v3 
-                     WHERE timeframe = ? 
-                     ORDER BY timestamp DESC LIMIT 168''', (tf,))
-        rows = c.fetchall()
-        entries = []
-        for row in reversed(rows):
-            entries.append({
-                "timestamp": row[0],
-                "currencies": {
-                    "AUD": row[1], "CAD": row[2], "CHF": row[3],
-                    "EUR": row[4], "GBP": row[5], "JPY": row[6],
-                    "NZD": row[7], "USD": row[8], "XAU": row[9]
-                }
-            })
-        timeline[tf] = entries
+        try:
+            c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU 
+                         FROM ccy_power_v2 
+                         WHERE timeframe = ? 
+                         ORDER BY timestamp DESC LIMIT 720''', (tf,))
+            rows = c.fetchall()
+            v2_count += len(rows)
+            entries = []
+            for row in reversed(rows):
+                entries.append({
+                    "timestamp": row[0],
+                    "currencies": {
+                        "AUD": row[1], "CAD": row[2], "CHF": row[3],
+                        "EUR": row[4], "GBP": row[5], "JPY": row[6],
+                        "NZD": row[7], "USD": row[8], "XAU": row[9]
+                    }
+                })
+            timeline[tf] = entries
+        except Exception:
+            pass
+    
+    # Fill missing TFs from v3
+    for tf in ['D1', 'H4', 'H1']:
+        if tf in timeline and len(timeline[tf]) > 0:
+            continue
+        try:
+            c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU 
+                         FROM ccy_power_v3 
+                         WHERE timeframe = ? 
+                         ORDER BY timestamp DESC LIMIT 720''', (tf,))
+            rows = c.fetchall()
+            entries = []
+            for row in reversed(rows):
+                entries.append({
+                    "timestamp": row[0],
+                    "currencies": {
+                        "AUD": row[1], "CAD": row[2], "CHF": row[3],
+                        "EUR": row[4], "GBP": row[5], "JPY": row[6],
+                        "NZD": row[7], "USD": row[8], "XAU": row[9]
+                    }
+                })
+            if entries:
+                timeline[tf] = entries
+        except Exception:
+            pass
     
     conn.close()
     
     out = {
         "success": True,
-        "hours": 168,
+        "hours": 720,
         "timeline": timeline
     }
     
@@ -147,7 +214,7 @@ def update_timeline_json():
         json.dump(out, f, indent=2)
     
     total = sum(len(v) for v in timeline.values())
-    print(f"[OK] timeline.json updated: {total} entries across {len(timeline)} TFs")
+    print(f"[OK] timeline.json: {total} entries across {len(timeline)} TFs (v2={v2_count} rows)")
 
 if __name__ == "__main__":
     result = read_csv()
