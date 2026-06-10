@@ -12,6 +12,7 @@ from collections import defaultdict
 CSV_PATH = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/forex_data.csv"
 DATA_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/data.json"
 TIMELINE_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/timeline.json"
+PAIRS_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/pairs.json"
 DB_PATH = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/data/ccy_power_history.db"
 
 def read_csv():
@@ -216,6 +217,81 @@ def update_timeline_json():
     total = sum(len(v) for v in timeline.values())
     print(f"[OK] timeline.json: {total} entries across {len(timeline)} TFs (v2={v2_count} rows)")
 
+def update_pairs_json(all_rows):
+    """Generate pairs.json with technical analysis from forex_data.csv"""
+    if not all_rows:
+        print("[WARN] No rows for pairs.json")
+        return
+    
+    pairs = {}
+    for row in all_rows:
+        sym = row.get('symbol','').rstrip('.')
+        tf = row.get('timeframe','')
+        try:
+            price = float(row.get('close','0'))
+            o = float(row.get('open','0'))
+            bb_u = float(row.get('bb_upper','0'))
+            bb_m = float(row.get('bb_middle','0'))
+            bb_l = float(row.get('bb_lower','0'))
+            ema20 = float(row.get('ema20','0'))
+            ema50 = float(row.get('ema50','0'))
+            ema200 = float(row.get('ema200','0'))
+            atr = float(row.get('atr14','0'))
+            rsi = float(row.get('rsi14','0'))
+            macd_h = float(row.get('macd_hist','0'))
+        except:
+            continue
+        
+        if sym not in pairs: pairs[sym] = {}
+        
+        # Signal calculation
+        signals = []
+        if rsi > 70: signals.append(-2)
+        elif rsi > 60: signals.append(1)
+        elif rsi > 40: signals.append(0)
+        elif rsi > 30: signals.append(-1)
+        else: signals.append(2)
+        
+        if macd_h > 0: signals.append(1)
+        elif macd_h < 0: signals.append(-1)
+        else: signals.append(0)
+        
+        if ema20 > ema50 > ema200: signals.append(2)
+        elif ema20 > ema50: signals.append(1)
+        elif ema20 < ema50 < ema200: signals.append(-2)
+        elif ema20 < ema50: signals.append(-1)
+        else: signals.append(0)
+        
+        if price > bb_u: signals.append(1)
+        elif price < bb_l: signals.append(-1)
+        else: signals.append(0)
+        
+        total = sum(signals)
+        if total >= 3: bias = "Strong Buy"
+        elif total >= 1: bias = "Buy"
+        elif total <= -3: bias = "Strong Sell"
+        elif total <= -1: bias = "Sell"
+        else: bias = "Neutral"
+        
+        change = round((price - o) / o * 10000, 1) if o > 0 else 0
+        
+        pairs[sym][tf] = {
+            "o": o, "h": float(row.get('high','0')), "l": float(row.get('low','0')), "c": price,
+            "bb_u": bb_u, "bb_m": bb_m, "bb_l": bb_l,
+            "ema20": ema20, "ema50": ema50, "ema200": ema200,
+            "atr": atr, "rsi": rsi,
+            "macd_h": macd_h,
+            "signal": total, "bias": bias, "change": change
+        }
+    
+    # Sort by D1 signal
+    sorted_pairs = dict(sorted(pairs.items(), key=lambda x: -(x[1].get('D1',{}).get('signal',0))))
+    
+    out = {"success": True, "pairs": sorted_pairs}
+    with open(PAIRS_JSON, 'w') as f:
+        json.dump(out, f)
+    print(f"[OK] pairs.json: {len(sorted_pairs)} pairs")
+
 if __name__ == "__main__":
     result = read_csv()
     if result is None:
@@ -230,4 +306,14 @@ if __name__ == "__main__":
     update_data_json(ccy_data)
     save_to_db(ccy_data)
     update_timeline_json()
+    
+    # Generate pairs.json from forex_data.csv (EA data has all 29 pairs)
+    csv_path = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/forex_data.csv"
+    if os.path.exists(csv_path):
+        pair_rows = []
+        with open(csv_path) as f:
+            reader = csv.DictReader(f)
+            for row in reader: pair_rows.append(row)
+        update_pairs_json(pair_rows)
+    
     print("[DONE] CCY Power update complete")
