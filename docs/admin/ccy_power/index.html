@@ -355,6 +355,10 @@
         .timeline-grid {
             display: grid;
             gap: 2px;
+        }
+        .timeline-grid.dense {
+            gap: 1px;
+        }
             min-height: 200px;
         }
         .timeline-loading {
@@ -947,15 +951,25 @@
             } else {
                 // 3d/7d/30d: all H1 data, compressed to fit mobile viewport
                 // 3d=72h, 7d=168h, 30d=720h - show all H1 entries compressed
-                const show = data.slice(-getHoursFromRange(range));
-                // Auto-calculate cell width to fit container (account for 2px gap)
+                const maxHours = getHoursFromRange(range);
+                let show = data.slice(-maxHours);
+                // Auto-calculate cell width to fit container (account for 1px gap)
                 const containerW = grid.parentElement ? grid.parentElement.clientWidth - 44 : 340;
-                const gapTotal = (show.length) * 2; // 2px gap per data cell
-                const cellW = Math.max(2, Math.floor((containerW - gapTotal) / Math.max(show.length, 1)));
+                const gapSize = show.length > 100 ? 1 : 2; // tighter gap for dense grids
+                const gapTotal = (show.length) * gapSize;
+                let cellW = Math.max(2, Math.floor((containerW - gapTotal) / Math.max(show.length, 1)));
+                // If still doesn't fit with all entries, sample to fit
+                if (cellW < 2 && show.length > 24) {
+                    const maxFit = Math.floor(containerW / 4); // 2px cell + 2px gap
+                    show = show.filter((_, i) => i % Math.ceil(show.length / maxFit) === 0);
+                    cellW = Math.max(2, Math.floor((containerW - show.length) / show.length));
+                }
                 
                 grid.style.gridTemplateColumns = '36px repeat(' + show.length + ', ' + cellW + 'px)';
                 grid.style.gridTemplateRows = '18px repeat(' + currencies.length + ', 18px)';
                 grid.style.overflowX = 'hidden';
+                // Use dense gap for large datasets
+                grid.className = 'timeline-grid' + (show.length > 100 ? ' dense' : '');
                 
                 // No date header - just currency rows
                 let html = '';
