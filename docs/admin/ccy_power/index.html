@@ -359,9 +359,16 @@
             text-align: center;
             padding: 2rem;
         }
-        .timeline-cell.strong { background: rgba(16,185,129,0.65); }
-        .timeline-cell.neutral { background: rgba(234,179,8,0.45); }
-        .timeline-cell.weak { background: rgba(239,68,68,0.55); }
+        /* 9-level rank-based gradient colors: rank 1 (strongest) → rank 9 (weakest) */
+        .timeline-cell.r1 { background: rgba(16,185,129,0.90); }  /* #10b981 deep green */
+        .timeline-cell.r2 { background: rgba(52,211,153,0.80); }  /* #34d399 */
+        .timeline-cell.r3 { background: rgba(110,231,183,0.70); }  /* #6ee7b7 */
+        .timeline-cell.r4 { background: rgba(167,243,208,0.55); }  /* #a7f3d0 light green */
+        .timeline-cell.r5 { background: rgba(234,179,8,0.35); }    /* #eab308 yellow */
+        .timeline-cell.r6 { background: rgba(251,191,36,0.45); }   /* #fbbf24 */
+        .timeline-cell.r7 { background: rgba(251,146,60,0.55); }   /* #fb923c orange */
+        .timeline-cell.r8 { background: rgba(248,113,113,0.65); }  /* #f87171 light red */
+        .timeline-cell.r9 { background: rgba(239,68,68,0.80); }    /* #ef4444 deep red */
         .timeline-cell.session-asia { box-shadow: inset 0 0 0 1px rgba(245,158,11,0.3); }
         .timeline-cell.session-europe { box-shadow: inset 0 0 0 1px rgba(59,130,246,0.3); }
         .timeline-cell.session-us { box-shadow: inset 0 0 0 1px rgba(16,185,129,0.3); }
@@ -461,9 +468,16 @@
             <div class="heatmap-header">
                 <div class="tf-label"><i class="fas fa-th"></i> MTF Heatmap</div>
                 <div class="heatmap-legend">
-                    <span class="legend-item"><span class="legend-dot strong"></span>Strong</span>
-                    <span class="legend-item"><span class="legend-dot neutral"></span>Neutral</span>
-                    <span class="legend-item"><span class="legend-dot weak"></span>Weak</span>
+                    <span class="legend-item" style="display:flex;align-items:center;gap:4px;">
+                        <span style="display:inline-flex;height:10px;border-radius:2px;overflow:hidden;">
+                            <span style="width:14px;background:rgba(16,185,129,0.90)"></span>
+                            <span style="width:14px;background:rgba(110,231,183,0.70)"></span>
+                            <span style="width:14px;background:rgba(234,179,8,0.35)"></span>
+                            <span style="width:14px;background:rgba(251,146,60,0.55)"></span>
+                            <span style="width:14px;background:rgba(239,68,68,0.80)"></span>
+                        </span>
+                        <span style="font-size:0.7rem;color:var(--text-secondary)">Strong → Weak</span>
+                    </span>
                 </div>
             </div>
             <div class="heatmap-grid" id="heatmap-grid"></div>
@@ -556,6 +570,14 @@
             if (value >= 6) return 'strong';
             if (value >= 4) return 'neutral';
             return 'weak';
+        }
+
+        // 9-level rank-based class: sort currencies by value at each timestamp, assign r1-r9
+        function getRankClass(value, allValues) {
+            if (!allValues || allValues.length === 0) return 'r5';
+            const sorted = [...allValues].sort((a, b) => b - a);
+            const rank = sorted.indexOf(value) + 1;
+            return 'r' + Math.min(9, Math.max(1, rank));
         }
 
         function renderCurrencyGrid(containerId, data) {
@@ -892,7 +914,8 @@
                     const idx = i - pad;
                     if (idx >= 0 && show[idx]) {
                         const v = show[idx].currencies[ccy] || 0;
-                        const cls = getStatusClass(v);
+                        const allVals = currencies.map(c => show[idx].currencies[c] || 0);
+                        const cls = getRankClass(v, allVals);
                         html += '<div class="timeline-cell ' + cls + ' session-' + getSession(show[idx].hour) + '" style="width:100%;height:18px;border-radius:2px;" title="' + show[idx].timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
                     } else {
                         html += '<div style="width:100%;height:18px;background:#1e293b;border-radius:2px;"></div>';
