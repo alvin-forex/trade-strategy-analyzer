@@ -323,10 +323,21 @@
             const grid=document.getElementById('timeline-grid'),ccys=['XAU','CAD','JPY','AUD','EUR','CHF','GBP','NZD','USD'],nowH=new Date().getHours();
             if(range==='24h') {
                 const last=data.slice(-30), byH={}; last.forEach(e=>{const h=typeof e.timestamp==='string'?parseInt(e.timestamp.split(' ')[1]):e.hour;byH[h]=e;});
-                // Forward-fill
-                const filled={}; let prev=null;
+                // Forward-fill + wrap-around: fill ALL 24 hours
+                const filled={};
+                // First pass: forward fill
+                let prev=null;
                 for(let h=0;h<24;h++){if(byH[h]){filled[h]=byH[h];prev=byH[h];}else if(prev){filled[h]=prev;}}
-                if(!filled[0]&&byH[23])filled[0]=byH[23];
+                // Wrap: if first hours empty, use last available data to fill backwards
+                if(!filled[0]){
+                    // Find last available hour
+                    let lastH=-1;
+                    for(let h=23;h>=0;h--) if(byH[h]){lastH=h;break;}
+                    if(lastH>=0){
+                        for(let h=0;h<lastH;h++) if(!filled[h]) filled[h]=byH[lastH];
+                    }
+                }
+                // Second pass: fill any remaining gaps
                 for(let h=1;h<24;h++) if(!filled[h]&&filled[h-1]) filled[h]=filled[h-1];
 
                 grid.style.gridTemplateColumns='36px repeat(24,14px)'; grid.style.gridTemplateRows='18px repeat('+ccys.length+',18px)'; grid.style.overflowX='hidden'; grid.className='timeline-grid';
