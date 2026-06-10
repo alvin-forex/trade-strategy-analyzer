@@ -117,18 +117,16 @@
     .pairs-table th { padding: 0.5rem 0.4rem; text-align: center; color: var(--text2); font-weight: 600; font-size: 0.7rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
     .pairs-table td { padding: 0.45rem 0.4rem; text-align: center; border-bottom: 1px solid rgba(51,65,85,0.3); white-space: nowrap; font-family: 'SF Mono','Fira Code',monospace; font-size: 0.72rem; }
     .pairs-table tr:hover td { background: var(--bg-hover); }
-    .pairs-table .pair-name { font-weight: 700; text-align: left; padding-left: 0.6rem; color: var(--text); }
-    .bias-strong-buy { color: #059669; font-weight: 700; }
-    .bias-buy { color: #10b981; }
-    .bias-neutral { color: var(--text2); }
-    .bias-sell { color: #fb923c; }
-    .bias-strong-sell { color: #b91c1c; font-weight: 700; }
-    .rsi-ob { color: #ef4444; }
-    .rsi-os { color: #10b981; }
-    .signal-bar { display: inline-block; width: 40px; height: 4px; border-radius: 2px; vertical-align: middle; }
-    .signal-pos { background: var(--green); }
-    .signal-neg { background: var(--red); }
-    .signal-zero { background: var(--border); }
+    .pairs-table .pair-name { font-weight: 700; text-align: left; padding-left: 0.6rem; color: var(--text); font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+    .pairs-table .pair-score { font-weight: 700; font-size: 0.85rem; }
+    /* Arrow indicator cells */
+    .ind-cell { display: flex; gap: 2px; justify-content: center; align-items: center; }
+    .ind-arr { font-size: 0.9rem; line-height: 1; padding: 1px 2px; border-radius: 2px; min-width: 16px; text-align: center; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+    .arr-sb { color: #3fb950; font-weight: 700; } /* strong buy */
+    .arr-b { color: #56d364; } /* buy */
+    .arr-n { color: var(--text2); opacity: 0.5; } /* neutral */
+    .arr-s { color: #ffa198; } /* sell */
+    .arr-ss { color: #f85149; font-weight: 700; } /* strong sell */
     @media (max-width: 768px) {
         body { margin-left: 0 !important; }
         .dashboard-container { padding: 0.5rem; }
@@ -176,6 +174,12 @@
                 <button onclick="refreshData()" class="px-3 py-1 rounded-lg text-sm font-medium transition" style="background: var(--primary); color: white;"><i class="fas fa-sync-alt mr-1"></i>Refresh</button>
             </div>
         </div>
+        <div class="summary-bar">
+            <div class="summary-item"><div class="summary-value strong" id="strongest-currency">--</div><div class="summary-label">Strongest</div></div>
+            <div class="summary-item"><div class="summary-value weak" id="weakest-currency">--</div><div class="summary-label">Weakest</div></div>
+            <div class="summary-item"><div class="summary-value" style="color: var(--primary)" id="spread-value">--</div><div class="summary-label">Spread</div></div>
+            <div class="summary-item"><div class="summary-value" style="color: var(--text2)" id="total-currencies">9</div><div class="summary-label">Currencies</div></div>
+        </div>
         <div class="heatmap-card">
             <div class="heatmap-header">
                 <div class="tf-label"><i class="fas fa-th"></i> MTF Heatmap</div>
@@ -210,28 +214,12 @@
             </div>
             <div class="timeline-grid" id="timeline-grid"><div class="timeline-loading">Loading...</div></div>
             <div id="session-bar" class="session-bar" style="display:none;"></div>
-        </div>
-        <div class="summary-bar">
-            <div class="summary-item"><div class="summary-value strong" id="strongest-currency">--</div><div class="summary-label">Strongest</div></div>
-            <div class="summary-item"><div class="summary-value weak" id="weakest-currency">--</div><div class="summary-label">Weakest</div></div>
-            <div class="summary-item"><div class="summary-value" style="color: var(--primary)" id="spread-value">--</div><div class="summary-label">Spread</div></div>
-            <div class="summary-item"><div class="summary-value" style="color: var(--text2)" id="total-currencies">9</div><div class="summary-label">Currencies</div></div>
-        </div>
-        <div class="tf-grid">
-            <div class="tf-card"><div class="tf-header"><div class="tf-label"><i class="fas fa-calendar-day"></i> D1</div><div class="tf-timestamp" id="d1-ts">--</div></div><div class="currency-list" id="d1-grid"></div></div>
-            <div class="tf-card"><div class="tf-header"><div class="tf-label"><i class="fas fa-clock"></i> H4</div><div class="tf-timestamp" id="h4-ts">--</div></div><div class="currency-list" id="h4-grid"></div></div>
-            <div class="tf-card"><div class="tf-header"><div class="tf-label"><i class="fas fa-hourglass-half"></i> H1</div><div class="tf-timestamp" id="h1-ts">--</div></div><div class="currency-list" id="h1-grid"></div></div>
-        </div>
+
         <!-- 29 Pairs Technical Analysis -->
         <div class="pairs-card">
             <div class="pairs-header">
-                <div class="tf-label"><i class="fas fa-table"></i> 29 Pairs Technical Analysis</div>
+                <div class="tf-label"><i class="fas fa-table"></i> 29 Pairs Analysis</div>
                 <div class="pairs-controls">
-                    <select id="pairs-tf-select" class="pairs-select">
-                        <option value="D1">D1</option>
-                        <option value="H4">H4</option>
-                        <option value="H1">H1</option>
-                    </select>
                     <button id="pairs-sort-signal" class="range-btn active" onclick="sortPairs('signal')">Signal</button>
                     <button id="pairs-sort-rsi" class="range-btn" onclick="sortPairs('rsi')">RSI</button>
                     <button id="pairs-sort-atr" class="range-btn" onclick="sortPairs('atr')">ATR</button>
@@ -240,9 +228,14 @@
             <div class="pairs-table-wrap">
                 <table class="pairs-table" id="pairs-table">
                     <thead><tr>
-                        <th>Pair</th><th>Price</th><th>Chg</th><th>RSI</th><th>MACD</th><th>EMA Trend</th><th>ATR</th><th>BB Pos</th><th>Signal</th><th>Bias</th>
+                        <th>Pair</th><th>Score</th>
+                        <th>EMA<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                        <th>RSI<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                        <th>MACD<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                        <th>BB<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                        <th>ATR<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
                     </tr></thead>
-                    <tbody id="pairs-tbody"><tr><td colspan="10" style="text-align:center;padding:1rem;color:var(--text2)">Loading...</td></tr></tbody>
+                    <tbody id="pairs-tbody"><tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--text2)">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -277,7 +270,7 @@
                 ['D1','H4','H1'].forEach(tf => { const v=data[tf][cur]; const d=document.createElement('div'); d.className='heatmap-cell '+getStatusClass(v); d.textContent=v.toFixed(2); c.appendChild(d); });
             });
         }
-        function updateData(data) { currentData=data; renderHeatmap(data); renderCurrencyGrid('d1-grid',data.D1); renderCurrencyGrid('h4-grid',data.H4); renderCurrencyGrid('h1-grid',data.H1); updateSummary(data); updateTimestamps(data.ts); const b=document.getElementById('status-badge'); b.className='status-badge status-connected'; b.innerHTML='<i class="fas fa-circle text-xs mr-1 pulse-dot pulse-green"></i>Connected'; }
+        function updateData(data) { currentData=data; renderHeatmap(data); updateSummary(data); updateTimestamps(data.ts); const b=document.getElementById('status-badge'); b.className='status-badge status-connected'; b.innerHTML='<i class="fas fa-circle text-xs mr-1 pulse-dot pulse-green"></i>Connected'; }
         function connectWebSocket() { ws = new WebSocket('ws://localhost:8787/ws/ccy_power'); ws.onopen = () => loadCurrentFromAPI(); ws.onmessage = e => { try { const d=JSON.parse(e.data); if(d.type==='ccy_power_multi') updateData(d); } catch(x){} }; ws.onerror = () => loadCurrentFromAPI(); ws.onclose = () => setTimeout(connectWebSocket,5000); }
         function loadCurrentFromAPI() {
             if (window.__CCY_POWER_DATA__ && window.__CCY_POWER_DATA__.success) { const r=window.__CCY_POWER_DATA__, d=r.data; updateData({type:'ccy_power_multi',ts:r.timestamp,D1:d.D1||{},H4:d.H4||{},H1:d.H1||{}}); return; }
@@ -364,41 +357,49 @@
             document.getElementById('pairs-sort-atr').className='range-btn'+(by==='atr'?' active':'');
             renderPairs();
         }
+        function arrowCls(v) { if(v>=2) return 'arr-sb'; if(v>=1) return 'arr-b'; if(v<=-2) return 'arr-ss'; if(v<=-1) return 'arr-s'; return 'arr-n'; }
+        function arrowChar(v) { if(v>=2) return '⬆'; if(v>=1) return '↑'; if(v<=-2) return '⬇'; if(v<=-1) return '↓'; return '—'; }
+        function arrowTitle(v) { if(v>=2) return '强多'; if(v>=1) return '偏多'; if(v<=-2) return '强空'; if(v<=-1) return '偏空'; return '中性'; }
+        function indArrow(v) { return '<div class="ind-arr '+arrowCls(v)+'" title="'+arrowTitle(v)+'">'+arrowChar(v)+'</div>'; }
+        function indCell(vals) { return '<div class="ind-cell">'+vals.map(v=>indArrow(v)).join('')+'</div>'; }
+        function emaSignal(ema20,ema50,ema200) { if(ema20>ema50&&ema50>ema200) return 2; if(ema20>ema50) return 1; if(ema20<ema50&&ema50<ema200) return -2; if(ema20<ema50) return -1; return 0; }
+        function rsiSignal(rsi) { if(rsi>70) return -2; if(rsi>60) return 1; if(rsi<30) return 2; if(rsi<40) return -1; return 0; }
+        function macdSignal(h) { return h>0?1:h<0?-1:0; }
+        function bbSignal(c,u,l) { if(u<=l) return 0; const p=(c-l)/(u-l); if(p>0.8) return -1; if(p<0.2) return 1; return 0; }
+        function atrSignal(atr,price) { if(!price) return 0; const pct=atr/price*100; if(pct>1.5) return 2; if(pct>0.8) return 1; if(pct<0.3) return -1; return 0; }
+
         function renderPairs() {
             if (!pairsData) return;
-            const tf = document.getElementById('pairs-tf-select').value;
             const tbody = document.getElementById('pairs-tbody');
-            let entries = Object.entries(pairsData).map(([sym,data])=>({sym,data:data[tf]||{}})).filter(e=>e.data.c);
+            let entries = Object.entries(pairsData).filter(([_,d])=>d.D1&&d.D1.c).map(([sym,d])=>{
+                const tfs=['D1','H4','H1'].map(tf=>d[tf]||{});
+                const score = tfs.reduce((s,t)=>s+(t.signal||0),0);
+                return {sym,data:d,tfs,score};
+            });
             
-            if (pairsSortBy==='signal') entries.sort((a,b)=>(b.data.signal||0)-(a.data.signal||0));
-            else if (pairsSortBy==='rsi') entries.sort((a,b)=>(b.data.rsi||0)-(a.data.rsi||0));
-            else if (pairsSortBy==='atr') entries.sort((a,b)=>(b.data.atr||0)-(a.data.atr||0));
+            if (pairsSortBy==='signal') entries.sort((a,b)=>b.score-a.score);
+            else if (pairsSortBy==='rsi') entries.sort((a,b)=>(b.tfs[0].rsi||0)-(a.tfs[0].rsi||0));
+            else if (pairsSortBy==='atr') entries.sort((a,b)=>(b.tfs[0].atr||0)-(a.tfs[0].atr||0));
             
             let html='';
-            entries.forEach(({sym,data})=>{
-                const bias = data.bias||'Neutral';
-                const biasCls = bias==='Strong Buy'?'bias-strong-buy':bias==='Buy'?'bias-buy':bias==='Sell'?'bias-sell':bias==='Strong Sell'?'bias-strong-sell':'bias-neutral';
-                const rsiCls = data.rsi>70?'rsi-ob':data.rsi<30?'rsi-os':'';
-                const emaTrend = data.ema20>data.ema50>data.ema200?'↑↑ Bull':data.ema20<data.ema50<data.ema200?'↓↓ Bear':'→ Mix';
-                const bbPos = ((data.c-data.bb_l)/(data.bb_u-data.bb_l)*100).toFixed(0);
-                const sig = data.signal||0;
-                const sigCls = sig>0?'signal-pos':sig<0?'signal-neg':'signal-zero';
-                const sigW = Math.min(40,Math.abs(sig)*6);
-                const dp = sym==='XAUUSD'||sym.includes('JPY')?2:5;
+            entries.forEach(({sym,data,tfs,score})=>{
+                const scoreColor = score>=6?'color:#3fb950':score>=2?'color:#56d364':score<=-6?'color:#f85149':score<=-2?'color:#ffa198':'color:var(--text2)';
+                const emaArr = indCell(tfs.map(t=>emaSignal(t.ema20||0,t.ema50||0,t.ema200||0)));
+                const rsiArr = indCell(tfs.map(t=>rsiSignal(t.rsi||0)));
+                const macdArr = indCell(tfs.map(t=>macdSignal(t.macd_h||0)));
+                const bbArr = indCell(tfs.map(t=>bbSignal(t.c||0,t.bb_u||0,t.bb_l||0)));
+                const atrArr = indCell(tfs.map(t=>atrSignal(t.atr||0,t.c||0)));
                 html+='<tr>'+
                     '<td class="pair-name">'+sym+'</td>'+
-                    '<td>'+data.c.toFixed(dp)+'</td>'+
-                    '<td style="color:'+(data.change>0?'var(--green)':'var(--red)')+'">'+(data.change>0?'+':'')+data.change+'</td>'+
-                    '<td class="'+rsiCls+'">'+(data.rsi||0).toFixed(1)+'</td>'+
-                    '<td style="color:'+(data.macd_h>0?'var(--green)':'var(--red)')+'">'+(data.macd_h>0?'▲':'▼')+' '+(data.macd_h||0).toFixed(dp)+'</td>'+
-                    '<td>'+emaTrend+'</td>'+
-                    '<td>'+(data.atr||0).toFixed(dp)+'</td>'+
-                    '<td>'+bbPos+'%</td>'+
-                    '<td><span class="signal-bar '+sigCls+'" style="width:'+sigW+'px"></span> '+sig+'</td>'+
-                    '<td class="'+biasCls+'">'+bias+'</td>'+
+                    '<td class="pair-score" style="'+scoreColor+'">'+(score>0?'+':'')+score+'</td>'+
+                    '<td>'+emaArr+'</td>'+
+                    '<td>'+rsiArr+'</td>'+
+                    '<td>'+macdArr+'</td>'+
+                    '<td>'+bbArr+'</td>'+
+                    '<td>'+atrArr+'</td>'+
                     '</tr>';
             });
-            tbody.innerHTML = html || '<tr><td colspan="10" style="text-align:center;padding:1rem;color:var(--text2)">No data</td></tr>';
+            tbody.innerHTML = html || '<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--text2)">No data</td></tr>';
         }
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -406,7 +407,6 @@
             if(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1') connectWebSocket();
             loadTimelineData('24h');
             loadPairsData();
-            document.getElementById('pairs-tf-select').addEventListener('change',renderPairs);
             document.querySelectorAll('.range-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadTimelineData(btn.dataset.range);});});
         });
     </script>
