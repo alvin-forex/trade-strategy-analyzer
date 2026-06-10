@@ -115,6 +115,14 @@
     .pairs-controls { display: flex; gap: 0.5rem; align-items: center; }
     .pairs-select { padding: 0.4rem 0.6rem; border-radius: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); font-size: 0.75rem; cursor: pointer; }
     .pairs-table-wrap { overflow-x: auto; }
+    /* Trend Chart */
+    .trend-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .trend-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+    .trend-controls { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .trend-tf-btn, .trend-range-btn { padding: 0.25rem 0.6rem; border-radius: 0.375rem; font-size: 0.7rem; font-weight: 600; background: var(--bg-hover); color: var(--text2); border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; }
+    .trend-tf-btn.active, .trend-range-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .trend-tf-btn:hover, .trend-range-btn:hover { border-color: var(--primary); }
+    .crossover-dot { filter: drop-shadow(0 0 3px rgba(255,255,255,0.8)); }
     .pairs-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
     .pairs-table th { padding: 0.5rem 0.4rem; text-align: center; color: var(--text2); font-weight: 600; font-size: 0.7rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
     .pairs-table td { padding: 0.45rem 0.4rem; text-align: center; border-bottom: 1px solid rgba(51,65,85,0.3); white-space: nowrap; font-family: 'SF Mono','Fira Code',monospace; font-size: 0.72rem; }
@@ -160,6 +168,7 @@
 <body>
     <div id="sidebar-container"></div>
     <script src="../../sidebar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <div class="dashboard-container">
         <div class="header">
             <div class="header-left">
@@ -195,6 +204,23 @@
                 </div>
             </div>
             <div class="heatmap-grid" id="heatmap-grid"></div>
+        </div>
+        <!-- CCY Power Trend Chart -->
+        <div class="trend-card">
+            <div class="trend-header">
+                <div class="tf-label"><i class="fas fa-chart-line"></i> CCY Power Trend</div>
+                <div class="trend-controls">
+                    <button class="trend-tf-btn active" data-tf="H1">H1</button>
+                    <button class="trend-tf-btn" data-tf="H4">H4</button>
+                    <button class="trend-tf-btn" data-tf="D1">D1</button>
+                    <button class="trend-range-btn" data-trange="24h" title="Last 24h">24h</button>
+                    <button class="trend-range-btn active" data-trange="3d" title="Last 3 days">3D</button>
+                    <button class="trend-range-btn" data-trange="7d" title="Last 7 days">7D</button>
+                    <button class="trend-range-btn" data-trange="30d" title="Last 30 days">30D</button>
+                    <button id="trend-crossover" class="range-btn" onclick="toggleCrossovers()" title="Show crossover points">✕ Cross</button>
+                </div>
+            </div>
+            <div id="trend-chart" style="width:100%;min-height:320px;"></div>
         </div>
         <div class="timeline-card">
             <div class="timeline-header">
@@ -415,12 +441,184 @@
             tbody.innerHTML = html || '<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--text2)">No data</td></tr>';
         }
 
+        // === CCY Power Trend Chart (ApexCharts) ===
+        const CCY_COLORS = {
+            EUR:'#3b82f6', GBP:'#8b5cf6', AUD:'#f59e0b', NZD:'#10b981',
+            CAD:'#ef4444', CHF:'#ec4899', XAU:'#fbbf24', JPY:'#06b6d4', USD:'#6b7280'
+        };
+        let trendChart = null, trendTF = 'H1', trendRange = '3d', showCrossovers = false;
+
+        function findCrossovers(series) {
+            // Find points where any two currency lines cross
+            const crossovers = [];
+            if (series.length < 2) return crossovers;
+            const ccys = Object.keys(CCY_COLORS);
+            for (let ci = 0; ci < ccys.length; ci++) {
+                for (let cj = ci+1; cj < ccys.length; cj++) {
+                    const a = series.map(p => p[ccys[ci]]);
+                    const b = series.map(p => p[ccys[cj]]);
+                    for (let i = 1; i < a.length; i++) {
+                        if ((a[i-1]-b[i-1])*(a[i]-b[i]) < 0) {
+                            // Cross detected - interpolate
+                            const ratio = Math.abs(a[i-1]-b[i-1]) / (Math.abs(a[i-1]-b[i-1]) + Math.abs(a[i]-b[i]));
+                            const crossVal = a[i-1] + (a[i]-a[i-1]) * ratio;
+                            crossovers.push({
+                                x: series[i].ts,
+                                y: crossVal,
+                                pair: ccys[ci]+'/'+ccys[cj],
+                                direction: a[i] > b[i] ? ccys[ci]+'⬆' : ccys[cj]+'⬆'
+                            });
+                        }
+                    }
+                }
+            }
+            return crossovers;
+        }
+
+        function renderTrendChart() {
+            if (!timelineData.length) return;
+
+            // Determine how many entries to show
+            const hoursMap = {'24h':24,'3d':72,'7d':168,'30d':720};
+            const showCount = hoursMap[trendRange] || 72;
+            // Use H1 data from timelineData (already loaded)
+            let entries = timelineData.slice(-showCount);
+            if (!entries.length) return;
+
+            // Build series
+            const ccys = Object.keys(CCY_COLORS);
+            const series = entries.map(e => {
+                const ts = typeof e.timestamp === 'string' ? e.timestamp : '';
+                const obj = {ts};
+                ccys.forEach(c => obj[c] = (e.currencies[c] || 0));
+                return obj;
+            });
+
+            const apexSeries = ccys.map(c => ({
+                name: c,
+                data: series.map(p => ({x: p.ts, y: p[c]}))
+            }));
+
+            const annotations = {xaxis:[], points:[]};
+            if (showCrossovers) {
+                const crosses = findCrossovers(series);
+                crosses.forEach((cr, i) => {
+                    annotations.points.push({
+                        x: cr.x, y: cr.y,
+                        marker: {size:5, fillColor:'#fff', strokeColor:'#f59e0b', strokeWidth:2, radius:2},
+                        label: {text: cr.pair, style:{fontSize:'9px',fontWeight:'bold',background:'#f59e0b',color:'#000',padding:{left:4,right:4,top:2,bottom:2}}}
+                    });
+                });
+                // Only show max 30 to avoid clutter
+                if (annotations.points.length > 30) annotations.points = annotations.points.slice(-30);
+            }
+
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const opts = {
+                chart: {
+                    type: 'line', height: 320,
+                    background: 'transparent',
+                    toolbar: {show: true, tools:{zoom:true,zoomin:true,zoomout:true,pan:true,reset:true,download:false}},
+                    zoom: {enabled: true, type:'x'},
+                    animations: {enabled: false},
+                    fontFamily: '-apple-system,BlinkMacSystemFont,sans-serif'
+                },
+                series: apexSeries,
+                colors: ccys.map(c => CCY_COLORS[c]),
+                stroke: {width: 2, curve: 'smooth'},
+                xaxis: {
+                    type: 'category',
+                    labels: {
+                        style: {colors: isDark?'#94a3b8':'#64748b', fontSize:'10px'},
+                        rotate: -45, rotateAlways: false, hideOverlappingLabels: true,
+                        formatter: v => {
+                            if (!v) return '';
+                            const parts = v.split(' ');
+                            if (parts.length===2) return trendRange==='24h'?parts[1].substring(0,5):parts[0].substring(5)+' '+parts[1].substring(0,2);
+                            return v;
+                        }
+                    },
+                    axisBorder: {color: isDark?'#334155':'#e2e8f0'},
+                    axisTicks: {color: isDark?'#334155':'#e2e8f0'},
+                    crosshairs: {show: true, stroke:{color:'#6366f1',width:1,dashArray:4}}
+                },
+                yaxis: {
+                    min: 0, max: 10,
+                    tickAmount: 5,
+                    labels: {style:{colors:isDark?'#94a3b8':'#64748b',fontSize:'10px'}, formatter:v=>v.toFixed(1)},
+                    title: {text:'Power', style:{color:isDark?'#94a3b8':'#64748b',fontSize:'11px'}}
+                },
+                grid: {borderColor:isDark?'#1e293b':'#f1f5f9', strokeDashArray:3},
+                tooltip: {
+                    shared: true, intersect: false,
+                    theme: isDark?'dark':'light',
+                    x: {format:'yyyy.MM.dd HH:mm'},
+                    y: {formatter: v => v.toFixed(2)}
+                },
+                legend: {
+                    show: true, position:'top', horizontalAlign:'left',
+                    fontSize:'11px',
+                    labels:{colors:isDark?'#cbd5e1':'#475569'},
+                    markers:{size:8,width:12,height:3,radius:2},
+                    itemMargin:{horizontal:6}
+                },
+                annotations: annotations,
+                theme: {mode: isDark?'dark':'light'}
+            };
+
+            if (trendChart) trendChart.destroy();
+            trendChart = new ApexCharts(document.getElementById('trend-chart'), opts);
+            trendChart.render();
+        }
+
+        function setTrendTF(tf) {
+            trendTF = tf;
+            document.querySelectorAll('.trend-tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
+            // Reload timeline for this TF
+            const base = new URL('.',window.location.href).href;
+            fetch(base+'timeline.json?t='+Date.now()).then(r=>r.json()).then(r=>{
+                if(r.success&&r.timeline&&r.timeline[tf]){
+                    timelineData = r.timeline[tf].map(e=>({timestamp:e.timestamp,currencies:e.currencies,hour:parseInt(e.timestamp.split(' ')[1]?.split(':')[0]||0)}));
+                    renderTimelineGrid(timelineData,currentRange);
+                    renderTrendChart();
+                }
+            }).catch(()=>{});
+        }
+
+        function setTrendRange(range) {
+            trendRange = range;
+            document.querySelectorAll('.trend-range-btn').forEach(b=>b.classList.toggle('active',b.dataset.trange===range));
+            renderTrendChart();
+        }
+
+        function toggleCrossovers() {
+            showCrossovers = !showCrossovers;
+            const btn = document.getElementById('trend-crossover');
+            btn.classList.toggle('active',showCrossovers);
+            btn.textContent = showCrossovers ? '✓ Cross' : '✕ Cross';
+            renderTrendChart();
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             loadCurrentFromAPI();
             if(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1') connectWebSocket();
             loadTimelineData('24h');
             loadPairsData();
-            document.querySelectorAll('.range-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadTimelineData(btn.dataset.range);});});
+            // Load timeline for trend chart (H1)
+            const base = new URL('.',window.location.href).href;
+            fetch(base+'timeline.json?t='+Date.now()).then(r=>r.json()).then(r=>{
+                if(r.success&&r.timeline){
+                    // Store all TF data
+                        timelineData = (r.timeline[trendTF]||r.timeline.H1||[]).map(e=>({timestamp:e.timestamp,currencies:e.currencies,hour:parseInt(e.timestamp.split(' ')[1]?.split(':')[0]||0)}));
+                        if(timelineData.length) renderTrendChart();
+                    }
+            }).catch(()=>{});
+            // Timeline range buttons
+            document.querySelectorAll('.range-btn[data-range]').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.range-btn[data-range]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadTimelineData(btn.dataset.range);});});
+            // Trend TF buttons
+            document.querySelectorAll('.trend-tf-btn').forEach(btn=>btn.addEventListener('click',()=>setTrendTF(btn.dataset.tf)));
+            // Trend range buttons
+            document.querySelectorAll('.trend-range-btn').forEach(btn=>btn.addEventListener('click',()=>setTrendRange(btn.dataset.trange)));
         });
     </script>
 </body>
