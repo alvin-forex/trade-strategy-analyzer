@@ -921,44 +921,27 @@
                 grid.innerHTML = html;
                 
             } else {
-                // 3d/7d/30d: show last N entries as a scrolling heatmap
-                const cols = range === '3d' ? 72 : range === '7d' ? 28 : 30;
-                const show = data.slice(-cols);
-                const pad = cols - show.length;
-                const cellW = range === '30d' ? 8 : range === '7d' ? 12 : 10;
+                // 3d/7d/30d: compressed to fit mobile viewport
+                const maxCols = range === '3d' ? 24 : range === '7d' ? 14 : 30;
+                const show = data.slice(-maxCols);
+                // Auto-calculate cell width to fit container
+                const containerW = grid.parentElement ? grid.parentElement.clientWidth - 44 : 340;
+                const cellW = Math.max(6, Math.floor(containerW / Math.max(show.length, 1)));
                 
-                grid.style.gridTemplateColumns = '36px repeat(' + cols + ', ' + cellW + 'px)';
+                grid.style.gridTemplateColumns = '36px repeat(' + show.length + ', ' + cellW + 'px)';
                 grid.style.gridTemplateRows = '18px repeat(' + currencies.length + ', 18px)';
+                grid.style.overflowX = 'hidden';
                 
-                // Header: show date labels
-                let html = '<div style="font-size:0.45rem;padding:1px 2px;">Date</div>';
-                for (let i = 0; i < cols; i++) {
-                    const idx = i - pad;
-                    if (idx >= 0 && show[idx]) {
-                        const ts = show[idx].timestamp;
-                        // Show MM/DD for 7d/30d, MM/DD HH for 3d
-                        const parts = ts.replace(/-/g, '.').split(' ');
-                        const dp = parts[0].split('.');
-                        const label = range === '3d' ? dp[1]+'/'+dp[2]+' '+parts[1].split(':')[0] : dp[1]+'/'+dp[2];
-                        html += '<div style="font-size:0.35rem;text-align:center;padding:1px;transform:rotate(-45deg);white-space:nowrap;height:14px;">' + label + '</div>';
-                    } else {
-                        html += '<div style="height:14px;"></div>';
-                    }
-                }
-                
+                // No date header - just currency rows
+                let html = '';
                 currencies.forEach(ccy => {
                     html += '<div style="font-size:0.55rem;padding:0 2px;font-weight:600;">' + ccy + '</div>';
-                    for (let i = 0; i < cols; i++) {
-                        const idx = i - pad;
-                        if (idx >= 0 && show[idx]) {
-                            const v = show[idx].currencies[ccy] || 0;
-                            const allVals = currencies.map(c => show[idx].currencies[c] || 0);
-                            const cls = getRankClass(v, allVals);
-                            html += '<div class="timeline-cell ' + cls + '" style="width:100%;height:18px;border-radius:2px;" title="' + show[idx].timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
-                        } else {
-                            html += '<div style="width:100%;height:18px;background:#1e293b;border-radius:2px;"></div>';
-                        }
-                    }
+                    show.forEach(entry => {
+                        const v = entry.currencies[ccy] || 0;
+                        const allVals = currencies.map(c => entry.currencies[c] || 0);
+                        const cls = getRankClass(v, allVals);
+                        html += '<div class="timeline-cell ' + cls + '" style="width:100%;height:18px;border-radius:2px;" title="' + entry.timestamp + ' ' + ccy + ': ' + v.toFixed(2) + '"></div>';
+                    });
                 });
                 grid.innerHTML = html;
             }
