@@ -89,19 +89,9 @@ def update_data_json(ccy_data):
 
 def save_to_db(ccy_data):
     """Save CCY Power data to ccy_power_v3 for timeline history.
-    Skip if data came from v2 DB (already has correct per-TF data).
-    Only write if at least 2 TFs have different values.
+    Always write - this is our primary timeline data source.
     """
     import sqlite3
-    
-    # Check if values are identical across TFs (EA bug)
-    tf_vals = list(ccy_data.values())
-    if len(tf_vals) >= 2:
-        first = tf_vals[0]
-        all_same = all(v == first for v in tf_vals[1:])
-        if all_same:
-            print("[SKIP] ccy_power_v3: values identical across TFs (EA bug), skipping")
-            return
     
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -141,8 +131,9 @@ def save_to_db(ccy_data):
     print(f"[OK] ccy_power_v3 updated: {count} TF entries")
 
 def update_timeline_json():
-    """Generate timeline.json from both ccy_power_v2 and ccy_power_v3 DBs.
-    Prefer ccy_power_v2 (Pipeline 2, real per-TF data) over v3 (may be identical).
+    """Generate timeline.json from ccy_power_v3 (primary) and v2 (supplement).
+    v3 = continuously updated by update_ccy_power.py (has 24h data).
+    v2 = Pipeline 2 from CCY Power Indicator (may be stale but has per-TF distinct values).
     """
     import sqlite3
     
@@ -153,42 +144,41 @@ def update_timeline_json():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Try v2 first for real per-TF timeline
-    v2_count = 0
     timeline = {}
     for tf in ['D1', 'H4', 'H1']:
-        try:
-            c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU 
-                         FROM ccy_power_v2 
-                         WHERE timeframe = ? 
-                         ORDER BY timestamp DESC LIMIT 720''', (tf,))
-            rows = c.fetchall()
-            v2_count += len(rows)
-            entries = []
-            for row in reversed(rows):
-                entries.append({
-                    "timestamp": row[0],
-                    "currencies": {
-                        "AUD": row[1], "CAD": row[2], "CHF": row[3],
-                        "EUR": row[4], "GBP": row[5], "JPY": row[6],
-                        "NZD": row[7], "USD": row[8], "XAU": row[9]
-                    }
-                })
-            timeline[tf] = entries
-        except Exception:
-            pass
-    
-    # Fill missing TFs from v3
-    for tf in ['D1', 'H4', 'H1']:
-        if tf in timeline and len(timeline[tf]) > 0:
-            continue
+        entries = []
+        seen_ts = set()
+        
+        # Primary: v3 (continuously updated)
         try:
             c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU 
                          FROM ccy_power_v3 
                          WHERE timeframe = ? 
                          ORDER BY timestamp DESC LIMIT 720''', (tf,))
             rows = c.fetchall()
-            entries = []
+            for row in reversed(rows):
+                if row[0] not in seen_ts:
+                    seen_ts.add(row[0])
+                    entries.append({
+                        "timestamp": row[0],
+                        "currencies": {
+                            "AUD": row[1], "CAD": row[2], "CHF": row[3],
+                            "EUR": row[4], "GBP": row[5], "JPY": row[6],
+                            "NZD": row[7], "USD": row[8], "XAU": row[9]
+                        }
+                    })
+        except Exception as e:
+            print(f"[WARN] v3 read failed for {tf}: {e}")
+        
+        # Supplement: v2 (has per-TF distinct values, fill gaps)
+        try:
+            c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU 
+                         FROM ccy_power_v2 
+                         WHERE timeframe = ? 
+                         AND timestamp NOT IN ({})
+                         ORDER BY timestamp DESC LIMIT 720'''.format(','.join(['?']*len(seen_ts))),
+                      (tf,) + tuple(seen_ts))
+            rows = c.fetchall()
             for row in reversed(rows):
                 entries.append({
                     "timestamp": row[0],
@@ -198,10 +188,12 @@ def update_timeline_json():
                         "NZD": row[7], "USD": row[8], "XAU": row[9]
                     }
                 })
-            if entries:
-                timeline[tf] = entries
+            entries.sort(key=lambda x: x['timestamp'])
         except Exception:
             pass
+        
+        if entries:
+            timeline[tf] = entries
     
     conn.close()
     
@@ -215,7 +207,7 @@ def update_timeline_json():
         json.dump(out, f, indent=2)
     
     total = sum(len(v) for v in timeline.values())
-    print(f"[OK] timeline.json: {total} entries across {len(timeline)} TFs (v2={v2_count} rows)")
+    print(f"[OK] timeline.json: {total} entries across {len(timeline)} TFs")
 
 def update_pairs_json(all_rows):
     """Generate pairs.json with technical analysis from forex_data.csv"""
