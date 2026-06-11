@@ -98,15 +98,76 @@ EVENTS = [
     {"time": "22:00 ET", "event": "美國成屋銷售", "importance": "🔴🔴", "forecast": "—", "previous": "—"},
 ]
 
-MARKET_GLANCE = OrderedDict([
-    ("DXY 美元指數", {"value": "104.82", "change": "+0.35%", "direction": "up"}),
-    ("VIX 恐慌指數", {"value": "18.5", "change": "+5.2%", "direction": "up"}),
-    ("Brent 原油", {"value": "$95.12", "change": "+2.8%", "direction": "up"}),
-    ("XAU 黃金", {"value": "$4,385", "change": "-1.2%", "direction": "down"}),
-    ("US 10Y", {"value": "4.511%", "change": "+3bp", "direction": "up"}),
-    ("US 2Y", {"value": "4.068%", "change": "+2bp", "direction": "up"}),
-    ("標普500", {"value": "5,480", "change": "-0.8%", "direction": "down"}),
-])
+def fetch_market_glance_yahoo():
+    """Fetch real-time market data from Yahoo Finance."""
+    symbols = {
+        '^GSPC': ('標普500', '{:,.2f}'),
+        '^DJI': ('道瓊', '{:,.2f}'),
+        '^IXIC': ('納指', '{:,.2f}'),
+        'DX-Y.NYB': ('DXY', '{:.2f}'),
+        '^VIX': ('VIX', '{:.2f}'),
+        'BZ=F': ('Brent原油', '$' + '{:.2f}'),
+        '^HSI': ('HK50', '{:,.2f}'),
+    }
+    items = []
+    try:
+        import yfinance as yf
+        for sym, (name, fmt) in symbols.items():
+            try:
+                ticker = yf.Ticker(sym)
+                info = ticker.info
+                price = info.get('regularMarketPrice') or info.get('currentPrice')
+                prev_close = info.get('regularMarketPreviousClose') or info.get('previousClose')
+                if price and prev_close:
+                    change_pct = ((price - prev_close) / prev_close) * 100
+                    direction = 'up' if change_pct > 0 else 'down'
+                    value = fmt.format(price) if not fmt.startswith('$') else '${:.2f}'.format(price)
+                    items.append((name, {'value': value, 'change': f'{change_pct:+.2f}%', 'direction': direction}))
+                else:
+                    items.append((name, {'value': '—', 'change': '無數據', 'direction': 'neutral'}))
+            except:
+                items.append((name, {'value': '—', 'change': 'error', 'direction': 'neutral'}))
+    except ImportError:
+        items.append(('Yahoo Finance', {'value': '未安裝', 'change': '', 'direction': 'neutral'}))
+    return items
+
+def build_market_glance_html(symbol_data=None):
+    """Build Market Glance with Yahoo Finance data + XAU from MT4."""
+    items = []
+
+    # Fetch Yahoo Finance data first
+    yahoo_items = fetch_market_glance_yahoo()
+    items.extend(yahoo_items)
+
+    # XAU from MT4 CSV (dynamic)
+    if symbol_data:
+        for sym_key in ['XAUUSD', 'XAUUSD.']:
+            if sym_key in symbol_data:
+                d1 = symbol_data[sym_key].get('D1', {})
+                if d1:
+                    close = d1.get('close', 0)
+                    try:
+                        close_f = float(close)
+                        items.append(('XAU黃金', {'value': f'${close_f:,.2f}', 'change': 'MT4', 'direction': 'neutral'}))
+                    except (ValueError, TypeError):
+                        pass
+                break
+
+    if not items:
+        items.append(('無數據', {'value': '—', 'change': '', 'direction': 'neutral'}))
+
+    html = '<div class="market-glance"><div class="mg-grid">\n'
+    for name, info in items:
+        cls = 'mg-up' if info.get('direction') == 'up' else 'mg-down' if info.get('direction') == 'down' else ''
+        html += (
+            f'<div class="mg-card">'
+            f'<div class="mg-label">{name}</div>'
+            f'<div class="mg-value">{info["value"]}</div>'
+            f'<div class="mg-change {cls}">{info["change"]}</div>'
+            f'</div>\n'
+        )
+    html += '</div>\n</div>\n'
+    return html
 
 INDICATORS = ["EMA", "RSI", "MACD", "STC", "BB", "River"]
 TIMEFRAMES = ["D1", "H4", "H1"]
@@ -348,8 +409,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
        margin: 0 auto; font-size: 12px; line-height: 1.5; }
 a { color: #58a6ff; text-decoration: none; }
 
-/* Sidebar handled by sidebar.css + sidebar.js */
-
 h1 { font-size: 17px; color: #fff; text-align: center; margin-bottom: 2px; }
 h2 { font-size: 12px; color: #666; text-align: center; margin-bottom: 14px; font-weight: normal; }
 h3 { font-size: 13px; color: #58a6ff; margin: 18px 0 8px 0; padding: 6px 10px;
@@ -476,19 +535,7 @@ def build_ccy_power_html(ccy_power):
     return html
 
 
-def build_market_glance_html():
-    html = '<div class="market-glance"><div class="mg-grid">\n'
-    for name, info in MARKET_GLANCE.items():
-        cls = "mg-up" if info["direction"] == "up" else "mg-down"
-        html += (
-            f'<div class="mg-card">'
-            f'<div class="mg-label">{name}</div>'
-            f'<div class="mg-value">{info["value"]}</div>'
-            f'<div class="mg-change {cls}">{info["change"]}</div>'
-            f'</div>\n'
-        )
-    html += '</div>\n</div>\n'
-    return html
+def _removed_old_market_glance(): pass  # removed, using Yahoo Finance version
 
 
 def build_news_html():
@@ -719,7 +766,7 @@ def generate_report(data, ccy_power, output_path):
     # Index data by symbol -> timeframe
     symbol_data = defaultdict(dict)
     for row in data:
-        sym = row.get("symbol", "")
+        sym = row.get("symbol", "").rstrip(".")
         tf = row.get("timeframe", "")
         if sym and tf:
             symbol_data[sym][tf] = row
@@ -747,19 +794,23 @@ def generate_report(data, ccy_power, output_path):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>外匯綜合分析報告 - {now}</title>
+
+<!-- TSA Sidebar -->
 <link rel="stylesheet" href="../../sidebar.css">
 <style>
 {build_css()}
 </style>
 </head>
-<body>
-<!-- Sidebar injected by sidebar.js -->
+<body class="has-sidebar">
+<!-- TSA Sidebar Nav -->
+<script src="../../sidebar.js"></script>
+
 <h1>📊 外匯綜合分析報告</h1>
 <h2>Combined Forex Analysis | {now}</h2>
 
 {build_ccy_power_html(ccy_power)}
 
-{build_market_glance_html()}
+{build_market_glance_html(symbol_data)}
 
 {build_technical_table_html(symbol_data, pair_signals)}
 
@@ -775,7 +826,6 @@ def generate_report(data, ccy_power, output_path):
 新聞 vs 技術對比 | 綠色=一致 | ⚠️=分歧 | 分=技術信號總分<br>
 Generated by OpenClaw Forex Combined Report v3.0
 </div>
-<script src="../../sidebar.js"></script>
 </body>
 </html>
 """
@@ -809,7 +859,20 @@ def main():
         if name:
             ccy_power[name] = power
 
-    output_path = args.output or f"/tmp/forex_combined_{datetime.now().strftime('%Y%m%d_%H%M')}.html"
+    # Fallback: if CSV CCY Power is all zeros, fetch from API
+    if not ccy_power or all(v == 0 for v in ccy_power.values()):
+        try:
+            import urllib.request, json as _json
+            req = urllib.request.Request("http://localhost:8788/api/ccy_power/current")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                api_data = _json.loads(resp.read())
+            if api_data.get("success") and api_data.get("data", {}).get("D1"):
+                ccy_power = {k: round(v, 2) for k, v in api_data["data"]["D1"].items() if k != "AVG"}
+                print(f"ℹ️ CCY Power loaded from API (:8788): {ccy_power}", file=sys.stderr)
+        except Exception as e:
+            print(f"⚠️ CCY Power API fallback failed: {e}", file=sys.stderr)
+
+    output_path = args.output or f"/tmp/openclaw/forex_combined_{datetime.now().strftime('%Y%m%d_%H%M')}.html"
     result = generate_report(data, ccy_power, output_path)
 
     # Stats
