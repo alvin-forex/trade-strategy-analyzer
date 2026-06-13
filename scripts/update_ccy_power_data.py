@@ -106,13 +106,11 @@ try:
         html = f.read()
 
     html = _inject(html, "window.__CCY_POWER_DATA__", f"window.__CCY_POWER_DATA__ = {json.dumps(api_data)};")
-
-    if tl_data.get("success"):
-        html = _inject(html, "window.__CCY_TIMELINE_DATA__", f"window.__CCY_TIMELINE_DATA__ = {json.dumps(tl_data)};")
+    html = _inject(html, "window.__CCY_TIMELINE_DATA__", f"window.__CCY_TIMELINE_DATA__ = {json.dumps(tl_data)};")
 
     with open(DST_HTML, "w") as f:
         f.write(html)
-    print("✅ index.html inline data updated")
+    print("✅ index.html inline data updated (power + timeline)")
 
 except Exception as e:
     print(f"❌ Failed: {e}", file=sys.stderr)
