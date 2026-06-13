@@ -219,7 +219,7 @@
                     <button class="trend-range-btn active" data-trange="3d" title="Last 3 days">3D</button>
                     <button class="trend-range-btn" data-trange="7d" title="Last 7 days">7D</button>
                     <button class="trend-range-btn" data-trange="30d" title="Last 30 days">30D</button>
-                    <button id="trend-crossover" class="range-btn" onclick="toggleCrossovers()" title="Show crossover points">✕ Cross</button>
+
                 </div>
             </div>
             <div id="trend-chart" style="width:100%;min-height:320px;"></div>
@@ -369,28 +369,29 @@
         function renderTimelineGrid(data,range) {
             const grid=document.getElementById('timeline-grid'),ccys=['XAU','CAD','JPY','AUD','EUR','CHF','GBP','NZD','USD'],nowH=new Date().getHours();
             if(range==='24h') {
-                const last=data.slice(-30), byH={}; last.forEach(e=>{const h=typeof e.timestamp==='string'?parseInt(e.timestamp.split(' ')[1]):e.hour;byH[h]=e;});
-                // Forward-fill + wrap-around: fill ALL 24 hours
-                const filled={};
-                // First pass: forward fill
-                let prev=null;
-                for(let h=0;h<24;h++){if(byH[h]){filled[h]=byH[h];prev=byH[h];}else if(prev){filled[h]=prev;}}
-                // Wrap: if first hours empty, use last available data to fill backwards
-                if(!filled[0]){
-                    // Find last available hour
-                    let lastH=-1;
-                    for(let h=23;h>=0;h--) if(byH[h]){lastH=h;break;}
-                    if(lastH>=0){
-                        for(let h=0;h<lastH;h++) if(!filled[h]) filled[h]=byH[lastH];
-                    }
-                }
-                // Second pass: fill any remaining gaps
-                for(let h=1;h<24;h++) if(!filled[h]&&filled[h-1]) filled[h]=filled[h-1];
-
-                grid.style.gridTemplateColumns='36px repeat(24,14px)'; grid.style.gridTemplateRows='18px repeat('+ccys.length+',18px)'; grid.style.overflowX='hidden'; grid.className='timeline-grid';
-                let html='<div style="font-size:0.5rem;padding:1px 2px;">HKT</div>';
-                for(let h=0;h<24;h++){const isN=(h===nowH); html+='<div class="'+(isN?'now-label':'')+'" style="font-size:0.5rem;text-align:center;padding:1px;'+(isN?'':'color:var(--text2);')+'">'+(isN?'NOW':h)+'</div>';}
-                ccys.forEach(c=>{html+='<div style="font-size:0.55rem;padding:0 2px;font-weight:600;">'+c+'</div>';for(let h=0;h<24;h++){const e=filled[h];if(e){const v=e.currencies[c]||0,av=ccys.map(x=>e.currencies[x]||0),cls=getRankClass(v,av),isN=(h===nowH);html+='<div class="timeline-cell '+cls+(isN?' is-now':'')+'" style="width:100%;height:18px;border-radius:2px;" title="'+(typeof e.timestamp==='string'?e.timestamp:'')+' '+c+': '+v.toFixed(2)+'"></div>';}else{html+='<div style="width:100%;height:18px;background:var(--border);border-radius:2px;"></div>';}}});
+                // 新邏輯：過去24小時從左到右，最新在右邊
+                const show=data.slice(-24); // 取最後24個entries
+                const pw=grid.parentElement?grid.parentElement.clientWidth:340,aw=pw-36,g=1;
+                let cw=Math.max(2,Math.floor((aw-24*g)/24));
+                grid.style.gridTemplateColumns='36px repeat('+show.length+','+cw+'px)'; grid.style.gridTemplateRows='18px repeat('+ccys.length+',18px)'; grid.style.overflowX='hidden'; grid.className='timeline-grid dense';
+                
+                // Time header：顯示相對時間（-23h...-1h, NOW）
+                let html='<div style="font-size:0.5rem;padding:1px 2px;">HKT</div>'; 
+                show.forEach((e,idx)=>{
+                    const isLast=(idx===show.length-1);
+                    const label = isLast?'NOW':(show.length-1-idx)+'h';
+                    html+='<div class="'+(isLast?'now-label':'')+'" style="font-size:0.5rem;text-align:center;padding:1px;'+(isLast?'':'color:var(--text2);')+'">'+label+'</div>'; 
+                });
+                
+                // Data rows
+                ccys.forEach(c=>{
+                    html+='<div style="font-size:0.55rem;padding:0 2px;font-weight:600;">'+c+'</div>'; 
+                    show.forEach((e,idx)=>{
+                        const v=e.currencies[c]||0,av=ccys.map(x=>e.currencies[x]||0),cls=getRankClass(v,av),isLast=(idx===show.length-1); 
+                        html+='<div class="timeline-cell '+cls+(isLast?' is-now':'')+'" style="width:100%;height:18px;border-radius:2px;" title="'+(typeof e.timestamp==='string'?e.timestamp:'')+' '+c+': '+v.toFixed(2)+'"></div>'; 
+                    });
+                });
+                grid.innerHTML=html;
                 grid.innerHTML=html;
             } else {
                 const mh=getHoursFromRange(range); let show=data.slice(-mh);
@@ -418,7 +419,7 @@
             renderPairs();
         }
         function arrowCls(v) { if(v>=2) return 'arr-sb'; if(v>=1) return 'arr-b'; if(v<=-2) return 'arr-ss'; if(v<=-1) return 'arr-s'; return 'arr-n'; }
-        function arrowChar(v) { if(v>=2) return '⬆'; if(v>=1) return '↑'; if(v<=-2) return '⬇'; if(v<=-1) return '↓'; return '—'; }
+        function arrowChar(v) { if(v>=2) return '⬆'; if(v>=1) return '↑'; if(v<=-2) return '⬇'; if(v<=-1) return '↓'; return '-'; }
         function arrowTitle(v) { if(v>=2) return '强多'; if(v>=1) return '偏多'; if(v<=-2) return '强空'; if(v<=-1) return '偏空'; return '中性'; }
         function indArrow(v) { return '<div class="ind-arr '+arrowCls(v)+'" title="'+arrowTitle(v)+'">'+arrowChar(v)+'</div>'; }
         function indCell(vals) { return '<div class="ind-cell">'+vals.map(v=>indArrow(v)).join('')+'</div>'; }
@@ -436,11 +437,11 @@
                 const score = tfs.reduce((s,t)=>s+(t.signal||0),0);
                 return {sym,data:d,tfs,score};
             });
-            
+
             if (pairsSortBy==='signal') entries.sort((a,b)=>b.score-a.score);
             else if (pairsSortBy==='rsi') entries.sort((a,b)=>(b.tfs[0].rsi||0)-(a.tfs[0].rsi||0));
             else if (pairsSortBy==='atr') entries.sort((a,b)=>(b.tfs[0].atr||0)-(a.tfs[0].atr||0));
-            
+
             let html='';
             entries.forEach(({sym,data,tfs,score})=>{
                 const scoreColor = score>=6?'color:#3fb950':score>=2?'color:#56d364':score<=-6?'color:#f85149':score<=-2?'color:#ffa198':'color:var(--text2)';
@@ -467,34 +468,7 @@
             EUR:'#3b82f6', GBP:'#8b5cf6', AUD:'#f59e0b', NZD:'#10b981',
             CAD:'#ef4444', CHF:'#ec4899', XAU:'#fbbf24', JPY:'#06b6d4', USD:'#6b7280'
         };
-        let trendChart = null, trendTF = 'H1', trendRange = '3d', showCrossovers = false;
-
-        function findCrossovers(series) {
-            // Find points where any two currency lines cross
-            const crossovers = [];
-            if (series.length < 2) return crossovers;
-            const ccys = Object.keys(CCY_COLORS);
-            for (let ci = 0; ci < ccys.length; ci++) {
-                for (let cj = ci+1; cj < ccys.length; cj++) {
-                    const a = series.map(p => p[ccys[ci]]);
-                    const b = series.map(p => p[ccys[cj]]);
-                    for (let i = 1; i < a.length; i++) {
-                        if ((a[i-1]-b[i-1])*(a[i]-b[i]) < 0) {
-                            // Cross detected - interpolate
-                            const ratio = Math.abs(a[i-1]-b[i-1]) / (Math.abs(a[i-1]-b[i-1]) + Math.abs(a[i]-b[i]));
-                            const crossVal = a[i-1] + (a[i]-a[i-1]) * ratio;
-                            crossovers.push({
-                                x: series[i].ts,
-                                y: crossVal,
-                                pair: ccys[ci]+'/'+ccys[cj],
-                                direction: a[i] > b[i] ? ccys[ci]+'⬆' : ccys[cj]+'⬆'
-                            });
-                        }
-                    }
-                }
-            }
-            return crossovers;
-        }
+: `        let trendChart = null, trendTF = 'H1', trendRange = '3d';
 
         function renderTrendChart() {
             if (!timelineData.length) return;
@@ -513,26 +487,47 @@
                 const obj = {ts};
                 ccys.forEach(c => obj[c] = (e.currencies[c] || 0));
                 return obj;
-            });
+            // H1/H4/D1 粒度合併計算
+            let displaySeries = series;
+            if (trendTF === 'H4') {
+                // 每4小時合併：取4個H1數據的平均值
+                const grouped = [];
+                for (let i = 0; i < series.length; i += 4) {
+                    const chunk = series.slice(i, i + 4);
+                    if (chunk.length === 0) continue;
+                    const avg = {ts: chunk[chunk.length-1].ts}; // 用最後一個時間戳
+                    ccys.forEach(c => {
+                        const vals = chunk.map(p => p[c]).filter(v => v > 0);
+                        avg[c] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+                    });
+                    grouped.push(avg);
+                }
+                displaySeries = grouped;
+            } else if (trendTF === 'D1') {
+                // 每天24小時合併：按日期分組取平均
+                const byDate = {};
+                series.forEach(p => {
+                    const date = p.ts.split(' ')[0]; // "2026.06.13"
+                    if (!byDate[date]) byDate[date] = [];
+                    byDate[date].push(p);
+                });
+                const daily = [];
+                Object.keys(byDate).sort().forEach(date => {
+                    const chunk = byDate[date];
+                    const avg = {ts: date.substring(5)}; // "06.13"
+                    ccys.forEach(c => {
+                        const vals = chunk.map(p => p[c]).filter(v => v > 0);
+                        avg[c] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+                    });
+                    daily.push(avg);
+                });
+                displaySeries = daily;
+            }
 
             const apexSeries = ccys.map(c => ({
                 name: c,
-                data: series.map(p => ({x: p.ts, y: p[c]}))
+                data: displaySeries.map(p => ({x: p.ts, y: p[c]}))
             }));
-
-            const annotations = {xaxis:[], points:[]};
-            if (showCrossovers) {
-                const crosses = findCrossovers(series);
-                crosses.forEach((cr, i) => {
-                    annotations.points.push({
-                        x: cr.x, y: cr.y,
-                        marker: {size:5, fillColor:'#fff', strokeColor:'#f59e0b', strokeWidth:2, radius:2},
-                        label: {text: cr.pair, style:{fontSize:'9px',fontWeight:'bold',background:'#f59e0b',color:'#000',padding:{left:4,right:4,top:2,bottom:2}}}
-                    });
-                });
-                // Only show max 30 to avoid clutter
-                if (annotations.points.length > 30) annotations.points = annotations.points.slice(-30);
-            }
 
             const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
             const opts = {
@@ -583,7 +578,7 @@
                     markers:{size:8,width:12,height:3,radius:2},
                     itemMargin:{horizontal:6}
                 },
-                annotations: annotations,
+
                 theme: {mode: isDark?'dark':'light'}
             };
 
@@ -595,15 +590,9 @@
         function setTrendTF(tf) {
             trendTF = tf;
             document.querySelectorAll('.trend-tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
-            // Reload timeline for this TF
-            const base = new URL('.',window.location.href).href;
-            fetch(base+'timeline.json?t='+Date.now()).then(r=>r.json()).then(r=>{
-                if(r.success&&r.timeline&&r.timeline[tf]){
-                    timelineData = r.timeline[tf].map(e=>({timestamp:e.timestamp,currencies:e.currencies,hour:parseInt(e.timestamp.split(' ')[1]?.split(':')[0]||0)}));
-                    renderTimelineGrid(timelineData,currentRange);
-                    renderTrendChart();
-                }
-            }).catch(()=>{});
+            // 不重新 fetch，直接用現有 timelineData（H1）
+            // 只改變顯示粒度
+            renderTrendChart();
         }
 
         function setTrendRange(range) {
@@ -612,13 +601,7 @@
             renderTrendChart();
         }
 
-        function toggleCrossovers() {
-            showCrossovers = !showCrossovers;
-            const btn = document.getElementById('trend-crossover');
-            btn.classList.toggle('active',showCrossovers);
-            btn.textContent = showCrossovers ? '✓ Cross' : '✕ Cross';
-            renderTrendChart();
-        }
+
 
         function initPage() {
             loadCurrentFromAPI();
