@@ -308,4 +308,27 @@ if __name__ == "__main__":
             for row in reader: pair_rows.append(row)
         update_pairs_json(pair_rows)
     
+    # Inject inline data into HTML
+    HTML_PATH = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/index.html"
+    import re
+    if os.path.exists(HTML_PATH):
+        with open(HTML_PATH, 'r') as f: html = f.read()
+        with open(DATA_JSON, 'r') as f: data_json = json.load(f)
+        with open(TIMELINE_JSON, 'r') as f: timeline_json = json.load(f)
+        # Fill H4/H1 from D1 if missing
+        d1 = data_json.get('data', {}).get('D1', {})
+        if d1:
+            for tf in ['H4', 'H1']:
+                if tf not in data_json.get('data', {}) or not data_json['data'][tf]:
+                    data_json.setdefault('data', {})[tf] = dict(d1)
+        # Remove existing inline script blocks
+        html = re.sub(r'<script>window\.__CCY_POWER_DATA__\s*=\s*\{.*?\};</script>\n?', '', html, flags=re.DOTALL)
+        html = re.sub(r'<script>window\.__CCY_TIMELINE_DATA__\s*=\s*\{.*?\};</script>\n?', '', html, flags=re.DOTALL)
+        # Insert both before </head>
+        inject = '<script>window.__CCY_POWER_DATA__ = ' + json.dumps(data_json) + ';</script>\n'
+        inject += '<script>window.__CCY_TIMELINE_DATA__ = ' + json.dumps(timeline_json) + ';</script>\n'
+        html = html.replace('</head>', inject + '</head>')
+        with open(HTML_PATH, 'w') as f: f.write(html)
+        print("[OK] HTML inline data injected (power + timeline)")
+    
     print("[DONE] CCY Power update complete")
