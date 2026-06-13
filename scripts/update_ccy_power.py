@@ -10,22 +10,55 @@ from datetime import datetime
 from collections import defaultdict
 
 CSV_PATH = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/forex_data.csv"
+READER_CSV_PATH = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/ccy_power_reader.csv"
 DATA_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/data.json"
 TIMELINE_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/timeline.json"
 PAIRS_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/pairs.json"
 DB_PATH = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/data/ccy_power_history.db"
 
 def read_csv():
-    """Read latest CCY Power data from ccy_power_v2 DB (Pipeline 2).
-    Falls back to forex_data.csv if DB is empty.
-    Pipeline 2 = CCY Power Indicator → ccy_power_history.csv → ccy_power_v2 DB
-    This gives per-TF distinct values, unlike EA's forex_data.csv (same values all TFs).
+    """Read latest CCY Power data.
+    Priority: ccy_power_reader.csv → ccy_power_v2 DB → forex_data.csv
+    ccy_power_reader.csv = CCYPowerReader EA (reads chart objects from 3 TF charts)
+    This gives REAL per-TF distinct values from CCY Power Indicator.
     """
     import sqlite3 as sq3
     
     CCY_NAMES = ["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD", "USD", "XAU"]
     
-    # Try ccy_power_v2 first (has real per-TF distinct values)
+    # Priority 1: ccy_power_reader.csv (CCYPowerReader EA - reads chart objects)
+    if os.path.exists(READER_CSV_PATH):
+        try:
+            data = {}
+            with open(READER_CSV_PATH, 'r') as f:
+                reader = csv.DictReader(f)
+                # Collect all rows, get latest per TF
+                tf_rows = {'D1': [], 'H4': [], 'H1': []}
+                for row in reader:
+                    tf = row.get('timeframe', '')
+                    if tf in tf_rows:
+                        tf_rows[tf].append(row)
+                # Get latest row for each TF
+                for tf, rows in tf_rows.items():
+                    if rows:
+                        latest = rows[-1]  # Last row is latest
+                        ccy = {}
+                        for i in range(1, 10):
+                            name = latest.get(f'ccy{i}_name', '').strip()
+                            val = latest.get(f'ccy{i}_power', '0').strip()
+                            if name:
+                                ccy[name] = float(val)
+                        if ccy:
+                            data[tf] = ccy
+            if len(data) >= 2:  # At least 2 TFs with data
+                print(f"[OK] Using ccy_power_reader.csv: {len(data)} TFs with distinct values")
+                ts = tf_rows['D1'][-1]['timestamp'] if tf_rows['D1'] else datetime.now().strftime("%Y.%m.%d %H:%M")
+                print(f"     Latest: {ts} | D1: {list(data.get('D1', {}).keys())[:3]} H4: {list(data.get('H4', {}).keys())[:3]} H1: {list(data.get('H1', {}).keys())[:3]}")
+                return data, []
+        except Exception as e:
+            print(f"[WARN] ccy_power_reader.csv read failed: {e}")
+    
+    # Priority 2: ccy_power_v2 DB
     if os.path.exists(DB_PATH):
         try:
             conn = sq3.connect(DB_PATH)
