@@ -289,21 +289,40 @@
         }
         function updateSummary(data) { if (!data || !data.D1) return; const s = Object.entries(data.D1).sort((a,b) => b[1]-a[1]); document.getElementById('strongest-currency').textContent = s[0][0]; document.getElementById('weakest-currency').textContent = s[s.length-1][0]; document.getElementById('spread-value').textContent = (s[0][1]-s[s.length-1][1]).toFixed(2); }
         function updateTimestamps(ts) { ['d1-ts','h4-ts','h1-ts'].forEach(id => document.getElementById(id).textContent = ts); document.getElementById('last-update').textContent = new Date().toLocaleTimeString('en-HK',{hour12:false}); }
+        function _ensureMultiTF(data) {
+            // Fallback: if H4 or H1 is empty/missing, fill with D1 data
+            if (!data || !data.D1) return data;
+            ['H4','H1'].forEach(tf => {
+                if (!data[tf] || Object.keys(data[tf]).length === 0) {
+                    data[tf] = Object.assign({}, data.D1);
+                }
+            });
+            return data;
+        }
         function renderHeatmap(data) {
-            if (!data) return; const c = document.getElementById('heatmap-grid'); if (!c) return; c.innerHTML = '';
+            if (!data) return; data = _ensureMultiTF(data);
+            const c = document.getElementById('heatmap-grid'); if (!c) return; c.innerHTML = '';
             c.appendChild(Object.assign(document.createElement('div'),{className:'heatmap-cell'}));
             ['D1','H4','H1'].forEach(tf => { const d = document.createElement('div'); d.className='heatmap-cell tf-label'; d.textContent=tf; c.appendChild(d); });
             Object.entries(data.D1).sort((a,b) => b[1]-a[1]).forEach(([cur]) => {
                 const l = document.createElement('div'); l.className='heatmap-cell currency-label'; l.textContent=cur; c.appendChild(l);
-                ['D1','H4','H1'].forEach(tf => { const v=data[tf][cur]; const d=document.createElement('div'); d.className='heatmap-cell '+getStatusClass(v); d.textContent=v.toFixed(2); c.appendChild(d); });
+                ['D1','H4','H1'].forEach(tf => { const v=(data[tf]&&data[tf][cur])||0; const d=document.createElement('div'); d.className='heatmap-cell '+getStatusClass(v); d.textContent=v.toFixed(2); c.appendChild(d); });
             });
         }
         function updateData(data) { currentData=data; renderHeatmap(data); updateSummary(data); updateTimestamps(data.ts); const b=document.getElementById('status-badge'); b.className='status-badge status-connected'; b.innerHTML='<i class="fas fa-circle text-xs mr-1 pulse-dot pulse-green"></i>Connected'; }
         function connectWebSocket() { ws = new WebSocket('ws://localhost:8787/ws/ccy_power'); ws.onopen = () => loadCurrentFromAPI(); ws.onmessage = e => { try { const d=JSON.parse(e.data); if(d.type==='ccy_power_multi') updateData(d); } catch(x){} }; ws.onerror = () => loadCurrentFromAPI(); ws.onclose = () => setTimeout(connectWebSocket,5000); }
         function loadCurrentFromAPI() {
-            if (window.__CCY_POWER_DATA__ && window.__CCY_POWER_DATA__.success) { const r=window.__CCY_POWER_DATA__, d=r.data; updateData({type:'ccy_power_multi',ts:r.timestamp,D1:d.D1||{},H4:d.H4||{},H1:d.H1||{}}); return; }
+            function _buildPayload(r) {
+                const d=r.data||{};
+                let payload={type:'ccy_power_multi',ts:r.timestamp,D1:d.D1||{},H4:d.H4||{},H1:d.H1||{}};
+                // Fallback: if H4 or H1 empty, use D1 data
+                if(Object.keys(payload.H4).length===0 && Object.keys(payload.D1).length>0) payload.H4=Object.assign({},payload.D1);
+                if(Object.keys(payload.H1).length===0 && Object.keys(payload.D1).length>0) payload.H1=Object.assign({},payload.D1);
+                return payload;
+            }
+            if (window.__CCY_POWER_DATA__ && window.__CCY_POWER_DATA__.success) { updateData(_buildPayload(window.__CCY_POWER_DATA__)); return; }
             const base = new URL('.',window.location.href).href;
-            fetch(base+'data.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.data){const d=r.data;updateData({type:'ccy_power_multi',ts:r.timestamp,D1:d.D1||{},H4:d.H4||{},H1:d.H1||{}});}}).catch(()=>{fetch('http://localhost:8788/api/ccy_power/current').then(r=>r.json()).then(r=>{if(r.success&&r.data){const d=r.data;updateData({type:'ccy_power_multi',ts:r.timestamp,D1:d.D1||{},H4:d.H4||{},H1:d.H1||{}});}}).catch(()=>{});});
+            fetch(base+'data.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.data){updateData(_buildPayload(r));}}).catch(()=>{fetch('http://localhost:8788/api/ccy_power/current').then(r=>r.json()).then(r=>{if(r.success&&r.data){updateData(_buildPayload(r));}}).catch(()=>{});});
         }
         function refreshData() { if(ws&&ws.readyState===WebSocket.OPEN) ws.send('{"type":"request_update"}'); else connectWebSocket(); }
 
