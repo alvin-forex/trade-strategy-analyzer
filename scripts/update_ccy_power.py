@@ -16,6 +16,22 @@ TIMELINE_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/ad
 PAIRS_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/pairs.json"
 DB_PATH = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/data/ccy_power_history.db"
 
+def is_market_closed():
+    """檢查是否為週末休市時間（以 HKT 為準）
+    週六05:00 HKT（紐約週五收市）→ 週一08:00 HKT（悉尼週一開市）
+    """
+    now = datetime.now()
+    weekday = now.weekday()  # 0=Mon, 5=Sat, 6=Sun
+    hour = now.hour
+
+    if weekday == 5 and hour >= 5:  # 週六 05:00 後
+        return True, f"週末休市（週六 {hour:02d}:00 HKT）"
+    if weekday == 6:  # 週日全天
+        return True, "週末休市（週日）"
+    if weekday == 0 and hour < 8:  # 週一 08:00 前
+        return True, f"週末休市（週一 {hour:02d}:00 HKT，未開市）"
+    return False, None
+
 def read_csv():
     """Read latest CCY Power data.
     Priority: ccy_power_reader.csv → ccy_power_v2 DB → forex_data.csv
@@ -318,6 +334,12 @@ def update_pairs_json(all_rows):
     print(f"[OK] pairs.json: {len(sorted_pairs)} pairs")
 
 if __name__ == "__main__":
+    # 休市時間檢查
+    closed, reason = is_market_closed()
+    if closed:
+        print(f"[SKIP] {reason}")
+        sys.exit(0)  # 正常退出，不報錯
+    
     result = read_csv()
     if result is None:
         sys.exit(1)
