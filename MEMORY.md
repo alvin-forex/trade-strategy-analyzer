@@ -46,3 +46,25 @@
 - 帳戶狀態 (截至 2026-06-05 23:59:59): 槓桿：1:500 [score=0.826 recalls=0 avg=0.620 source=memory/2026-06-08.md:16-16]
 <!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:16:16 -->
 - 新事件摘要（6月4-8日）: 其他: EURCAD, EURJPY, CHFJPY, EURAUD, GBPJPY 各1單 [score=0.822 recalls=0 avg=0.620 source=memory/2026-06-09.md:16-16]
+
+## Promoted From Short-Term Memory (2026-06-14)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:19:21 -->
+- 新事件摘要（6月4-8日）: USDCHF SELL +$23.88; Nikkei225 x6 淨利 +$80.64（最大 +$31.97）; Nikkei225 x1 小虧 -$0.16 [score=0.855 recalls=0 avg=0.620 source=memory/2026-06-09.md:19-21]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-07.md:26:26 -->
+- 已完成: pending_events.json 已清理 [score=0.847 recalls=0 avg=0.620 source=memory/2026-06-07.md:26-26]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:26:26 -->
+- 待解決: [ ] WhatsApp allowFrom 配置未修復 [score=0.845 recalls=0 avg=0.620 source=memory/2026-06-09.md:26-26]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:11:11 -->
+- 新事件摘要（6月4-8日）: **新倉 (33筆):** [score=0.835 recalls=0 avg=0.620 source=memory/2026-06-09.md:11-11]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:18:18 -->
+- 新事件摘要（6月4-8日）: **平倉 (9筆):** [score=0.825 recalls=0 avg=0.620 source=memory/2026-06-09.md:18-18]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-08.md:52:53 -->
+- 待辦事項: [ ] 檢查 WhatsApp allowFrom 配置; [ ] 確認 daily summary cron 正常運作 [score=0.808 recalls=0 avg=0.620 source=memory/2026-06-08.md:52-53]
+
+## Promoted From Short-Term Memory (2026-06-15)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:14:15 -->
+- 今日活動摘要: 最後狀態更新: 2026.06.12 19:25:49; 帳戶從 5.47 增至 4.89 (+.42) [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-13.md:14-15]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:23:23 -->
+- 備註: 帳戶處於低資金狀態，需注意風控。 [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-13.md:23-23]
