@@ -68,3 +68,18 @@
 - 今日活動摘要: 最後狀態更新: 2026.06.12 19:25:49; 帳戶從 5.47 增至 4.89 (+.42) [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-13.md:14-15]
 <!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:23:23 -->
 - 備註: 帳戶處於低資金狀態，需注意風控。 [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-13.md:23-23]
+
+## Promoted From Short-Term Memory (2026-06-16)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:7:10 -->
+- 帳戶狀態: Broker: Vantage Markets; Login: 7737997; Balance: 4.89; Equity: 4.89 [score=0.866 recalls=0 avg=0.620 source=memory/2026-06-13.md:7-10]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:20:20 -->
+- WhatsApp 發送: messageId: 3EB06B62D1655B012FC751 [score=0.817 recalls=0 avg=0.620 source=memory/2026-06-13.md:20-20]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:4:7 -->
+- Cron: mt4-daily-summary: **狀態：** ✅ 成功; **MT4 狀態讀取：** ✅ (monitor_state_*.json); **交易事件讀取：** ✅ (monitor_events_*.csv); **WhatsApp 發送：** ✅ messageId=3EB06E4A95D4D35E1A8287 [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-14.md:4-7]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:11:11 -->
+- 帳戶狀態: Positions: 0 [score=0.807 recalls=0 avg=0.620 source=memory/2026-06-13.md:11-11]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:19:19 -->
+- WhatsApp 發送: ✅ 成功發送到 +85295424877 [score=0.807 recalls=0 avg=0.620 source=memory/2026-06-13.md:19-19]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:4:4 -->
+- 執行時間: 00:30 HKT (2026-06-13) [score=0.807 recalls=0 avg=0.620 source=memory/2026-06-13.md:4-4]
