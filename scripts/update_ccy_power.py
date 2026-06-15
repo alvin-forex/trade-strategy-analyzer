@@ -303,9 +303,14 @@ def update_pairs_json(all_rows):
         elif ema20 < ema50: signals.append(-1)
         else: signals.append(0)
         
-        if price > bb_u: signals.append(1)
-        elif price < bb_l: signals.append(-1)
-        else: signals.append(0)
+        # BB: 均值回歸邏輯（與前端 JS bbSignal 一致）
+        if bb_u > bb_l:
+            bb_pos = (price - bb_l) / (bb_u - bb_l)
+            if bb_pos > 0.8: signals.append(-1)   # 接近上軌 = 超買
+            elif bb_pos < 0.2: signals.append(1)  # 接近下軌 = 超賣
+            else: signals.append(0)
+        else:
+            signals.append(0)
         
         total = sum(signals)
         if total >= 3: bias = "Strong Buy"
