@@ -38,8 +38,10 @@ body{font-family:var(--font-main);background:var(--bg);color:var(--text)}
 .report-item .badge{font-size:.68em;padding:2px 7px;border-radius:4px;font-weight:600;white-space:nowrap}
 .badge-morning{background:rgba(26,35,126,.3);color:#90caf9}
 .badge-evening{background:rgba(183,28,28,.2);color:#ef9a9a}
+.badge-4h{background:rgba(0,77,64,.3);color:#80cbc4}
 [data-theme="light"] .badge-morning{background:#e3f2fd;color:#1565c0}
 [data-theme="light"] .badge-evening{background:#fce4ec;color:#c62828}
+[data-theme="light"] .badge-4h{background:#e0f2f1;color:#00695c}
 
 /* Right: Report Viewer */
 .report-viewer{flex:1;overflow:hidden;display:flex;flex-direction:column}
@@ -126,7 +128,35 @@ function toggleTheme(){
 // Report registry — updated when new reports arrive
 const REPORTS = [
   /* REPORT_REGISTRY_START */
+  {date:'2026-06-16',type:'morning',file:'2026-06-16_morning.html',label:'早盤報告'},
+  {date:'2026-06-15',type:'morning',file:'2026-06-15_morning.html',label:'早盤報告'},
+  {date:'2026-06-15',type:'evening',file:'2026-06-15_evening.html',label:'晚盤報告'},
+  {date:'2026-06-15',type:'4h',file:'4h_analysis_2026-06-15.html',label:'4H 分析'},
+  {date:'2026-06-15',type:'4h',file:'4h_2026-06-15.html',label:'4H 分析'},
+  {date:'2026-06-12',type:'morning',file:'2026-06-12_morning.html',label:'早盤報告'},
+  {date:'2026-06-12',type:'4h',file:'4h_2026-06-12_1626.html',label:'4H 分析'},
+  {date:'2026-06-12',type:'4h',file:'4h_2026-06-12_1205.html',label:'4H 分析'},
+  {date:'2026-06-11',type:'evening',file:'2026-06-11_evening.html',label:'晚盤報告'},
+  {date:'2026-06-11',type:'morning',file:'2026-06-11_morning.html',label:'早盤報告'},
+  {date:'2026-06-11',type:'4h',file:'4h_2026-06-11_1626.html',label:'4H 分析'},
+  {date:'2026-06-11',type:'4h',file:'4h_2026-06-11.html',label:'4H 分析'},
+  {date:'2026-06-10',type:'evening',file:'2026-06-10_evening.html',label:'晚盤報告'},
+  {date:'2026-06-10',type:'morning',file:'2026-06-10_morning.html',label:'早盤報告'},
+  {date:'2026-06-09',type:'morning',file:'2026-06-09_morning.html',label:'早盤報告'},
+  {date:'2026-06-08',type:'evening',file:'2026-06-08_evening.html',label:'晚盤報告'},
+  {date:'2026-06-08',type:'morning',file:'2026-06-08_morning.html',label:'早盤報告'},
+  {date:'2026-06-05',type:'morning',file:'2026-06-05_morning.html',label:'早盤報告'},
+  {date:'2026-06-05',type:'evening',file:'2026-06-05_evening.html',label:'晚盤報告'},
+  {date:'2026-06-04',type:'evening',file:'2026-06-04_evening.html',label:'晚盤報告'},
+  {date:'2026-06-04',type:'morning',file:'2026-06-04_morning.html',label:'早盤報告'},
+  {date:'2026-06-03',type:'evening',file:'2026-06-03_evening.html',label:'晚盤報告'},
+  {date:'2026-06-03',type:'morning',file:'2026-06-03_morning.html',label:'早盤報告'},
+  {date:'2026-06-02',type:'morning',file:'2026-06-02_morning.html',label:'早盤報告'},
+  {date:'2026-06-01',type:'evening',file:'2026-06-01_evening.html',label:'晚盤報告'},
+  {date:'2026-06-01',type:'morning',file:'2026-06-01_morning.html',label:'早盤報告'},
+  {date:'2026-05-30',type:'morning',file:'2026-05-30_morning.html',label:'早盤報告'},
   {date:'2026-05-29',type:'evening',file:'2026-05-29_evening.html',label:'晚盤報告'},
+  {date:'2026-05-29',type:'daily',file:'2026-05-29_daily.html',label:'日報'},
   {date:'2026-05-29',type:'morning',file:'2026-05-29_morning.html',label:'早盤報告'},
   {date:'2026-05-28',type:'evening',file:'2026-05-28_evening.html',label:'晚盤報告'},
   {date:'2026-05-28',type:'morning',file:'2026-05-28_morning.html',label:'早盤報告'},
@@ -165,13 +195,18 @@ function renderList() {
     const dayName = dayNames[d.getDay()];
     html += `<div class="date-group">`;
     html += `<div class="date-label">📅 ${date} (${dayName})</div>`;
-    // Morning first, then evening
-    const sorted = groups[date].sort((a,b) => a.type === 'morning' ? -1 : 1);
+    // Sort: morning first, then evening, then 4h, then daily
+    const typeOrder = {morning:0, evening:1, '4h':2, daily:3};
+    const sorted = groups[date].sort((a,b) => (typeOrder[a.type]||9) - (typeOrder[b.type]||9));
     sorted.forEach(r => {
-      const icon = r.type === 'morning' ? '🌅' : '🌆';
-      const badgeClass = r.type === 'morning' ? 'badge-morning' : 'badge-evening';
-      const badgeText = r.type === 'morning' ? '早盤' : '晚盤';
-      const timeText = r.type === 'morning' ? '07:00 HKT' : '18:00 HKT';
+      const icons = {morning:'🌅', evening:'🌆', '4h':'📊', daily:'📋'};
+      const badges = {morning:'badge-morning', evening:'badge-evening', '4h':'badge-4h', daily:'badge-morning'};
+      const badgeTexts = {morning:'早盤', evening:'晚盤', '4h':'4H', daily:'日報'};
+      const times = {morning:'07:00 HKT', evening:'18:00 HKT', '4h':'4H週期', daily:'每日'};
+      const icon = icons[r.type] || '📄';
+      const badgeClass = badges[r.type] || 'badge-morning';
+      const badgeText = badgeTexts[r.type] || r.type;
+      const timeText = times[r.type] || '';
       html += `<div class="report-item" data-file="${r.file}" onclick="loadReport('${r.file}','${date} ${r.label}')">
         <span class="icon">${icon}</span>
         <div class="info">

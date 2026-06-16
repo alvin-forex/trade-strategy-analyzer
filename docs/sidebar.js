@@ -20,7 +20,6 @@
       <a href="${depth}admin/volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
       <div class="sidebar-sep"></div>
       <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
-      <a href="${depth}admin/forex_reports/index.html" class="sidebar-link" data-page="forex_reports"><span class="icon">📰</span>外匯報告</a>
       <a href="${depth}admin/forex_news.html" class="sidebar-link" data-page="forex_news"><span class="icon">📄</span>外匯新聞</a>
     </div>
   `;
@@ -61,7 +60,7 @@
     else if(dp==='ccy_ranking' && filename==='ccy_ranking') link.classList.add('active');
     else if(dp==='volatility' && (filename==='volatility' || filename==='ccy_timeframe_volatility')) link.classList.add('active');
     else if(dp==='ccy_power' && (path.includes('/admin/ccy_power/') || filename==='ccy_power')) link.classList.add('active');
-    else if(dp==='forex_reports' && (path.includes('/admin/forex_reports/') || filename==='forex_reports')) link.classList.add('active');
+    else if(dp==='forex_news' && (filename==='forex_news' || path.includes('/admin/forex_reports/'))) link.classList.add('active');
     else if(dp!=='index' && filename.includes(dp)) link.classList.add('active');
   });
 })();
