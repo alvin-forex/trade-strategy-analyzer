@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCY Power Multi-TF Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../sidebar.css">
+    <style>
+    /* === Theme System === */
+    :root { --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', sans-serif; }
+    [data-theme="dark"] {
+        --bg: #0f172a; --bg-card: #1e293b; --bg-hover: #334155;
+        --text: #f8fafc; --text2: #94a3b8;
+        --primary: #60a5fa; --accent: #38bdf8;
+        --green: #22c55e; --red: #ef4444; --yellow: #eab308; --orange: #f97316;
+        --border: #334155; --shadow: rgba(0,0,0,0.3);
+    }
+    [data-theme="light"] {
+        --bg: #f1f5f9; --bg-card: #ffffff; --bg-hover: #e2e8f0;
+        --text: #1e293b; --text2: #64748b;
+        --primary: #2563eb; --accent: #0ea5e9;
+        --green: #16a34a; --red: #dc2626; --yellow: #ca8a04; --orange: #ea580c;
+        --border: #cbd5e1; --shadow: rgba(0,0,0,0.08);
+    }
+    * { transition: background-color .2s ease, color .2s ease, border-color .2s ease; }
+    body { background: var(--bg) !important; color: var(--text) !important; }
+    .theme-toggle {
+        width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 50%;
+        background: var(--bg-card); color: var(--text); font-size: 16px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0;
+    }
+    .theme-toggle:hover { background: var(--bg-hover); transform: scale(1.1); }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; min-height: 100vh; margin-left: 260px; }
+    .dashboard-container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: var(--bg-card); border-radius: 1rem; margin-bottom: 1.5rem; border: 1px solid var(--border); }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .header-title { font-size: 1.5rem; font-weight: 700; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .status-connected { background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .status-disconnected { background: rgba(239, 68, 68, 0.15); color: var(--red); border: 1px solid var(--red); }
+    .tf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    @media (max-width: 1024px) { .tf-grid { grid-template-columns: 1fr; } }
+    .tf-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; transition: all 0.2s; }
+    .tf-card:hover { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 4px 12px rgba(59, 130, 246, 0.15); }
+    .tf-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+    .tf-label { font-size: 1.125rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+    .tf-label i { color: var(--primary); }
+    .tf-timestamp { font-size: 0.75rem; color: var(--text2); }
+    .currency-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .currency-item { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1rem; background: rgba(15, 23, 42, 0.5); border-radius: 0.5rem; border: 1px solid var(--border); transition: all 0.15s; }
+    .currency-item:hover { border-color: var(--primary); background: rgba(15, 23, 42, 0.8); }
+    .currency-name { font-size: 0.9rem; font-weight: 700; letter-spacing: 0.05em; min-width: 40px; }
+    .currency-value { font-size: 1.1rem; font-weight: 800; font-family: 'SF Mono', 'Fira Code', monospace; min-width: 60px; text-align: right; }
+    .heatmap-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .heatmap-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+    .heatmap-legend { display: flex; gap: 1rem; }
+    .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--text2); }
+    .heatmap-grid { display: grid; grid-template-columns: auto repeat(3, 1fr); gap: 0.25rem; }
+    .heatmap-cell { display: flex; align-items: center; justify-content: center; padding: 0.5rem; border-radius: 0.5rem; font-size: 0.9rem; font-weight: 600; font-family: 'SF Mono', monospace; transition: all 0.2s; }
+    .heatmap-cell:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .heatmap-cell.currency-label { background: transparent; justify-content: flex-start; padding-left: 0.5rem; font-weight: 700; color: var(--text); border-radius: 0; }
+    .heatmap-cell.tf-label { background: rgba(59, 130, 246, 0.1); color: var(--primary); font-size: 0.8rem; font-weight: 700; }
+    .heatmap-cell.strong { background: rgba(16, 185, 129, 0.2); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .heatmap-cell.neutral { background: rgba(245, 158, 11, 0.2); color: var(--yellow); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .heatmap-cell.weak { background: rgba(239, 68, 68, 0.2); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.3); }
+    .currency-bar-container { flex: 1; margin: 0 1rem; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .currency-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+    .strong { color: var(--green); } .strong .currency-bar-fill { background: var(--green); }
+    .neutral { color: var(--yellow); } .neutral .currency-bar-fill { background: var(--yellow); }
+    .weak { color: var(--red); } .weak .currency-bar-fill { background: var(--red); }
+    .summary-bar { display: flex; justify-content: space-around; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; margin-bottom: 1.5rem; }
+    .summary-item { text-align: center; }
+    .summary-value { font-size: 1.5rem; font-weight: 800; font-family: 'SF Mono', monospace; }
+    .summary-label { font-size: 0.75rem; color: var(--text2); margin-top: 0.25rem; }
+    .pulse-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+    .pulse-green { background: var(--green); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .timeline-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .timeline-card .timeline-grid, .timeline-card #session-bar { width: fit-content; }
+    .timeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem; }
+    .timeline-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 600; }
+    .timeline-controls { display: flex; gap: 0.5rem; }
+    .range-btn { padding: 0.4rem 0.8rem; border-radius: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); color: var(--text2); font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
+    .range-btn:hover, .range-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .timeline-market-labels { display: flex; gap: 1rem; margin-bottom: 0.5rem; }
+    .market-label { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 0.3rem; }
+    .market-label.asian { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+    .market-label.european { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+    .market-label.american { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+    .timeline-grid { display: grid; gap: 2px; width: fit-content; max-width: 100%; }
+    .timeline-card .timeline-grid { width: fit-content; }
+    .timeline-grid.dense { gap: 1px; }
+    .timeline-loading { text-align: center; padding: 2rem; color: var(--text2); }
+    .timeline-cell.r1 { background: #059669; } .timeline-cell.r2 { background: #10b981; }
+    .timeline-cell.r3 { background: #34d399; } .timeline-cell.r4 { background: #86efac; }
+    .timeline-cell.r5 { background: #fde047; } .timeline-cell.r6 { background: #fdba74; }
+    .timeline-cell.r7 { background: #fb923c; } .timeline-cell.r8 { background: #ef4444; }
+    .timeline-cell.r9 { background: #b91c1c; }
+    /* NOW marker */
+    .timeline-cell.is-now { outline: 2px solid var(--accent); outline-offset: -1px; z-index: 1; }
+    .now-label { background: var(--accent); color: #fff; font-size: 0.45rem; font-weight: 700; padding: 1px 3px; border-radius: 2px; text-align: center; line-height: 1.2; }
+    /* Session bar */
+    .session-bar { display: grid; height: 6px; border-radius: 1px; margin-top: 2px; overflow: hidden; }
+    .session-bar .sb-asia { background: #f59e0b; } .session-bar .sb-europe { background: #3b82f6; }
+    .session-bar .sb-us { background: #10b981; } .session-bar .sb-none { background: var(--border); }
+    /* Latest time badge */
+    .latest-time-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.15); border: 1px solid var(--accent); color: var(--accent); font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 0.3rem; margin-left: 0.5rem; }
+    .footer { text-align: center; padding: 1.5rem; color: var(--text2); font-size: 0.75rem; }
+    /* Pairs table */
+    .pairs-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .pairs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem; }
+    .pairs-controls { display: flex; gap: 0.5rem; align-items: center; }
+    .pairs-select { padding: 0.4rem 0.6rem; border-radius: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); font-size: 0.75rem; cursor: pointer; }
+    .pairs-table-wrap { overflow-x: auto; }
+    /* Trend Chart */
+    .trend-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .trend-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+    .trend-controls { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .trend-tf-btn, .trend-range-btn { padding: 0.25rem 0.6rem; border-radius: 0.375rem; font-size: 0.7rem; font-weight: 600; background: var(--bg-hover); color: var(--text2); border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; }
+    .trend-tf-btn.active, .trend-range-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .trend-tf-btn:hover, .trend-range-btn:hover { border-color: var(--primary); }
+    .crossover-dot { filter: drop-shadow(0 0 3px rgba(255,255,255,0.8)); }
+    .pairs-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .pairs-table th { padding: 0.5rem 0.4rem; text-align: center; color: var(--text2); font-weight: 600; font-size: 0.7rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .pairs-table td { padding: 0.45rem 0.4rem; text-align: center; border-bottom: 1px solid rgba(51,65,85,0.3); white-space: nowrap; font-family: 'SF Mono','Fira Code',monospace; font-size: 0.72rem; }
+    .pairs-table tr:hover td { background: var(--bg-hover); }
+    .pairs-table .pair-name { font-weight: 700; text-align: left; padding-left: 0.6rem; color: var(--text); font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+    .pairs-table .pair-score { font-weight: 700; font-size: 0.85rem; }
+    /* Arrow indicator cells */
+    .ind-cell { display: flex; gap: 2px; justify-content: center; align-items: center; }
+    .ind-arr { font-size: 0.9rem; line-height: 1; padding: 1px 2px; border-radius: 2px; min-width: 16px; text-align: center; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+    .arr-sb { color: #3fb950; font-weight: 700; } /* strong buy */
+    .arr-b { color: #56d364; } /* buy */
+    .arr-n { color: var(--text2); opacity: 0.5; } /* neutral */
+    .arr-s { color: #ffa198; } /* sell */
+    .arr-ss { color: #f85149; font-weight: 700; } /* strong sell */
+    @media (max-width: 768px) {
+        body { margin-left: 0 !important; }
+        .dashboard-container { padding: 0.5rem; }
+        .header { padding: 0.5rem 0.75rem; border-radius: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+        .header-title { font-size: 1rem; }
+        .header-left { gap: 0.5rem; }
+        .header-left i { font-size: 1.2rem !important; }
+        .header-left .text-sm { font-size: 0.65rem; }
+        .status-badge { font-size: 0.6rem; padding: 0.15rem 0.5rem; }
+        .tf-card { padding: 0.5rem; border-radius: 0.5rem; }
+        .currency-item { padding: 0.3rem 0.5rem; border-radius: 0.25rem; }
+        .currency-name { font-size: 0.7rem; } .currency-value { font-size: 0.85rem; }
+        .summary-bar { padding: 0.5rem; border-radius: 0.5rem; }
+        .summary-value { font-size: 1rem; } .summary-label { font-size: 0.6rem; }
+        .timeline-card { padding: 0.5rem; border-radius: 0.5rem; }
+        .timeline-title { font-size: 0.85rem; }
+        .range-btn { padding: 0.25rem 0.5rem; font-size: 0.65rem; }
+        .market-label { font-size: 0.55rem; padding: 0.15rem 0.4rem; }
+        .timeline-grid { gap: 1px; }
+        .footer { padding: 0.75rem; font-size: 0.6rem; }
+    }
+    </style>
+    <script>
+    (function(){ var s=localStorage.getItem('tsa-theme'); var t=s||'dark'; document.documentElement.setAttribute('data-theme',t); })();
+    function toggleTheme(){ var c=document.documentElement.getAttribute('data-theme'); var n=c==='dark'?'light':'dark'; document.documentElement.setAttribute('data-theme',n); localStorage.setItem('tsa-theme',n); var b=document.getElementById('theme-toggle'); if(b)b.textContent=n==='dark'?'\u2600\ufe0f':'\ud83c\udf19'; }
+    document.addEventListener('DOMContentLoaded',function(){ var t=localStorage.getItem('tsa-theme')||'dark'; var b=document.getElementById('theme-toggle'); if(b)b.textContent=t==='dark'?'\u2600\ufe0f':'\ud83c\udf19'; });
+    </script>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-blue: #3b82f6;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+        }
+        body { margin-left: 260px; }
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-connected {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+        .status-disconnected {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+        }
+        .tf-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 1024px) {
+            .tf-grid { grid-template-columns: 1fr; }
+        }
+        .tf-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            transition: all 0.2s;
+        }
+        .tf-card:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 1px var(--accent-blue), 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+        .tf-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .tf-label {
+            font-size: 1.125rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .tf-label i { color: var(--accent-blue); }
+        .tf-timestamp {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .currency-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .currency-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 1rem;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.15s;
+        }
+        .currency-item:hover {
+            border-color: var(--accent-blue);
+            background: rgba(15, 23, 42, 0.8);
+        }
+        .currency-name {
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            min-width: 40px;
+        }
+        .currency-value {
+            font-size: 1.1rem;
+            font-weight: 800;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            min-width: 60px;
+            text-align: right;
+        }
+        /* Heatmap */
+        .heatmap-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .heatmap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .heatmap-legend {
+            display: flex;
+            gap: 1rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+        .legend-dot.strong { background: var(--accent-green); }
+        .legend-dot.neutral { background: var(--accent-yellow); }
+        .legend-dot.weak { background: var(--accent-red); }
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: auto repeat(3, 1fr);
+            gap: 0.25rem;
+        }
+        .heatmap-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: 'SF Mono', monospace;
+            transition: all 0.2s;
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .heatmap-cell.currency-label {
+            background: transparent;
+            justify-content: flex-start;
+            padding-left: 0.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-radius: 0;
+        }
+        .heatmap-cell.tf-label {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+        .heatmap-cell.strong {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .heatmap-cell.neutral {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-yellow);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        .heatmap-cell.weak {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .currency-bar-container {
+            flex: 1;
+            margin: 0 1rem;
+            height: 6px;
+            background: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .currency-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        .strong { color: var(--accent-green); }
+        .strong .currency-bar-fill { background: var(--accent-green); }
+        .neutral { color: var(--accent-yellow); }
+        .neutral .currency-bar-fill { background: var(--accent-yellow); }
+        .weak { color: var(--accent-red); }
+        .weak .currency-bar-fill { background: var(--accent-red); }
+        .rank-badge {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.625rem;
+            font-weight: 800;
+        }
+        .summary-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            font-family: 'SF Mono', monospace;
+        }
+        .summary-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        .pulse-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .pulse-green { background: var(--accent-green); }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+    </style>
+<script>window.__CCY_POWER_DATA__ = {"success": true, "timestamp": "2026.06.16 15:00", "data": {"D1": {"GBP": 6.43, "USD": 5.88, "EUR": 5.75, "JPY": 4.88, "XAU": 4.25, "CAD": 3.29, "NZD": 3.29, "AUD": 3.25, "CHF": 3.14}, "H4": {"XAU": 7.0, "USD": 5.75, "EUR": 5.38, "CHF": 5.29, "GBP": 4.57, "JPY": 4.38, "AUD": 3.38, "CAD": 3.29, "NZD": 2.43}, "H1": {"XAU": 7.0, "EUR": 5.63, "GBP": 5.57, "USD": 4.88, "JPY": 4.63, "NZD": 4.0, "CHF": 3.86, "CAD": 3.29, "AUD": 2.75}}};</script>
+<script>window.__CCY_TIMELINE_DATA__ = {"success": true, "hours": 720, "timeline": {"D1": [{"timestamp": "2026.05.18 00:00", "currencies": {"AUD": 4.5, "CAD": 4.53, "CHF": 4.4, "EUR": 4.46, "GBP": 4.57, "JPY": 4.89, "NZD": 4.65, "USD": 4.25, "XAU": 0.0}}, {"timestamp": "2026.05.19 00:00", "currencies": {"AUD": 4.84, "CAD": 4.39, "CHF": 4.68, "EUR": 4.54, "GBP": 4.53, "JPY": 4.84, "NZD": 4.96, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.20 00:00", "currencies": {"AUD": 4.62, "CAD": 4.37, "CHF": 4.66, "EUR": 4.62, "GBP": 4.43, "JPY": 4.78, "NZD": 4.7, "USD": 4.28, "XAU": 0.0}}, {"timestamp": "2026.05.21 00:00", "currencies": {"AUD": 4.65, "CAD": 4.55, "CHF": 4.55, "EUR": 4.68, "GBP": 4.42, "JPY": 4.77, "NZD": 4.61, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.22 00:00", "currencies": {"AUD": 4.74, "CAD": 4.76, "CHF": 4.33, "EUR": 4.67, "GBP": 4.37, "JPY": 4.76, "NZD": 4.86, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.25 00:00", "currencies": {"AUD": 4.49, "CAD": 4.82, "CHF": 4.33, "EUR": 4.62, "GBP": 4.05, "JPY": 4.81, "NZD": 4.68, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.05.26 00:00", "currencies": {"AUD": 4.41, "CAD": 4.75, "CHF": 4.51, "EUR": 4.38, "GBP": 4.28, "JPY": 4.81, "NZD": 4.95, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.27 00:00", "currencies": {"AUD": 4.68, "CAD": 4.91, "CHF": 4.74, "EUR": 4.51, "GBP": 4.42, "JPY": 4.95, "NZD": 4.19, "USD": 4.38, "XAU": 0.0}}, {"timestamp": "2026.05.28 00:00", "currencies": {"AUD": 4.57, "CAD": 4.72, "CHF": 4.5, "EUR": 4.5, "GBP": 4.44, "JPY": 4.93, "NZD": 3.99, "USD": 4.71, "XAU": 0.0}}, {"timestamp": "2026.05.29 00:00", "currencies": {"AUD": 4.29, "CAD": 4.66, "CHF": 4.17, "EUR": 4.51, "GBP": 4.43, "JPY": 4.76, "NZD": 3.86, "USD": 4.63, "XAU": 0.0}}, {"timestamp": "2026.06.01 00:00", "currencies": {"AUD": 4.23, "CAD": 4.7, "CHF": 4.6, "EUR": 4.38, "GBP": 4.26, "JPY": 4.79, "NZD": 4.15, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.06.02 00:00", "currencies": {"AUD": 4.09, "CAD": 4.66, "CHF": 4.68, "EUR": 4.44, "GBP": 4.23, "JPY": 4.87, "NZD": 4.23, "USD": 4.41, "XAU": 0.0}}, {"timestamp": "2026.06.03 00:00", "currencies": {"AUD": 4.34, "CAD": 4.72, "CHF": 4.78, "EUR": 4.3, "GBP": 4.23, "JPY": 4.57, "NZD": 4.62, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.04 00:00", "currencies": {"AUD": 4.37, "CAD": 4.63, "CHF": 4.53, "EUR": 4.23, "GBP": 4.22, "JPY": 4.52, "NZD": 4.57, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.05 00:00", "currencies": {"AUD": 4.91, "CAD": 4.4, "CHF": 4.83, "EUR": 4.59, "GBP": 4.56, "JPY": 4.34, "NZD": 4.99, "USD": 4.02, "XAU": 0.0}}, {"timestamp": "2026.06.08 00:00", "currencies": {"AUD": 4.69, "CAD": 4.48, "CHF": 4.87, "EUR": 4.41, "GBP": 4.4, "JPY": 4.37, "NZD": 4.75, "USD": 4.12, "XAU": 0.0}}, {"timestamp": "2026.06.09 00:00", "currencies": {"AUD": 4.83, "CAD": 4.61, "CHF": 4.97, "EUR": 4.49, "GBP": 4.26, "JPY": 4.6, "NZD": 4.83, "USD": 4.22, "XAU": 0.0}}, {"timestamp": "2026.06.10 00:00", "currencies": {"AUD": 3.0, "CAD": 5.29, "CHF": 2.43, "EUR": 5.75, "GBP": 7.0, "JPY": 3.25, "NZD": 3.57, "USD": 6.25, "XAU": 3.5}}, {"timestamp": "2026.06.10 12:34", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.10 14:08", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.10 17:04", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.10 18:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.10 19:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.10 20:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.10 21:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.10 22:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.10 23:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 00:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 01:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 02:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 02:59", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 03:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 04:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 05:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 06:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 07:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 08:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 09:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 10:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 11:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 12:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 13:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 14:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 15:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 16:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 17:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 18:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 19:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 20:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 21:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 22:00", "currencies": {"AUD": 3.5, "CAD": 4.4286, "CHF": 2.0, "EUR": 5.5, "GBP": 5.1429, "JPY": 5.5, "NZD": 2.8571, "USD": 7.25, "XAU": 3.25}}, {"timestamp": "2026.06.11 22:59", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.11 23:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 00:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 01:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 02:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 03:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 04:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 05:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 06:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 07:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 08:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 09:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 10:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 11:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 12:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:55", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:56", "currencies": {"AUD": 3.71, "CAD": 0.88, "CHF": 2.84, "EUR": 4.54, "GBP": 6.15, "JPY": 3.03, "NZD": 3.5, "USD": 7.38, "XAU": 0.37}}, {"timestamp": "2026.06.12 14:00", "currencies": {"AUD": 3.71, "CAD": 0.88, "CHF": 2.84, "EUR": 4.54, "GBP": 6.15, "JPY": 3.03, "NZD": 3.5, "USD": 7.38, "XAU": 0.37}}, {"timestamp": "2026.06.12 14:06", "currencies": {"AUD": 3.71, "CAD": 0.88, "CHF": 2.84, "EUR": 4.54, "GBP": 6.15, "JPY": 3.03, "NZD": 3.5, "USD": 7.38, "XAU": 0.37}}, {"timestamp": "2026.06.12 15:00", "currencies": {"AUD": 3.78, "CAD": 1.04, "CHF": 2.75, "EUR": 4.65, "GBP": 6.14, "JPY": 2.88, "NZD": 3.51, "USD": 7.3, "XAU": 0.37}}, {"timestamp": "2026.06.12 16:00", "currencies": {"AUD": 3.7, "CAD": 0.87, "CHF": 2.74, "EUR": 4.57, "GBP": 6.12, "JPY": 3.12, "NZD": 3.52, "USD": 7.39, "XAU": 0.37}}, {"timestamp": "2026.06.12 17:00", "currencies": {"AUD": 4.75, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.57, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.12 18:00", "currencies": {"AUD": 3.5, "CAD": 2.43, "CHF": 3.43, "EUR": 6.13, "GBP": 6.86, "JPY": 4.75, "NZD": 3.43, "USD": 5.38, "XAU": 4.25}}, {"timestamp": "2026.06.12 20:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.12 20:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.12 21:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.12 21:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.12 22:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.12 22:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.12 23:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.12 23:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 00:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 00:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 01:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 02:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 02:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 03:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 03:31", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 04:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 04:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 05:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 05:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 06:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 06:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 07:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 07:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 08:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 08:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 09:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 09:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 09:45", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 10:00", "currencies": {"AUD": 4.88, "CAD": 4.25, "CHF": 5.63, "EUR": 3.25, "GBP": 3.29, "JPY": 2.43, "NZD": 3.43, "USD": 6.86, "XAU": 6.13}}, {"timestamp": "2026.06.13 10:23", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 10:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 11:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 11:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 12:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 12:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 13:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 13:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 14:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 14:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 15:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 15:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 16:33", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 17:33", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 18:33", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 19:33", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 20:33", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 21:33", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 22:33", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.13 23:33", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.14 00:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.14 01:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.14 02:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.14 03:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.14 04:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.14 05:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.14 06:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.14 07:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 00:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 01:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 02:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 03:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 04:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 05:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 06:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 07:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 08:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 08:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 09:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 10:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 11:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 11:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 12:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 13:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 14:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 15:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 16:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 17:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 18:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 18:32", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 19:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 20:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 21:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 22:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.15 23:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 00:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 00:51", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 01:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 01:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 02:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 03:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 03:35", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 04:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 05:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 06:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 06:36", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 07:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 07:36", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 08:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 08:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 09:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 09:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 10:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 11:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 11:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 12:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 13:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 13:29", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 14:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}, {"timestamp": "2026.06.16 15:00", "currencies": {"AUD": 3.25, "CAD": 3.29, "CHF": 3.14, "EUR": 5.75, "GBP": 6.43, "JPY": 4.88, "NZD": 3.29, "USD": 5.88, "XAU": 4.25}}], "H4": [{"timestamp": "2026.05.18 00:00", "currencies": {"AUD": 4.5, "CAD": 4.53, "CHF": 4.4, "EUR": 4.46, "GBP": 4.57, "JPY": 4.89, "NZD": 4.65, "USD": 4.25, "XAU": 0.0}}, {"timestamp": "2026.05.18 04:00", "currencies": {"AUD": 4.5, "CAD": 4.53, "CHF": 4.4, "EUR": 4.46, "GBP": 4.57, "JPY": 4.89, "NZD": 4.65, "USD": 4.25, "XAU": 0.0}}, {"timestamp": "2026.05.18 08:00", "currencies": {"AUD": 4.5, "CAD": 4.53, "CHF": 4.4, "EUR": 4.46, "GBP": 4.57, "JPY": 4.89, "NZD": 4.65, "USD": 4.25, "XAU": 0.0}}, {"timestamp": "2026.05.18 12:00", "currencies": {"AUD": 4.5, "CAD": 4.53, "CHF": 4.4, "EUR": 4.46, "GBP": 4.57, "JPY": 4.89, "NZD": 4.65, "USD": 4.25, "XAU": 0.0}}, {"timestamp": "2026.05.18 16:00", "currencies": {"AUD": 4.5, "CAD": 4.53, "CHF": 4.4, "EUR": 4.46, "GBP": 4.57, "JPY": 4.89, "NZD": 4.65, "USD": 4.25, "XAU": 0.0}}, {"timestamp": "2026.05.18 20:00", "currencies": {"AUD": 4.5, "CAD": 4.53, "CHF": 4.4, "EUR": 4.46, "GBP": 4.57, "JPY": 4.89, "NZD": 4.65, "USD": 4.25, "XAU": 0.0}}, {"timestamp": "2026.05.19 00:00", "currencies": {"AUD": 4.84, "CAD": 4.39, "CHF": 4.68, "EUR": 4.54, "GBP": 4.53, "JPY": 4.84, "NZD": 4.96, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.19 04:00", "currencies": {"AUD": 4.84, "CAD": 4.39, "CHF": 4.68, "EUR": 4.54, "GBP": 4.53, "JPY": 4.84, "NZD": 4.96, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.19 08:00", "currencies": {"AUD": 4.84, "CAD": 4.39, "CHF": 4.68, "EUR": 4.54, "GBP": 4.53, "JPY": 4.84, "NZD": 4.96, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.19 12:00", "currencies": {"AUD": 4.84, "CAD": 4.39, "CHF": 4.68, "EUR": 4.54, "GBP": 4.53, "JPY": 4.84, "NZD": 4.96, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.19 16:00", "currencies": {"AUD": 4.84, "CAD": 4.39, "CHF": 4.68, "EUR": 4.54, "GBP": 4.53, "JPY": 4.84, "NZD": 4.96, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.19 20:00", "currencies": {"AUD": 4.84, "CAD": 4.39, "CHF": 4.68, "EUR": 4.54, "GBP": 4.53, "JPY": 4.84, "NZD": 4.96, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.20 00:00", "currencies": {"AUD": 4.62, "CAD": 4.37, "CHF": 4.66, "EUR": 4.62, "GBP": 4.43, "JPY": 4.78, "NZD": 4.7, "USD": 4.28, "XAU": 0.0}}, {"timestamp": "2026.05.20 04:00", "currencies": {"AUD": 4.62, "CAD": 4.37, "CHF": 4.66, "EUR": 4.62, "GBP": 4.43, "JPY": 4.78, "NZD": 4.7, "USD": 4.28, "XAU": 0.0}}, {"timestamp": "2026.05.20 08:00", "currencies": {"AUD": 4.62, "CAD": 4.37, "CHF": 4.66, "EUR": 4.62, "GBP": 4.43, "JPY": 4.78, "NZD": 4.7, "USD": 4.28, "XAU": 0.0}}, {"timestamp": "2026.05.20 12:00", "currencies": {"AUD": 4.62, "CAD": 4.37, "CHF": 4.66, "EUR": 4.62, "GBP": 4.43, "JPY": 4.78, "NZD": 4.7, "USD": 4.28, "XAU": 0.0}}, {"timestamp": "2026.05.20 16:00", "currencies": {"AUD": 4.62, "CAD": 4.37, "CHF": 4.66, "EUR": 4.62, "GBP": 4.43, "JPY": 4.78, "NZD": 4.7, "USD": 4.28, "XAU": 0.0}}, {"timestamp": "2026.05.20 20:00", "currencies": {"AUD": 4.62, "CAD": 4.37, "CHF": 4.66, "EUR": 4.62, "GBP": 4.43, "JPY": 4.78, "NZD": 4.7, "USD": 4.28, "XAU": 0.0}}, {"timestamp": "2026.05.21 00:00", "currencies": {"AUD": 4.65, "CAD": 4.55, "CHF": 4.55, "EUR": 4.68, "GBP": 4.42, "JPY": 4.77, "NZD": 4.61, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.21 04:00", "currencies": {"AUD": 4.65, "CAD": 4.55, "CHF": 4.55, "EUR": 4.68, "GBP": 4.42, "JPY": 4.77, "NZD": 4.61, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.21 08:00", "currencies": {"AUD": 4.65, "CAD": 4.55, "CHF": 4.55, "EUR": 4.68, "GBP": 4.42, "JPY": 4.77, "NZD": 4.61, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.21 12:00", "currencies": {"AUD": 4.65, "CAD": 4.55, "CHF": 4.55, "EUR": 4.68, "GBP": 4.42, "JPY": 4.77, "NZD": 4.61, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.21 16:00", "currencies": {"AUD": 4.65, "CAD": 4.55, "CHF": 4.55, "EUR": 4.68, "GBP": 4.42, "JPY": 4.77, "NZD": 4.61, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.21 20:00", "currencies": {"AUD": 4.65, "CAD": 4.55, "CHF": 4.55, "EUR": 4.68, "GBP": 4.42, "JPY": 4.77, "NZD": 4.61, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.22 00:00", "currencies": {"AUD": 4.74, "CAD": 4.76, "CHF": 4.33, "EUR": 4.67, "GBP": 4.37, "JPY": 4.76, "NZD": 4.86, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.22 04:00", "currencies": {"AUD": 4.74, "CAD": 4.76, "CHF": 4.33, "EUR": 4.67, "GBP": 4.37, "JPY": 4.76, "NZD": 4.86, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.22 08:00", "currencies": {"AUD": 4.74, "CAD": 4.76, "CHF": 4.33, "EUR": 4.67, "GBP": 4.37, "JPY": 4.76, "NZD": 4.86, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.22 12:00", "currencies": {"AUD": 4.74, "CAD": 4.76, "CHF": 4.33, "EUR": 4.67, "GBP": 4.37, "JPY": 4.76, "NZD": 4.86, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.22 16:00", "currencies": {"AUD": 4.74, "CAD": 4.76, "CHF": 4.33, "EUR": 4.67, "GBP": 4.37, "JPY": 4.76, "NZD": 4.86, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.22 20:00", "currencies": {"AUD": 4.74, "CAD": 4.76, "CHF": 4.33, "EUR": 4.67, "GBP": 4.37, "JPY": 4.76, "NZD": 4.86, "USD": 4.23, "XAU": 0.0}}, {"timestamp": "2026.05.25 00:00", "currencies": {"AUD": 4.49, "CAD": 4.82, "CHF": 4.33, "EUR": 4.62, "GBP": 4.05, "JPY": 4.81, "NZD": 4.68, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.05.25 04:00", "currencies": {"AUD": 4.49, "CAD": 4.82, "CHF": 4.33, "EUR": 4.62, "GBP": 4.05, "JPY": 4.81, "NZD": 4.68, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.05.25 08:00", "currencies": {"AUD": 4.49, "CAD": 4.82, "CHF": 4.33, "EUR": 4.62, "GBP": 4.05, "JPY": 4.81, "NZD": 4.68, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.05.25 12:00", "currencies": {"AUD": 4.49, "CAD": 4.82, "CHF": 4.33, "EUR": 4.62, "GBP": 4.05, "JPY": 4.81, "NZD": 4.68, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.05.25 16:00", "currencies": {"AUD": 4.49, "CAD": 4.82, "CHF": 4.33, "EUR": 4.62, "GBP": 4.05, "JPY": 4.81, "NZD": 4.68, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.05.25 20:00", "currencies": {"AUD": 4.49, "CAD": 4.82, "CHF": 4.33, "EUR": 4.62, "GBP": 4.05, "JPY": 4.81, "NZD": 4.68, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.05.26 00:00", "currencies": {"AUD": 4.41, "CAD": 4.75, "CHF": 4.51, "EUR": 4.38, "GBP": 4.28, "JPY": 4.81, "NZD": 4.95, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.26 04:00", "currencies": {"AUD": 4.41, "CAD": 4.75, "CHF": 4.51, "EUR": 4.38, "GBP": 4.28, "JPY": 4.81, "NZD": 4.95, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.26 08:00", "currencies": {"AUD": 4.41, "CAD": 4.75, "CHF": 4.51, "EUR": 4.38, "GBP": 4.28, "JPY": 4.81, "NZD": 4.95, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.26 12:00", "currencies": {"AUD": 4.41, "CAD": 4.75, "CHF": 4.51, "EUR": 4.38, "GBP": 4.28, "JPY": 4.81, "NZD": 4.95, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.26 16:00", "currencies": {"AUD": 4.41, "CAD": 4.75, "CHF": 4.51, "EUR": 4.38, "GBP": 4.28, "JPY": 4.81, "NZD": 4.95, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.26 20:00", "currencies": {"AUD": 4.41, "CAD": 4.75, "CHF": 4.51, "EUR": 4.38, "GBP": 4.28, "JPY": 4.81, "NZD": 4.95, "USD": 4.31, "XAU": 0.0}}, {"timestamp": "2026.05.27 00:00", "currencies": {"AUD": 4.68, "CAD": 4.91, "CHF": 4.74, "EUR": 4.51, "GBP": 4.42, "JPY": 4.95, "NZD": 4.19, "USD": 4.38, "XAU": 0.0}}, {"timestamp": "2026.05.27 04:00", "currencies": {"AUD": 4.68, "CAD": 4.91, "CHF": 4.74, "EUR": 4.51, "GBP": 4.42, "JPY": 4.95, "NZD": 4.19, "USD": 4.38, "XAU": 0.0}}, {"timestamp": "2026.05.27 08:00", "currencies": {"AUD": 4.68, "CAD": 4.91, "CHF": 4.74, "EUR": 4.51, "GBP": 4.42, "JPY": 4.95, "NZD": 4.19, "USD": 4.38, "XAU": 0.0}}, {"timestamp": "2026.05.27 12:00", "currencies": {"AUD": 4.68, "CAD": 4.91, "CHF": 4.74, "EUR": 4.51, "GBP": 4.42, "JPY": 4.95, "NZD": 4.19, "USD": 4.38, "XAU": 0.0}}, {"timestamp": "2026.05.27 16:00", "currencies": {"AUD": 4.68, "CAD": 4.91, "CHF": 4.74, "EUR": 4.51, "GBP": 4.42, "JPY": 4.95, "NZD": 4.19, "USD": 4.38, "XAU": 0.0}}, {"timestamp": "2026.05.27 20:00", "currencies": {"AUD": 4.68, "CAD": 4.91, "CHF": 4.74, "EUR": 4.51, "GBP": 4.42, "JPY": 4.95, "NZD": 4.19, "USD": 4.38, "XAU": 0.0}}, {"timestamp": "2026.05.28 00:00", "currencies": {"AUD": 4.57, "CAD": 4.72, "CHF": 4.5, "EUR": 4.5, "GBP": 4.44, "JPY": 4.93, "NZD": 3.99, "USD": 4.71, "XAU": 0.0}}, {"timestamp": "2026.05.28 04:00", "currencies": {"AUD": 4.57, "CAD": 4.72, "CHF": 4.5, "EUR": 4.5, "GBP": 4.44, "JPY": 4.93, "NZD": 3.99, "USD": 4.71, "XAU": 0.0}}, {"timestamp": "2026.05.28 08:00", "currencies": {"AUD": 4.57, "CAD": 4.72, "CHF": 4.5, "EUR": 4.5, "GBP": 4.44, "JPY": 4.93, "NZD": 3.99, "USD": 4.71, "XAU": 0.0}}, {"timestamp": "2026.05.28 12:00", "currencies": {"AUD": 4.57, "CAD": 4.72, "CHF": 4.5, "EUR": 4.5, "GBP": 4.44, "JPY": 4.93, "NZD": 3.99, "USD": 4.71, "XAU": 0.0}}, {"timestamp": "2026.05.28 16:00", "currencies": {"AUD": 4.57, "CAD": 4.72, "CHF": 4.5, "EUR": 4.5, "GBP": 4.44, "JPY": 4.93, "NZD": 3.99, "USD": 4.71, "XAU": 0.0}}, {"timestamp": "2026.05.28 20:00", "currencies": {"AUD": 4.57, "CAD": 4.72, "CHF": 4.5, "EUR": 4.5, "GBP": 4.44, "JPY": 4.93, "NZD": 3.99, "USD": 4.71, "XAU": 0.0}}, {"timestamp": "2026.05.29 00:00", "currencies": {"AUD": 4.29, "CAD": 4.66, "CHF": 4.17, "EUR": 4.51, "GBP": 4.43, "JPY": 4.76, "NZD": 3.86, "USD": 4.63, "XAU": 0.0}}, {"timestamp": "2026.05.29 04:00", "currencies": {"AUD": 4.29, "CAD": 4.66, "CHF": 4.17, "EUR": 4.51, "GBP": 4.43, "JPY": 4.76, "NZD": 3.86, "USD": 4.63, "XAU": 0.0}}, {"timestamp": "2026.05.29 08:00", "currencies": {"AUD": 4.29, "CAD": 4.66, "CHF": 4.17, "EUR": 4.51, "GBP": 4.43, "JPY": 4.76, "NZD": 3.86, "USD": 4.63, "XAU": 0.0}}, {"timestamp": "2026.05.29 12:00", "currencies": {"AUD": 4.29, "CAD": 4.66, "CHF": 4.17, "EUR": 4.51, "GBP": 4.43, "JPY": 4.76, "NZD": 3.86, "USD": 4.63, "XAU": 0.0}}, {"timestamp": "2026.05.29 16:00", "currencies": {"AUD": 4.29, "CAD": 4.66, "CHF": 4.17, "EUR": 4.51, "GBP": 4.43, "JPY": 4.76, "NZD": 3.86, "USD": 4.63, "XAU": 0.0}}, {"timestamp": "2026.05.29 20:00", "currencies": {"AUD": 4.29, "CAD": 4.66, "CHF": 4.17, "EUR": 4.51, "GBP": 4.43, "JPY": 4.76, "NZD": 3.86, "USD": 4.63, "XAU": 0.0}}, {"timestamp": "2026.06.01 00:00", "currencies": {"AUD": 4.23, "CAD": 4.7, "CHF": 4.6, "EUR": 4.38, "GBP": 4.26, "JPY": 4.79, "NZD": 4.15, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.06.01 04:00", "currencies": {"AUD": 4.23, "CAD": 4.7, "CHF": 4.6, "EUR": 4.38, "GBP": 4.26, "JPY": 4.79, "NZD": 4.15, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.06.01 08:00", "currencies": {"AUD": 4.23, "CAD": 4.7, "CHF": 4.6, "EUR": 4.38, "GBP": 4.26, "JPY": 4.79, "NZD": 4.15, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.06.01 12:00", "currencies": {"AUD": 4.23, "CAD": 4.7, "CHF": 4.6, "EUR": 4.38, "GBP": 4.26, "JPY": 4.79, "NZD": 4.15, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.06.01 16:00", "currencies": {"AUD": 4.23, "CAD": 4.7, "CHF": 4.6, "EUR": 4.38, "GBP": 4.26, "JPY": 4.79, "NZD": 4.15, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.06.01 20:00", "currencies": {"AUD": 4.23, "CAD": 4.7, "CHF": 4.6, "EUR": 4.38, "GBP": 4.26, "JPY": 4.79, "NZD": 4.15, "USD": 4.39, "XAU": 0.0}}, {"timestamp": "2026.06.02 00:00", "currencies": {"AUD": 4.09, "CAD": 4.66, "CHF": 4.68, "EUR": 4.44, "GBP": 4.23, "JPY": 4.87, "NZD": 4.23, "USD": 4.41, "XAU": 0.0}}, {"timestamp": "2026.06.02 04:00", "currencies": {"AUD": 4.09, "CAD": 4.66, "CHF": 4.68, "EUR": 4.44, "GBP": 4.23, "JPY": 4.87, "NZD": 4.23, "USD": 4.41, "XAU": 0.0}}, {"timestamp": "2026.06.02 08:00", "currencies": {"AUD": 4.09, "CAD": 4.66, "CHF": 4.68, "EUR": 4.44, "GBP": 4.23, "JPY": 4.87, "NZD": 4.23, "USD": 4.41, "XAU": 0.0}}, {"timestamp": "2026.06.02 12:00", "currencies": {"AUD": 4.09, "CAD": 4.66, "CHF": 4.68, "EUR": 4.44, "GBP": 4.23, "JPY": 4.87, "NZD": 4.23, "USD": 4.41, "XAU": 0.0}}, {"timestamp": "2026.06.02 16:00", "currencies": {"AUD": 4.09, "CAD": 4.66, "CHF": 4.68, "EUR": 4.44, "GBP": 4.23, "JPY": 4.87, "NZD": 4.23, "USD": 4.41, "XAU": 0.0}}, {"timestamp": "2026.06.02 20:00", "currencies": {"AUD": 4.09, "CAD": 4.66, "CHF": 4.68, "EUR": 4.44, "GBP": 4.23, "JPY": 4.87, "NZD": 4.23, "USD": 4.41, "XAU": 0.0}}, {"timestamp": "2026.06.03 00:00", "currencies": {"AUD": 4.34, "CAD": 4.72, "CHF": 4.78, "EUR": 4.3, "GBP": 4.23, "JPY": 4.57, "NZD": 4.62, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.03 04:00", "currencies": {"AUD": 4.34, "CAD": 4.72, "CHF": 4.78, "EUR": 4.3, "GBP": 4.23, "JPY": 4.57, "NZD": 4.62, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.03 08:00", "currencies": {"AUD": 4.34, "CAD": 4.72, "CHF": 4.78, "EUR": 4.3, "GBP": 4.23, "JPY": 4.57, "NZD": 4.62, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.03 12:00", "currencies": {"AUD": 4.34, "CAD": 4.72, "CHF": 4.78, "EUR": 4.3, "GBP": 4.23, "JPY": 4.57, "NZD": 4.62, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.03 16:00", "currencies": {"AUD": 4.34, "CAD": 4.72, "CHF": 4.78, "EUR": 4.3, "GBP": 4.23, "JPY": 4.57, "NZD": 4.62, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.03 20:00", "currencies": {"AUD": 4.34, "CAD": 4.72, "CHF": 4.78, "EUR": 4.3, "GBP": 4.23, "JPY": 4.57, "NZD": 4.62, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.04 00:00", "currencies": {"AUD": 4.37, "CAD": 4.63, "CHF": 4.53, "EUR": 4.23, "GBP": 4.22, "JPY": 4.52, "NZD": 4.57, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.04 04:00", "currencies": {"AUD": 4.37, "CAD": 4.63, "CHF": 4.53, "EUR": 4.23, "GBP": 4.22, "JPY": 4.52, "NZD": 4.57, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.04 08:00", "currencies": {"AUD": 4.37, "CAD": 4.63, "CHF": 4.53, "EUR": 4.23, "GBP": 4.22, "JPY": 4.52, "NZD": 4.57, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.04 12:00", "currencies": {"AUD": 4.37, "CAD": 4.63, "CHF": 4.53, "EUR": 4.23, "GBP": 4.22, "JPY": 4.52, "NZD": 4.57, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.04 16:00", "currencies": {"AUD": 4.37, "CAD": 4.63, "CHF": 4.53, "EUR": 4.23, "GBP": 4.22, "JPY": 4.52, "NZD": 4.57, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.04 20:00", "currencies": {"AUD": 4.37, "CAD": 4.63, "CHF": 4.53, "EUR": 4.23, "GBP": 4.22, "JPY": 4.52, "NZD": 4.57, "USD": 4.05, "XAU": 0.0}}, {"timestamp": "2026.06.05 00:00", "currencies": {"AUD": 4.91, "CAD": 4.4, "CHF": 4.83, "EUR": 4.59, "GBP": 4.56, "JPY": 4.34, "NZD": 4.99, "USD": 4.02, "XAU": 0.0}}, {"timestamp": "2026.06.05 04:00", "currencies": {"AUD": 4.91, "CAD": 4.4, "CHF": 4.83, "EUR": 4.59, "GBP": 4.56, "JPY": 4.34, "NZD": 4.99, "USD": 4.02, "XAU": 0.0}}, {"timestamp": "2026.06.05 08:00", "currencies": {"AUD": 4.91, "CAD": 4.4, "CHF": 4.83, "EUR": 4.59, "GBP": 4.56, "JPY": 4.34, "NZD": 4.99, "USD": 4.02, "XAU": 0.0}}, {"timestamp": "2026.06.05 12:00", "currencies": {"AUD": 4.91, "CAD": 4.4, "CHF": 4.83, "EUR": 4.59, "GBP": 4.56, "JPY": 4.34, "NZD": 4.99, "USD": 4.02, "XAU": 0.0}}, {"timestamp": "2026.06.05 16:00", "currencies": {"AUD": 4.91, "CAD": 4.4, "CHF": 4.83, "EUR": 4.59, "GBP": 4.56, "JPY": 4.34, "NZD": 4.99, "USD": 4.02, "XAU": 0.0}}, {"timestamp": "2026.06.05 20:00", "currencies": {"AUD": 4.91, "CAD": 4.4, "CHF": 4.83, "EUR": 4.59, "GBP": 4.56, "JPY": 4.34, "NZD": 4.99, "USD": 4.02, "XAU": 0.0}}, {"timestamp": "2026.06.08 00:00", "currencies": {"AUD": 4.69, "CAD": 4.48, "CHF": 4.87, "EUR": 4.41, "GBP": 4.4, "JPY": 4.37, "NZD": 4.75, "USD": 4.12, "XAU": 0.0}}, {"timestamp": "2026.06.08 04:00", "currencies": {"AUD": 4.69, "CAD": 4.48, "CHF": 4.87, "EUR": 4.41, "GBP": 4.4, "JPY": 4.37, "NZD": 4.75, "USD": 4.12, "XAU": 0.0}}, {"timestamp": "2026.06.08 08:00", "currencies": {"AUD": 4.69, "CAD": 4.48, "CHF": 4.87, "EUR": 4.41, "GBP": 4.4, "JPY": 4.37, "NZD": 4.75, "USD": 4.12, "XAU": 0.0}}, {"timestamp": "2026.06.08 12:00", "currencies": {"AUD": 4.69, "CAD": 4.48, "CHF": 4.87, "EUR": 4.41, "GBP": 4.4, "JPY": 4.37, "NZD": 4.75, "USD": 4.12, "XAU": 0.0}}, {"timestamp": "2026.06.08 16:00", "currencies": {"AUD": 4.69, "CAD": 4.48, "CHF": 4.87, "EUR": 4.41, "GBP": 4.4, "JPY": 4.37, "NZD": 4.75, "USD": 4.12, "XAU": 0.0}}, {"timestamp": "2026.06.08 20:00", "currencies": {"AUD": 4.69, "CAD": 4.48, "CHF": 4.87, "EUR": 4.41, "GBP": 4.4, "JPY": 4.37, "NZD": 4.75, "USD": 4.12, "XAU": 0.0}}, {"timestamp": "2026.06.09 00:00", "currencies": {"AUD": 4.83, "CAD": 4.61, "CHF": 4.97, "EUR": 4.49, "GBP": 4.26, "JPY": 4.6, "NZD": 4.83, "USD": 4.22, "XAU": 0.0}}, {"timestamp": "2026.06.09 04:00", "currencies": {"AUD": 4.83, "CAD": 4.61, "CHF": 4.97, "EUR": 4.49, "GBP": 4.26, "JPY": 4.6, "NZD": 4.83, "USD": 4.22, "XAU": 0.0}}, {"timestamp": "2026.06.09 08:00", "currencies": {"AUD": 4.83, "CAD": 4.61, "CHF": 4.97, "EUR": 4.49, "GBP": 4.26, "JPY": 4.6, "NZD": 4.83, "USD": 4.22, "XAU": 0.0}}, {"timestamp": "2026.06.09 12:00", "currencies": {"AUD": 4.83, "CAD": 4.61, "CHF": 4.97, "EUR": 4.49, "GBP": 4.26, "JPY": 4.6, "NZD": 4.83, "USD": 4.22, "XAU": 0.0}}, {"timestamp": "2026.06.09 16:00", "currencies": {"AUD": 4.83, "CAD": 4.61, "CHF": 4.97, "EUR": 4.49, "GBP": 4.26, "JPY": 4.6, "NZD": 4.83, "USD": 4.22, "XAU": 0.0}}, {"timestamp": "2026.06.09 20:00", "currencies": {"AUD": 4.83, "CAD": 4.61, "CHF": 4.97, "EUR": 4.49, "GBP": 4.26, "JPY": 4.6, "NZD": 4.83, "USD": 4.22, "XAU": 0.0}}, {"timestamp": "2026.06.10 00:00", "currencies": {"AUD": 3.25, "CAD": 4.14, "CHF": 3.57, "EUR": 5.88, "GBP": 7.0, "JPY": 2.63, "NZD": 4.86, "USD": 5.38, "XAU": 3.5}}, {"timestamp": "2026.06.10 08:00", "currencies": {"AUD": 3.0, "CAD": 5.29, "CHF": 2.43, "EUR": 5.75, "GBP": 7.0, "JPY": 3.25, "NZD": 3.57, "USD": 6.25, "XAU": 3.5}}, {"timestamp": "2026.06.10 12:34", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.10 14:08", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.10 17:04", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.10 18:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.10 19:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.10 20:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.10 21:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.10 22:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.10 23:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 00:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 01:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 02:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 02:59", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 03:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 04:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 05:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 06:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 07:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 08:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 09:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 10:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 11:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 12:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 13:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 14:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 15:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 16:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 17:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 18:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 19:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 20:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 21:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 22:00", "currencies": {"AUD": 3.75, "CAD": 4.5714, "CHF": 1.7143, "EUR": 5.25, "GBP": 3.5714, "JPY": 5.25, "NZD": 5.5714, "USD": 6.125, "XAU": 4.0}}, {"timestamp": "2026.06.11 22:59", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.11 23:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 00:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 01:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 02:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 03:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 04:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 05:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 06:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 07:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 08:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 09:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 10:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 11:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 12:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:55", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:56", "currencies": {"AUD": 2.64, "CAD": 1.01, "CHF": 4.37, "EUR": 4.84, "GBP": 6.02, "JPY": 4.45, "NZD": 2.96, "USD": 5.73, "XAU": 2.22}}, {"timestamp": "2026.06.12 14:00", "currencies": {"AUD": 2.64, "CAD": 1.01, "CHF": 4.37, "EUR": 4.84, "GBP": 6.02, "JPY": 4.45, "NZD": 2.96, "USD": 5.73, "XAU": 2.22}}, {"timestamp": "2026.06.12 14:06", "currencies": {"AUD": 2.64, "CAD": 1.01, "CHF": 4.37, "EUR": 4.84, "GBP": 6.02, "JPY": 4.45, "NZD": 2.96, "USD": 5.73, "XAU": 2.22}}, {"timestamp": "2026.06.12 15:00", "currencies": {"AUD": 2.72, "CAD": 1.33, "CHF": 3.88, "EUR": 5.3, "GBP": 5.91, "JPY": 4.36, "NZD": 3.19, "USD": 5.37, "XAU": 2.25}}, {"timestamp": "2026.06.12 16:00", "currencies": {"AUD": 2.64, "CAD": 0.98, "CHF": 3.69, "EUR": 5.14, "GBP": 5.71, "JPY": 4.63, "NZD": 3.3, "USD": 5.89, "XAU": 2.23}}, {"timestamp": "2026.06.12 17:00", "currencies": {"AUD": 2.75, "CAD": 7.5, "CHF": 2.88, "EUR": 6.13, "GBP": 5.71, "JPY": 1.71, "NZD": 4.43, "USD": 5.43, "XAU": 5.38}}, {"timestamp": "2026.06.12 18:00", "currencies": {"AUD": 6.0, "CAD": 1.57, "CHF": 4.57, "EUR": 5.25, "GBP": 5.43, "JPY": 2.63, "NZD": 6.57, "USD": 2.5, "XAU": 7.5}}, {"timestamp": "2026.06.12 20:29", "currencies": {"AUD": 6.13, "CAD": 2.29, "CHF": 3.43, "EUR": 5.13, "GBP": 4.86, "JPY": 3.13, "NZD": 5.71, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.12 21:29", "currencies": {"AUD": 6.5, "CAD": 2.71, "CHF": 3.57, "EUR": 5.13, "GBP": 4.86, "JPY": 2.38, "NZD": 6.43, "USD": 3.0, "XAU": 7.25}}, {"timestamp": "2026.06.12 22:29", "currencies": {"AUD": 6.63, "CAD": 3.14, "CHF": 3.14, "EUR": 5.25, "GBP": 4.86, "JPY": 2.5, "NZD": 6.0, "USD": 3.38, "XAU": 6.5}}, {"timestamp": "2026.06.12 23:29", "currencies": {"AUD": 7.75, "CAD": 3.14, "CHF": 3.43, "EUR": 4.75, "GBP": 5.14, "JPY": 1.25, "NZD": 6.71, "USD": 2.13, "XAU": 8.0}}, {"timestamp": "2026.06.13 00:29", "currencies": {"AUD": 6.5, "CAD": 2.71, "CHF": 3.71, "EUR": 4.63, "GBP": 5.29, "JPY": 2.38, "NZD": 6.43, "USD": 2.88, "XAU": 7.5}}, {"timestamp": "2026.06.13 02:29", "currencies": {"AUD": 6.38, "CAD": 2.43, "CHF": 3.57, "EUR": 4.63, "GBP": 5.71, "JPY": 2.25, "NZD": 6.57, "USD": 2.75, "XAU": 8.0}}, {"timestamp": "2026.06.13 03:31", "currencies": {"AUD": 6.38, "CAD": 2.43, "CHF": 3.57, "EUR": 4.75, "GBP": 5.71, "JPY": 2.25, "NZD": 6.57, "USD": 2.88, "XAU": 7.5}}, {"timestamp": "2026.06.13 04:29", "currencies": {"AUD": 6.75, "CAD": 2.29, "CHF": 3.57, "EUR": 4.75, "GBP": 5.14, "JPY": 2.5, "NZD": 6.43, "USD": 3.0, "XAU": 7.5}}, {"timestamp": "2026.06.13 05:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 06:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 07:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 08:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 09:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 10:23", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 10:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 11:00", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 11:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 12:00", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 12:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 13:00", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 13:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 14:00", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 14:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 15:00", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 15:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 16:33", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 17:33", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 18:33", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 19:33", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 20:33", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 21:33", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 22:33", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.13 23:33", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.14 00:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.14 01:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.14 02:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.14 03:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.14 04:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.14 05:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.14 06:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.14 07:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 00:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 01:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 02:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 03:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 04:29", "currencies": {"AUD": 6.5, "CAD": 2.0, "CHF": 3.43, "EUR": 4.5, "GBP": 4.86, "JPY": 3.0, "NZD": 6.57, "USD": 3.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 05:29", "currencies": {"AUD": 3.63, "CAD": 1.86, "CHF": 3.71, "EUR": 6.25, "GBP": 5.71, "JPY": 5.5, "NZD": 3.86, "USD": 5.38, "XAU": 4.0}}, {"timestamp": "2026.06.15 06:29", "currencies": {"AUD": 6.25, "CAD": 2.71, "CHF": 4.43, "EUR": 5.13, "GBP": 5.29, "JPY": 2.0, "NZD": 7.0, "USD": 1.5, "XAU": 8.25}}, {"timestamp": "2026.06.15 07:29", "currencies": {"AUD": 5.88, "CAD": 2.86, "CHF": 4.57, "EUR": 4.88, "GBP": 5.86, "JPY": 2.25, "NZD": 6.14, "USD": 1.88, "XAU": 8.25}}, {"timestamp": "2026.06.15 08:00", "currencies": {"AUD": 6.13, "CAD": 2.86, "CHF": 4.57, "EUR": 4.5, "GBP": 6.14, "JPY": 1.75, "NZD": 6.71, "USD": 1.75, "XAU": 8.25}}, {"timestamp": "2026.06.15 08:29", "currencies": {"AUD": 6.5, "CAD": 2.71, "CHF": 4.43, "EUR": 4.75, "GBP": 6.71, "JPY": 1.63, "NZD": 6.0, "USD": 1.25, "XAU": 9.0}}, {"timestamp": "2026.06.15 09:00", "currencies": {"AUD": 5.75, "CAD": 3.0, "CHF": 4.29, "EUR": 4.88, "GBP": 6.29, "JPY": 1.88, "NZD": 5.86, "USD": 2.25, "XAU": 8.5}}, {"timestamp": "2026.06.15 10:00", "currencies": {"AUD": 6.13, "CAD": 3.29, "CHF": 4.14, "EUR": 4.75, "GBP": 5.86, "JPY": 1.38, "NZD": 6.0, "USD": 2.38, "XAU": 9.0}}, {"timestamp": "2026.06.15 11:00", "currencies": {"AUD": 6.5, "CAD": 3.14, "CHF": 4.71, "EUR": 4.63, "GBP": 5.71, "JPY": 1.25, "NZD": 6.0, "USD": 2.13, "XAU": 8.75}}, {"timestamp": "2026.06.15 11:29", "currencies": {"AUD": 6.88, "CAD": 3.14, "CHF": 4.57, "EUR": 4.63, "GBP": 5.57, "JPY": 1.88, "NZD": 5.43, "USD": 2.13, "XAU": 8.25}}, {"timestamp": "2026.06.15 12:00", "currencies": {"AUD": 6.75, "CAD": 3.14, "CHF": 4.57, "EUR": 4.88, "GBP": 5.14, "JPY": 1.5, "NZD": 6.14, "USD": 2.13, "XAU": 8.25}}, {"timestamp": "2026.06.15 13:00", "currencies": {"AUD": 6.5, "CAD": 2.86, "CHF": 4.71, "EUR": 5.5, "GBP": 5.43, "JPY": 1.25, "NZD": 6.57, "USD": 1.38, "XAU": 8.5}}, {"timestamp": "2026.06.15 14:00", "currencies": {"AUD": 6.0, "CAD": 3.14, "CHF": 5.43, "EUR": 5.63, "GBP": 5.86, "JPY": 1.0, "NZD": 6.14, "USD": 1.5, "XAU": 7.75}}, {"timestamp": "2026.06.15 15:00", "currencies": {"AUD": 6.0, "CAD": 2.86, "CHF": 5.0, "EUR": 5.5, "GBP": 5.57, "JPY": 1.63, "NZD": 5.57, "USD": 2.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 16:00", "currencies": {"AUD": 5.63, "CAD": 2.71, "CHF": 5.86, "EUR": 5.63, "GBP": 4.71, "JPY": 2.0, "NZD": 5.29, "USD": 2.38, "XAU": 8.25}}, {"timestamp": "2026.06.15 17:00", "currencies": {"AUD": 5.63, "CAD": 3.29, "CHF": 6.0, "EUR": 5.5, "GBP": 3.86, "JPY": 2.13, "NZD": 5.43, "USD": 2.38, "XAU": 8.25}}, {"timestamp": "2026.06.15 18:00", "currencies": {"AUD": 5.38, "CAD": 3.43, "CHF": 5.86, "EUR": 5.88, "GBP": 3.86, "JPY": 2.13, "NZD": 4.29, "USD": 3.25, "XAU": 8.25}}, {"timestamp": "2026.06.15 18:32", "currencies": {"AUD": 3.75, "CAD": 2.29, "CHF": 4.86, "EUR": 6.25, "GBP": 5.71, "JPY": 3.63, "NZD": 4.29, "USD": 4.38, "XAU": 6.0}}, {"timestamp": "2026.06.15 19:00", "currencies": {"AUD": 5.5, "CAD": 3.43, "CHF": 6.43, "EUR": 6.13, "GBP": 3.57, "JPY": 1.88, "NZD": 4.14, "USD": 3.0, "XAU": 8.25}}, {"timestamp": "2026.06.15 20:00", "currencies": {"AUD": 5.5, "CAD": 2.57, "CHF": 5.86, "EUR": 6.38, "GBP": 4.0, "JPY": 2.13, "NZD": 4.0, "USD": 3.5, "XAU": 8.25}}, {"timestamp": "2026.06.15 21:00", "currencies": {"AUD": 5.25, "CAD": 2.86, "CHF": 6.14, "EUR": 6.25, "GBP": 4.0, "JPY": 2.0, "NZD": 4.14, "USD": 3.0, "XAU": 9.0}}, {"timestamp": "2026.06.15 22:00", "currencies": {"AUD": 5.38, "CAD": 2.43, "CHF": 7.57, "EUR": 5.75, "GBP": 4.43, "JPY": 2.5, "NZD": 3.14, "USD": 2.88, "XAU": 8.25}}, {"timestamp": "2026.06.15 23:00", "currencies": {"AUD": 4.5, "CAD": 1.86, "CHF": 4.71, "EUR": 5.88, "GBP": 6.43, "JPY": 3.88, "NZD": 3.57, "USD": 4.13, "XAU": 6.25}}, {"timestamp": "2026.06.16 00:00", "currencies": {"AUD": 4.63, "CAD": 2.0, "CHF": 4.29, "EUR": 5.75, "GBP": 6.14, "JPY": 4.0, "NZD": 3.29, "USD": 4.75, "XAU": 6.25}}, {"timestamp": "2026.06.16 00:51", "currencies": {"AUD": 6.88, "CAD": 3.29, "CHF": 6.0, "EUR": 4.88, "GBP": 4.86, "JPY": 2.13, "NZD": 2.14, "USD": 4.13, "XAU": 7.5}}, {"timestamp": "2026.06.16 01:00", "currencies": {"AUD": 4.5, "CAD": 2.29, "CHF": 4.14, "EUR": 6.25, "GBP": 6.0, "JPY": 3.88, "NZD": 3.0, "USD": 4.75, "XAU": 6.25}}, {"timestamp": "2026.06.16 01:29", "currencies": {"AUD": 4.5, "CAD": 2.43, "CHF": 4.14, "EUR": 6.13, "GBP": 6.14, "JPY": 3.88, "NZD": 3.0, "USD": 4.88, "XAU": 5.75}}, {"timestamp": "2026.06.16 02:00", "currencies": {"AUD": 4.25, "CAD": 2.43, "CHF": 4.29, "EUR": 6.13, "GBP": 6.29, "JPY": 3.88, "NZD": 3.0, "USD": 4.88, "XAU": 5.75}}, {"timestamp": "2026.06.16 03:00", "currencies": {"AUD": 4.38, "CAD": 2.57, "CHF": 4.43, "EUR": 6.13, "GBP": 5.86, "JPY": 3.75, "NZD": 3.0, "USD": 5.0, "XAU": 5.75}}, {"timestamp": "2026.06.16 03:35", "currencies": {"AUD": 4.5, "CAD": 2.57, "CHF": 4.14, "EUR": 6.25, "GBP": 5.86, "JPY": 3.75, "NZD": 3.0, "USD": 5.0, "XAU": 5.75}}, {"timestamp": "2026.06.16 04:00", "currencies": {"AUD": 4.5, "CAD": 2.57, "CHF": 4.0, "EUR": 6.13, "GBP": 5.71, "JPY": 3.75, "NZD": 3.0, "USD": 5.38, "XAU": 5.75}}, {"timestamp": "2026.06.16 05:00", "currencies": {"AUD": 4.63, "CAD": 2.57, "CHF": 4.0, "EUR": 6.0, "GBP": 5.86, "JPY": 3.75, "NZD": 3.0, "USD": 5.38, "XAU": 5.5}}, {"timestamp": "2026.06.16 06:00", "currencies": {"AUD": 4.63, "CAD": 2.57, "CHF": 4.71, "EUR": 6.0, "GBP": 5.29, "JPY": 3.88, "NZD": 3.0, "USD": 5.13, "XAU": 5.5}}, {"timestamp": "2026.06.16 06:36", "currencies": {"AUD": 4.5, "CAD": 2.57, "CHF": 4.14, "EUR": 6.13, "GBP": 5.71, "JPY": 3.75, "NZD": 3.0, "USD": 5.25, "XAU": 5.75}}, {"timestamp": "2026.06.16 07:00", "currencies": {"AUD": 6.0, "CAD": 3.57, "CHF": 4.86, "EUR": 5.13, "GBP": 4.71, "JPY": 2.63, "NZD": 2.29, "USD": 5.5, "XAU": 6.5}}, {"timestamp": "2026.06.16 07:36", "currencies": {"AUD": 6.0, "CAD": 3.43, "CHF": 4.86, "EUR": 5.0, "GBP": 4.86, "JPY": 2.63, "NZD": 2.57, "USD": 5.25, "XAU": 6.75}}, {"timestamp": "2026.06.16 08:00", "currencies": {"AUD": 6.13, "CAD": 3.29, "CHF": 4.86, "EUR": 5.0, "GBP": 4.71, "JPY": 2.88, "NZD": 2.43, "USD": 5.25, "XAU": 6.75}}, {"timestamp": "2026.06.16 08:29", "currencies": {"AUD": 6.0, "CAD": 3.14, "CHF": 4.71, "EUR": 5.25, "GBP": 4.71, "JPY": 3.25, "NZD": 2.0, "USD": 5.5, "XAU": 6.5}}, {"timestamp": "2026.06.16 09:00", "currencies": {"AUD": 6.0, "CAD": 3.57, "CHF": 5.0, "EUR": 5.13, "GBP": 4.57, "JPY": 3.63, "NZD": 1.29, "USD": 5.25, "XAU": 6.75}}, {"timestamp": "2026.06.16 09:29", "currencies": {"AUD": 5.75, "CAD": 3.43, "CHF": 5.0, "EUR": 5.13, "GBP": 4.43, "JPY": 4.25, "NZD": 0.57, "USD": 5.5, "XAU": 7.25}}, {"timestamp": "2026.06.16 10:00", "currencies": {"AUD": 5.0, "CAD": 3.43, "CHF": 5.0, "EUR": 5.25, "GBP": 4.14, "JPY": 4.38, "NZD": 1.43, "USD": 5.88, "XAU": 6.5}}, {"timestamp": "2026.06.16 11:00", "currencies": {"AUD": 5.25, "CAD": 3.86, "CHF": 4.86, "EUR": 5.25, "GBP": 4.0, "JPY": 5.0, "NZD": 0.29, "USD": 5.75, "XAU": 6.75}}, {"timestamp": "2026.06.16 11:29", "currencies": {"AUD": 5.0, "CAD": 3.71, "CHF": 5.14, "EUR": 5.13, "GBP": 4.14, "JPY": 4.25, "NZD": 1.14, "USD": 5.75, "XAU": 7.0}}, {"timestamp": "2026.06.16 12:00", "currencies": {"AUD": 5.25, "CAD": 3.71, "CHF": 5.0, "EUR": 5.13, "GBP": 4.14, "JPY": 3.88, "NZD": 1.29, "USD": 5.63, "XAU": 7.5}}, {"timestamp": "2026.06.16 13:00", "currencies": {"AUD": 3.88, "CAD": 3.14, "CHF": 4.86, "EUR": 5.13, "GBP": 4.43, "JPY": 4.5, "NZD": 2.0, "USD": 6.25, "XAU": 7.25}}, {"timestamp": "2026.06.16 13:29", "currencies": {"AUD": 4.0, "CAD": 3.29, "CHF": 4.86, "EUR": 5.0, "GBP": 4.57, "JPY": 4.25, "NZD": 2.0, "USD": 6.25, "XAU": 7.25}}, {"timestamp": "2026.06.16 14:00", "currencies": {"AUD": 3.25, "CAD": 3.43, "CHF": 4.86, "EUR": 5.0, "GBP": 4.43, "JPY": 4.38, "NZD": 2.43, "USD": 6.63, "XAU": 7.0}}, {"timestamp": "2026.06.16 15:00", "currencies": {"AUD": 3.38, "CAD": 3.29, "CHF": 5.29, "EUR": 5.38, "GBP": 4.57, "JPY": 4.38, "NZD": 2.43, "USD": 5.75, "XAU": 7.0}}], "H1": [{"timestamp": "2026.06.10 12:34", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.10 14:08", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.10 17:04", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.10 18:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.10 19:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.10 20:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.10 21:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.10 22:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.10 23:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 00:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 01:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 02:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 02:59", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 03:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 04:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 05:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 06:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 07:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 08:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 09:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 10:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 11:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 12:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 13:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 14:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 15:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 16:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 17:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 18:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 19:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 20:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 21:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 22:00", "currencies": {"AUD": 3.875, "CAD": 2.8571, "CHF": 3.5714, "EUR": 6.75, "GBP": 5.0, "JPY": 2.375, "NZD": 6.0, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.11 22:59", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.11 23:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 00:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 01:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 02:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 03:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 04:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 05:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 06:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 07:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 08:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 09:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 10:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 11:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 12:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:00", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:55", "currencies": {"AUD": 5.0489, "CAD": 4.9484, "CHF": 4.9737, "EUR": 4.971, "GBP": 4.7585, "JPY": 5.186, "NZD": 4.8912, "USD": 5.2223, "XAU": 0.0}}, {"timestamp": "2026.06.12 13:56", "currencies": {"AUD": 4.18, "CAD": 2.0, "CHF": 5.41, "EUR": 4.24, "GBP": 6.14, "JPY": 2.57, "NZD": 3.94, "USD": 3.67, "XAU": 3.3}}, {"timestamp": "2026.06.12 14:00", "currencies": {"AUD": 4.18, "CAD": 2.0, "CHF": 5.41, "EUR": 4.24, "GBP": 6.14, "JPY": 2.57, "NZD": 3.94, "USD": 3.67, "XAU": 3.3}}, {"timestamp": "2026.06.12 14:06", "currencies": {"AUD": 4.18, "CAD": 2.0, "CHF": 5.41, "EUR": 4.24, "GBP": 6.14, "JPY": 2.57, "NZD": 3.94, "USD": 3.67, "XAU": 3.3}}, {"timestamp": "2026.06.12 15:00", "currencies": {"AUD": 4.11, "CAD": 2.33, "CHF": 5.42, "EUR": 4.18, "GBP": 5.98, "JPY": 2.61, "NZD": 3.59, "USD": 4.11, "XAU": 1.65}}, {"timestamp": "2026.06.12 16:00", "currencies": {"AUD": 3.88, "CAD": 2.45, "CHF": 5.13, "EUR": 4.94, "GBP": 6.0, "JPY": 2.03, "NZD": 3.97, "USD": 3.87, "XAU": 2.23}}, {"timestamp": "2026.06.12 17:00", "currencies": {"AUD": 4.88, "CAD": 6.75, "CHF": 3.63, "EUR": 4.88, "GBP": 5.57, "JPY": 2.14, "NZD": 2.57, "USD": 5.14, "XAU": 5.75}}, {"timestamp": "2026.06.12 18:00", "currencies": {"AUD": 5.0, "CAD": 2.57, "CHF": 4.14, "EUR": 5.0, "GBP": 4.71, "JPY": 4.0, "NZD": 7.0, "USD": 2.13, "XAU": 7.5}}, {"timestamp": "2026.06.12 20:29", "currencies": {"AUD": 5.0, "CAD": 4.43, "CHF": 1.71, "EUR": 4.0, "GBP": 2.43, "JPY": 5.75, "NZD": 4.71, "USD": 6.5, "XAU": 6.25}}, {"timestamp": "2026.06.12 21:29", "currencies": {"AUD": 6.38, "CAD": 5.0, "CHF": 2.71, "EUR": 4.63, "GBP": 3.29, "JPY": 2.88, "NZD": 6.43, "USD": 4.0, "XAU": 5.75}}, {"timestamp": "2026.06.12 22:29", "currencies": {"AUD": 6.5, "CAD": 6.43, "CHF": 1.57, "EUR": 4.5, "GBP": 3.57, "JPY": 3.25, "NZD": 5.29, "USD": 4.75, "XAU": 4.5}}, {"timestamp": "2026.06.12 23:29", "currencies": {"AUD": 7.5, "CAD": 6.14, "CHF": 2.71, "EUR": 3.38, "GBP": 4.86, "JPY": 1.0, "NZD": 7.29, "USD": 1.63, "XAU": 8.25}}, {"timestamp": "2026.06.13 00:29", "currencies": {"AUD": 6.13, "CAD": 5.0, "CHF": 2.71, "EUR": 3.0, "GBP": 4.71, "JPY": 3.0, "NZD": 6.29, "USD": 4.13, "XAU": 6.75}}, {"timestamp": "2026.06.13 02:29", "currencies": {"AUD": 5.38, "CAD": 3.86, "CHF": 2.86, "EUR": 3.75, "GBP": 5.86, "JPY": 2.63, "NZD": 6.43, "USD": 3.88, "XAU": 7.5}}, {"timestamp": "2026.06.13 03:31", "currencies": {"AUD": 5.63, "CAD": 3.86, "CHF": 3.57, "EUR": 3.75, "GBP": 6.0, "JPY": 2.5, "NZD": 6.43, "USD": 3.88, "XAU": 5.75}}, {"timestamp": "2026.06.13 04:29", "currencies": {"AUD": 5.88, "CAD": 3.43, "CHF": 3.57, "EUR": 2.75, "GBP": 3.86, "JPY": 4.38, "NZD": 6.57, "USD": 4.5, "XAU": 6.5}}, {"timestamp": "2026.06.13 05:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 06:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 07:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 08:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 09:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 10:23", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 10:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 11:00", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 11:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 12:00", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 12:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 13:00", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 13:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 14:00", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 14:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 15:00", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 15:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 16:33", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 17:33", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 18:33", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 19:33", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 20:33", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 21:33", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 22:33", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.13 23:33", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.14 00:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.14 01:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.14 02:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.14 03:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.14 04:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.14 05:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.14 06:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.14 07:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.15 00:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.15 01:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.15 02:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.15 03:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.15 04:29", "currencies": {"AUD": 5.13, "CAD": 2.57, "CHF": 3.29, "EUR": 2.88, "GBP": 3.71, "JPY": 5.25, "NZD": 7.0, "USD": 4.88, "XAU": 6.75}}, {"timestamp": "2026.06.15 05:29", "currencies": {"AUD": 5.5, "CAD": 1.71, "CHF": 6.43, "EUR": 5.88, "GBP": 2.0, "JPY": 7.0, "NZD": 2.57, "USD": 3.13, "XAU": 6.75}}, {"timestamp": "2026.06.15 06:29", "currencies": {"AUD": 5.75, "CAD": 3.14, "CHF": 4.57, "EUR": 5.13, "GBP": 5.43, "JPY": 2.13, "NZD": 6.57, "USD": 2.0, "XAU": 7.5}}, {"timestamp": "2026.06.15 07:29", "currencies": {"AUD": 4.88, "CAD": 3.86, "CHF": 4.86, "EUR": 4.88, "GBP": 6.57, "JPY": 2.25, "NZD": 5.14, "USD": 2.38, "XAU": 7.5}}, {"timestamp": "2026.06.15 08:00", "currencies": {"AUD": 5.25, "CAD": 3.57, "CHF": 4.86, "EUR": 4.25, "GBP": 7.14, "JPY": 1.88, "NZD": 5.43, "USD": 2.25, "XAU": 8.0}}, {"timestamp": "2026.06.15 08:29", "currencies": {"AUD": 6.0, "CAD": 3.43, "CHF": 4.71, "EUR": 4.5, "GBP": 7.57, "JPY": 1.88, "NZD": 4.43, "USD": 1.5, "XAU": 9.0}}, {"timestamp": "2026.06.15 09:00", "currencies": {"AUD": 4.63, "CAD": 3.86, "CHF": 4.43, "EUR": 5.13, "GBP": 7.0, "JPY": 1.75, "NZD": 4.29, "USD": 3.38, "XAU": 8.0}}, {"timestamp": "2026.06.15 10:00", "currencies": {"AUD": 5.25, "CAD": 3.86, "CHF": 4.29, "EUR": 5.0, "GBP": 6.43, "JPY": 1.13, "NZD": 4.86, "USD": 3.38, "XAU": 8.5}}, {"timestamp": "2026.06.15 11:00", "currencies": {"AUD": 5.88, "CAD": 4.14, "CHF": 4.86, "EUR": 4.63, "GBP": 6.0, "JPY": 1.25, "NZD": 4.43, "USD": 3.13, "XAU": 8.25}}, {"timestamp": "2026.06.15 11:29", "currencies": {"AUD": 6.38, "CAD": 3.86, "CHF": 5.0, "EUR": 4.75, "GBP": 5.86, "JPY": 1.63, "NZD": 4.0, "USD": 3.0, "XAU": 7.75}}, {"timestamp": "2026.06.15 12:00", "currencies": {"AUD": 6.13, "CAD": 3.86, "CHF": 5.0, "EUR": 4.88, "GBP": 5.57, "JPY": 1.63, "NZD": 4.71, "USD": 2.75, "XAU": 7.75}}, {"timestamp": "2026.06.15 13:00", "currencies": {"AUD": 5.38, "CAD": 3.71, "CHF": 5.29, "EUR": 5.75, "GBP": 6.0, "JPY": 0.88, "NZD": 5.29, "USD": 2.25, "XAU": 8.0}}, {"timestamp": "2026.06.15 14:00", "currencies": {"AUD": 5.13, "CAD": 3.57, "CHF": 6.0, "EUR": 6.0, "GBP": 6.43, "JPY": 1.0, "NZD": 4.86, "USD": 2.0, "XAU": 7.25}}, {"timestamp": "2026.06.15 15:00", "currencies": {"AUD": 5.13, "CAD": 3.14, "CHF": 5.0, "EUR": 5.63, "GBP": 6.0, "JPY": 1.63, "NZD": 4.43, "USD": 3.75, "XAU": 7.25}}, {"timestamp": "2026.06.15 16:00", "currencies": {"AUD": 3.5, "CAD": 3.43, "CHF": 6.86, "EUR": 5.38, "GBP": 4.43, "JPY": 2.88, "NZD": 2.57, "USD": 5.38, "XAU": 7.5}}, {"timestamp": "2026.06.15 17:00", "currencies": {"AUD": 3.75, "CAD": 4.71, "CHF": 6.71, "EUR": 4.63, "GBP": 1.71, "JPY": 4.13, "NZD": 3.0, "USD": 5.63, "XAU": 7.5}}, {"timestamp": "2026.06.15 18:00", "currencies": {"AUD": 3.25, "CAD": 5.0, "CHF": 6.86, "EUR": 5.5, "GBP": 2.14, "JPY": 4.13, "NZD": 1.86, "USD": 5.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 18:32", "currencies": {"AUD": 3.25, "CAD": 4.14, "CHF": 8.14, "EUR": 5.75, "GBP": 2.71, "JPY": 3.75, "NZD": 2.0, "USD": 4.63, "XAU": 7.5}}, {"timestamp": "2026.06.15 19:00", "currencies": {"AUD": 3.63, "CAD": 5.14, "CHF": 7.14, "EUR": 5.63, "GBP": 2.0, "JPY": 3.88, "NZD": 2.0, "USD": 4.88, "XAU": 7.5}}, {"timestamp": "2026.06.15 20:00", "currencies": {"AUD": 4.13, "CAD": 3.57, "CHF": 6.43, "EUR": 6.88, "GBP": 2.57, "JPY": 3.5, "NZD": 2.0, "USD": 5.13, "XAU": 7.25}}, {"timestamp": "2026.06.15 21:00", "currencies": {"AUD": 3.25, "CAD": 4.0, "CHF": 7.14, "EUR": 6.88, "GBP": 2.71, "JPY": 3.38, "NZD": 2.43, "USD": 4.5, "XAU": 7.5}}, {"timestamp": "2026.06.15 22:00", "currencies": {"AUD": 3.75, "CAD": 1.86, "CHF": 7.43, "EUR": 5.5, "GBP": 4.71, "JPY": 4.88, "NZD": 1.43, "USD": 4.63, "XAU": 7.5}}, {"timestamp": "2026.06.15 23:00", "currencies": {"AUD": 7.25, "CAD": 4.14, "CHF": 5.57, "EUR": 2.63, "GBP": 5.29, "JPY": 3.38, "NZD": 2.29, "USD": 3.75, "XAU": 7.75}}, {"timestamp": "2026.06.16 00:00", "currencies": {"AUD": 6.63, "CAD": 4.43, "CHF": 4.57, "EUR": 2.75, "GBP": 3.71, "JPY": 4.38, "NZD": 1.29, "USD": 6.13, "XAU": 7.75}}, {"timestamp": "2026.06.16 00:51", "currencies": {"AUD": 6.75, "CAD": 4.71, "CHF": 4.14, "EUR": 4.0, "GBP": 4.86, "JPY": 3.38, "NZD": 1.0, "USD": 6.25, "XAU": 5.5}}, {"timestamp": "2026.06.16 01:00", "currencies": {"AUD": 6.63, "CAD": 5.14, "CHF": 4.14, "EUR": 4.5, "GBP": 4.71, "JPY": 3.0, "NZD": 1.0, "USD": 5.88, "XAU": 5.75}}, {"timestamp": "2026.06.16 01:29", "currencies": {"AUD": 6.88, "CAD": 5.0, "CHF": 3.71, "EUR": 4.5, "GBP": 5.86, "JPY": 3.0, "NZD": 0.57, "USD": 6.38, "XAU": 4.0}}, {"timestamp": "2026.06.16 02:00", "currencies": {"AUD": 6.13, "CAD": 5.14, "CHF": 3.0, "EUR": 4.63, "GBP": 6.29, "JPY": 3.38, "NZD": 1.14, "USD": 6.88, "XAU": 2.75}}, {"timestamp": "2026.06.16 03:00", "currencies": {"AUD": 6.13, "CAD": 6.0, "CHF": 3.57, "EUR": 4.0, "GBP": 4.71, "JPY": 3.0, "NZD": 1.29, "USD": 7.38, "XAU": 3.75}}, {"timestamp": "2026.06.16 03:35", "currencies": {"AUD": 5.88, "CAD": 6.86, "CHF": 3.0, "EUR": 4.0, "GBP": 4.0, "JPY": 4.0, "NZD": 1.0, "USD": 7.38, "XAU": 3.5}}, {"timestamp": "2026.06.16 04:00", "currencies": {"AUD": 6.63, "CAD": 5.86, "CHF": 2.29, "EUR": 3.5, "GBP": 4.14, "JPY": 4.25, "NZD": 1.14, "USD": 8.38, "XAU": 3.0}}, {"timestamp": "2026.06.16 05:00", "currencies": {"AUD": 6.0, "CAD": 6.14, "CHF": 2.14, "EUR": 4.38, "GBP": 4.57, "JPY": 4.5, "NZD": 1.57, "USD": 7.5, "XAU": 2.0}}, {"timestamp": "2026.06.16 06:00", "currencies": {"AUD": 5.5, "CAD": 6.14, "CHF": 3.29, "EUR": 4.25, "GBP": 3.14, "JPY": 4.75, "NZD": 2.43, "USD": 7.0, "XAU": 2.75}}, {"timestamp": "2026.06.16 06:36", "currencies": {"AUD": 5.25, "CAD": 5.29, "CHF": 2.0, "EUR": 4.75, "GBP": 4.14, "JPY": 4.75, "NZD": 2.57, "USD": 7.63, "XAU": 2.75}}, {"timestamp": "2026.06.16 07:00", "currencies": {"AUD": 5.13, "CAD": 5.43, "CHF": 2.0, "EUR": 4.75, "GBP": 4.57, "JPY": 4.25, "NZD": 2.86, "USD": 7.13, "XAU": 3.5}}, {"timestamp": "2026.06.16 07:36", "currencies": {"AUD": 5.0, "CAD": 4.86, "CHF": 2.0, "EUR": 4.63, "GBP": 4.57, "JPY": 4.5, "NZD": 4.14, "USD": 6.5, "XAU": 3.5}}, {"timestamp": "2026.06.16 08:00", "currencies": {"AUD": 5.25, "CAD": 4.29, "CHF": 1.86, "EUR": 4.5, "GBP": 4.71, "JPY": 5.13, "NZD": 4.0, "USD": 6.38, "XAU": 3.5}}, {"timestamp": "2026.06.16 08:29", "currencies": {"AUD": 3.38, "CAD": 3.71, "CHF": 1.71, "EUR": 6.13, "GBP": 4.57, "JPY": 6.88, "NZD": 2.71, "USD": 7.38, "XAU": 2.25}}, {"timestamp": "2026.06.16 09:00", "currencies": {"AUD": 3.63, "CAD": 4.14, "CHF": 2.29, "EUR": 6.25, "GBP": 4.43, "JPY": 6.63, "NZD": 2.0, "USD": 6.5, "XAU": 3.5}}, {"timestamp": "2026.06.16 09:29", "currencies": {"AUD": 3.75, "CAD": 4.43, "CHF": 2.43, "EUR": 5.88, "GBP": 4.71, "JPY": 7.0, "NZD": 1.0, "USD": 6.25, "XAU": 4.25}}, {"timestamp": "2026.06.16 10:00", "currencies": {"AUD": 2.5, "CAD": 5.14, "CHF": 2.14, "EUR": 5.88, "GBP": 3.86, "JPY": 7.13, "NZD": 2.43, "USD": 6.88, "XAU": 3.5}}, {"timestamp": "2026.06.16 11:00", "currencies": {"AUD": 3.63, "CAD": 5.14, "CHF": 2.29, "EUR": 5.88, "GBP": 4.14, "JPY": 7.63, "NZD": 0.57, "USD": 6.38, "XAU": 3.75}}, {"timestamp": "2026.06.16 11:29", "currencies": {"AUD": 3.13, "CAD": 4.43, "CHF": 3.0, "EUR": 5.88, "GBP": 4.71, "JPY": 5.38, "NZD": 1.71, "USD": 6.38, "XAU": 6.25}}, {"timestamp": "2026.06.16 12:00", "currencies": {"AUD": 3.25, "CAD": 4.43, "CHF": 2.86, "EUR": 5.38, "GBP": 4.43, "JPY": 5.0, "NZD": 2.29, "USD": 6.13, "XAU": 8.0}}, {"timestamp": "2026.06.16 13:00", "currencies": {"AUD": 2.5, "CAD": 3.29, "CHF": 2.57, "EUR": 5.5, "GBP": 5.29, "JPY": 5.38, "NZD": 3.43, "USD": 6.38, "XAU": 7.0}}, {"timestamp": "2026.06.16 13:29", "currencies": {"AUD": 3.0, "CAD": 3.0, "CHF": 3.29, "EUR": 5.0, "GBP": 5.57, "JPY": 5.38, "NZD": 3.0, "USD": 6.0, "XAU": 7.25}}, {"timestamp": "2026.06.16 14:00", "currencies": {"AUD": 2.38, "CAD": 3.57, "CHF": 2.71, "EUR": 5.13, "GBP": 4.71, "JPY": 5.13, "NZD": 4.29, "USD": 7.0, "XAU": 6.0}}, {"timestamp": "2026.06.16 15:00", "currencies": {"AUD": 2.75, "CAD": 3.29, "CHF": 3.86, "EUR": 5.63, "GBP": 5.57, "JPY": 4.63, "NZD": 4.0, "USD": 4.88, "XAU": 7.0}}]}};</script>
+</head>
+<body>
+    <div id="sidebar-container"></div>
+    <script src="../../sidebar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <div class="dashboard-container">
+        <div class="header">
+            <div class="header-left">
+                <i class="fas fa-chart-line text-3xl" style="color: var(--primary)"></i>
+                <div>
+                    <div class="header-title">CCY Power Multi-TF</div>
+                    <div class="text-sm" style="color: var(--text2)">Real-time Currency Strength Monitor</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">☀️</button>
+                <span id="status-badge" class="status-badge status-disconnected"><i class="fas fa-circle text-xs mr-1"></i>Disconnected</span>
+                <span id="last-update" class="text-sm" style="color: var(--text2)">--:--:--</span>
+                <button onclick="refreshData()" class="px-3 py-1 rounded-lg text-sm font-medium transition" style="background: var(--primary); color: white;"><i class="fas fa-sync-alt mr-1"></i>Refresh</button>
+            </div>
+        </div>
+        <div class="summary-bar">
+            <div class="summary-item"><div class="summary-value strong" id="strongest-currency">--</div><div class="summary-label">Strongest</div></div>
+            <div class="summary-item"><div class="summary-value weak" id="weakest-currency">--</div><div class="summary-label">Weakest</div></div>
+            <div class="summary-item"><div class="summary-value" style="color: var(--primary)" id="spread-value">--</div><div class="summary-label">Spread</div></div>
+            <div class="summary-item"><div class="summary-value" style="color: var(--text2)" id="total-currencies">9</div><div class="summary-label">Currencies</div></div>
+        <!-- Heatmap -->
+        <div class="heatmap-card">
+            <div class="heatmap-header">
+                <div class="tf-label"><i class="fas fa-th"></i> MTF Heatmap</div>
+                <div class="heatmap-legend">
+                    <span class="legend-item" style="display:flex;align-items:center;gap:4px;">
+                        <span style="display:inline-flex;height:10px;border-radius:2px;overflow:hidden;">
+                            <span style="width:14px;background:#059669"></span><span style="width:14px;background:#34d399"></span><span style="width:14px;background:#fde047"></span><span style="width:14px;background:#fb923c"></span><span style="width:14px;background:#b91c1c"></span>
+                        </span>
+                        <span style="font-size:0.7rem;color:var(--text2)">Strong → Weak</span>
+                    </span>
+                    <span class="legend-item"><span class="legend-dot strong"></span>Strong</span>
+                    <span class="legend-item"><span class="legend-dot neutral"></span>Neutral</span>
+                    <span class="legend-item"><span class="legend-dot weak"></span>Weak</span>
+                </div>
+            </div>
+            <div class="heatmap-grid" id="heatmap-grid"></div>
+        </div>
+        <!-- CCY Power Trend Chart -->
+        <div class="trend-card">
+            <div class="trend-header">
+                <div class="tf-label"><i class="fas fa-chart-line"></i> CCY Power Trend</div>
+                <div class="trend-controls">
+                    <button class="trend-tf-btn active" data-tf="H1">H1</button>
+                    <button class="trend-tf-btn" data-tf="H4">H4</button>
+                    <button class="trend-tf-btn" data-tf="D1">D1</button>
+                    <button class="trend-range-btn" data-trange="24h" title="Last 24h">24h</button>
+                    <button class="trend-range-btn active" data-trange="3d" title="Last 3 days">3D</button>
+                    <button class="trend-range-btn" data-trange="7d" title="Last 7 days">7D</button>
+                    <button class="trend-range-btn" data-trange="30d" title="Last 30 days">30D</button>
+
+                </div>
+            </div>
+            <div id="trend-chart" style="width:100%;min-height:320px;"></div>
+        </div>
+        <div class="timeline-card">
+            <div class="timeline-header">
+                <div class="timeline-title">
+                    <i class="fas fa-clock"></i><span>CCY Power Timeline</span>
+                    <span id="latest-time-badge" class="latest-time-badge" style="display:none;"><i class="fas fa-map-pin"></i><span id="latest-time-text"></span></span>
+                </div>
+                <div class="timeline-controls">
+                    <button class="range-btn active" data-range="24h">24hr</button>
+                    <button class="range-btn" data-range="3d">3D</button>
+                    <button class="range-btn" data-range="7d">7D</button>
+                    <button class="range-btn" data-range="30d">30D</button>
+                </div>
+            </div>
+            <div class="timeline-market-labels">
+                <span class="market-label asian">🇦 Asia (07-16)</span>
+                <span class="market-label european">🇪 Europe (14-23)</span>
+                <span class="market-label american">🇺 US (20-05)</span>
+            </div>
+            <div class="timeline-grid" id="timeline-grid"><div class="timeline-loading">Loading...</div></div>
+            <div id="session-bar" class="session-bar" style="display:none;"></div>
+
+        <!-- 29 Pairs Technical Analysis -->
+        <div class="pairs-card">
+            <div class="pairs-header">
+                <div class="tf-label"><i class="fas fa-table"></i> 29 Pairs Analysis</div>
+                <div class="pairs-controls">
+                    <button id="pairs-sort-signal" class="range-btn active" onclick="sortPairs('signal')">Signal</button>
+                    <button id="pairs-sort-rsi" class="range-btn" onclick="sortPairs('rsi')">RSI</button>
+                    <button id="pairs-sort-atr" class="range-btn" onclick="sortPairs('atr')">ATR</button>
+                </div>
+            </div>
+            <div class="pairs-table-wrap">
+                <table class="pairs-table" id="pairs-table">
+                    <thead><tr>
+                        <th>Pair</th><th>Score</th>
+                        <th>EMA<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                        <th>RSI<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                        <th>MACD<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                        <th>BB<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                        <th>ATR<br><span style="font-weight:normal;color:var(--text2);font-size:0.6rem">D1 H4 H1</span></th>
+                    </tr></thead>
+                    <tbody id="pairs-tbody"><tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--text2)">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="footer">
+            <p>CCY Power Dashboard v1.2 | Data Source: MT4 ForexDataExporter EA (v5.01)</p>
+            <p>Last verified: 2026-06-10 HKT</p>
+        </div>
+    </div>
+    <script>
+        const CURRENCIES = ['EUR','GBP','AUD','NZD','CAD','CHF','XAU','JPY','USD'];
+        const MAX_VALUE = 10;
+        let ws = null, currentData = null;
+        function getStatusClass(v) { return v >= 6 ? 'strong' : v >= 4 ? 'neutral' : 'weak'; }
+        function getRankClass(value, all) { if (!all || !all.length) return 'r5'; const s = [...all].sort((a,b) => b-a); return 'r' + Math.min(9, Math.max(1, s.indexOf(value)+1)); }
+        function renderCurrencyGrid(id, data) {
+            const el = document.getElementById(id); if (!el || !data) return; el.innerHTML = '';
+            Object.entries(data).sort((a,b) => b[1]-a[1]).forEach(([c,v],i) => {
+                const sc = getStatusClass(v), bw = Math.min(100,(v/MAX_VALUE)*100);
+                const d = document.createElement('div'); d.className = 'currency-item ' + sc;
+                d.innerHTML = '<span style="color:var(--text2);font-size:0.75rem;min-width:20px;">#'+(i+1)+'</span><span class="currency-name">'+c+'</span><div class="currency-bar-container"><div class="currency-bar-fill" style="width:'+bw+'%"></div></div><span class="currency-value">'+v.toFixed(2)+'</span>';
+                el.appendChild(d);
+            });
+        }
+        function updateSummary(data) { if (!data || !data.D1) return; const s = Object.entries(data.D1).sort((a,b) => b[1]-a[1]); document.getElementById('strongest-currency').textContent = s[0][0]; document.getElementById('weakest-currency').textContent = s[s.length-1][0]; document.getElementById('spread-value').textContent = (s[0][1]-s[s.length-1][1]).toFixed(2); }
+        function updateTimestamps(ts) { ['d1-ts','h4-ts','h1-ts'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=ts; }); document.getElementById('last-update').textContent = new Date().toLocaleTimeString('en-HK',{hour12:false}); }
+        function _ensureMultiTF(data) {
+            // Fallback: if H4 or H1 is empty/missing, fill with D1 data
+            if (!data || !data.D1) return data;
+            ['H4','H1'].forEach(tf => {
+                if (!data[tf] || Object.keys(data[tf]).length === 0) {
+                    data[tf] = Object.assign({}, data.D1);
+                }
+            });
+            return data;
+        }
+        function renderHeatmap(data) {
+            if (!data) return; data = _ensureMultiTF(data);
+            const c = document.getElementById('heatmap-grid'); if (!c) return; c.innerHTML = '';
+            c.appendChild(Object.assign(document.createElement('div'),{className:'heatmap-cell'}));
+            ['D1','H4','H1'].forEach(tf => { const d = document.createElement('div'); d.className='heatmap-cell tf-label'; d.textContent=tf; c.appendChild(d); });
+            Object.entries(data.D1).sort((a,b) => b[1]-a[1]).forEach(([cur]) => {
+                const l = document.createElement('div'); l.className='heatmap-cell currency-label'; l.textContent=cur; c.appendChild(l);
+                ['D1','H4','H1'].forEach(tf => { const v=(data[tf]&&data[tf][cur])||0; const d=document.createElement('div'); d.className='heatmap-cell '+getStatusClass(v); d.textContent=v.toFixed(2); c.appendChild(d); });
+            });
+        }
+        function updateData(data) { currentData=data; renderHeatmap(data); updateSummary(data); updateTimestamps(data.ts); const b=document.getElementById('status-badge'); b.className='status-badge status-connected'; b.innerHTML='<i class="fas fa-circle text-xs mr-1 pulse-dot pulse-green"></i>Connected'; }
+        function connectWebSocket() { ws = new WebSocket('ws://localhost:8787/ws/ccy_power'); ws.onopen = () => loadCurrentFromAPI(); ws.onmessage = e => { try { const d=JSON.parse(e.data); if(d.type==='ccy_power_multi') updateData(d); } catch(x){} }; ws.onerror = () => loadCurrentFromAPI(); ws.onclose = () => setTimeout(connectWebSocket,5000); }
+        function loadCurrentFromAPI() {
+            function _buildPayload(r) {
+                const d=r.data||{};
+                let payload={type:'ccy_power_multi',ts:r.timestamp,D1:d.D1||{},H4:d.H4||{},H1:d.H1||{}};
+                // Fallback: if H4 or H1 empty, use D1 data
+                if(Object.keys(payload.H4).length===0 && Object.keys(payload.D1).length>0) payload.H4=Object.assign({},payload.D1);
+                if(Object.keys(payload.H1).length===0 && Object.keys(payload.D1).length>0) payload.H1=Object.assign({},payload.D1);
+                return payload;
+            }
+            if (window.__CCY_POWER_DATA__ && window.__CCY_POWER_DATA__.success) { updateData(_buildPayload(window.__CCY_POWER_DATA__)); return; }
+            const base = new URL('.',window.location.href).href;
+            fetch(base+'data.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.data){updateData(_buildPayload(r));}}).catch(()=>{fetch('http://localhost:8788/api/ccy_power/current').then(r=>r.json()).then(r=>{if(r.success&&r.data){updateData(_buildPayload(r));}}).catch(()=>{});});
+        }
+        function refreshData() { if(ws&&ws.readyState===WebSocket.OPEN) ws.send('{"type":"request_update"}'); else connectWebSocket(); }
+
+        // === Timeline ===
+        let timelineData = [], currentRange = '24h';
+        function getHoursFromRange(r) { return {'24h':24,'3d':72,'7d':168,'30d':720}[r]||24; }
+        function loadTimelineData(range) {
+            currentRange = range; const grid = document.getElementById('timeline-grid'); grid.innerHTML = '<div class="timeline-loading">Loading...</div>';
+            if (window.__CCY_TIMELINE_DATA__ && window.__CCY_TIMELINE_DATA__.success) { _procTL(window.__CCY_TIMELINE_DATA__,range); return; }
+            const base = new URL('.',window.location.href).href;
+            fetch(base+'timeline.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.timeline) _procTL(r,range); else _tlFallback(range);}).catch(()=>_tlFallback(range));
+        }
+        function _procTL(result,range) { try { const entries=(result.timeline['H1']||[]); timelineData=entries.map(e=>({timestamp:e.timestamp,currencies:e.currencies,hour:parseInt(e.timestamp.split(' ')[1].split(':')[0])})); if(timelineData.length>0) renderTimelineGrid(timelineData,range); else _demoTL(range); } catch(e){_demoTL(range);} }
+        function _tlFallback(range) { fetch('http://localhost:8788/api/ccy_power/timeline?hours='+getHoursFromRange(range)).then(r=>r.json()).then(r=>{if(r.success&&r.timeline) _procTL(r,range); else _demoTL(range);}).catch(()=>_demoTL(range)); }
+        function _demoTL(range) { const hrs=getHoursFromRange(range),ccys=['XAU','CAD','JPY','AUD','EUR','CHF','GBP','NZD','USD'],now=new Date(); timelineData=[]; for(let h=hrs-1;h>=0;h--){const ts=new Date(now-h*3600000),hr=ts.getHours(),bv={XAU:9.2,CAD:8.5,JPY:7.15,AUD:6.25,EUR:5.8,CHF:4.35,GBP:3.9,NZD:2.25,USD:1.8},v=Math.sin(hr/24*Math.PI*2)*1.5,vals={};ccys.forEach(c=>vals[c]=Math.max(0.5,Math.min(9.5,bv[c]+v+(Math.random()-0.5)*0.5)));timelineData.push({timestamp:ts,currencies:vals,hour:hr});} renderTimelineGrid(timelineData,range); }
+
+        function getSession(h) { if(h>=7&&h<16) return 'asia'; if(h>=14&&h<23) return 'europe'; if(h>=20||h<5) return 'us'; return ''; }
+        function getSessionCSS(h) { const s=getSession(h); return s==='asia'?'sb-asia':s==='europe'?'sb-europe':s==='us'?'sb-us':'sb-none'; }
+
+        function renderSessionBar(range) {
+            const bar = document.getElementById('session-bar'); if(!bar) return;
+            if(range!=='24h'&&range!=='3d') { bar.style.display='none'; return; }
+            bar.style.display='grid';
+            if(range==='24h') {
+                // 與 Timeline Grid 同步：過去24小時從左到右
+                const show=timelineData.slice(-24);
+                if(!show.length){bar.style.display='none';return;}
+                bar.style.gridTemplateColumns='36px repeat('+show.length+','+Math.max(2,Math.floor((bar.parentElement?bar.parentElement.clientWidth:340)-36-24)/show.length)+'px)';
+                bar.style.gap='1px';
+                let h='<div></div>';
+                show.forEach(e=>{const th=typeof e.timestamp==='string'?parseInt(e.timestamp.split(' ')[1]):e.hour;h+='<div class="'+getSessionCSS(th)+'"></div>';});
+                bar.innerHTML=h;
+            }
+            else {
+                const entries=timelineData.slice(-72); if(!entries.length){bar.style.display='none';return;}
+                const pw=bar.parentElement?bar.parentElement.clientWidth:340, aw=pw-36, g=1;
+                let rcw=(aw-entries.length*g)/entries.length, cw=Math.max(2,Math.floor(rcw)), show=entries;
+                if(rcw<2.5){const mc=Math.floor(aw/(2+g)),st=Math.ceil(show.length/mc);show=show.filter((_,i)=>i%st===0||i===show.length-1);cw=Math.max(2,Math.floor((aw-(show.length-1)*g)/show.length));}
+                bar.style.gridTemplateColumns='36px repeat('+show.length+','+cw+'px)'; bar.style.gap=g+'px';
+                let h='<div></div>'; show.forEach(e=>{const th=typeof e.timestamp==='string'?parseInt(e.timestamp.split(' ')[1]):e.hour;h+='<div class="'+getSessionCSS(th)+'"></div>';}); bar.innerHTML=h;
+            }
+        }
+
+        function updateLatestBadge(range) {
+            const badge=document.getElementById('latest-time-badge'),text=document.getElementById('latest-time-text'); if(!badge||!text)return;
+            if(!timelineData.length){badge.style.display='none';return;}
+            const last=timelineData[timelineData.length-1], ts=typeof last.timestamp==='string'?last.timestamp:'';
+            if(ts){text.textContent=range==='24h'?ts.split(' ')[1].substring(0,5):ts.substring(0,16);badge.style.display='inline-flex';}else badge.style.display='none';
+        }
+
+        function renderTimelineGrid(data,range) {
+            const grid=document.getElementById('timeline-grid'),ccys=['XAU','CAD','JPY','AUD','EUR','CHF','GBP','NZD','USD'],nowH=new Date().getHours();
+            if(range==='24h') {
+                // 新邏輯：過去24小時從左到右，最新在右邊
+                const show=data.slice(-24); // 取最後24個entries
+                const pw=grid.parentElement?grid.parentElement.clientWidth:340,aw=pw-36,g=1;
+                let cw=Math.max(2,Math.floor((aw-24*g)/24));
+                grid.style.gridTemplateColumns='36px repeat('+show.length+','+cw+'px)'; grid.style.gridTemplateRows='18px repeat('+ccys.length+',18px)'; grid.style.overflowX='hidden'; grid.className='timeline-grid dense';
+                
+                // Time header：顯示相對時間（-23h...-1h, NOW）
+                let html='<div style="font-size:0.5rem;padding:1px 2px;">HKT</div>'; 
+                show.forEach((e,idx)=>{
+                    const isLast=(idx===show.length-1);
+                    const label = isLast?'NOW':(show.length-1-idx)+'h';
+                    html+='<div class="'+(isLast?'now-label':'')+'" style="font-size:0.5rem;text-align:center;padding:1px;'+(isLast?'':'color:var(--text2);')+'">'+label+'</div>'; 
+                });
+                
+                // Data rows
+                ccys.forEach(c=>{
+                    html+='<div style="font-size:0.55rem;padding:0 2px;font-weight:600;">'+c+'</div>'; 
+                    show.forEach((e,idx)=>{
+                        const v=e.currencies[c]||0,av=ccys.map(x=>e.currencies[x]||0),cls=getRankClass(v,av),isLast=(idx===show.length-1); 
+                        html+='<div class="timeline-cell '+cls+(isLast?' is-now':'')+'" style="width:100%;height:18px;border-radius:2px;" title="'+(typeof e.timestamp==='string'?e.timestamp:'')+' '+c+': '+v.toFixed(2)+'"></div>'; 
+                    });
+                });
+                grid.innerHTML=html;
+                grid.innerHTML=html;
+            } else {
+                const mh=getHoursFromRange(range); let show=data.slice(-mh);
+                const pw=grid.parentElement?grid.parentElement.clientWidth:340,aw=pw-36,g=1;
+                let rcw=(aw-show.length*g)/show.length,cw=Math.max(2,Math.floor(rcw));
+                if(rcw<2.5){const mc=Math.floor(aw/(2+g)),st=Math.ceil(show.length/mc);show=show.filter((_,i)=>i%st===0||i===show.length-1);cw=Math.max(2,Math.floor((aw-(show.length-1)*g)/show.length));}
+                grid.style.gridTemplateColumns='36px repeat('+show.length+','+cw+'px)'; grid.style.gridTemplateRows='18px repeat('+ccys.length+',18px)'; grid.style.overflowX='hidden'; grid.className='timeline-grid dense';
+                let html=''; ccys.forEach(c=>{html+='<div style="font-size:0.55rem;padding:0 2px;font-weight:600;">'+c+'</div>';show.forEach((e,idx)=>{const v=e.currencies[c]||0,av=ccys.map(x=>e.currencies[x]||0),cls=getRankClass(v,av),isL=(idx===show.length-1);html+='<div class="timeline-cell '+cls+(isL?' is-now':'')+'" style="width:100%;height:18px;border-radius:2px;" title="'+(typeof e.timestamp==='string'?e.timestamp:'')+' '+c+': '+v.toFixed(2)+'"></div>';});});
+                grid.innerHTML=html;
+            }
+            updateLatestBadge(range); renderSessionBar(range);
+        }
+
+        // === 29 Pairs Analysis ===
+        let pairsData = null, pairsSortBy = 'signal', pairsTF = 'D1';
+        function loadPairsData() {
+            const base = new URL('.',window.location.href).href;
+            fetch(base+'pairs.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.pairs){pairsData=r.pairs;renderPairs();}}).catch(()=>{});
+        }
+        function sortPairs(by) {
+            pairsSortBy = by;
+            document.getElementById('pairs-sort-signal').className='range-btn'+(by==='signal'?' active':'');
+            document.getElementById('pairs-sort-rsi').className='range-btn'+(by==='rsi'?' active':'');
+            document.getElementById('pairs-sort-atr').className='range-btn'+(by==='atr'?' active':'');
+            renderPairs();
+        }
+        function arrowCls(v) { if(v>=2) return 'arr-sb'; if(v>=1) return 'arr-b'; if(v<=-2) return 'arr-ss'; if(v<=-1) return 'arr-s'; return 'arr-n'; }
+        function arrowChar(v) { if(v>=2) return '⬆'; if(v>=1) return '↑'; if(v<=-2) return '⬇'; if(v<=-1) return '↓'; return '-'; }
+        function arrowTitle(v) { if(v>=2) return '强多'; if(v>=1) return '偏多'; if(v<=-2) return '强空'; if(v<=-1) return '偏空'; return '中性'; }
+        function indArrow(v) { return '<div class="ind-arr '+arrowCls(v)+'" title="'+arrowTitle(v)+'">'+arrowChar(v)+'</div>'; }
+        function indCell(vals) { return '<div class="ind-cell">'+vals.map(v=>indArrow(v)).join('')+'</div>'; }
+        function emaSignal(ema20,ema50,ema200) { if(ema20>ema50&&ema50>ema200) return 2; if(ema20>ema50) return 1; if(ema20<ema50&&ema50<ema200) return -2; if(ema20<ema50) return -1; return 0; }
+        function rsiSignal(rsi) { if(rsi>70) return -2; if(rsi>60) return 1; if(rsi<30) return 2; if(rsi<40) return -1; return 0; }
+        function macdSignal(h) { return h>0?1:h<0?-1:0; }
+        function bbSignal(c,u,l) { if(u<=l) return 0; const p=(c-l)/(u-l); if(p>0.8) return -1; if(p<0.2) return 1; return 0; }
+        function atrSignal(atr,price) { if(!price) return 0; const pct=atr/price*100; if(pct>1.5) return 2; if(pct>0.8) return 1; if(pct<0.3) return -1; return 0; }
+
+        function renderPairs() {
+            if (!pairsData) return;
+            const tbody = document.getElementById('pairs-tbody');
+            let entries = Object.entries(pairsData).filter(([_,d])=>d.D1&&d.D1.c).map(([sym,d])=>{
+                const tfs=['D1','H4','H1'].map(tf=>d[tf]||{});
+                const score = tfs.reduce((s,t)=>s+(t.signal||0),0);
+                return {sym,data:d,tfs,score};
+            });
+
+            if (pairsSortBy==='signal') entries.sort((a,b)=>b.score-a.score);
+            else if (pairsSortBy==='rsi') entries.sort((a,b)=>(b.tfs[0].rsi||0)-(a.tfs[0].rsi||0));
+            else if (pairsSortBy==='atr') entries.sort((a,b)=>(b.tfs[0].atr||0)-(a.tfs[0].atr||0));
+
+            let html='';
+            entries.forEach(({sym,data,tfs,score})=>{
+                const scoreColor = score>=6?'color:#3fb950':score>=2?'color:#56d364':score<=-6?'color:#f85149':score<=-2?'color:#ffa198':'color:var(--text2)';
+                const emaArr = indCell(tfs.map(t=>emaSignal(t.ema20||0,t.ema50||0,t.ema200||0)));
+                const rsiArr = indCell(tfs.map(t=>rsiSignal(t.rsi||0)));
+                const macdArr = indCell(tfs.map(t=>macdSignal(t.macd_h||0)));
+                const bbArr = indCell(tfs.map(t=>bbSignal(t.c||0,t.bb_u||0,t.bb_l||0)));
+                const atrArr = indCell(tfs.map(t=>atrSignal(t.atr||0,t.c||0)));
+                html+='<tr>'+
+                    '<td class="pair-name">'+sym+'</td>'+
+                    '<td class="pair-score" style="'+scoreColor+'">'+(score>0?'+':'')+score+'</td>'+
+                    '<td>'+emaArr+'</td>'+
+                    '<td>'+rsiArr+'</td>'+
+                    '<td>'+macdArr+'</td>'+
+                    '<td>'+bbArr+'</td>'+
+                    '<td>'+atrArr+'</td>'+
+                    '</tr>';
+            });
+            tbody.innerHTML = html || '<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--text2)">No data</td></tr>';
+        }
+
+        // === CCY Power Trend Chart (ApexCharts) ===
+        const CCY_COLORS = {
+            EUR:'#3b82f6', GBP:'#8b5cf6', AUD:'#f59e0b', NZD:'#10b981',
+            CAD:'#ef4444', CHF:'#ec4899', XAU:'#fbbf24', JPY:'#06b6d4', USD:'#6b7280'
+        };
+        let trendChart = null, trendTF = 'H1', trendRange = '3d';
+
+        function renderTrendChart() {
+            if (!timelineData.length) return;
+
+            // Determine how many entries to show
+            const hoursMap = {'24h':24,'3d':72,'7d':168,'30d':720};
+            const showCount = hoursMap[trendRange] || 72;
+            // Use H1 data from timelineData (already loaded)
+            let entries = timelineData.slice(-showCount);
+            if (!entries.length) return;
+
+            // Build series
+            const ccys = Object.keys(CCY_COLORS);
+            const series = entries.map(e => {
+                const ts = typeof e.timestamp === 'string' ? e.timestamp : '';
+                const obj = {ts};
+                ccys.forEach(c => obj[c] = (e.currencies[c] || 0));
+                return obj;
+            });
+
+            // H1/H4/D1 粒度合併計算
+            let displaySeries = series;
+            if (trendTF === 'H4') {
+                // 每4小時合併：取4個H1數據的平均值
+                const grouped = [];
+                for (let i = 0; i < series.length; i += 4) {
+                    const chunk = series.slice(i, i + 4);
+                    if (chunk.length === 0) continue;
+                    const avg = {ts: chunk[chunk.length-1].ts}; // 用最後一個時間戳
+                    ccys.forEach(c => {
+                        const vals = chunk.map(p => p[c]).filter(v => v > 0);
+                        avg[c] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+                    });
+                    grouped.push(avg);
+                }
+                displaySeries = grouped;
+            } else if (trendTF === 'D1') {
+                // 每天24小時合併：按日期分組取平均
+                const byDate = {};
+                series.forEach(p => {
+                    const date = p.ts.split(' ')[0]; // "2026.06.13"
+                    if (!byDate[date]) byDate[date] = [];
+                    byDate[date].push(p);
+                });
+                const daily = [];
+                Object.keys(byDate).sort().forEach(date => {
+                    const chunk = byDate[date];
+                    const avg = {ts: date.substring(5)}; // "06.13"
+                    ccys.forEach(c => {
+                        const vals = chunk.map(p => p[c]).filter(v => v > 0);
+                        avg[c] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+                    });
+                    daily.push(avg);
+                });
+                displaySeries = daily;
+            }
+
+            const apexSeries = ccys.map(c => ({
+                name: c,
+                data: displaySeries.map(p => ({x: p.ts, y: p[c]}))
+            }));
+
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const opts = {
+                chart: {
+                    type: 'line', height: 320,
+                    background: 'transparent',
+                    toolbar: {show: true, tools:{zoom:true,zoomin:true,zoomout:true,pan:true,reset:true,download:false}},
+                    zoom: {enabled: true, type:'x'},
+                    animations: {enabled: false},
+                    fontFamily: '-apple-system,BlinkMacSystemFont,sans-serif'
+                },
+                series: apexSeries,
+                colors: ccys.map(c => CCY_COLORS[c]),
+                stroke: {width: 2, curve: 'smooth'},
+                xaxis: {
+                    type: 'category',
+                    labels: {
+                        style: {colors: isDark?'#94a3b8':'#64748b', fontSize:'10px'},
+                        rotate: -45, rotateAlways: false, hideOverlappingLabels: true,
+                        formatter: v => {
+                            if (!v) return '';
+                            const parts = v.split(' ');
+                            if (parts.length===2) return trendRange==='24h'?parts[1].substring(0,5):parts[0].substring(5)+' '+parts[1].substring(0,2);
+                            return v;
+                        }
+                    },
+                    axisBorder: {color: isDark?'#334155':'#e2e8f0'},
+                    axisTicks: {color: isDark?'#334155':'#e2e8f0'},
+                    crosshairs: {show: true, stroke:{color:'#6366f1',width:1,dashArray:4}}
+                },
+                yaxis: {
+                    min: 0, max: 10,
+                    tickAmount: 5,
+                    labels: {style:{colors:isDark?'#94a3b8':'#64748b',fontSize:'10px'}, formatter:v=>v.toFixed(1)},
+                    title: {text:'Power', style:{color:isDark?'#94a3b8':'#64748b',fontSize:'11px'}}
+                },
+                grid: {borderColor:isDark?'#1e293b':'#f1f5f9', strokeDashArray:3},
+                tooltip: {
+                    shared: true, intersect: false,
+                    theme: isDark?'dark':'light',
+                    x: {format:'yyyy.MM.dd HH:mm'},
+                    y: {formatter: v => v.toFixed(2)}
+                },
+                legend: {
+                    show: true, position:'top', horizontalAlign:'left',
+                    fontSize:'11px',
+                    labels:{colors:isDark?'#cbd5e1':'#475569'},
+                    markers:{size:8,width:12,height:3,radius:2},
+                    itemMargin:{horizontal:6}
+                },
+
+                theme: {mode: isDark?'dark':'light'}
+            };
+
+            if (trendChart) trendChart.destroy();
+            trendChart = new ApexCharts(document.getElementById('trend-chart'), opts);
+            trendChart.render();
+        }
+
+        function setTrendTF(tf) {
+            trendTF = tf;
+            document.querySelectorAll('.trend-tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
+            // 不重新 fetch，直接用現有 timelineData（H1）
+            // 只改變顯示粒度
+            renderTrendChart();
+        }
+
+        function setTrendRange(range) {
+            trendRange = range;
+            document.querySelectorAll('.trend-range-btn').forEach(b=>b.classList.toggle('active',b.dataset.trange===range));
+            renderTrendChart();
+        }
+
+
+
+        function initPage() {
+            loadCurrentFromAPI();
+            if(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1') connectWebSocket();
+            loadTimelineData('24h');
+            loadPairsData();
+            // Load timeline for trend chart (H1)
+            const base = new URL('.',window.location.href).href;
+            fetch(base+'timeline.json?t='+Date.now()).then(r=>r.json()).then(r=>{
+                if(r.success&&r.timeline){
+                    // Store all TF data
+                        timelineData = (r.timeline[trendTF]||r.timeline.H1||[]).map(e=>({timestamp:e.timestamp,currencies:e.currencies,hour:parseInt(e.timestamp.split(' ')[1]?.split(':')[0]||0)}));
+                        if(timelineData.length) renderTrendChart();
+                    }
+            }).catch(()=>{});
+            // Timeline range buttons
+            document.querySelectorAll('.range-btn[data-range]').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.range-btn[data-range]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadTimelineData(btn.dataset.range);});});
+            // Trend TF buttons
+            document.querySelectorAll('.trend-tf-btn').forEach(btn=>btn.addEventListener('click',()=>setTrendTF(btn.dataset.tf)));
+            // Trend range buttons
+            document.querySelectorAll('.trend-range-btn').forEach(btn=>btn.addEventListener('click',()=>setTrendRange(btn.dataset.trange)));
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPage);
+        } else {
+            initPage(); // DOM already ready
+        }
+
+        <!-- Summary Bar -->
+        <div class="summary-bar">
+            <div class="summary-item">
+                <div class="summary-value strong" id="strongest-currency">--</div>
+                <div class="summary-label">Strongest</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value weak" id="weakest-currency">--</div>
+                <div class="summary-label">Weakest</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value" style="color: var(--accent-blue)" id="spread-value">--</div>
+                <div class="summary-label">Spread</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value" style="color: var(--text-secondary)" id="total-currencies">9</div>
+                <div class="summary-label">Currencies</div>
+            </div>
+        </div>
+
+        <!-- TF Cards -->
+        <div class="tf-grid">
+            <div class="tf-card">
+                <div class="tf-header">
+                    <div class="tf-label"><i class="fas fa-calendar-day"></i> D1</div>
+                    <div class="tf-timestamp" id="d1-ts">--</div>
+                </div>
+                <div class="currency-list" id="d1-grid"></div>
+            </div>
+            <div class="tf-card">
+                <div class="tf-header">
+                    <div class="tf-label"><i class="fas fa-clock"></i> H4</div>
+                    <div class="tf-timestamp" id="h4-ts">--</div>
+                </div>
+                <div class="currency-list" id="h4-grid"></div>
+            </div>
+            <div class="tf-card">
+                <div class="tf-header">
+                    <div class="tf-label"><i class="fas fa-hourglass-half"></i> H1</div>
+                    <div class="tf-timestamp" id="h1-ts">--</div>
+                </div>
+                <div class="currency-list" id="h1-grid"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>CCY Power Dashboard v1.0 | Data Source: MT4 ForexDataExporter EA (v4.12)</p>
+            <p>Buffer indices: 0, 2, 3, 4 | Last verified: 2026-06-07 20:34 HKT</p>
+        </div>
+    </div>
+
+    <script>
+        const CURRENCIES = ['NZD', 'AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'USD', 'XAU'];
+        const MAX_VALUE = 10;
+        let ws = null;
+        let currentData = null;
+
+        function getStatusClass(value) {
+            if (value >= 6) return 'strong';
+            if (value >= 4) return 'neutral';
+            return 'weak';
+        }
+
+        function renderCurrencyGrid(containerId, data) {
+            const container = document.getElementById(containerId);
+            if (!container || !data) return;
+            
+            container.innerHTML = '';
+            const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+            
+            sorted.forEach(([currency, value], index) => {
+                const statusClass = getStatusClass(value);
+                const barWidth = Math.min(100, (value / MAX_VALUE) * 100);
+                const rank = index + 1;
+                
+                const item = document.createElement('div');
+                item.className = `currency-item ${statusClass}`;
+                item.innerHTML = `
+                    <span style="color: var(--text-secondary); font-size: 0.75rem; min-width: 20px;">#${rank}</span>
+                    <span class="currency-name">${currency}</span>
+                    <div class="currency-bar-container">
+                        <div class="currency-bar-fill" style="width: ${barWidth}%"></div>
+                    </div>
+                    <span class="currency-value">${value.toFixed(2)}</span>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function updateSummary(data) {
+            if (!data || !data.D1) return;
+            
+            const entries = Object.entries(data.D1);
+            const sorted = entries.sort((a, b) => b[1] - a[1]);
+            
+            document.getElementById('strongest-currency').textContent = sorted[0][0];
+            document.getElementById('weakest-currency').textContent = sorted[sorted.length - 1][0];
+            document.getElementById('spread-value').textContent = (sorted[0][1] - sorted[sorted.length - 1][1]).toFixed(2);
+        }
+
+        function updateTimestamps(ts) {
+            document.getElementById('d1-ts').textContent = ts;
+            document.getElementById('h4-ts').textContent = ts;
+            document.getElementById('h1-ts').textContent = ts;
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString('en-HK', { hour12: false });
+        }
+
+        function renderHeatmap(data) {
+            if (!data) return;
+            const container = document.getElementById('heatmap-grid');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            // Header row: TF labels
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'heatmap-cell';
+            container.appendChild(emptyCell);
+            
+            ['D1', 'H4', 'H1'].forEach(tf => {
+                const cell = document.createElement('div');
+                cell.className = 'heatmap-cell tf-label';
+                cell.textContent = tf;
+                container.appendChild(cell);
+            });
+            
+            // Currency rows
+            const sorted = Object.entries(data.D1).sort((a, b) => b[1] - a[1]);
+            
+            sorted.forEach(([currency, _]) => {
+                // Currency label
+                const labelCell = document.createElement('div');
+                labelCell.className = 'heatmap-cell currency-label';
+                labelCell.textContent = currency;
+                container.appendChild(labelCell);
+                
+                // TF values
+                ['D1', 'H4', 'H1'].forEach(tf => {
+                    const value = data[tf][currency];
+                    const statusClass = getStatusClass(value);
+                    const cell = document.createElement('div');
+                    cell.className = `heatmap-cell ${statusClass}`;
+                    cell.textContent = value.toFixed(2);
+                    container.appendChild(cell);
+                });
+            });
+        }
+
+        function updateData(data) {
+            currentData = data;
+            renderHeatmap(data);
+            renderCurrencyGrid('d1-grid', data.D1);
+            renderCurrencyGrid('h4-grid', data.H4);
+            renderCurrencyGrid('h1-grid', data.H1);
+            updateSummary(data);
+            updateTimestamps(data.ts);
+            
+            const badge = document.getElementById('status-badge');
+            badge.className = 'status-badge status-connected';
+            badge.innerHTML = '<i class="fas fa-circle text-xs mr-1 pulse-dot pulse-green"></i>Connected';
+        }
+
+        function connectWebSocket() {
+            // ZeroMQ PUB-SUB bridge or WebSocket endpoint
+            const wsUrl = 'ws://localhost:8787/ws/ccy_power';
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'ccy_power_multi') {
+                        updateData(data);
+                    }
+                } catch (e) {
+                    console.error('Invalid data:', e);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                const badge = document.getElementById('status-badge');
+                badge.className = 'status-badge status-disconnected';
+                badge.innerHTML = '<i class="fas fa-circle text-xs mr-1"></i>Disconnected';
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket closed');
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        function refreshData() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('{"type": "request_update"}');
+            } else {
+                connectWebSocket();
+            }
+        }
+
+        // Initialize - uses initPage() from main script (fetches real data.json)
+    </script>
+</body>
+</html>
