@@ -83,3 +83,14 @@
 - WhatsApp 發送: ✅ 成功發送到 +85295424877 [score=0.807 recalls=0 avg=0.620 source=memory/2026-06-13.md:19-19]
 <!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:4:4 -->
 - 執行時間: 00:30 HKT (2026-06-13) [score=0.807 recalls=0 avg=0.620 source=memory/2026-06-13.md:4-4]
+
+## Promoted From Short-Term Memory (2026-06-17)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:14:14 -->
+- 帳戶摘要: 最近活動：6/11-6/12 多單平倉，淨利 .36 [score=0.888 recalls=0 avg=0.620 source=memory/2026-06-14.md:14-14]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:11:12 -->
+- 帳戶摘要: 帳戶：Vantage Markets #7737997 (Wayne Manual Order); 餘額/淨值：4.89 [score=0.837 recalls=0 avg=0.620 source=memory/2026-06-14.md:11-12]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:8:8 -->
+- Cron: mt4-daily-summary: **目標：** +85295424877 [score=0.827 recalls=0 avg=0.620 source=memory/2026-06-14.md:8-8]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:17:17 -->
+- 執行時間: 2026-06-14 00:30 HKT [score=0.807 recalls=0 avg=0.620 source=memory/2026-06-14.md:17-17]
