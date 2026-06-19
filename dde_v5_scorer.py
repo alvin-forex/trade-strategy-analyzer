@@ -222,6 +222,7 @@ def compute_raw_metrics(trades_for_symbol, lot_layers=None):
 
     # --- Other useful metrics ---
     total_net_pips = sum(t['net_pips'] for t in trades_for_symbol)
+    total_net_profit = sum(t['net_profit'] for t in trades_for_symbol)
     max_loss_pip = max((t['max_loss_pips'] for t in trades_for_symbol), default=0)
     avg_hold = sum(t['holding_hours'] for t in trades_for_symbol) / n
 
@@ -294,6 +295,7 @@ def compute_raw_metrics(trades_for_symbol, lot_layers=None):
         'trades': n,
         'wal': round(wal, 3),
         'total_net_pips': round(total_net_pips, 1),
+        'total_net_profit': round(total_net_profit, 1),
         'max_dd_pips': round(abs(max_dd), 1),
         'max_loss_pip': round(max_loss_pip, 1),
         'avg_hold': round(avg_hold, 2),
