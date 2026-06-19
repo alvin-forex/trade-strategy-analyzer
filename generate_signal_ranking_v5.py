@@ -260,6 +260,7 @@ input[type=text]::placeholder{{color:#555}}
 label{{color:var(--text2);font-size:0.9em;margin-left:12px}}
 @media(max-width:768px){{body{{font-size:11px}}th,td{{padding:3px 5px}}}}
 </style>
+<link rel="stylesheet" href="../sidebar.css">
 <script>
 (function(){{
   const saved=localStorage.getItem('tsa-theme');
@@ -341,6 +342,7 @@ document.querySelectorAll('table[id^="tbl"]').forEach(function(table) {{
   }});
 }});
 </script>
+<script src="../sidebar.js"></script>
 </body></html>'''
 
     return html
@@ -376,6 +378,12 @@ def main() -> None:
     # Also create signal_ranking.html (main alias)
     docs_alias: Path = DOCS_DIR / 'signal_ranking.html'
     with open(docs_alias, 'w', encoding='utf-8') as f:
+        f.write(html)
+
+    # Also write to docs/admin/ for sidebar navigation (primary page)
+    admin_path: Path = DOCS_DIR / 'admin' / 'signal_ranking.html'
+    admin_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(admin_path, 'w', encoding='utf-8') as f:
         f.write(html)
 
     print(f"\n✅ Generated: {output_path}")
