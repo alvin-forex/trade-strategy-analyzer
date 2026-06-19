@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED — 用 v5 scorer 但舊排名邏輯
+# 改用 generate_signal_ranking_v5.py 或 generate_ranking_ccy_v5.py
 """
 Generate Symbol-based Signal Ranking HTML (DDE v5 — ranking-based, 4 dimensions)
 WR 15% + PF 20% + DD 25% + Martin 40%
