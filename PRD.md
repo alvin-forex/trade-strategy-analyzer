@@ -1,8 +1,8 @@
 # PRD：交易策略分析系統（Trade Strategy Analyzer）
 
-> **版本：** v0.8（全面優化分析 — 四方 Agent 討論共識）
-> **日期：** 2026-05-25
-> **前一版本：** v0.7（2026-05-10）
+> **版本：** v0.9（v5 統一評分 + EA_MAP 去重 + QA 加強）
+> **日期：** 2026-06-19
+> **前一版本：** v0.8（2026-05-25）
 > **作者：** 丁蟹 + Alvin
 > **狀態：** 已實作，持續迭代中
 
@@ -36,7 +36,7 @@ Alvin 在 AlgoForest（Forex Forest）平台管理多個信號頁（如 #14581�
 - 產生排名總表，識別最佳 Copy 信號
 - 為每個貨幣對、每個層數提供精細化建議
 - **Lot-Based 層級偵測**：用 lot 數量判斷層數（取代舊 pip-based），與 EA 實際馬丁層級一致
-- **三合一模組整合**：`generate_all_levels_from_csv.py` 整合 CSV 下載、層級偵測、DDE v3 評分、HTML 報告生成
+- **模組化架構**：`dde_v5_scorer.py` 為核心計算引擎，`generate_signal_ranking_v5.py` / `generate_ranking_ccy_v5.py` 生成排名頁面，`config.py` 為 EA_MAP 唯一真相來源
 
 ---
 
@@ -399,23 +399,30 @@ Scraper 下載：/home/alvin/.openclaw/workspace/trade_strategy_analyzer/samples
 
 ```bash
 # 1. 生成個別信號詳細報告（69份）
-python3 generate_all_levels_from_csv.py --signal {signal_id} --csv samples/{signal_id}.csv
+python3 dde_v5_scorer.py --signal {signal_id} --csv downloads/{signal_id}.csv
 
 # 2. 生成 Signal Ranking 總表
-python3 generate_signal_ranking.py
+python3 generate_signal_ranking_v5.py
 ```
 
 ### 7.3 關鍵腳本
 
 | 腳本 | 用途 | 大小 |
 |------|------|------|
-| `generate_all_levels_from_csv.py` | 三合一模組：CSV 下載 + 層級偵測 + DDE v3 評分 + HTML 報告生成 | 52KB / 1356 行 |
-| `generate_signal_ranking.py` | 從 detailed HTML 提取分數，生成排名總表 | ~10KB / 294 行 |
-| `batch_detailed_all.py` | 批量下載 CSV + 生成報告 | 6.7KB |
-| `batch_analyze.py` | 批量基礎分析 | 30KB |
+| `dde_v5_scorer.py` | DDE v5 核心計算引擎（WR + PF + DD + Martin 4維排名制） | ~24KB / 620 行 |
+| `generate_signal_ranking_v5.py` | Signal 排名 HTML 生成（v5） | ~15KB / 390 行 |
+| `generate_ranking_ccy_v5.py` | CCY 排名 HTML 生成（v5） | ~15KB |
+| `generate_ccy_deep_analysis.py` | CCY 跨 Signal 深度分析 | ~20KB |
+| `config.py` | 全局配置（EA_MAP 唯一真相來源、路徑、常數） | ~6KB |
+| `db_manager.py` | SQLite 統一存儲接口 | ~18KB |
+| `generate_martin_autopsy_v3.py` | 馬丁驗屍報告 v3 生成 | ~45KB |
+| `generate_manual_pptx.py` | 簡報PPTX生成 | ~40KB |
+| `generate_signal_ranking.py` | ⚠️ DEPRECATED (v4) — 仍被簡報引用 | ~10KB |
+| `dde_v4_scorer.py` | ⚠️ DEPRECATED (v4) — 仍被 v4 ranking 引用 | ~18KB |
 | `scripts/algoforest_scraper.py` | AlgoForest 網頁 scraper | — |
 | `scripts/api_server.py` | FastAPI 服務（localhost:8787） | — |
 | `scripts/history_manager.py` | 分析歷史管理 | — |
+| `scripts/tsa_qa_check.py` | QA 自動質量檢查（sidebar + 連結 + EA 類型） | — |
 
 ---
 
@@ -432,40 +439,53 @@ python3 generate_signal_ranking.py
 ```
 trade_strategy_analyzer/
 ├── PRD.md                              # 本文件
-├── PRD_v0.4.md                         # 舊版 PRD（歷史參考）
+├── CLAUDE.md                           # 工程標準（5-phase 開發流程）
 ├── FEATURE_ARCHITECTURE.md             # 功能架構思路
-├── CHANGELOG.md                        # 版本更新日誌
-├── generate_all_levels_from_csv.py     # 主 scoring engine（DDE v3）
-├── generate_signal_ranking.py          # Signal Ranking 排名生成
-├── batch_detailed_all.py               # 批量 detailed reports
-├── batch_analyze.py                    # 批量基礎分析
-├── generate_batch_reports.py           # 批量報告生成
-├── generate_cross_signal_summary.py    # 跨信號摘要
-├── generate_detailed_comparison.py     # 個別詳細對比
-├── generate_8325_report.py             # 特定信號報告
-├── samples/                            # 69 個 CSV 數據檔
-├── output/                             # 所有生成嘅 HTML 報告
-│   ├── signal_ranking_dde_v3.html      # 排名總表
-│   ├── detailed_comparison_all_levels_*.html  # 69 份詳細報告
-│   ├── full_cross_reference.html       # .set vs 交易表現對照
-│   ├── dd_control_analysis.html        # DD 控制分析
-│   ├── cross_signal_summary.html       # 跨信號摘要
-│   └── batch_analysis_results.json     # 58 entries batch 結果
+├── config.py                           # ⭐ EA_MAP 唯一真相來源 + 全局配置
+├── dde_v5_scorer.py                    # ⭐ DDE v5 核心計算引擎
+├── generate_signal_ranking_v5.py       # ⭐ Signal 排名 HTML（v5）
+├── generate_ranking_ccy_v5.py          # ⭐ CCY 排名 HTML（v5）
+├── generate_ccy_deep_analysis.py       # CCY 跨 Signal 深度分析
+├── db_manager.py                       # SQLite 統一存儲接口
+├── generate_martin_autopsy_v3.py       # 馬丁驗屍報告 v3
+├── martin_autopsy_v3.py                # 馬丁驗屍核心邏輯
+├── generate_manual_pptx.py             # 簡報PPTX生成
+├── generate_period_stats.py            # 週期統計
+├── generate_pivot_table.py             # Pivot 表格生成
+├── generate_history_backup.py          # 歷史備份
+├── generate_version_comparison.py      # 版本對比
+├── batch_index_reports.py              # 批量報告索引
+├── recalculate_baselines.py            # 基線重算
+├── dde_v4_scorer.py                    # ⚠️ DEPRECATED (v4)
+├── generate_signal_ranking.py          # ⚠️ DEPRECATED (v4)
+├── generate_ranking_ccy.py             # ⚠️ DEPRECATED (v4)
+├── generate_symbol_ranking.py          # ⚠️ DEPRECATED (舊邏輯)
+├── generate_martin_v4.py               # ⚠️ DEPRECATED (v4)
+├── generate_mfe_mae.py                 # ⚠️ DEPRECATED (已整合)
+├── downloads/                          # CSV 交易數據
+├── output/                             # 生成的 HTML 報告
+├── docs/                               # GitHub Pages 部署
+│   ├── index.html                      # 首頁
+│   ├── sidebar.js / sidebar.css        # 全局導航
+│   ├── signal_ranking.html             # Signal 排名（v5）
+│   ├── signal_ranking_dde_v5.html      # v5 副本
+│   ├── admin/                          # 管理頁面目錄
+│   │   ├── signal_ranking.html         # Signal 排名（sidebar 入口）
+│   │   ├── ccy_ranking.html            # CCY 排名（v5）
+│   │   ├── volatility.html             # 波幅表
+│   │   ├── forex_news.html             # 外匯新聞
+│   │   └── ccy_power/                  # CCY Power 頁面
+│   └── reports/                        # 個別 Signal 報告
 ├── scripts/
 │   ├── api_server.py                   # FastAPI localhost:8787
 │   ├── history_manager.py              # 分析歷史管理
-│   ├── export_hst.py                   # MT4 .hst → JSON
+│   ├── tsa_qa_check.py                 # QA 自動質量檢查
 │   ├── algoforest_scraper.py           # AlgoForest 網頁 scraper
 │   └── extract_signal_data.py          # 數據提取
-├── docs/
-│   └── data/                           # 34 個 D1 JSON 市場數據 + manifest.json
-├── ea_manuals/                         # EA 手冊（MKD、S10、DragonWare、SMA、Flash）
 ├── data/
-│   └── analysis_history.db             # SQLite 分析歷史（13 records）
-├── market_data/
-├── uploads/
-├── secrets/
-├── src/                                # 前端模組（已部署到 GitHub Pages）
+│   ├── analysis_history.db             # SQLite 分析歷史
+│   └── tsa.db                          # v5 排名數據庫
+├── ea_manuals/                         # EA 手冊（MKD、S10、DragonWare、SMA、Flash）
 └── templates/
 ```
 
@@ -685,8 +705,9 @@ trade_strategy_analyzer/
 
 | 系統 | 用途 | 核心文件 |
 |------|------|----------|
-| DDE v3 | Symbol Ranking（按 CCY 篩選 Signal） | `generate_symbol_ranking.py` |
-| DDE v4 | Signal Ranking + CCY Ranking | `dde_v4_scorer.py` + ranking 腳本 |
+| **DDE v5** ⭐ | Signal Ranking + CCY Ranking（統一評分） | `dde_v5_scorer.py` + `generate_signal_ranking_v5.py` |
+| DDE v4 | ⚠️ DEPRECATED — 仍被簡報生成引用 | `dde_v4_scorer.py` + `generate_signal_ranking.py` |
+| DDE v3 | ⚠️ DEPRECATED — 已拆分為 v5 模組 | （原 `generate_all_levels_from_csv.py` 已移除） |
 | Rating S+/S/A/B/C/D/E | CCY Deep Analysis（跨 Signal 聚合） | `generate_ccy_deep_analysis.py` |
 
 #### 14.2.2 DDE v5 統一評分維度（✅ 老闆確認版 2026-05-26）
