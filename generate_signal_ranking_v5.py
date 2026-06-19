@@ -113,6 +113,7 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
                 'total_trades': sum(r['trades'] for r in rows),
                 'win_rate': round(sum(r['win_rate'] for r in rows) / len(rows), 1),
                 'total_net_pips': round(sum(r['total_net_pips'] for r in rows), 1),
+                'total_net_profit': round(sum(r['total_net_profit'] for r in rows), 1),
                 'max_dd_pips': round(max(r['max_dd_pips'] for r in rows), 1),
                 'pf': round(sum(r['pf'] for r in rows) / len(rows), 2),
                 'wal': round(sum(r['wal'] for r in rows) / len(rows), 3),
@@ -123,6 +124,7 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
         total_trades = sum(r['trades'] for r in rows)
         avg_wr = round(sum(r['win_rate'] for r in rows) / len(rows), 1)
         total_pips = round(sum(r['total_net_pips'] for r in rows), 1)
+        total_profit = round(sum(r['total_net_profit'] for r in rows), 1)
         max_dd = round(max(r['max_dd_pips'] for r in rows), 1)
         avg_pf = round(sum(r['pf'] for r in rows) / len(rows), 2)
         avg_wal = round(sum(r['wal'] for r in rows) / len(rows), 3)
@@ -138,6 +140,7 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
             'total_trades': total_trades,
             'win_rate': avg_wr,
             'total_net_pips': total_pips,
+            'total_net_profit': total_profit,
             'max_dd_pips': max_dd,
             'pf': avg_pf,
             'wal': avg_wal,
@@ -170,8 +173,8 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
 
             pf_str: str = 'Inf' if s['pf'] > 999 else f'{s["pf"]:.2f}'
             wr_str: str = f'{s["win_rate"]:.1f}%'
-            pips_str: str = f'{s["total_net_pips"]:,.0f}'
-            dd_str: str = f'{s["max_dd_pips"]:,.0f}'
+            pips_str: str = f'{s["total_net_pips"]:,.0f}p / ${s["total_net_profit"]:,.0f}'
+            dd_str: str = f'{s["max_dd_pips"]:,.0f}p'
             wal_str: str = f'{s["wal"]:.2f}'
 
             clean_icon: str = '✅' if s['clean_pct'] >= 80 else ('⚠️' if s['clean_pct'] >= 50 else '🚫')
@@ -203,8 +206,8 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
 <th data-col="wr" data-type="num">Win%<span class="arrow"></span></th>
 <th data-col="trades" data-type="num">Trades<span class="arrow"></span></th>
 <th data-col="pf" data-type="num">PF<span class="arrow"></span></th>
-<th data-col="profit" data-type="num">Profit<span class="arrow"></span></th>
-<th data-col="dd" data-type="num">Max DD<span class="arrow"></span></th>
+<th data-col="profit" data-type="num"><span class="tooltip" data-tip="總淨利潤（pips / USD）">Profit</span><span class="arrow"></span></th>
+<th data-col="dd" data-type="num"><span class="tooltip" data-tip="最大回撤（pips）">Max DD</span><span class="arrow"></span></th>
 <th data-col="wal" data-type="num">WAL<span class="arrow"></span></th>
 </tr></thead>'''
 
