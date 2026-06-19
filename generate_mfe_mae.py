@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED — 功能已整合到其他 v5 腳本
 """
 Generate MFE/MAE Analysis HTML for TSA.
 MFE = Maximum Favorable Excursion (Max Profit)

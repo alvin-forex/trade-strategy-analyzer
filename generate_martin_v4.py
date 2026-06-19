@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED (v4) — 改用 generate_martin_autopsy_v3.py（如果適用）
 """Generate Martin Autopsy V4 interactive HTML pages for all Signals.
 
 Creates one HTML per signal that loads CSV and renders client-side.

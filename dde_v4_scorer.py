@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED (v4) — 改用 dde_v5_scorer.py
+# 仍被 generate_signal_ranking.py（v4 簡報用）引用，唔好刪除
 """
 DDE v4 評分模型 — 基於老闆指定嘅 5 個維度
 Based on Gemini consultation + Alvin's 5 criteria

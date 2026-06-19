@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED (v4) — 改用 generate_ranking_ccy_v5.py
+# 冇任何腳本引用
 """
 Generate Currency Pair Ranking HTML (DDE v4 — unified theme, matching gh-pages UI).
 Reads from SQLite (via db_manager) with pickle fallback for legacy data.

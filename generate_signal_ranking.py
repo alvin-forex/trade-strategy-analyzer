@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED (v4) — 改用 generate_signal_ranking_v5.py
+# 仍被 generate_manual_pptx.py 引用（簡報生成）
 """
 Generate Signal Ranking HTML (DDE v4 — 5 dimensions)
 Win Rate 20% + Holding Time 5% + Trade Count 15% + Martin Layers 25% + Risk/Reward 35%
