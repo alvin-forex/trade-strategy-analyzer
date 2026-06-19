@@ -56,7 +56,7 @@
   links.forEach(function(link){
     var dp = link.getAttribute('data-page');
     if(dp==='index' && (filename==='index' || filename==='dashboard')) link.classList.add('active');
-    else if(dp==='signal_ranking' && (filename==='signal_ranking' || filename==='signal_ranking_dde_v4')) link.classList.add('active');
+    else if(dp==='signal_ranking' && (filename==='signal_ranking' || filename==='signal_ranking_dde_v5')) link.classList.add('active');
     else if(dp==='ccy_ranking' && filename==='ccy_ranking') link.classList.add('active');
     else if(dp==='volatility' && (filename==='volatility' || filename==='ccy_timeframe_volatility')) link.classList.add('active');
     else if(dp==='ccy_power' && (path.includes('/admin/ccy_power/') || filename==='ccy_power')) link.classList.add('active');
