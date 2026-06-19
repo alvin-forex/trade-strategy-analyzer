@@ -19,12 +19,13 @@ DOCS_DIR = BASE_DIR / "docs"
 REPORTS_DIR = BASE_DIR / "reports"
 DOWNLOADS_DIR = BASE_DIR / "downloads"
 
-# 必要頁面清單
+# 必要頁面清單（相對於 docs/）
 REQUIRED_PAGES = [
     "index.html",
     "signal_ranking.html",
     "signal_ranking_dde_v5.html",
-    "ranking_ccy.html",
+    "admin/signal_ranking.html",
+    "admin/ccy_ranking.html",
 ]
 
 # 導航組件 (sidebar 或 topnav 二擇一即可)
@@ -68,21 +69,24 @@ class QAResult:
 
 
 def check_sidebar_consistency(result: QAResult):
-    """檢查 1：docs/ 下 HTML 頁面應有導航組件"""
+    """檢查 1：docs/ 及 docs/admin/ 下 HTML 頁面應有導航組件"""
     print("\n🔍 檢查 1：導航組件一致性")
-    html_files = sorted(DOCS_DIR.glob("*.html"))
+    # 掃描 docs/*.html 和 docs/admin/*.html
+    html_files = sorted(DOCS_DIR.glob("*.html")) + sorted((DOCS_DIR / "admin").glob("*.html"))
 
     for html_file in html_files:
-        name = html_file.name
+        # 用相對於 docs/ 的路徑顯示
+        rel = html_file.relative_to(DOCS_DIR)
+        name = str(rel)
         content = html_file.read_text(encoding="utf-8", errors="ignore")
         has_nav = any(p in content for p in NAV_PATTERNS)
 
         # 排除 index.html（主頁可能有獨立導航）
-        if name == "index.html":
+        if rel.name == "index.html":
             if has_nav:
-                result.ok(f"index.html 有導航組件")
+                result.ok(f"{name} 有導航組件")
             else:
-                result.warn(f"index.html 沒有 sidebar/topnav 導航（可能使用獨立導航）")
+                result.warn(f"{name} 沒有 sidebar/topnav 導航（可能使用獨立導航）")
             continue
 
         if has_nav:
@@ -94,7 +98,7 @@ def check_sidebar_consistency(result: QAResult):
 def check_signal_links(result: QAResult):
     """檢查 2：排名頁 signal 連結應指向新版報告"""
     print("\n🔍 檢查 2：Signal 連結有效性")
-    ranking_files = sorted(DOCS_DIR.glob("signal_ranking*.html"))
+    ranking_files = sorted(DOCS_DIR.glob("signal_ranking*.html")) + sorted((DOCS_DIR / "admin").glob("signal_ranking*.html"))
 
     valid_prefixes = ("../reports/martin_v4_", "../reports/index_")
     bad_pattern = "../reports/detailed_comparison_"
@@ -184,6 +188,31 @@ def check_page_completeness(result: QAResult):
             result.fail(f"{page} 不存在")
 
 
+def check_generated_pages_nav(result: QAResult):
+    """檢查 6：腳本生成的 HTML 必須包含 sidebar"""
+    print("\n🔍 檢查 6：生成頁面導航完整性")
+    # 呢啲係由 generate_*.py 腳本生成的頁面，必須有 sidebar
+    generated_pages = [
+        "signal_ranking.html",
+        "signal_ranking_dde_v5.html",
+        "admin/signal_ranking.html",
+        "admin/ccy_ranking.html",
+    ]
+    for page in generated_pages:
+        path = DOCS_DIR / page
+        if not path.exists():
+            continue  # check_page_completeness 會報告缺失
+        content = path.read_text(encoding="utf-8", errors="ignore")
+        has_css = "sidebar.css" in content
+        has_js = "sidebar.js" in content
+        if has_css and has_js:
+            result.ok(f"{page} 有 sidebar.css + sidebar.js")
+        elif has_css or has_js:
+            result.fail(f"{page} 只有 sidebar.css 或 sidebar.js 其中一個")
+        else:
+            result.fail(f"{page} 完全缺少 sidebar.css 和 sidebar.js")
+
+
 def main():
     parser = argparse.ArgumentParser(description="TSA 系統 QA 檢查")
     parser.add_argument("--quick", action="store_true", help="快速模式：只檢查 sidebar + 連結")
@@ -203,6 +232,7 @@ def main():
     # 所有模式都跑的檢查
     check_sidebar_consistency(result)
     check_signal_links(result)
+    check_generated_pages_nav(result)
 
     if args.full:
         check_ea_types(result)
