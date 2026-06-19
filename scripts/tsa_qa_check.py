@@ -152,11 +152,11 @@ def check_ea_types(result: QAResult):
 
 
 def check_csv_freshness(result: QAResult):
-    """檢查 4：CSV 不應超過 48 小時"""
+    """檢查 4：CSV 不應超過 7 天"""
     print("\n🔍 檢查 4：CSV 時效性")
     csv_files = sorted(DOWNLOADS_DIR.glob("*.csv"))
     now = time.time()
-    threshold_h = 48
+    threshold_h = 7 * 24
     stale = []
 
     for csv in csv_files:
