@@ -235,6 +235,16 @@ def generate_report(signals_data: Dict[str, dict], start_date: datetime, end_dat
         ccy_dir_groups[key].append(t)
     for key, trades in sorted(ccy_dir_groups.items(), key=lambda x: analyze_trades(x[1])['total_pnl'], reverse=True):
         by_ccy_dir[key] = analyze_trades(trades)
+        # Build by_ccy_direction_signal for accordion
+        sig_in_ccydir = defaultdict(list)
+        for t in trades:
+            sig_in_ccydir[t['_signal_id']].append(t)
+        by_ccy_dir[key]['by_signal'] = []
+        for sid, sig_trades in sorted(sig_in_ccydir.items(), key=lambda x: analyze_trades(x[1])['total_pnl'], reverse=True):
+            sig_stats = analyze_trades(sig_trades)
+            sig_stats['signal_id'] = sid
+            sig_stats['ea'] = signals_data.get(sid, {}).get('ea', get_ea_from_signal(sid))
+            by_ccy_dir[key]['by_signal'].append(sig_stats)
     
     day_groups = defaultdict(list)
     for t in filtered:
@@ -264,9 +274,34 @@ def get_ea_style(ea: str) -> str:
     return f'background:{bg};color:{fg}'
 
 
+def get_signal_link(signal_id: str) -> str:
+    """Generate link to Signal report if exists."""
+    import os
+    base_path = Path(__file__).parent.parent  # workspace root
+    reports_dir = base_path / 'docs' / 'reports'
+    # Check Signal_Deep_Analysis first
+    deep_path = reports_dir / f'Signal_Deep_Analysis_{signal_id}.html'
+    if deep_path.exists():
+        return f'<a href="../reports/Signal_Deep_Analysis_{signal_id}.html" class="signal-link">{signal_id}</a>'
+    # Check martin_v4 report
+    martin_path = reports_dir / f'martin_v4_{signal_id}.html'
+    if martin_path.exists():
+        return f'<a href="../reports/martin_v4_{signal_id}.html" class="signal-link">{signal_id}</a>'
+    # No report exists, return plain text
+    return signal_id
+
+
 def generate_html(report: dict, output_path: Path) -> None:
     """Generate HTML report with TSA style."""
     meta, overall = report['meta'], report['overall']
+    
+    # Calculate sidebar path depth based on output location
+    # reviews/monthly/*.html -> ../../sidebar.js
+    # reviews/weekly/*.html -> ../../sidebar.js
+    # reviews/*.html -> ../sidebar.js
+    sidebar_depth = '../' if output_path.parent.name in ('monthly', 'weekly', 'daily') else '../'
+    if output_path.parent.name in ('monthly', 'weekly', 'daily'):
+        sidebar_depth = '../../'
     
     # Build HTML using string concatenation
     lines = []
@@ -276,8 +311,8 @@ def generate_html(report: dict, output_path: Path) -> None:
     lines.append('<meta charset="UTF-8">')
     lines.append('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
     lines.append(f'<title>日期覆盤 | {meta["start_date"]} - {meta["end_date"]}</title>')
-    lines.append('<link rel="stylesheet" href="../sidebar.css">')
-    lines.append('<script src="../sidebar.js"></script>')
+    lines.append(f'<link rel="stylesheet" href="{sidebar_depth}sidebar.css">')
+    lines.append(f'<script src="{sidebar_depth}sidebar.js"></script>')
     lines.append('<style>')
     lines.append('*{margin:0;padding:0;box-sizing:border-box}')
     lines.append('body{font-family:-apple-system,sans-serif;background:#0d1117;color:#c9d1d9}')
@@ -305,6 +340,9 @@ def generate_html(report: dict, output_path: Path) -> None:
     lines.append('.tab-content{display:none}')
     lines.append('.tab-content.active{display:block}')
     lines.append('footer{text-align:center;margin-top:24px;color:#484f58;font-size:0.7em}')
+    # Signal link styles
+    lines.append('.signal-link{color:#58a6ff;text-decoration:none;font-weight:500}')
+    lines.append('.signal-link:hover{color:#79c0ff;text-decoration:underline}')
     # Accordion styles
     lines.append('.accordion-row{cursor:pointer;user-select:none}')
     lines.append('.accordion-row:hover{background:#1a2332}')
@@ -367,7 +405,7 @@ def generate_html(report: dict, output_path: Path) -> None:
     for item in report['signal_comparison']:
         pnl_cls = 'positive' if item['total_pnl'] >= 0 else 'negative'
         pf_s = f"{item['profit_factor']:.2f}" if isinstance(item['profit_factor'], float) else str(item['profit_factor'])
-        lines.append(f'<tr><td>{item["signal_id"]}</td><td><span class="ea-badge" style="{get_ea_style(item["ea"]) }">{item["ea"]}</span></td><td>{item["count"]:,}</td><td>{item["win_rate"]:.1f}%</td><td class="{pnl_cls}">${item["total_pnl"]:,.2f}</td><td>{item["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
+        lines.append(f'<tr><td>{get_signal_link(str(item["signal_id"]))}</td><td><span class="ea-badge" style="{get_ea_style(item["ea"]) }">{item["ea"]}</span></td><td>{item["count"]:,}</td><td>{item["win_rate"]:.1f}%</td><td class="{pnl_cls}">${item["total_pnl"]:,.2f}</td><td>{item["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
     lines.append('</tbody></table></div></div>')
     
     # CCY with accordion
@@ -382,7 +420,7 @@ def generate_html(report: dict, output_path: Path) -> None:
         detail_rows = report.get('by_ccy_signal', {}).get(ccy, [])
         if detail_rows:
             lines.append(f'<tr class="accordion-detail" id="detail-{ccy_id}"><td colspan="7" class="accordion-inner">')
-            lines.append('<table class="accordion-table"><thead><tr><th>Signal</th><th>EA</th><th>Dir</th><th>Trades</th><th>WR</th><th>PnL</th></tr></thead><tbody>')
+            lines.append('<table class="accordion-table"><thead><tr><th>Signal</th><th>EA</th><th>Dir</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
             for s in detail_rows:
                 ea = s.get('ea', 'UNK')
                 ea_style = get_ea_style(ea)
@@ -394,14 +432,16 @@ def generate_html(report: dict, output_path: Path) -> None:
                         d_pnl_cls = 'positive' if ds['total_pnl'] >= 0 else 'negative'
                         d_label = 'Buy' if d == 'buy' else 'Sell'
                         d_cls = 'sub-buy' if d == 'buy' else 'sub-sell'
+                        d_pf = f"{ds['profit_factor']:.2f}" if isinstance(ds.get('profit_factor'), float) else str(ds.get('profit_factor', '-'))
                         if idx == 0:
                             # First row: include Signal, EA with rowspan
-                            lines.append(f'<tr><td rowspan="{n_dirs}">{s["signal_id"]}</td><td rowspan="{n_dirs}"><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td></tr>')
+                            lines.append(f'<tr><td rowspan="{n_dirs}">{s["signal_id"]}</td><td rowspan="{n_dirs}"><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td><td>{ds.get("total_pips",0):,.1f}</td><td>{d_pf}</td></tr>')
                         else:
                             # Subsequent rows: skip Signal and EA columns
-                            lines.append(f'<tr><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td></tr>')
+                            lines.append(f'<tr><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td><td>{ds.get("total_pips",0):,.1f}</td><td>{d_pf}</td></tr>')
                 else:
-                    lines.append(f'<tr><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>-</td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
+                    s_pf = f"{s['profit_factor']:.2f}" if isinstance(s.get('profit_factor'), float) else str(s.get('profit_factor', '-'))
+                    lines.append(f'<tr><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>-</td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td></tr>')
             lines.append('</tbody></table></td></tr>')
     lines.append('</tbody></table></div></div>')
     
@@ -418,7 +458,7 @@ def generate_html(report: dict, output_path: Path) -> None:
         detail_rows = report.get('by_direction_ccy', {}).get(dir_key, [])
         if detail_rows:
             lines.append(f'<tr class="accordion-detail" id="detail-{dir_id}"><td colspan="7" class="accordion-inner">')
-            lines.append('<table class="accordion-table"><thead><tr><th>CCY</th><th>Signal</th><th>EA</th><th>Trades</th><th>WR</th><th>PnL</th></tr></thead><tbody>')
+            lines.append('<table class="accordion-table"><thead><tr><th>CCY</th><th>Signal</th><th>EA</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
             for c in detail_rows:
                 sig_rows = c.get('by_signal', [])
                 n_sigs = max(len(sig_rows), 1)
@@ -426,29 +466,44 @@ def generate_html(report: dict, output_path: Path) -> None:
                     ea = s.get('ea', 'UNK')
                     ea_style = get_ea_style(ea)
                     s_pnl_cls = 'positive' if s['total_pnl'] >= 0 else 'negative'
+                    s_pf = f"{s['profit_factor']:.2f}" if isinstance(s.get('profit_factor'), float) else str(s.get('profit_factor', '-'))
                     if i == 0:
                         # First row: CCY with rowspan
                         rowspan_attr = f' rowspan="{n_sigs}"' if n_sigs > 1 else ''
-                        lines.append(f'<tr><td{rowspan_attr}>{c["ccy"]}</td><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
+                        lines.append(f'<tr><td{rowspan_attr}>{c["ccy"]}</td><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td></tr>')
                     else:
                         # Subsequent rows: no CCY cell (covered by rowspan)
-                        lines.append(f'<tr><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
+                        lines.append(f'<tr><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td></tr>')
                 if not sig_rows:
                     ccy_pnl_cls = 'positive' if c['total_pnl'] >= 0 else 'negative'
-                    lines.append(f'<tr><td>{c["ccy"]}</td><td>-</td><td>-</td><td>{c["count"]:,}</td><td>{c["win_rate"]:.1f}%</td><td class="{ccy_pnl_cls}">${c["total_pnl"]:,.2f}</td></tr>')
+                    ccy_pf = f"{c['profit_factor']:.2f}" if isinstance(c.get('profit_factor'), float) else str(c.get('profit_factor', '-'))
+                    lines.append(f'<tr><td>{c["ccy"]}</td><td>-</td><td>-</td><td>{c["count"]:,}</td><td>{c["win_rate"]:.1f}%</td><td class="{ccy_pnl_cls}">${c["total_pnl"]:,.2f}</td><td>{c.get("total_pips",0):,.1f}</td><td>{ccy_pf}</td></tr>')
             lines.append('</tbody></table></td></tr>')
     lines.append('</tbody></table></div></div>')
     
-    # CCY+Direction
+    # CCY+Direction with accordion
     lines.append('<div id="tab-ccydir" class="tab-content"><div class="section"><h2>CCY+方向</h2>')
-    lines.append('<table><thead><tr><th>CCY</th><th>Dir</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
+    lines.append('<table><thead><tr><th style="width:24px"></th><th>CCY</th><th>Dir</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
     for key, stats in list(report['by_ccy_direction'].items())[:50]:
         pnl_cls = 'positive' if stats['total_pnl'] >= 0 else 'negative'
         pf_s = f"{stats['profit_factor']:.2f}" if isinstance(stats['profit_factor'], float) else str(stats['profit_factor'])
         parts = key.rsplit('_', 1)
         ccy, d = parts[0] if len(parts) > 1 else key, parts[1] if len(parts) > 1 else ''
         dl = 'Buy' if d == 'buy' else 'Sell' if d == 'sell' else d
-        lines.append(f'<tr><td>{ccy}</td><td>{dl}</td><td>{stats["count"]:,}</td><td>{stats["win_rate"]:.1f}%</td><td class="{pnl_cls}">${stats["total_pnl"]:,.2f}</td><td>{stats["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
+        ccydir_id = key.replace('-', '')
+        lines.append(f'<tr class="accordion-row" onclick="toggleAccordion(\'{ccydir_id}\')"><td><span class="accordion-toggle" id="toggle-{ccydir_id}">▶</span></td><td>{ccy}</td><td>{dl}</td><td>{stats["count"]:,}</td><td>{stats["win_rate"]:.1f}%</td><td class="{pnl_cls}">${stats["total_pnl"]:,.2f}</td><td>{stats["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
+        # Accordion detail: Signal breakdown
+        sig_rows = stats.get('by_signal', [])
+        if sig_rows:
+            lines.append(f'<tr class="accordion-detail" id="detail-{ccydir_id}"><td colspan="8" class="accordion-inner">')
+            lines.append('<table class="accordion-table"><thead><tr><th>Signal</th><th>EA</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
+            for s in sig_rows:
+                ea = s.get('ea', 'UNK')
+                ea_style = get_ea_style(ea)
+                s_pnl_cls = 'positive' if s['total_pnl'] >= 0 else 'negative'
+                s_pf = f"{s['profit_factor']:.2f}" if isinstance(s.get('profit_factor'), float) else str(s.get('profit_factor', '-'))
+                lines.append(f'<tr><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td></tr>')
+            lines.append('</tbody></table></td></tr>')
     lines.append('</tbody></table></div></div>')
     
     # Daily
