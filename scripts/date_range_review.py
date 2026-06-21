@@ -389,11 +389,17 @@ def generate_html(report: dict, output_path: Path) -> None:
                 # Show direction breakdown if available
                 dir_bd = s.get('by_direction', {})
                 if dir_bd:
-                    for d, ds in dir_bd.items():
+                    n_dirs = len(dir_bd)
+                    for idx, (d, ds) in enumerate(dir_bd.items()):
                         d_pnl_cls = 'positive' if ds['total_pnl'] >= 0 else 'negative'
                         d_label = 'Buy' if d == 'buy' else 'Sell'
                         d_cls = 'sub-buy' if d == 'buy' else 'sub-sell'
-                        lines.append(f'<tr><td rowspan="{len(dir_bd)}">{s["signal_id"]}</td><td rowspan="{len(dir_bd)}"><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td></tr>')
+                        if idx == 0:
+                            # First row: include Signal, EA with rowspan
+                            lines.append(f'<tr><td rowspan="{n_dirs}">{s["signal_id"]}</td><td rowspan="{n_dirs}"><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td></tr>')
+                        else:
+                            # Subsequent rows: skip Signal and EA columns
+                            lines.append(f'<tr><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td></tr>')
                 else:
                     lines.append(f'<tr><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>-</td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
             lines.append('</tbody></table></td></tr>')
@@ -420,9 +426,13 @@ def generate_html(report: dict, output_path: Path) -> None:
                     ea = s.get('ea', 'UNK')
                     ea_style = get_ea_style(ea)
                     s_pnl_cls = 'positive' if s['total_pnl'] >= 0 else 'negative'
-                    ccy_text = c['ccy'] if i == 0 else ''
-                    rowspan = f' rowspan="{n_sigs}"' if i == 0 and n_sigs > 1 else ''
-                    lines.append(f'<tr><td{rowspan}>{ccy_text}</td><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
+                    if i == 0:
+                        # First row: CCY with rowspan
+                        rowspan_attr = f' rowspan="{n_sigs}"' if n_sigs > 1 else ''
+                        lines.append(f'<tr><td{rowspan_attr}>{c["ccy"]}</td><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
+                    else:
+                        # Subsequent rows: no CCY cell (covered by rowspan)
+                        lines.append(f'<tr><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
                 if not sig_rows:
                     ccy_pnl_cls = 'positive' if c['total_pnl'] >= 0 else 'negative'
                     lines.append(f'<tr><td>{c["ccy"]}</td><td>-</td><td>-</td><td>{c["count"]:,}</td><td>{c["win_rate"]:.1f}%</td><td class="{ccy_pnl_cls}">${c["total_pnl"]:,.2f}</td></tr>')
