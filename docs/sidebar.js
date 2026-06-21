@@ -5,7 +5,7 @@
   var depth = '';
   if(path.includes('/admin/ccy_power/') || path.includes('/admin/forex_reports/') || path.includes('/reviews/')) depth='../../';
   else if(path.includes('/admin/')) depth='../';
-  else if(path.includes('/reports/')) depth='../';
+  else if(path.includes('/reports/') || path.includes('/portfolios/')) depth='../';
 
   // Build sidebar HTML
   var sidebar = document.createElement('nav');
@@ -18,6 +18,7 @@
       <a href="${depth}admin/signal_ranking.html" class="sidebar-link" data-page="signal_ranking"><span class="icon">🏆</span>Signal 排名</a>
       <a href="${depth}admin/ccy_ranking.html" class="sidebar-link" data-page="ccy_ranking"><span class="icon">💱</span>CCY 排名</a>
       <a href="${depth}admin/volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
+      <a href="${depth}portfolios/portfolio_master_report_v2.html" class="sidebar-link" data-page="portfolios"><span class="icon">💼</span>Portfolio V2</a>
       <div class="sidebar-sep"></div>
       <a href="${depth}reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
       <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
@@ -62,6 +63,7 @@
     else if(dp==='volatility' && (filename==='volatility' || filename==='ccy_timeframe_volatility')) link.classList.add('active');
     else if(dp==='ccy_power' && (path.includes('/admin/ccy_power/') || filename==='ccy_power')) link.classList.add('active');
     else if(dp==='forex_news' && (filename==='forex_news' || path.includes('/admin/forex_reports/'))) link.classList.add('active');
+    else if(dp==='portfolios' && path.includes('/portfolios/')) link.classList.add('active');
     else if(dp==='reviews' && path.includes('/reviews/')) link.classList.add('active');
     else if(dp!=='index' && filename.includes(dp)) link.classList.add('active');
   });

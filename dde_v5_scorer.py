@@ -84,6 +84,8 @@ def read_csv_trades(csv_path):
                     'max_loss': max_loss,             # MAE $
                     'max_pips': max_pips,             # MFE pips
                     '_open_time': _open_time,         # For time analysis
+                    'comment': row.get('Comment', '').strip(),
+                    'magic': row.get('Magic Number', '').strip(),
                 })
             except (ValueError, TypeError):
                 continue
@@ -130,10 +132,15 @@ def compute_layer_lot(trade_lot, lot_layers):
     best_level = 1
     best_diff = float('inf')
     for level, lot in lot_layers:
+        # Handle both formats: (int, lot) and ('Ln', lot)
+        if isinstance(level, str) and level.startswith('L'):
+            level_num = int(level[1:]) if level != 'L9+' else 9
+        else:
+            level_num = level
         diff = abs(trade_lot - lot)
         if diff < best_diff:
             best_diff = diff
-            best_level = level
+            best_level = level_num
     if best_level >= 9:
         return 'L9+'
     return f'L{best_level}'
@@ -265,20 +272,42 @@ def compute_raw_metrics(trades_for_symbol, lot_layers=None):
 
     # --- Red card rules ---
     red_card = False
+    yellow_card = False
     red_reasons = []
-    if total_net_pips <= 0:
+    yellow_reasons = []
+    
+    # Tier 1: Definitely red (< 10 trades or any absolute failure)
+    if n < 10:
         red_card = True
-        red_reasons.append('Net Pips <= 0')
-    if n < 20:
-        red_card = True
-        red_reasons.append(f'Trades < 20 ({n})')
-    if win_rate < 50:
-        red_card = True
-        red_reasons.append(f'Win Rate < 50% ({win_rate:.1f}%)')
-    # 單筆 max loss > 500 pips → red card
-    if max_loss_pip > 500:
-        red_card = True
-        red_reasons.append(f'Single Max Loss > 500 pips ({max_loss_pip:.0f})')
+        red_reasons.append(f'Trades < 10 ({n})')
+    
+    # Tier 2: Yellow card (10-19 trades, but positive performance)
+    if 10 <= n < 20:
+        if total_net_pips <= 0:
+            red_card = True
+            red_reasons.append('Net Pips <= 0 (low volume)')
+        elif win_rate < 60:
+            red_card = True
+            red_reasons.append(f'Win Rate < 60% ({win_rate:.1f}%) (low volume)')
+        elif max_loss_pip > 500:
+            red_card = True
+            red_reasons.append(f'Single Max Loss > 500 pips ({max_loss_pip:.0f}) (low volume)')
+        else:
+            yellow_card = True
+            red_card = False  # Not red — still gets scored
+            yellow_reasons.append(f'Low volume ({n} trades)')
+    
+    # Tier 3: Standard red rules (>= 20 trades)
+    if n >= 20:
+        if total_net_pips <= 0:
+            red_card = True
+            red_reasons.append('Net Pips <= 0')
+        if win_rate < 50:
+            red_card = True
+            red_reasons.append(f'Win Rate < 50% ({win_rate:.1f}%)')
+        if max_loss_pip > 500:
+            red_card = True
+            red_reasons.append(f'Single Max Loss > 500 pips ({max_loss_pip:.0f})')
 
     return {
         # v5 raw metrics (for ranking)
@@ -290,6 +319,8 @@ def compute_raw_metrics(trades_for_symbol, lot_layers=None):
         # Other info
         'red_card': red_card,
         'red_reasons': red_reasons,
+        'yellow_card': yellow_card,
+        'yellow_reasons': yellow_reasons,
         'win_rate': round(win_rate, 1),
         'pf': round(pf_raw, 2),
         'trades': n,
@@ -432,13 +463,16 @@ def get_ea(sid):
 
 
 def run_v5_scoring():
-    """Main entry: load all CSVs, compute raw metrics, batch score."""
+    """Main entry: load all CSVs, split by EA, compute raw metrics per EA, batch score."""
     SAMPLES = Path(__file__).parent / 'samples'
     DOWNLOADS = Path(__file__).parent / 'downloads'
     OUTPUT = Path(__file__).parent / 'output'
 
-    lot_mapping = load_lot_mapping()
-    print(f"📦 Lot mapping loaded: {len(lot_mapping)} signals")
+    # Use new v2 lot mapping (multi-EA, multi-version)
+    from config import load_lot_mapping_v2, get_lot_layers_for_trade, extract_comment_prefix
+
+    lot_mapping_v2 = load_lot_mapping_v2()
+    print(f"📦 Lot mapping v2 loaded: {len(lot_mapping_v2)} signals")
 
     # Collect CSVs with dedup
     all_csvs = {}
@@ -453,7 +487,7 @@ def run_v5_scoring():
 
     print(f"📄 CSV signals: {len(all_csvs)}")
 
-    # Step 1: Compute raw metrics for all Signal×CCY
+    # Step 1: Compute raw metrics for all Signal x EA x CCY
     all_metrics = []
     for sid, csv_file in sorted(all_csvs.items()):
         eas = get_ea(sid)
@@ -463,27 +497,42 @@ def run_v5_scoring():
         if not trades:
             continue
 
-        # 按 (symbol, type) 双维度分组 - BUY/SELL分开评分
-        by_sym_type = defaultdict(list)
+        # Split trades by EA group (comment_prefix + magic)
+        ea_trade_groups = defaultdict(list)
         for t in trades:
-            key = (t['symbol'], t['type'])  # (symbol, 'buy'/'sell')
-            by_sym_type[key].append(t)
+            comment = t.get('comment', '')
+            magic = t.get('magic', '')
+            prefix = extract_comment_prefix(comment)
+            ea_key = f"{prefix}_M{magic}" if magic else prefix
+            if not ea_key:
+                ea_key = 'UNKNOWN'
+            key = (ea_key, t['symbol'], t['type'])
+            ea_trade_groups[key].append(t)
 
-        lot_layers = None
-        if sid in lot_mapping and lot_mapping[sid].get('lot_layers'):
-            lot_layers = [(lv, lot) for lv, lot in lot_mapping[sid].get('lot_layers', [])]
+        for (ea_key, sym, trade_type), group_trades in ea_trade_groups.items():
+            first_trade = group_trades[0]
+            trade_date_str = ''
+            if first_trade.get('_open_time'):
+                trade_date_str = first_trade['_open_time'].strftime('%Y-%m-%d')
 
-        for (sym, trade_type), sym_type_trades in by_sym_type.items():
-            metrics = compute_raw_metrics(sym_type_trades, lot_layers=lot_layers)
+            lot_layers = get_lot_layers_for_trade(
+                sid,
+                first_trade.get('comment', ''),
+                first_trade.get('magic', ''),
+                trade_date_str
+            )
+
+            metrics = compute_raw_metrics(group_trades, lot_layers=lot_layers)
             if metrics is None:
                 continue
 
             metrics['signal_id'] = sid
             metrics['symbol'] = sym
-            metrics['type'] = trade_type  # 新增: buy/sell 标识
+            metrics['type'] = trade_type
             metrics['ea'] = ea_tag
+            metrics['ea_key'] = ea_key
+            metrics['ea_trades'] = len(group_trades)
 
-            # Layer display string
             layer_names = []
             for ln in sorted(set(metrics['layers'].keys()),
                             key=lambda x: (99 if x == 'L9+' else int(x[1:]))):
@@ -493,7 +542,7 @@ def run_v5_scoring():
 
             all_metrics.append(metrics)
 
-    print(f"📊 Raw metrics computed: {len(all_metrics)} Signal×CCY pairs")
+    print(f"📊 Raw metrics computed: {len(all_metrics)} Signal x EA x CCY pairs")
 
     # Step 2: Batch score using ranking
     scored_results = score_v5_batch(all_metrics)
@@ -501,11 +550,26 @@ def run_v5_scoring():
     # Summary
     valid = [r for r in scored_results if not r['red_card']]
     red = [r for r in scored_results if r['red_card']]
+    yellow = [r for r in scored_results if r.get('yellow_card')]
 
-    print(f"\n📊 DDE v5 Results (ranking-based):")
+    print(f"\n📊 DDE v5 Results (ranking-based, EA-split):")
     print(f"  Total rows: {len(scored_results)}")
-    print(f"  Scored: {len(valid)}")
-    print(f"  Red card: {len(red)}")
+    print(f"  🟢 Scored: {len(valid)}")
+    print(f"  🟡 Yellow (low volume, still scored): {len(yellow)}")
+    print(f"  🔴 Red card: {len(red)}")
+
+    if valid:
+        scores = [r['dde_v5'] for r in valid]
+        print(f"  Score range: {min(scores)} - {max(scores)}")
+        print(f"  Average: {round(sum(scores)/len(scores), 1)}")
+
+    # Show some yellow card examples
+    if yellow:
+        yellow.sort(key=lambda x: x['dde_v5'], reverse=True)
+        print(f"\n🟡 Top Yellow (low volume, but scored):")
+        for r in yellow[:8]:
+            print(f"  {r['signal_id']} x {r['symbol']:7s} [{str(r.get('ea_key',''))[:18]:18s}] = {r['dde_v5']:5.1f}  "
+                  f"WR={r['win_rate']:.0f}% PF={r['pf']:.2f} DD={r['max_dd_pips']:.0f} [{r['ea_trades']}t]")
 
     if valid:
         scores = [r['dde_v5'] for r in valid]
@@ -516,7 +580,6 @@ def run_v5_scoring():
     from db_manager import save_scores
     batch_id = save_scores(scored_results, version='v5')
     print(f"   Batch ID: {batch_id}")
-    # Legacy: also save pickle for backward compat
     try:
         import pickle
         with open('/tmp/dde_v5_data.pkl', 'wb') as f:
@@ -525,23 +588,23 @@ def run_v5_scoring():
     except Exception:
         pass
 
-    # Top 10
+    # Top 10 (group by signal, show best EA sub-group per symbol)
     valid.sort(key=lambda x: x['dde_v5'], reverse=True)
-    print(f"\n🏆 Top 10 (v5):")
+    print(f"\n🏆 Top 10 (v5, EA-split):")
     for r in valid[:10]:
-        print(f"  {r['signal_id']} × {r['symbol']:8s} = {r['dde_v5']:5.1f}  "
+        print(f"  {r['signal_id']} x {r['symbol']:8s} [{r.get('ea_key','')[:20]}]= {r['dde_v5']:5.1f}  "
               f"WR={r['win_rate']:.0f}% PF={r['pf']:.2f} DD={r['max_dd_pips']:.0f} WAL={r['wal']:.2f}  "
-              f"[WR%={r['wr_pct']:.0f} PF%={r['pf_pct']:.0f} DD%={r['dd_pct']:.0f} M%={r['martin_pct']:.0f}]")
+              f"[{r['ea_trades']}]")
 
     print(f"\n💀 Bottom 5 (scored):")
     for r in valid[-5:]:
-        print(f"  {r['signal_id']} × {r['symbol']:8s} = {r['dde_v5']:5.1f}  "
+        print(f"  {r['signal_id']} x {r['symbol']:8s} [{r.get('ea_key','')[:20]}]= {r['dde_v5']:5.1f}  "
               f"WR={r['win_rate']:.0f}% PF={r['pf']:.2f} DD={r['max_dd_pips']:.0f} WAL={r['wal']:.2f}")
 
     if red:
         print(f"\n🚫 Red cards ({len(red)}):")
         for r in red[:5]:
-            print(f"  {r['signal_id']} × {r['symbol']:8s} — {', '.join(r['red_reasons'])}")
+            print(f"  {r['signal_id']} x {r['symbol']:8s} [{r.get('ea_key','')[:20]}] — {'; '.join(r['red_reasons'])}")
 
     return scored_results
 
