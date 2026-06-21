@@ -13,8 +13,40 @@ body.has-sidebar{padding-left:240px}
 .container{max-width:1200px;margin:auto;padding:20px}
 h1{color:#58a6ff;font-size:1.5em;margin-bottom:8px}
 .subtitle{color:#8b949e;font-size:0.85em;margin-bottom:24px}
+
+/* 日期選擇器 */
+.date-picker{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:20px;margin-bottom:16px}
+.date-picker h2{color:#58a6ff;font-size:1em;margin-bottom:12px}
+.date-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:0.75em;color:#8b949e}
+.field input[type="date"]{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:0.9em}
+.field input[type="date"]:focus{outline:none;border-color:#58a6ff}
+.field input[type="text"]{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:0.9em;width:120px}
+.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:600}
+.btn-primary{background:#238636;color:#fff}
+.btn-primary:hover{background:#2ea043}
+.btn-secondary{background:#21262d;color:#c9d1d9;border:1px solid #30363d}
+.btn-secondary:hover{background:#30363d}
+.btn-group{display:flex;gap:8px;margin-top:8px}
+
+/* 預設期間按鈕 */
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.preset-btn{padding:4px 12px;background:#21262d;border:1px solid #30363d;border-radius:20px;color:#8b949e;font-size:0.75em;cursor:pointer}
+.preset-btn:hover{background:#30363d;color:#c9d1d9}
+
+/* 命令顯示 */
+.cmd-box{background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:12px;margin-top:12px;font-family:monospace;font-size:0.8em;color:#c9d1d9;position:relative;display:none}
+.cmd-box code{word-break:break-all}
+.cmd-copy{position:absolute;top:8px;right:8px;padding:4px 8px;background:#21262d;border:1px solid #30363d;border-radius:4px;color:#8b949e;cursor:pointer;font-size:0.75em}
+.cmd-copy:hover{background:#30363d;color:#c9d1d9}
+
+/* 搜尋匹配結果 */
+.match-result{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:12px;margin-top:12px;display:none}
+.match-result.show{display:block}
+
 .section{background:#161b22;border-radius:8px;padding:20px;margin-bottom:16px;border:1px solid #21262d}
-h2{color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:8px;margin-bottom:16px;font-size:1.1em}
+h2.section-title{color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:8px;margin-bottom:16px;font-size:1.1em}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
 .card{background:#0d1117;border-radius:8px;padding:16px;border:1px solid #21262d;transition:border-color 0.2s}
 .card:hover{border-color:#58a6ff}
@@ -41,6 +73,54 @@ footer{text-align:center;margin-top:24px;color:#484f58;font-size:0.7em}
 <h1>覆盤報告</h1>
 <p class="subtitle">按日期範圍分析交易表現 — 月報、週報、日報</p>
 
+<!-- 日期選擇器 -->
+<div class="date-picker">
+<h2>📅 選擇日期範圍</h2>
+<div class="date-row">
+<div class="field">
+<label>開始日期</label>
+<input type="date" id="start-date">
+</div>
+<div class="field">
+<label>結束日期</label>
+<input type="date" id="end-date">
+</div>
+<div class="field">
+<label>報告類型</label>
+<select id="report-type" style="background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:0.9em">
+<option value="auto">自動判斷</option>
+<option value="monthly">月報</option>
+<option value="weekly">週報</option>
+<option value="daily">日報</option>
+</select>
+</div>
+<div class="field">
+<label>指定 Signal (可選)</label>
+<input type="text" id="signal-id" placeholder="例如: 31593">
+</div>
+</div>
+<div class="btn-group">
+<button class="btn btn-primary" onclick="generateReview()">🔍 搵報告 / 生成指令</button>
+</div>
+<div class="presets">
+<button class="preset-btn" onclick="setPreset('this-month')">今個月</button>
+<button class="preset-btn" onclick="setPreset('last-month')">上個月</button>
+<button class="preset-btn" onclick="setPreset('this-week')">今個星期</button>
+<button class="preset-btn" onclick="setPreset('last-week')">上個星期</button>
+<button class="preset-btn" onclick="setPreset('last-30d')">過去 30 日</button>
+</div>
+
+<!-- 匹配結果 -->
+<div class="match-result" id="match-result"></div>
+
+<!-- 命令顯示 -->
+<div class="cmd-box" id="cmd-box">
+<button class="cmd-copy" onclick="copyCmd()">📋 複製</button>
+<code id="cmd-text"></code>
+</div>
+</div>
+
+<!-- 報告列表 -->
 <div class="tabs">
 <div class="tab active" onclick="showPeriod('monthly')">月報</div>
 <div class="tab" onclick="showPeriod('weekly')">週報</div>
@@ -48,33 +128,25 @@ footer{text-align:center;margin-top:24px;color:#484f58;font-size:0.7em}
 </div>
 
 <div id="monthly" class="section">
-<h2>月度覆盤</h2>
-<div class="grid" id="monthly-grid">
-<!-- Monthly reports will be populated here -->
-<div class="empty">暫無月報</div>
-</div>
+<h2 class="section-title">月度覆盤</h2>
+<div class="grid" id="monthly-grid"><div class="empty">載入中...</div></div>
 </div>
 
 <div id="weekly" class="section" style="display:none">
-<h2>週度覆盤</h2>
-<div class="grid" id="weekly-grid">
-<!-- Weekly reports will be populated here -->
-<div class="empty">暫無週報</div>
-</div>
+<h2 class="section-title">週度覆盤</h2>
+<div class="grid" id="weekly-grid"><div class="empty">載入中...</div></div>
 </div>
 
 <div id="daily" class="section" style="display:none">
-<h2>每日覆盤</h2>
-<div class="grid" id="daily-grid">
-<!-- Daily reports will be populated here -->
-<div class="empty">暫無日報</div>
-</div>
+<h2 class="section-title">每日覆盤</h2>
+<div class="grid" id="daily-grid"><div class="empty">載入中...</div></div>
 </div>
 
 <footer>Trade Strategy Analyzer | 按日期覆盤系統</footer>
 </div>
 
 <script>
+// ═══ Tab switching ═══
 function showPeriod(id){
   document.querySelectorAll('.section').forEach(e=>e.style.display='none');
   document.getElementById(id).style.display='block';
@@ -82,7 +154,38 @@ function showPeriod(id){
   event.target.classList.add('active');
 }
 
-// Load reports from JSON files (if available)
+// ═══ Presets ═══
+function setPreset(p){
+  const now = new Date();
+  let start, end;
+  const fmt = d => d.toISOString().split('T')[0];
+
+  if(p === 'this-month'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if(p === 'last-month'){
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if(p === 'this-week'){
+    const day = now.getDay() || 7;
+    start = new Date(now); start.setDate(now.getDate() - day + 1);
+    end = new Date(start); end.setDate(start.getDate() + 6);
+  } else if(p === 'last-week'){
+    const day = now.getDay() || 7;
+    start = new Date(now); start.setDate(now.getDate() - day - 6);
+    end = new Date(start); end.setDate(start.getDate() + 6);
+  } else if(p === 'last-30d'){
+    end = new Date(now);
+    start = new Date(now); start.setDate(now.getDate() - 29);
+  }
+
+  document.getElementById('start-date').value = fmt(start);
+  document.getElementById('end-date').value = fmt(end);
+}
+
+// ═══ Load report indexes ═══
+let allReports = [];
+
 async function loadReports(){
   const periods = ['monthly', 'weekly', 'daily'];
   for(const p of periods){
@@ -90,12 +193,13 @@ async function loadReports(){
       const res = await fetch(`${p}/index.json`);
       if(res.ok){
         const data = await res.json();
+        allReports = allReports.concat((data.reports || []).map(r => ({...r, period: p})));
         renderReports(p, data.reports || []);
       }
-    }catch(e){
-      // No index.json, keep empty state
-    }
+    }catch(e){}
   }
+  // Sort all by start_date desc
+  allReports.sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
 }
 
 function renderReports(period, reports){
@@ -104,14 +208,13 @@ function renderReports(period, reports){
     grid.innerHTML = '<div class="empty">暫無報告</div>';
     return;
   }
-  
-  grid.innerHTML = reports.map(r=>{
+  grid.innerHTML = reports.map(r => {
     const pnlClass = r.total_pnl >= 0 ? 'positive' : 'negative';
     const pnlSign = r.total_pnl >= 0 ? '+' : '';
     return `
     <div class="card">
       <div class="card-title">${r.start_date} - ${r.end_date}</div>
-      <div class="card-meta">${r.signals ? `${r.signals} Signals` : ''} | ${r.trades ? `${r.trades} Trades` : ''}</div>
+      <div class="card-meta">${r.signals ? `${r.signals} Signals` : ''} | ${r.trades ? `${r.trades.toLocaleString()} Trades` : ''}</div>
       <div class="card-stats">
         <div class="stat"><span class="stat-label">勝率</span><span class="stat-value">${r.win_rate ? `${r.win_rate}%` : '-'}</span></div>
         <div class="stat"><span class="stat-label">盈虧</span><span class="stat-value ${pnlClass}">${pnlSign}$${r.total_pnl ? r.total_pnl.toLocaleString() : '-'}</span></div>
@@ -121,6 +224,87 @@ function renderReports(period, reports){
   }).join('');
 }
 
+// ═══ Generate / Find review ═══
+function generateReview(){
+  const start = document.getElementById('start-date').value;
+  const end = document.getElementById('end-date').value;
+  const type = document.getElementById('report-type').value;
+  const signalId = document.getElementById('signal-id').value.trim();
+
+  if(!start || !end){
+    alert('請選擇開始同結束日期');
+    return;
+  }
+  if(start > end){
+    alert('開始日期唔可以晚於結束日期');
+    return;
+  }
+
+  // 1. Try to find matching report from index
+  const match = findReport(start, end, signalId);
+  const matchEl = document.getElementById('match-result');
+  const cmdBox = document.getElementById('cmd-box');
+
+  if(match){
+    matchEl.className = 'match-result show';
+    matchEl.innerHTML = `
+      <p style="color:#3fb950;margin-bottom:8px">✅ 搵到相近報告：</p>
+      <div class="card" style="margin:0">
+        <div class="card-title">${match.start_date} - ${match.end_date}</div>
+        <div class="card-meta">${match.period} | ${match.signals ? `${match.signals} Signals` : ''} | ${match.trades ? `${match.trades.toLocaleString()} Trades` : ''}</div>
+        <a href="${match.period}/${match.filename}" class="card-link">查看報告 →</a>
+      </div>`;
+    cmdBox.style.display = 'none';
+    return;
+  }
+
+  matchEl.className = 'match-result';
+  matchEl.innerHTML = '';
+
+  // 2. Show command to run
+  const base = (type === 'auto') ? inferPeriod(start, end) : type;
+  let cmd = `cd ~/trade_strategy_analyzer && python3 scripts/date_range_review.py --start-date ${start} --end-date ${end} --period ${base}`;
+  if(signalId) cmd += ` --signal-id ${signalId}`;
+
+  document.getElementById('cmd-text').textContent = cmd;
+  cmdBox.style.display = 'block';
+}
+
+function findReport(start, end, signalId){
+  // Find report with same date range
+  for(const r of allReports){
+    if(r.start_date === start && r.end_date === end){
+      if(!signalId || (r.filename && r.filename.includes(signalId))) return r;
+    }
+  }
+  // Find report that overlaps
+  for(const r of allReports){
+    if(start >= r.start_date && end <= r.end_date){
+      return r;
+    }
+  }
+  return null;
+}
+
+function inferPeriod(start, end){
+  const s = new Date(start), e = new Date(end);
+  const days = Math.round((e - s) / (1000*60*60*24)) + 1;
+  if(days <= 1) return 'daily';
+  if(days <= 7) return 'weekly';
+  return 'monthly';
+}
+
+function copyCmd(){
+  const text = document.getElementById('cmd-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.cmd-copy');
+    btn.textContent = '✅ 已複製';
+    setTimeout(() => btn.textContent = '📋 複製', 2000);
+  });
+}
+
+// Set default dates
+setPreset('this-month');
 loadReports();
 </script>
 </body>

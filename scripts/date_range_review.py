@@ -140,12 +140,19 @@ def analyze_trades(trades: List[dict]) -> dict:
 
 def generate_report(signals_data: Dict[str, dict], start_date: datetime, end_date: datetime, signal_id: Optional[str] = None) -> dict:
     """Generate date range review report."""
+    # Valid trade types only (exclude balance, credit, etc.)
+    VALID_TRADE_TYPES = {'buy', 'sell'}
+    
     all_trades = []
     for sid, data in signals_data.items():
         if signal_id and sid != signal_id:
             continue
         ea = data.get('ea', get_ea_from_signal(sid))
         for trade in data.get('trades', []):
+            # Filter: only include buy/sell trades
+            trade_type = trade.get('Type', '').lower()
+            if trade_type not in VALID_TRADE_TYPES:
+                continue
             trade_copy = trade.copy()
             trade_copy['_signal_id'] = sid
             trade_copy['_ea'] = ea
@@ -159,6 +166,7 @@ def generate_report(signals_data: Dict[str, dict], start_date: datetime, end_dat
     by_ccy = {}
     by_direction = {}
     by_ccy_dir = {}
+    by_ccy_signal = {}  # New: CCY -> Signal -> stats
     daily = {}
     
     groups = defaultdict(list)
@@ -174,12 +182,52 @@ def generate_report(signals_data: Dict[str, dict], start_date: datetime, end_dat
         ccy_groups[t.get('Symbol', 'UNK')].append(t)
     for ccy, trades in sorted(ccy_groups.items(), key=lambda x: analyze_trades(x[1])['total_pnl'], reverse=True):
         by_ccy[ccy] = analyze_trades(trades)
+        # Build by_ccy_signal for accordion
+        ccy_signal_groups = defaultdict(list)
+        for t in trades:
+            ccy_signal_groups[t['_signal_id']].append(t)
+        by_ccy_signal[ccy] = []
+        for sid, s_trades in sorted(ccy_signal_groups.items(), key=lambda x: analyze_trades(x[1])['total_pnl'], reverse=True):
+            s_stats = analyze_trades(s_trades)
+            s_stats['signal_id'] = sid
+            s_stats['ea'] = signals_data.get(sid, {}).get('ea', get_ea_from_signal(sid))
+            # Also breakdown by direction within each signal
+            dir_breakdown = {}
+            for d, d_trades in defaultdict(list, {t.get('Type', '').lower(): [] for t in s_trades}).items():
+                if d in ('buy', 'sell'):
+                    dir_trades = [t for t in s_trades if t.get('Type', '').lower() == d]
+                    if dir_trades:
+                        dir_breakdown[d] = analyze_trades(dir_trades)
+            s_stats['by_direction'] = dir_breakdown
+            by_ccy_signal[ccy].append(s_stats)
     
     dir_groups = defaultdict(list)
     for t in filtered:
         dir_groups[t.get('Type', '').lower()].append(t)
     for dir, trades in dir_groups.items():
         by_direction[dir] = analyze_trades(trades)
+    
+    # Build by_direction_ccy for accordion (Direction -> CCY breakdown)
+    by_direction_ccy = {}
+    for dir, dir_trades in dir_groups.items():
+        ccy_in_dir = defaultdict(list)
+        for t in dir_trades:
+            ccy_in_dir[t.get('Symbol', 'UNK')].append(t)
+        by_direction_ccy[dir] = []
+        for ccy, c_trades in sorted(ccy_in_dir.items(), key=lambda x: analyze_trades(x[1])['total_pnl'], reverse=True):
+            c_stats = analyze_trades(c_trades)
+            c_stats['ccy'] = ccy
+            # Breakdown by signal within direction-ccy
+            sig_in_ccy = defaultdict(list)
+            for t in c_trades:
+                sig_in_ccy[t['_signal_id']].append(t)
+            c_stats['by_signal'] = []
+            for sid, sig_trades in sorted(sig_in_ccy.items(), key=lambda x: analyze_trades(x[1])['total_pnl'], reverse=True):
+                sig_stats = analyze_trades(sig_trades)
+                sig_stats['signal_id'] = sid
+                sig_stats['ea'] = signals_data.get(sid, {}).get('ea', get_ea_from_signal(sid))
+                c_stats['by_signal'].append(sig_stats)
+            by_direction_ccy[dir].append(c_stats)
     
     ccy_dir_groups = defaultdict(list)
     for t in filtered:
@@ -205,7 +253,8 @@ def generate_report(signals_data: Dict[str, dict], start_date: datetime, end_dat
                  'end_date': end_date.strftime('%Y-%m-%d'), 'signal_filter': signal_id,
                  'total_signals': len(by_signal), 'total_trades': len(filtered)},
         'overall': overall, 'by_signal': by_signal, 'by_ccy': by_ccy, 'by_direction': by_direction,
-        'by_ccy_direction': by_ccy_dir, 'daily': daily, 'signal_comparison': signal_comp,
+        'by_ccy_direction': by_ccy_dir, 'by_ccy_signal': by_ccy_signal,
+        'by_direction_ccy': by_direction_ccy, 'daily': daily, 'signal_comparison': signal_comp,
     }
 
 
@@ -256,6 +305,22 @@ def generate_html(report: dict, output_path: Path) -> None:
     lines.append('.tab-content{display:none}')
     lines.append('.tab-content.active{display:block}')
     lines.append('footer{text-align:center;margin-top:24px;color:#484f58;font-size:0.7em}')
+    # Accordion styles
+    lines.append('.accordion-row{cursor:pointer;user-select:none}')
+    lines.append('.accordion-row:hover{background:#1a2332}')
+    lines.append('.accordion-toggle{display:inline-block;width:20px;text-align:center;transition:transform 0.2s}')
+    lines.append('.accordion-toggle.open{transform:rotate(90deg)}')
+    lines.append('.accordion-detail{display:none}')
+    lines.append('.accordion-detail.show{display:table-row}')
+    lines.append('.accordion-inner{padding:0}')
+    lines.append('.accordion-table{margin:4px 0 4px 24px;width:calc(100% - 24px);font-size:0.9em}')
+    lines.append('.accordion-table th{background:#161b22;font-size:0.85em}')
+    lines.append('.accordion-table td{padding:4px 6px;border-bottom:1px solid #1c2128}')
+    lines.append('.accordion-table tr:hover{background:#1a2332}')
+    lines.append('.ea-badge-sm{display:inline-block;padding:1px 4px;border-radius:3px;font-size:0.65em;font-weight:600}')
+    lines.append('.sub-dir{font-size:0.8em;padding:1px 5px;border-radius:3px;font-weight:600}')
+    lines.append('.sub-buy{background:#0d47a1;color:#90caf9}')
+    lines.append('.sub-sell{background:#b71c1c;color:#ef9a9a}')
     lines.append('</style>')
     lines.append('</head>')
     lines.append('<body>')
@@ -305,23 +370,63 @@ def generate_html(report: dict, output_path: Path) -> None:
         lines.append(f'<tr><td>{item["signal_id"]}</td><td><span class="ea-badge" style="{get_ea_style(item["ea"]) }">{item["ea"]}</span></td><td>{item["count"]:,}</td><td>{item["win_rate"]:.1f}%</td><td class="{pnl_cls}">${item["total_pnl"]:,.2f}</td><td>{item["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
     lines.append('</tbody></table></div></div>')
     
-    # CCY
+    # CCY with accordion
     lines.append('<div id="tab-ccy" class="tab-content"><div class="section"><h2>按貨幣對</h2>')
-    lines.append('<table><thead><tr><th>CCY</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
+    lines.append('<table><thead><tr><th style="width:24px"></th><th>CCY</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
     for ccy, stats in report['by_ccy'].items():
         pnl_cls = 'positive' if stats['total_pnl'] >= 0 else 'negative'
         pf_s = f"{stats['profit_factor']:.2f}" if isinstance(stats['profit_factor'], float) else str(stats['profit_factor'])
-        lines.append(f'<tr><td>{ccy}</td><td>{stats["count"]:,}</td><td>{stats["win_rate"]:.1f}%</td><td class="{pnl_cls}">${stats["total_pnl"]:,.2f}</td><td>{stats["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
+        ccy_id = ccy.replace('-', '')
+        lines.append(f'<tr class="accordion-row" onclick="toggleAccordion(\'{ccy_id}\')"><td><span class="accordion-toggle" id="toggle-{ccy_id}">▶</span></td><td>{ccy}</td><td>{stats["count"]:,}</td><td>{stats["win_rate"]:.1f}%</td><td class="{pnl_cls}">${stats["total_pnl"]:,.2f}</td><td>{stats["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
+        # Accordion detail: Signal breakdown for this CCY
+        detail_rows = report.get('by_ccy_signal', {}).get(ccy, [])
+        if detail_rows:
+            lines.append(f'<tr class="accordion-detail" id="detail-{ccy_id}"><td colspan="7" class="accordion-inner">')
+            lines.append('<table class="accordion-table"><thead><tr><th>Signal</th><th>EA</th><th>Dir</th><th>Trades</th><th>WR</th><th>PnL</th></tr></thead><tbody>')
+            for s in detail_rows:
+                ea = s.get('ea', 'UNK')
+                ea_style = get_ea_style(ea)
+                # Show direction breakdown if available
+                dir_bd = s.get('by_direction', {})
+                if dir_bd:
+                    for d, ds in dir_bd.items():
+                        d_pnl_cls = 'positive' if ds['total_pnl'] >= 0 else 'negative'
+                        d_label = 'Buy' if d == 'buy' else 'Sell'
+                        d_cls = 'sub-buy' if d == 'buy' else 'sub-sell'
+                        lines.append(f'<tr><td rowspan="{len(dir_bd)}">{s["signal_id"]}</td><td rowspan="{len(dir_bd)}"><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td></tr>')
+                else:
+                    lines.append(f'<tr><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>-</td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
+            lines.append('</tbody></table></td></tr>')
     lines.append('</tbody></table></div></div>')
     
-    # Direction
+    # Direction with accordion
     lines.append('<div id="tab-dir" class="tab-content"><div class="section"><h2>按方向</h2>')
-    lines.append('<table><thead><tr><th>方向</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
-    for dir, stats in report['by_direction'].items():
+    lines.append('<table><thead><tr><th style="width:24px"></th><th>方向</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th></tr></thead><tbody>')
+    for dir_key, stats in report['by_direction'].items():
         pnl_cls = 'positive' if stats['total_pnl'] >= 0 else 'negative'
         pf_s = f"{stats['profit_factor']:.2f}" if isinstance(stats['profit_factor'], float) else str(stats['profit_factor'])
-        label = 'Buy' if dir == 'buy' else 'Sell' if dir == 'sell' else dir
-        lines.append(f'<tr><td>{label}</td><td>{stats["count"]:,}</td><td>{stats["win_rate"]:.1f}%</td><td class="{pnl_cls}">${stats["total_pnl"]:,.2f}</td><td>{stats["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
+        label = 'Buy' if dir_key == 'buy' else 'Sell' if dir_key == 'sell' else dir_key
+        dir_id = dir_key
+        lines.append(f'<tr class="accordion-row" onclick="toggleAccordion(\'{dir_id}\')"><td><span class="accordion-toggle" id="toggle-{dir_id}">▶</span></td><td>{label}</td><td>{stats["count"]:,}</td><td>{stats["win_rate"]:.1f}%</td><td class="{pnl_cls}">${stats["total_pnl"]:,.2f}</td><td>{stats["total_pips"]:,.1f}</td><td>{pf_s}</td></tr>')
+        # Accordion detail: CCY breakdown for this direction
+        detail_rows = report.get('by_direction_ccy', {}).get(dir_key, [])
+        if detail_rows:
+            lines.append(f'<tr class="accordion-detail" id="detail-{dir_id}"><td colspan="7" class="accordion-inner">')
+            lines.append('<table class="accordion-table"><thead><tr><th>CCY</th><th>Signal</th><th>EA</th><th>Trades</th><th>WR</th><th>PnL</th></tr></thead><tbody>')
+            for c in detail_rows:
+                sig_rows = c.get('by_signal', [])
+                n_sigs = max(len(sig_rows), 1)
+                for i, s in enumerate(sig_rows):
+                    ea = s.get('ea', 'UNK')
+                    ea_style = get_ea_style(ea)
+                    s_pnl_cls = 'positive' if s['total_pnl'] >= 0 else 'negative'
+                    ccy_text = c['ccy'] if i == 0 else ''
+                    rowspan = f' rowspan="{n_sigs}"' if i == 0 and n_sigs > 1 else ''
+                    lines.append(f'<tr><td{rowspan}>{ccy_text}</td><td>{s["signal_id"]}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td></tr>')
+                if not sig_rows:
+                    ccy_pnl_cls = 'positive' if c['total_pnl'] >= 0 else 'negative'
+                    lines.append(f'<tr><td>{c["ccy"]}</td><td>-</td><td>-</td><td>{c["count"]:,}</td><td>{c["win_rate"]:.1f}%</td><td class="{ccy_pnl_cls}">${c["total_pnl"]:,.2f}</td></tr>')
+            lines.append('</tbody></table></td></tr>')
     lines.append('</tbody></table></div></div>')
     
     # CCY+Direction
@@ -352,6 +457,15 @@ def generate_html(report: dict, output_path: Path) -> None:
     lines.append('  document.querySelectorAll(".tab").forEach(function(e){e.classList.remove("active")});')
     lines.append('  document.getElementById("tab-"+id).classList.add("active");')
     lines.append('  event.target.classList.add("active");')
+    lines.append('}')
+    lines.append('function toggleAccordion(id){')
+    lines.append('  var detail=document.getElementById("detail-"+id);')
+    lines.append('  var toggle=document.getElementById("toggle-"+id);')
+    lines.append('  if(!detail||!toggle)return;')
+    lines.append('  var isOpen=detail.classList.contains("show");')
+    lines.append('  detail.classList.toggle("show");')
+    lines.append('  toggle.classList.toggle("open");')
+    lines.append('  toggle.textContent=isOpen?"▶":"▼";')
     lines.append('}')
     lines.append('</script>')
     lines.append('</body>')
