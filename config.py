@@ -182,3 +182,158 @@ def normalize_ea_name(ea_name):
         Standardized EA tag, or None if should be ignored
     """
     return EA_NORMALIZE.get(ea_name, ea_name)
+
+
+# =============================================================================
+# Lot Mapping V2 - Multi-EA + Multi-Version Support
+# =============================================================================
+
+import json
+from pathlib import Path
+from datetime import datetime
+
+
+def extract_comment_prefix(comment: str) -> str:
+    """
+    Extract EA prefix from comment for grouping.
+    
+    Rules:
+    - Dragon Wave_XXX → 'Dragon Wave'
+    - S10 BUY/SELL → 'S10'
+    - MKD_LD-02 → 'MKD_LD-02'
+    - {timestamp}_M12345 → '{timestamp}' (copy trade source)
+    
+    Args:
+        comment: Full comment string from CSV
+    
+    Returns:
+        Comment prefix for EA grouping
+    """
+    if not comment:
+        return ''
+    
+    # Special case: Dragon Wave (keep two words)
+    if comment.startswith('Dragon Wave'):
+        return 'Dragon Wave'
+    
+    # Special case: Copy trade sources {timestamp}_M...
+    if comment.startswith('{') and '}' in comment:
+        return comment.split('}')[0] + '}'
+    
+    # Standard: take first part before _ or [
+    for sep in ['_', '[', ' ']:
+        if sep in comment:
+            return comment.split(sep)[0]
+    
+    return comment
+
+
+def load_lot_mapping_v2():
+    """
+    Load the new v2 lot mapping structure with multi-EA + multi-version support.
+    
+    Returns:
+        dict: {signal_id: {eas: [{ea_id, comment_prefix, magic, set_versions: [{date, lot_layers}]}]}}
+    """
+    mapping_path = Path(__file__).parent / 'signal_lot_mapping.json'
+    
+    if not mapping_path.exists():
+        return {}
+    
+    with open(mapping_path, encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # Check if it's v2 format (has 'signals' key) or legacy format
+    if 'signals' in data:
+        return data['signals']
+    
+    # Legacy format - convert to v2-like structure
+    result = {}
+    for sig_id, sig_data in data.items():
+        if sig_id.startswith('_') or sig_id in ['generated_at', 'version', 'summary']:
+            continue
+        
+        result[sig_id] = {
+            'eas': [{
+                'ea_id': sig_data.get('ea_type', 'UNK'),
+                'comment_prefix': '',
+                'magic': None,
+                'set_versions': [{
+                    'date': 'unknown',
+                    'lot_layers': sig_data.get('lot_layers', []),
+                    'set_file': sig_data.get('set_file', '')
+                }]
+            }]
+        }
+    
+    return result
+
+
+def get_lot_layers_for_trade(signal_id: str, trade_comment: str, trade_magic: str, trade_date: str = None):
+    """
+    Get the appropriate lot_layers for a specific trade.
+    
+    Args:
+        signal_id: Signal ID
+        trade_comment: Comment from CSV trade
+        trade_magic: Magic number from CSV trade
+        trade_date: Trade open date (YYYY-MM-DD) for version matching
+    
+    Returns:
+        list: lot_layers [(level, lot), ...] or None
+    """
+    mapping = load_lot_mapping_v2()
+    
+    if signal_id not in mapping:
+        return None
+    
+    sig_data = mapping[signal_id]
+    trade_prefix = extract_comment_prefix(trade_comment)
+    
+    # Find matching EA by comment_prefix + magic
+    for ea in sig_data.get('eas', []):
+        ea_prefix = ea.get('comment_prefix', '')
+        ea_magic = ea.get('magic')
+        
+        # Match by magic number if available
+        if ea_magic and str(trade_magic) == str(ea_magic):
+            # Find appropriate version by date
+            return _get_version_lot_layers(ea.get('set_versions', []), trade_date)
+        
+        # Match by comment prefix
+        if ea_prefix and trade_prefix == ea_prefix:
+            return _get_version_lot_layers(ea.get('set_versions', []), trade_date)
+    
+    # Fallback: use first EA's latest version
+    if sig_data.get('eas'):
+        return _get_version_lot_layers(sig_data['eas'][0].get('set_versions', []), trade_date)
+    
+    return None
+
+
+def _get_version_lot_layers(versions: list, trade_date: str = None):
+    """
+    Get lot_layers from the appropriate SET version.
+    
+    Args:
+        versions: List of {date, lot_layers, set_file}
+        trade_date: Trade date for matching
+    
+    Returns:
+        list: lot_layers or None
+    """
+    if not versions:
+        return None
+    
+    if not trade_date or len(versions) == 1:
+        return versions[-1].get('lot_layers')
+    
+    # Find version with date <= trade_date
+    sorted_versions = sorted(versions, key=lambda v: v.get('date', '9999'))
+    
+    for v in reversed(sorted_versions):
+        if v.get('date', '9999') <= trade_date:
+            return v.get('lot_layers')
+    
+    # Before all versions - use earliest
+    return sorted_versions[0].get('lot_layers')
