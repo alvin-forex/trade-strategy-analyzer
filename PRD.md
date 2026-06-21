@@ -420,9 +420,30 @@ python3 generate_signal_ranking_v5.py
 | `generate_signal_ranking.py` | ⚠️ DEPRECATED (v4) — 仍被簡報引用 | ~10KB |
 | `dde_v4_scorer.py` | ⚠️ DEPRECATED (v4) — 仍被 v4 ranking 引用 | ~18KB |
 | `scripts/algoforest_scraper.py` | AlgoForest 網頁 scraper | — |
+| `scripts/algoforest_downloader.py` | AlgoForest 下載器 | — |
 | `scripts/api_server.py` | FastAPI 服務（localhost:8787） | — |
+| `scripts/batch_csv_downloader.py` | 批量 CSV 下載 | — |
+| `scripts/batch_set_downloader.py` | 批量 SET 下載 | — |
 | `scripts/history_manager.py` | 分析歷史管理 | — |
 | `scripts/tsa_qa_check.py` | QA 自動質量檢查（sidebar + 連結 + EA 類型） | — |
+| `scripts/extract_signal_data.py` | 數據提取 | — |
+| `scripts/set_parser.py` | SET 檔案解析 | — |
+| `scripts/portfolio_builder.py` | 投資組合建構 | — |
+| `scripts/signal_anomaly_detector.py` | 信號異常偵測 | — |
+| `scripts/signal_ea_timeline.py` | Signal EA 時間線 | — |
+| `scripts/signal_lot_mapping_upgrade.py` | Lot mapping 升級工具 | — |
+| `scripts/ccy_power_history_api.py` | CCY Power 歷史 API | — |
+| `scripts/update_ccy_power.py` | CCY Power 更新 | — |
+| `scripts/ea_grouping_fix.py` | EA 分組修復 | — |
+| `scripts/export_hst.py` | HST 檔案匯出 | — |
+| `scripts/fix_nav.py` | 導航修復 | — |
+| `scripts/migrate_to_sqlite.py` | SQLite 遷移工具 | — |
+| `scripts/v2_snapshot.py` | v2 快照工具 | — |
+| `scripts/version_tracker.py` | 版本追蹤 | — |
+| `analyze_buy_sell.py` | 買賣方向分析 | — |
+| `calc_usd_value.py` | USD 價值計算 | — |
+| `sidebar_qa_check.py` | Sidebar QA 檢查 | — |
+| `tsa_set_csv_audit.py` | SET/CSV 審計工具 | — |
 
 ---
 
@@ -462,6 +483,10 @@ trade_strategy_analyzer/
 ├── generate_symbol_ranking.py          # ⚠️ DEPRECATED (舊邏輯)
 ├── generate_martin_v4.py               # ⚠️ DEPRECATED (v4)
 ├── generate_mfe_mae.py                 # ⚠️ DEPRECATED (已整合)
+├── analyze_buy_sell.py                 # 買賣方向分析
+├── calc_usd_value.py                   # USD 價值計算
+├── sidebar_qa_check.py                 # Sidebar QA 檢查
+├── tsa_set_csv_audit.py                # SET/CSV 審計工具
 ├── downloads/                          # CSV 交易數據
 ├── output/                             # 生成的 HTML 報告
 ├── docs/                               # GitHub Pages 部署
@@ -481,7 +506,23 @@ trade_strategy_analyzer/
 │   ├── history_manager.py              # 分析歷史管理
 │   ├── tsa_qa_check.py                 # QA 自動質量檢查
 │   ├── algoforest_scraper.py           # AlgoForest 網頁 scraper
-│   └── extract_signal_data.py          # 數據提取
+│   ├── algoforest_downloader.py        # AlgoForest 下載器
+│   ├── batch_csv_downloader.py         # 批量 CSV 下載
+│   ├── batch_set_downloader.py         # 批量 SET 下載
+│   ├── extract_signal_data.py          # 數據提取
+│   ├── set_parser.py                   # SET 檔案解析
+│   ├── portfolio_builder.py            # 投資組合建構
+│   ├── signal_anomaly_detector.py      # 信號異常偵測
+│   ├── signal_ea_timeline.py           # Signal EA 時間線
+│   ├── signal_lot_mapping_upgrade.py   # Lot mapping 升級工具
+│   ├── ccy_power_history_api.py        # CCY Power 歷史 API
+│   ├── update_ccy_power.py             # CCY Power 更新
+│   ├── ea_grouping_fix.py              # EA 分組修復
+│   ├── export_hst.py                   # HST 檔案匯出
+│   ├── fix_nav.py                      # 導航修復
+│   ├── migrate_to_sqlite.py            # SQLite 遷移工具
+│   ├── v2_snapshot.py                  # v2 快照工具
+│   └── version_tracker.py              # 版本追蹤
 ├── data/
 │   ├── analysis_history.db             # SQLite 分析歷史
 │   └── tsa.db                          # v5 排名數據庫
