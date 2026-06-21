@@ -191,6 +191,7 @@ def normalize_ea_name(ea_name):
 import json
 from pathlib import Path
 from datetime import datetime
+from functools import lru_cache
 
 
 def extract_comment_prefix(comment: str) -> str:
@@ -228,6 +229,7 @@ def extract_comment_prefix(comment: str) -> str:
     return comment
 
 
+@lru_cache(maxsize=1)
 def load_lot_mapping_v2():
     """
     Load the new v2 lot mapping structure with multi-EA + multi-version support.
