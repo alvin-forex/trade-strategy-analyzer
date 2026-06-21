@@ -17,7 +17,9 @@ from src.entry_quality import calculate_entry_score, calculate_strategy_score
 from src.statistics import (
     calculate_overall_stats, calculate_symbol_stats,
     calculate_layer_stats, calculate_time_stats,
-    calculate_direction_stats
+    calculate_direction_stats,
+    calculate_session_stats_utc, calculate_monthly_stats,
+    calculate_daily_stats, calculate_best_worst_days
 )
 from src.equity_curve import calculate_equity_curve
 from src.report_generator import generate_html_report
@@ -80,12 +82,18 @@ def main():
 
     # 5. Calculate statistics
     print("\n[5/7] 計算統計...")
+    best_days, worst_days = calculate_best_worst_days(positions)
     stats = {
         'overall': calculate_overall_stats(positions),
         'by_symbol': calculate_symbol_stats(positions),
         'by_layer': calculate_layer_stats(positions),
         'by_time': calculate_time_stats(positions),
         'by_direction': calculate_direction_stats(positions),
+        'by_session': calculate_session_stats_utc(positions),
+        'by_month': calculate_monthly_stats(positions),
+        'by_day': calculate_daily_stats(positions),
+        'best_days': best_days,
+        'worst_days': worst_days,
     }
     print(f"   ✓ 勝率: {stats['overall'].get('win_rate', 0):.1f}%  PF: {stats['overall'].get('profit_factor', 0):.2f}")
 

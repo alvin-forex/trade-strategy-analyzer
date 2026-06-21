@@ -512,3 +512,181 @@ def calculate_drawdown_recovery(profits: List[float]) -> float:
 
     # 如果沒有恢復，返回 0
     return 0
+
+
+# ══════════════════════════════════════════════════════════════
+# 按日期覆盤統計
+# ══════════════════════════════════════════════════════════════
+
+
+def calculate_session_stats_utc(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    計算按時段統計（UTC 時區）
+    Asia: 00-08 UTC (香港 08-16)
+    London: 08-16 UTC (香港 16-24)
+    New York: 16-21 UTC (香港 00-05)
+
+    Args:
+        positions: 倉位列表
+
+    Returns:
+        Dict: 時段統計
+    """
+    def get_utc_session(hour):
+        # UTC hours
+        if 0 <= hour < 8:
+            return 'Asia (00-08 UTC)'
+        elif 8 <= hour < 16:
+            return 'London (08-16 UTC)'
+        elif 16 <= hour < 21:
+            return 'New York (16-21 UTC)'
+        else:
+            return 'Other'
+
+    session_stats = defaultdict(list)
+
+    for position in positions:
+        hour = position['open_time'].hour
+        session = get_utc_session(hour)
+        session_stats[session].append(position)
+
+    def calc_session_stats(session_positions):
+        if not session_positions:
+            return {
+                'count': 0,
+                'avg_profit': 0,
+                'win_rate': 0,
+                'profit_factor': 0
+            }
+        wins = [p for p in session_positions if p['net_profit'] > 0]
+        losses = [p for p in session_positions if p['net_profit'] <= 0]
+        gross_win = sum(p['net_profit'] for p in wins)
+        gross_loss = abs(sum(p['net_profit'] for p in losses))
+        pf = gross_win / gross_loss if gross_loss > 0 else float('inf')
+        return {
+            'count': len(session_positions),
+            'avg_profit': round(np.mean([p['net_profit'] for p in session_positions]), 2),
+            'win_rate': round(len(wins) / len(session_positions) * 100, 2),
+            'profit_factor': round(pf, 2)
+        }
+
+    return {
+        'Asia (00-08 UTC)': calc_session_stats(session_stats.get('Asia (00-08 UTC)', [])),
+        'London (08-16 UTC)': calc_session_stats(session_stats.get('London (08-16 UTC)', [])),
+        'New York (16-21 UTC)': calc_session_stats(session_stats.get('New York (16-21 UTC)', [])),
+        'Other': calc_session_stats(session_stats.get('Other', []))
+    }
+
+
+def calculate_monthly_stats(positions: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """
+    計算按月份統計
+
+    Args:
+        positions: 倉位列表
+
+    Returns:
+        Dict: 月份統計 {YYYY-MM: stats}
+    """
+    monthly_stats = defaultdict(list)
+
+    for position in positions:
+        month_key = position['open_time'].strftime('%Y-%m')
+        monthly_stats[month_key].append(position)
+
+    results = {}
+    for month, month_positions in sorted(monthly_stats.items()):
+        wins = [p for p in month_positions if p['net_profit'] > 0]
+        losses = [p for p in month_positions if p['net_profit'] <= 0]
+        gross_win = sum(p['net_profit'] for p in wins)
+        gross_loss = abs(sum(p['net_profit'] for p in losses))
+        pf = gross_win / gross_loss if gross_loss > 0 else float('inf')
+        avg_hold = np.mean([p['holding_time_hours'] for p in month_positions])
+
+        results[month] = {
+            'count': len(month_positions),
+            'win_rate': round(len(wins) / len(month_positions) * 100, 2),
+            'total_profit': round(sum(p['net_profit'] for p in month_positions), 2),
+            'avg_profit': round(np.mean([p['net_profit'] for p in month_positions]), 2),
+            'profit_factor': round(pf, 2),
+            'avg_hold': round(avg_hold, 2)
+        }
+
+    return results
+
+
+def calculate_daily_stats(positions: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """
+    計算按日期統計
+
+    Args:
+        positions: 倉位列表
+
+    Returns:
+        Dict: 日期統計 {YYYY-MM-DD: stats}
+    """
+    daily_stats = defaultdict(list)
+
+    for position in positions:
+        day_key = position['open_time'].strftime('%Y-%m-%d')
+        daily_stats[day_key].append(position)
+
+    results = {}
+    for day, day_positions in sorted(daily_stats.items()):
+        wins = [p for p in day_positions if p['net_profit'] > 0]
+        losses = [p for p in day_positions if p['net_profit'] <= 0]
+        gross_win = sum(p['net_profit'] for p in wins)
+        gross_loss = abs(sum(p['net_profit'] for p in losses))
+        pf = gross_win / gross_loss if gross_loss > 0 else float('inf')
+        avg_hold = np.mean([p['holding_time_hours'] for p in day_positions])
+
+        results[day] = {
+            'count': len(day_positions),
+            'win_rate': round(len(wins) / len(day_positions) * 100, 2),
+            'total_profit': round(sum(p['net_profit'] for p in day_positions), 2),
+            'avg_profit': round(np.mean([p['net_profit'] for p in day_positions]), 2),
+            'profit_factor': round(pf, 2),
+            'avg_hold': round(avg_hold, 2)
+        }
+
+    return results
+
+
+def calculate_best_worst_days(positions: List[Dict[str, Any]], top_n: int = 10) -> tuple:
+    """
+    計算最佳/最差交易日
+
+    Args:
+        positions: 倉位列表
+        top_n: 返回前 N 個
+
+    Returns:
+        tuple: (best_days, worst_days)
+    """
+    daily_stats = calculate_daily_stats(positions)
+
+    # 按總盈虧排序
+    sorted_days = sorted(daily_stats.items(), key=lambda x: x[1]['total_profit'], reverse=True)
+
+    best_days = []
+    for day, stats in sorted_days[:top_n]:
+        best_days.append({
+            'date': day,
+            'count': stats['count'],
+            'win_rate': stats['win_rate'],
+            'total_profit': stats['total_profit']
+        })
+
+    worst_days = []
+    for day, stats in sorted_days[-top_n:]:
+        worst_days.append({
+            'date': day,
+            'count': stats['count'],
+            'win_rate': stats['win_rate'],
+            'total_profit': stats['total_profit']
+        })
+
+    # 反轉 worst_days 讓最差嘅排前面
+    worst_days.reverse()
+
+    return best_days, worst_days
