@@ -22,6 +22,11 @@ def generate_html_report(
     layer_stats = stats.get('by_layer', {})
     time_stats = stats.get('by_time', {})
     direction_stats = stats.get('by_direction', {})
+    session_stats = stats.get('by_session', {})  # 新增：時段分析
+    monthly_stats = stats.get('by_month', {})    # 新增：月度表現
+    day_stats = stats.get('by_day', {})          # 新增：每日表現
+    best_days = stats.get('best_days', [])       # 新增：最佳交易日
+    worst_days = stats.get('worst_days', [])     # 新增：最差交易日
     
     # Get equity curve data
     equity_data = []
@@ -87,6 +92,53 @@ def generate_html_report(
             <td>{s.get('win_rate', 0):.1f}%</td>
             <td>${s.get('avg_profit', 0):.2f}</td>
             <td>{s.get('profit_factor', 0):.2f}</td>
+        </tr>"""
+    
+    # ── 按日期覆盤：時段分析 ──
+    session_rows = ""
+    for session, s in session_stats.items():
+        session_rows += f"""
+        <tr>
+            <td>{session}</td>
+            <td>{s.get('count', 0)}</td>
+            <td>{s.get('win_rate', 0):.1f}%</td>
+            <td>${s.get('avg_profit', 0):.2f}</td>
+            <td>{s.get('profit_factor', 0):.2f}</td>
+        </tr>"""
+    
+    # ── 按日期覆盤：月度表現 ──
+    monthly_rows = ""
+    for month, s in sorted(monthly_stats.items()):
+        pnl_color = '#28a745' if s.get('total_profit', 0) > 0 else '#dc3545'
+        monthly_rows += f"""
+        <tr>
+            <td>{month}</td>
+            <td>{s.get('count', 0)}</td>
+            <td>{s.get('win_rate', 0):.1f}%</td>
+            <td style="color:{pnl_color};font-weight:bold">${s.get('total_profit', 0):.2f}</td>
+            <td>{s.get('profit_factor', 0):.2f}</td>
+            <td>{s.get('avg_hold', 0):.0f}h</td>
+        </tr>"""
+    
+    # ── 按日期覆盤：最佳/最差交易日 ──
+    best_days_rows = ""
+    for d in best_days[:5]:
+        best_days_rows += f"""
+        <tr style="background:#d4edda">
+            <td>{d.get('date', '-')}</td>
+            <td>{d.get('count', 0)}</td>
+            <td>{d.get('win_rate', 0):.1f}%</td>
+            <td style="color:#28a745;font-weight:bold">${d.get('total_profit', 0):.2f}</td>
+        </tr>"""
+    
+    worst_days_rows = ""
+    for d in worst_days[:5]:
+        worst_days_rows += f"""
+        <tr style="background:#f8d7da">
+            <td>{d.get('date', '-')}</td>
+            <td>{d.get('count', 0)}</td>
+            <td>{d.get('win_rate', 0):.1f}%</td>
+            <td style="color:#dc3545;font-weight:bold">${d.get('total_profit', 0):.2f}</td>
         </tr>"""
     
     # Top 50 positions detail
@@ -221,6 +273,36 @@ tr:hover {{ opacity: 0.9; }}
 {strategy_html}
 
 {market_ctx_html}
+
+<h2>📅 按日期覆盤</h2>
+<p style="color:#666;font-size:0.85em;margin-bottom:12px;">
+    分析 Signal 在不同時間維度嘅表現：月度走勢、交易時段、最佳/最差交易日
+</p>
+
+<h3>🕐 時段分析</h3>
+<p style="color:#888;font-size:0.75em;margin-bottom:6px;">Asia (00-08 UTC) | London (08-16 UTC) | New York (16-21 UTC)</p>
+<table>
+<tr><th>時段</th><th>倉位數</th><th>勝率</th><th>平均盈虧</th><th>PF</th></tr>
+{session_rows}
+</table>
+
+<h3>📊 月度表現</h3>
+<table>
+<tr><th>月份</th><th>倉位數</th><th>勝率</th><th>總盈虧</th><th>PF</th><th>平均持倉</th></tr>
+{monthly_rows}
+</table>
+
+<h3>🏆 最佳交易日</h3>
+<table>
+<tr><th>日期</th><th>倉位數</th><th>勝率</th><th>總盈虧</th></tr>
+{best_days_rows}
+</table>
+
+<h3>⚠️ 最差交易日</h3>
+<table>
+<tr><th>日期</th><th>倉位數</th><th>勝率</th><th>總盈虧</th></tr>
+{worst_days_rows}
+</table>
 
 <h2>🏆 貨幣對排名</h2>
 <table>

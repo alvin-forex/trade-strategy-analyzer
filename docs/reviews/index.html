@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>覆盤報告 | Trade Strategy Analyzer</title>
+<link rel="stylesheet" href="../sidebar.css">
+<script src="../sidebar.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0d1117;color:#c9d1d9}
+body.has-sidebar{padding-left:240px}
+.container{max-width:1200px;margin:auto;padding:20px}
+h1{color:#58a6ff;font-size:1.5em;margin-bottom:8px}
+.subtitle{color:#8b949e;font-size:0.85em;margin-bottom:24px}
+.section{background:#161b22;border-radius:8px;padding:20px;margin-bottom:16px;border:1px solid #21262d}
+h2{color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:8px;margin-bottom:16px;font-size:1.1em}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:#0d1117;border-radius:8px;padding:16px;border:1px solid #21262d;transition:border-color 0.2s}
+.card:hover{border-color:#58a6ff}
+.card-title{font-size:1em;font-weight:600;color:#c9d1d9;margin-bottom:8px}
+.card-meta{color:#8b949e;font-size:0.8em;margin-bottom:12px}
+.card-stats{display:flex;gap:12px;flex-wrap:wrap}
+.stat{display:flex;align-items:center;gap:4px}
+.stat-label{color:#8b949e;font-size:0.75em}
+.stat-value{font-weight:600;font-size:0.9em}
+.positive{color:#3fb950}
+.negative{color:#f85149}
+.card-link{display:inline-block;margin-top:12px;padding:6px 12px;background:#21262d;border-radius:6px;color:#58a6ff;font-size:0.8em;text-decoration:none}
+.card-link:hover{background:#30363d}
+.empty{color:#8b949e;font-size:0.9em;text-align:center;padding:40px}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{padding:8px 16px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;font-size:0.85em}
+.tab:hover{background:#30363d}
+.tab.active{background:#58a6ff;color:#0d1117;border-color:#58a6ff}
+footer{text-align:center;margin-top:24px;color:#484f58;font-size:0.7em}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>覆盤報告</h1>
+<p class="subtitle">按日期範圍分析交易表現 — 月報、週報、日報</p>
+
+<div class="tabs">
+<div class="tab active" onclick="showPeriod('monthly')">月報</div>
+<div class="tab" onclick="showPeriod('weekly')">週報</div>
+<div class="tab" onclick="showPeriod('daily')">日報</div>
+</div>
+
+<div id="monthly" class="section">
+<h2>月度覆盤</h2>
+<div class="grid" id="monthly-grid">
+<!-- Monthly reports will be populated here -->
+<div class="empty">暫無月報</div>
+</div>
+</div>
+
+<div id="weekly" class="section" style="display:none">
+<h2>週度覆盤</h2>
+<div class="grid" id="weekly-grid">
+<!-- Weekly reports will be populated here -->
+<div class="empty">暫無週報</div>
+</div>
+</div>
+
+<div id="daily" class="section" style="display:none">
+<h2>每日覆盤</h2>
+<div class="grid" id="daily-grid">
+<!-- Daily reports will be populated here -->
+<div class="empty">暫無日報</div>
+</div>
+</div>
+
+<footer>Trade Strategy Analyzer | 按日期覆盤系統</footer>
+</div>
+
+<script>
+function showPeriod(id){
+  document.querySelectorAll('.section').forEach(e=>e.style.display='none');
+  document.getElementById(id).style.display='block';
+  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// Load reports from JSON files (if available)
+async function loadReports(){
+  const periods = ['monthly', 'weekly', 'daily'];
+  for(const p of periods){
+    try{
+      const res = await fetch(`${p}/index.json`);
+      if(res.ok){
+        const data = await res.json();
+        renderReports(p, data.reports || []);
+      }
+    }catch(e){
+      // No index.json, keep empty state
+    }
+  }
+}
+
+function renderReports(period, reports){
+  const grid = document.getElementById(`${period}-grid`);
+  if(!reports.length){
+    grid.innerHTML = '<div class="empty">暫無報告</div>';
+    return;
+  }
+  
+  grid.innerHTML = reports.map(r=>{
+    const pnlClass = r.total_pnl >= 0 ? 'positive' : 'negative';
+    const pnlSign = r.total_pnl >= 0 ? '+' : '';
+    return `
+    <div class="card">
+      <div class="card-title">${r.start_date} - ${r.end_date}</div>
+      <div class="card-meta">${r.signals ? `${r.signals} Signals` : ''} | ${r.trades ? `${r.trades} Trades` : ''}</div>
+      <div class="card-stats">
+        <div class="stat"><span class="stat-label">勝率</span><span class="stat-value">${r.win_rate ? `${r.win_rate}%` : '-'}</span></div>
+        <div class="stat"><span class="stat-label">盈虧</span><span class="stat-value ${pnlClass}">${pnlSign}$${r.total_pnl ? r.total_pnl.toLocaleString() : '-'}</span></div>
+      </div>
+      <a href="${period}/${r.filename}" class="card-link">查看報告 →</a>
+    </div>`;
+  }).join('');
+}
+
+loadReports();
+</script>
+</body>
+</html>

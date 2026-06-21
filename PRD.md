@@ -1040,3 +1040,119 @@ Example: WR=60% → P(5連虧) = 1.0%, P(8連虧) = 0.07%
 ---
 
 *此章節由丁蟹整合 Quant、King、Coder、Gemini Pro Hui 四方討論結果。日期：2026-05-25。*
+
+---
+
+## 15. 按日期覆盤功能（Date Range Review）
+
+> **版本：** v1.0  
+> **日期：** 2026-06-21  
+> **作者：** 丁蟹 + Alvin + Coder
+
+### 15.1 功能目標
+
+實現「覆盤對單」功能，支持：
+- 按日期範圍分析（例如 2026-03-01 至 2026-03-31）
+- 按 Signal/CCY/Buy/Sell 分組統計
+- 跨系統所有 signals 對比
+- 結合市況數據做相似性分析
+
+### 15.2 兩種覆盤模式
+
+#### 模式 A：個別 Signal 覆盤
+
+**融合位置**：`Signal_Deep_Analysis_*.html`  
+**實現方式**：喺現有深度分析報告入面新增「📅 按日期覆盤」section  
+**包含內容**：
+- 時段分析
+- 月度表現（逐月勝率、盈虧）
+- 最佳/最差交易日
+
+**負責腳本**：`src/report_generator.py` + `src/statistics.py`
+
+#### 模式 B：全系統覆盤
+
+**獨立位置**：`docs/reviews/`  
+**實現方式**：獨立新版，支援月報/週報/日報  
+**包含內容**：
+- 跨所有 signals 嘅日期範圍分析
+- 按 Signal/CCY/Buy/Sell 分組對比
+- 自動生成報告索引
+
+**負責腳本**：`scripts/date_range_review.py`
+
+### 15.3 目錄結構
+
+```
+trade_strategy_analyzer/
+├── scripts/
+│   └── date_range_review.py      # 全系統覆盤腳本
+│
+├── src/
+│   ├── statistics.py              # 新增時段/月度統計函數
+│   └── report_generator.py         # 更新：加入覆盤 section
+│
+├── docs/
+│   ├── reviews/                    # 全系統覆盤
+│   │   ├── index.html             # 報告列表頁
+│   │   ├── daily/                 # 日報
+│   │   ├── weekly/                # 週報
+│   │   └── monthly/               # 月報
+│   │
+│   └── reports/                    # 個別 Signal 深度分析
+│       └── Signal_Deep_Analysis_*.html  # 包含覆盤 section
+│
+└── data/history/                  # 逐筆交易數據（JSON）
+    └── signal_*.json              # 67 個 signals
+```
+
+### 15.4 使用方式
+
+#### 個別 Signal 覆盤
+
+```bash
+# 自動生成深度分析報告（包含覆盤 section）
+python3 archive/main.py --signal-id 31593
+```
+
+#### 全系統覆盤
+
+```bash
+# 月報（所有 signals）
+python3 scripts/date_range_review.py --start-date 2026-04-01 --end-date 2026-05-31 --period monthly
+
+# 週報（單一 signal）
+python3 scripts/date_range_review.py --start-date 2026-04-01 --end-date 2026-04-07 --period weekly --signal-id 31593
+
+# 日報
+python3 scripts/date_range_review.py --start-date 2026-06-01 --end-date 2026-06-01 --period daily
+```
+
+### 15.5 輸出格式
+
+**JSON 數據**（供 API 使用）：
+- `review_YYYY-MM-DD_YYYY-MM-DD.json`
+- 包含：總體統計、按 Signal 分組、按 CCY 分組、每日明細
+
+**HTML 報表**（供 GitHub Pages 部署）：
+- TSA dark theme 樣式
+- Tab 切換（Signal / CCY / 方向 / CCY+方向 / 每日）
+- 表格排序（按 PnL 降序）
+- 響應式設計
+
+### 15.6 自動化規劃（未來）
+
+- **每日自動生成**：Cron job 每日 00:05 生成「昨日覆盤」
+- **每週自動生成**：Cron job 每週一 00:10 生成「上週覆盤」
+- **報告保留策略**：日報30 日、週報 12 週、月報 12 個月
+
+### 15.7 市況數據整合（Phase 2）
+
+**預留接口**：
+- Economic Calendar overlay
+- CCY Power 歷史數據疊加
+- VIX/DXY 波動率對比
+
+---
+
+*此章節由丁蟹整合老闆指示 + Coder 實現結果。日期：2026-06-21。*
