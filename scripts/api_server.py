@@ -15,6 +15,7 @@ Runs on localhost:8787 alongside OpenClaw.
 import sys
 import os
 import threading
+import logging
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -28,7 +29,7 @@ from v2_snapshot import (
     get_snapshot as v2_get_snapshot,
     get_latest as v2_get_latest,
 )
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import json
@@ -46,20 +47,54 @@ def notify_telegram(message: str):
     except Exception:
         pass
 
+logger = logging.getLogger("tsa_api")
+
 app = FastAPI(title="Trade Strategy Analyzer API")
+
+
+def _cors_origins() -> list[str]:
+    """Read allowed origins from env; safe localhost defaults only."""
+    raw = os.getenv("TSA_API_CORS_ORIGINS", "http://localhost:8787,http://127.0.0.1:8787")
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+def _api_token() -> str | None:
+    return os.getenv("TSA_API_TOKEN")
+
+
+async def require_api_token(request: Request):
+    """Optional token auth for write endpoints.
+
+    If TSA_API_TOKEN is not set, write endpoints are allowed only from localhost
+    for backwards compatibility with local-only workflows.
+    """
+    expected = _api_token()
+    client_host = request.client.host if request.client else ""
+    if not expected:
+        if client_host in {"127.0.0.1", "::1", "localhost"}:
+            return
+        raise HTTPException(status_code=403, detail="API token required")
+
+    provided = request.headers.get("x-api-key") or request.query_params.get("api_key")
+    if provided != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def safe_error(status_code: int = 500, message: str = "Internal server error"):
+    return JSONResponse({"ok": False, "error": message}, status_code=status_code)
 
 # CORS — allow GitHub Pages and localhost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tunnel URL changes each session; restrict later with named tunnel
-    allow_credentials=True,
+    allow_origins=_cors_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["content-type", "x-api-key"],
 )
 
 
 @app.post("/api/save")
-async def api_save(data: dict):
+async def api_save(data: dict, _auth=Depends(require_api_token)):
     """Save analysis data from frontend."""
     try:
         aid = save_analysis(data)
@@ -74,8 +109,9 @@ async def api_save(data: dict):
         msg = f"✅ 新分析已存檔\n{emoji} Signal {sig} | {ea} | {positions} 倉位\nWR {wr:.1f}% | PF {pf:.2f} | {emoji} ${profit:+.2f}"
         threading.Thread(target=notify_telegram, args=(msg,), daemon=True).start()
         return {"ok": True, "id": aid}
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    except Exception:
+        logger.exception("api_save failed")
+        return safe_error()
 
 
 @app.get("/api/list")
@@ -132,14 +168,14 @@ async def api_health():
 # ==============================
 
 @app.post("/api/v2/snapshot")
-async def api_v2_save_snapshot(data: dict):
+async def api_v2_save_snapshot(data: dict, _auth=Depends(require_api_token)):
     """Save V2 technical analysis snapshot."""
     try:
         snapshot_time = data.get('snapshot_time')
         snapshot_type = data.get('snapshot_type')
         csv_data = data.get('csv_data', '')
         if not snapshot_time or not snapshot_type:
-            return JSONResponse({"ok": False, "error": "snapshot_time and snapshot_type required"}, status_code=400)
+            return safe_error(400, "snapshot_time and snapshot_type required")
 
         aid = v2_save_snapshot(
             snapshot_time=snapshot_time,
@@ -153,8 +189,9 @@ async def api_v2_save_snapshot(data: dict):
             news=data.get('news'),
         )
         return {"ok": True, "id": aid}
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    except Exception:
+        logger.exception("api_v2_save_snapshot failed")
+        return safe_error()
 
 
 @app.get("/api/v2/snapshots")
@@ -163,8 +200,9 @@ async def api_v2_list_snapshots(limit: int = Query(10, ge=1, le=100)):
     try:
         snapshots = v2_list_snapshots(limit)
         return {"ok": True, "snapshots": snapshots}
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    except Exception:
+        logger.exception("api_v2_list_snapshots failed")
+        return safe_error()
 
 
 @app.get("/api/v2/snapshot/{snapshot_id}")
