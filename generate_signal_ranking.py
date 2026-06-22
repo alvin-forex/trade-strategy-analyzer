@@ -359,7 +359,7 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
         pf = r['profit_factor']
         pf_str = 'Inf' if pf > 999 else f'{pf:.1f}'
 
-        report_url = f'../reports/index_{signal_id}.html'
+        report_url = f'../reports/martin_v4_{signal_id}.html'
         martin_url = f'../reports/Signal_Deep_Analysis_{signal_id}.html'
         signal_page_url = f'https://signals.algoforest.com/signals/{signal_id}'
         html += f'''<tr{row_class}>

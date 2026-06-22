@@ -179,9 +179,12 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
 
             clean_icon: str = '✅' if s['clean_pct'] >= 80 else ('⚠️' if s['clean_pct'] >= 50 else '🚫')
 
+            # Use martin_v4 report (available for all signals)
+            report_link: str = f"../reports/martin_v4_{s['signal_id']}.html"
+
             rows_html += f'''<tr{row_class}>
 <td>{rank}</td>
-<td><a href="https://signals.algoforest.com/signals/{s['signal_id']}">{s['signal_id']}</a> <a href="../reports/index_{s['signal_id']}.html">📊</a></td>
+<td><a href="https://signals.algoforest.com/signals/{s['signal_id']}">{s['signal_id']}</a> <a href="{report_link}">📊</a></td>
 <td><span style="{ea_style};padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:bold">{s['ea']}</span></td>
 <td>{s['total_symbols']}</td>
 <td class="{score_cls}">{s['avg_v5']}</td>
