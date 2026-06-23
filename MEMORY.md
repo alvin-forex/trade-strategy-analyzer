@@ -94,3 +94,8 @@
 - 帳戶摘要: 當日交易：0（連續第6日無交易）; 最後狀態更新：2026.06.17 19:28:17; 最近活動：6/12 清倉後持續休眠 [score=0.869 recalls=0 avg=0.620 source=memory/2026-06-18.md:16-18]
 <!-- openclaw-memory-promotion:memory:memory/2026-06-18.md:21:22 -->
 - 重複觸發處理: Cron 重複觸發（相同 timestamp 00:30 HKT），偵測到數據完全相同; 跳過第2次發送，避免重複 WhatsApp 訊息 [score=0.837 recalls=0 avg=0.620 source=memory/2026-06-18.md:21-22]
+
+## Promoted From Short-Term Memory (2026-06-24)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-17.md:1:23 -->
+- ## MT4 帳戶日報 (00:30 HKT) ### 帳戶狀態 (截至 2026-06-16 19:29:58) **Vantage Markets (7737997) - Wayne Manual Order** - 淨值：$54.89 - 餘額：$54.89 - 當日盈虧：$0.00（無交易） - 保證金：$0.00 - 可用保證金：$54.89 - 持倉數量：0 - 槓桿：1:500 ### 備註 - 自 6/12 批量平倉後，連續5日無交易活動 - 帳戶處於低資金觀望狀態 - WhatsApp 發送成功：messageId=3EB0FE411398FC993DF509 ## TSA 每日 QA (23:00 HKT) - 執行 `tsa_qa_check.py --full`：**155/155 通過，0 警告，0 失敗** ✅ - 無需修復，無 commit [score=0.827 recalls=3 avg=0.450 source=memory/2026-06-17.md:1-23]
