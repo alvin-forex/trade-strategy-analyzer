@@ -3,7 +3,7 @@
   // Determine depth for relative links
   var path = window.location.pathname;
   var depth = '';
-  if(path.includes('/admin/ccy_power/') || path.includes('/admin/forex_reports/') || path.includes('/reviews/')) depth='../../';
+  if(path.includes('/admin/ccy_power/') || path.includes('/admin/forex_reports/') || path.includes('/admin/forex_hub/') || path.includes('/reviews/')) depth='../../';
   else if(path.includes('/admin/')) depth='../';
   else if(path.includes('/reports/') || path.includes('/portfolios/')) depth='../';
 
@@ -23,6 +23,10 @@
       <a href="${depth}reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
       <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
       <a href="${depth}admin/forex_news.html" class="sidebar-link" data-page="forex_news"><span class="icon">📄</span>外匯新聞</a>
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-section-title"><span class="icon">📊</span>外匯分析</div>
+      <a href="${depth}admin/forex_hub/index.html#4h" class="sidebar-link sub-link" data-page="forex_hub_4h"><span class="icon">🦀</span>4H 市場分析</a>
+      <a href="${depth}admin/forex_hub/index.html#daily" class="sidebar-link sub-link" data-page="forex_hub_daily"><span class="icon">📰</span>每日報告</a>
     </div>
   `;
 
@@ -65,6 +69,8 @@
     else if(dp==='forex_news' && (filename==='forex_news' || path.includes('/admin/forex_reports/'))) link.classList.add('active');
     else if(dp==='portfolios' && path.includes('/portfolios/')) link.classList.add('active');
     else if(dp==='reviews' && path.includes('/reviews/')) link.classList.add('active');
+    else if(dp==='forex_hub_4h' && (path.includes('/admin/forex_hub/') || path.includes('/admin/4h_reports/'))) link.classList.add('active');
+    else if(dp==='forex_hub_daily' && path.includes('/admin/forex_hub/') && window.location.hash==='#daily') link.classList.add('active');
     else if(dp!=='index' && filename.includes(dp)) link.classList.add('active');
   });
 })();
