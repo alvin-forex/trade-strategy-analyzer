@@ -26,6 +26,7 @@
       <a href="${depth}admin/ccy_ranking.html" class="sidebar-link" data-page="ccy_ranking"><span class="icon">💱</span>CCY 排名</a>
       <a href="${depth}admin/volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
       <a href="${depth}portfolios/portfolio_master_report_v2.html" class="sidebar-link" data-page="portfolios"><span class="icon">💼</span>Portfolio V2</a>
+      <a href="${depth}review_filter.html" class="sidebar-link" data-page="review_filter"><span class="icon">🔍</span>覆盤報告 Filter</a>
       <div class="sidebar-sep"></div>
       <a href="${depth}reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
       <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
@@ -115,6 +116,7 @@
     else if(dp==='forex_news' && (filename==='forex_news' || path.includes('/admin/forex_reports/'))) link.classList.add('active');
     else if(dp==='portfolios' && path.includes('/portfolios/')) link.classList.add('active');
     else if(dp==='reviews' && path.includes('/reviews/')) link.classList.add('active');
+    else if(dp==='review_filter' && filename==='review_filter') link.classList.add('active');
     else if(dp==='forex_hub_4h' && (path.includes('/admin/forex_hub/') || path.includes('/admin/4h_reports/') || path.includes('/reports/'))) link.classList.add('active');
     else if(dp==='forex_hub_daily' && path.includes('/admin/forex_hub/') && window.location.hash==='#daily') link.classList.add('active');
     else if(dp!=='index' && filename.includes(dp)) link.classList.add('active');
