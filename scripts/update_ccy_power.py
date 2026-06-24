@@ -49,7 +49,7 @@ def read_csv():
             with open(READER_CSV_PATH, 'r') as f:
                 reader = csv.DictReader(f)
                 # Collect all rows, get latest per TF
-                tf_rows = {'D1': [], 'H4': [], 'H1': []}
+                tf_rows = {'D1': [], 'H4': [], 'H1': [], 'M30': []}
                 for row in reader:
                     tf = row.get('timeframe', '')
                     if tf in tf_rows:
@@ -69,7 +69,7 @@ def read_csv():
             if len(data) >= 2:  # At least 2 TFs with data
                 print(f"[OK] Using ccy_power_reader.csv: {len(data)} TFs with distinct values")
                 ts = tf_rows['D1'][-1]['timestamp'] if tf_rows['D1'] else datetime.now().strftime("%Y.%m.%d %H:%M")
-                print(f"     Latest: {ts} | D1: {list(data.get('D1', {}).keys())[:3]} H4: {list(data.get('H4', {}).keys())[:3]} H1: {list(data.get('H1', {}).keys())[:3]}")
+                print(f"     Latest: {ts} | D1: {list(data.get('D1', {}).keys())[:3]} H4: {list(data.get('H4', {}).keys())[:3]} H1: {list(data.get('H1', {}).keys())[:3]} M30: {list(data.get('M30', {}).keys())[:3]}")
                 return data, []
         except Exception as e:
             print(f"[WARN] ccy_power_reader.csv read failed: {e}")
@@ -80,7 +80,7 @@ def read_csv():
             conn = sq3.connect(DB_PATH)
             c = conn.cursor()
             data = {}
-            for tf in ['D1', 'H4', 'H1']:
+            for tf in ['D1', 'H4', 'H1', 'M30']:
                 c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU
                              FROM ccy_power_v2 WHERE timeframe=? ORDER BY timestamp DESC LIMIT 1''', (tf,))
                 row = c.fetchone()
@@ -194,7 +194,7 @@ def update_timeline_json():
     c = conn.cursor()
     
     timeline = {}
-    for tf in ['D1', 'H4', 'H1']:
+    for tf in ['D1', 'H4', 'H1', 'M30']:
         entries = []
         seen_ts = set()
         
