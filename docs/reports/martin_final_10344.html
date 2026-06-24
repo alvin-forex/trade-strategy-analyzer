@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>馬丁剖析法 V3 - Signal #10344</title>
+    <style>
+        :root {--bg:#0a0a1a;--surface:#0f0f23;--border:#2a2a4a;--text:#e0e0e0;--muted:#888;--accent:#FFD700}
+        [data-theme="light"] {--bg:#f5f5f5;--surface:#fff;--border:#ddd;--text:#222;--muted:#666;--accent:#d4a017}
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+            font-size:12px; line-height:1.5; color:var(--text); background:var(--bg); padding:15px;
+        }
+        .theme-toggle {
+            position:fixed;top:12px;right:16px;z-index:1001;
+            background:var(--surface);color:var(--text);border:1px solid var(--border);
+            border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;transition:background .2s;
+        }
+        .theme-toggle:hover { background:var(--border); }
+        .container { max-width:1400px; margin:0 auto; }
+        .header {
+            background:linear-gradient(135deg,#1a1a3e 0%,#2d1b69 50%,#1a1a3e 100%);
+            border:1px solid #4a3f8a; border-radius:12px; padding:20px; margin-bottom:20px;
+        }
+        .header h1 { font-size:22px; color:#FFD700; margin-bottom:4px; }
+        .header .subtitle { font-size:12px; color:#999; }
+        .kpi-row {
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+            gap:12px; margin-top:15px;
+        }
+        .kpi-card {
+            background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
+            border-radius:8px; padding:10px; text-align:center;
+        }
+        .kpi-card .label { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+        .kpi-card .value { font-size:18px; font-weight:bold; color:#fff; margin-top:4px; }
+        .kpi-card .value.green { color:#2ecc71; }
+        .kpi-card .value.red { color:#e74c3c; }
+        .kpi-card .value.gold { color:#FFD700; }
+        .section {
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; margin-bottom:12px; overflow:hidden;
+        }
+        .section-header {
+            background:linear-gradient(90deg,#1a1a3e,#2d1b69);
+            padding:10px 14px; font-size:13px; font-weight:bold; color:#fff;
+            border-bottom:1px solid #3a3a6a; display:flex; align-items:center; gap:8px;
+        }
+        .section-header .badge {
+            display:inline-block; background:#FFD700; color:#000;
+            font-size:10px; padding:2px 8px; border-radius:10px; font-weight:normal;
+        }
+        .section-body { padding:12px; }
+        .info-icon {
+            position:relative; display:inline-flex; align-items:center; justify-content:center;
+            width:18px; height:18px; border-radius:50%; background:rgba(255,255,255,0.15);
+            color:#ccc; font-size:11px; cursor:help; font-style:normal; flex-shrink:0;
+        }
+        .info-icon .info-tip {
+            display:none; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+            background:#1a1a3e; border:1px solid #4a3f8a; border-radius:6px;
+            padding:8px 10px; font-size:10px; font-weight:normal; color:#ccc;
+            white-space:normal; width:280px; z-index:100; line-height:1.6;
+            box-shadow:0 4px 12px rgba(0,0,0,.5); pointer-events:none;
+        }
+        .info-icon:hover .info-tip, .info-icon:focus .info-tip { display:block; }
+        .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        table { width:100%; border-collapse:collapse; font-size:11px; }
+        table th {
+            background:#1a1a3e; color:#bbb; padding:6px 8px; text-align:left;
+            font-size:10px; text-transform:uppercase; letter-spacing:0.5px;
+            border-bottom:1px solid #3a3a6a; white-space:nowrap; position:sticky; top:0;
+        }
+        table td { padding:5px 8px; border-bottom:1px solid #1a1a2a; white-space:nowrap; }
+        table tr:hover { background:rgba(255,255,255,0.03); }
+        .positive { color:#2ecc71; }
+        .negative { color:#e74c3c; }
+        .neutral { color:#888; }
+        .rating-badge {
+            display:inline-block; padding:1px 6px; border-radius:3px;
+            font-weight:700; font-size:11px; text-align:center; min-width:28px;
+        }
+        .scatter-grid {
+            display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:12px;
+        }
+        .scatter-card {
+            background:#0a0a18; border:1px solid #2a2a4a; border-radius:8px; padding:8px;
+        }
+        .scatter-card .title { font-size:11px; color:#bbb; margin-bottom:4px; }
+        .chart-container {
+            margin-top:12px; padding:12px; background:#0a0a18;
+            border:1px solid #2a2a4a; border-radius:8px;
+        }
+        .chart-title { font-size:11px; color:#bbb; margin-bottom:8px; }
+        .section-nav {
+            display:flex; gap:2px; flex-wrap:wrap; background:#0a0a18;
+            border-bottom:2px solid #2a2a4a; padding:0 12px;
+            position:sticky; top:0; z-index:50;
+        }
+        .section-nav a {
+            padding:8px 14px; font-size:11px; color:#888; text-decoration:none;
+            border-bottom:2px solid transparent; transition:all 0.2s;
+        }
+        .section-nav a:hover { color:#FFD700; border-bottom-color:#FFD700; }
+        /* CCY section styles */
+        .ccy-section {
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; margin-bottom:16px; padding:0;
+        }
+        .ccy-summary {
+            display:block; padding:14px 18px; font-size:14px; cursor:pointer;
+            background:linear-gradient(90deg,#1a1a3e,#2d1b69);
+            border-radius:10px; color:#fff; list-style:none;
+        }
+        .ccy-summary::-webkit-details-marker { display:none; }
+        .ccy-summary::before {
+            content:'▶'; display:inline-block; font-size:12px; color:#FFD700;
+            margin-right:10px; transition:transform 0.15s;
+        }
+        .ccy-section[open] .ccy-summary::before { transform:rotate(90deg); }
+        .ccy-section > .section { margin:8px 12px 12px 12px; }
+        .row-a { background:rgba(46,204,113,0.08); }
+        .row-d { background:rgba(231,76,60,0.08); }
+        .footer { text-align:center; padding:15px; color:#555; font-size:10px; }
+        /* Light theme */
+        [data-theme="light"] .header {
+            background:linear-gradient(135deg,#e8eaf6 0%,#c5cae9 50%,#e8eaf6 100%);
+            border-color:#9fa8da;
+        }
+        [data-theme="light"] .header h1 { color:#1a237e; }
+        [data-theme="light"] .section-header {
+            background:linear-gradient(90deg,#e8eaf6,#c5cae9);
+            color:#1a237e; border-bottom-color:#9fa8da;
+        }
+        [data-theme="light"] table th { background:#e8eaf6; color:#555; border-bottom-color:#c5cae9; }
+        [data-theme="light"] table td { border-bottom-color:#e0e0e0; }
+        [data-theme="light"] .scatter-card,
+        [data-theme="light"] .chart-container { background:#fff; border-color:#ddd; }
+        [data-theme="light"] .info-icon .info-tip { background:#fff; border-color:#ccc; color:#333; }
+        [data-theme="light"] .section-nav { background:#e0e0e0; border-bottom-color:#ccc; }
+        [data-theme="light"] .ccy-section { background:#fff; border-color:#ddd; }
+        [data-theme="light"] .ccy-summary {
+            background:linear-gradient(90deg,#e8eaf6,#c5cae9); color:#1a237e;
+        }
+    </style>
+    <script>
+    function toggleTheme(){
+        var t=document.documentElement.getAttribute('data-theme');
+        if(t==='light'){document.documentElement.removeAttribute('data-theme');localStorage.setItem('theme','dark')}
+        else{document.documentElement.setAttribute('data-theme','light');localStorage.setItem('theme','light')}
+    }
+    (function(){
+        var s=localStorage.getItem('theme');
+        if(s==='light')document.documentElement.setAttribute('data-theme','light');
+    })();
+    </script>
+<link rel="stylesheet" href="../sidebar.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()" title="切換亮/暗模式">🌓</button>
+<div class="container">
+
+    <!-- ═══ Executive Summary ═══ -->
+    <div class="header">
+        <h1>🔬 馬丁剖析法 V3 - Signal #10344</h1>
+        <div class="subtitle">
+            2 個 CCY×Direction 組合 · 11 個層級 · 生成時間 2026-06-25 04:12
+        </div>
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="label">總交易</div>
+                <div class="value">238</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">總盈虧</div>
+                <div class="value green">$+36,587.40</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">勝率</div>
+                <div class="value green">79.8%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">平均持倉</div>
+                <div class="value">0.6h</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">CCY 組合</div>
+                <div class="value gold">2</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">層級總數</div>
+                <div class="value gold">11</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Bar Chart (merged $ + PIP) -->
+    <div class="section">
+        <div class="section-header">📊 全局盈虧概覽(金額 + PIP)
+            <i class="info-icon" tabindex="0">i<span class="info-tip">
+                <b>盈虧概覽說明</b><br>
+                每個 CCY×Direction 顯示兩組數據:<br><br>
+                <b>金額條(粗)</b>:Total$ 盈虧金額<br>
+                綠色 = 盈利 | 紅色 = 虧損<br><br>
+                <b>PIP 條(細)</b>:Total PIP 盈虧<br>
+                藍色 = 盈利 PIP | 橙色 = 虧損 PIP<br><br>
+                每條 bar 旁邊顯示精確數值
+            </span></i>
+        </div>
+        <div class="section-body">
+            <div class="chart-container">
+                <svg viewBox="0 0 780 200" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="780" height="200" fill="#0a0a18" rx="6"/><line x1="390" y1="30" x2="390" y2="165" stroke="#333" stroke-width="1"/><line x1="230.0" y1="30" x2="230.0" y2="165" stroke="#1a1a2a" stroke-width="0.5"/><line x1="550.0" y1="30" x2="550.0" y2="165" stroke="#1a1a2a" stroke-width="0.5"/><line x1="390.0" y1="30" x2="390.0" y2="165" stroke="#1a1a2a" stroke-width="0.5"/><line x1="390.0" y1="30" x2="390.0" y2="165" stroke="#1a1a2a" stroke-width="0.5"/><line x1="550.0" y1="30" x2="550.0" y2="165" stroke="#1a1a2a" stroke-width="0.5"/><line x1="230.0" y1="30" x2="230.0" y2="165" stroke="#1a1a2a" stroke-width="0.5"/><line x1="710.0" y1="30" x2="710.0" y2="165" stroke="#1a1a2a" stroke-width="0.5"/><line x1="70.0" y1="30" x2="70.0" y2="165" stroke="#1a1a2a" stroke-width="0.5"/><text x="70" y="18" fill="#e74c3c" font-size="9" text-anchor="start">-$ / -PIP</text><text x="710" y="18" fill="#2ecc71" font-size="9" text-anchor="end">+$ / +PIP</text><text x="4" y="38" fill="#ccc" font-size="9">XAUUSD buy</text><rect x="390.0" y="28" width="320.0" height="16" fill="#2ecc71" rx="2" opacity="0.85"/><text x="713.0" y="40" fill="#2ecc71" font-size="8" font-weight="bold" text-anchor="start">$+24,884</text><rect x="390.0" y="46" width="1.0" height="8" fill="#5dade2" rx="2" opacity="0.8"/><text x="393.0" y="54" fill="#5dade2" font-size="7" text-anchor="start">+0.0 pip</text><text x="4" y="80" fill="#ccc" font-size="9">XAUUSD sell</text><rect x="390.0" y="70" width="150.5" height="16" fill="#2ecc71" rx="2" opacity="0.85"/><text x="543.5" y="82" fill="#2ecc71" font-size="8" font-weight="bold" text-anchor="start">$+11,703</text><rect x="390.0" y="88" width="1.0" height="8" fill="#5dade2" rx="2" opacity="0.8"/><text x="393.0" y="96" fill="#5dade2" font-size="7" text-anchor="start">+0.0 pip</text><rect x="70" y="182" width="10" height="8" fill="#2ecc71" rx="1"/><text x="84" y="190" fill="#aaa" font-size="8">盈利$</text><rect x="125" y="182" width="10" height="8" fill="#e74c3c" rx="1"/><text x="139" y="190" fill="#aaa" font-size="8">虧損$</text><rect x="190" y="182" width="10" height="4" fill="#5dade2" rx="1"/><text x="204" y="190" fill="#aaa" font-size="8">盈利PIP</text><rect x="265" y="182" width="10" height="4" fill="#e67e22" rx="1"/><text x="279" y="190" fill="#aaa" font-size="8">虧損PIP</text></svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="section-nav">
+        <a href="#ccy-XAUUSD-buy">XAUUSD BUY</a> <a href="#ccy-XAUUSD-sell">XAUUSD SELL</a>
+    </div>
+
+    <!-- ═══ CCY×Direction Sections ═══ -->
+    
+    <details id="ccy-XAUUSD-buy" class="ccy-section" open>
+      <summary class="ccy-summary">
+        <span style="font-size:16px">📌</span> <b>XAUUSD BUY</b>
+        &nbsp;-&nbsp; <span class="positive">$+24,884.10</span>
+        &nbsp;·&nbsp; 129 trades
+        &nbsp;·&nbsp; WR 80.6%
+        &nbsp;·&nbsp; 6 layers
+      </summary>
+
+      <div class="section">
+        <div class="section-header">
+          Part 1 · 組合概覽
+          <span class="badge">6 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>組合概覽說明</b><br>
+            顯示此 CCY×Direction 下每一層嘅完整統計。<br>
+            <span style="color:#2ecc71">綠色行</span> = A 級以上 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = D 級以下<br><br>
+            <b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br>
+            <b>EV$</b>: 預期盈虧 | <b>Odds</b>: 盈虧比 | <b>MFE/MAE</b>: 最大有利/不利波幅
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
+                <th>WR%</th><th>EV$</th><th>WinPip</th><th>LossPip</th>
+                <th>Odds$</th><th>OddsPip</th><th>MFE</th><th>MAE</th><th>MaxMAE</th>
+                <th>Hold(h)</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+<tr class="row-a">
+                <td><b>L0.5</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>97</td>
+                <td>6</td>
+                <td>6:0</td>
+                <td>100.0%</td>
+                <td class="positive">+218.75</td>
+                <td>44.4</td>
+                <td>0</td>
+                <td>999</td>
+                <td>999</td>
+                <td>46.1</td>
+                <td>2.9</td>
+                <td><b>17.7</b></td>
+                <td>0.1</td>
+                <td class="positive"><b>$+1,312.50</b></td>
+              </tr>
+<tr>
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>48.3</td>
+                <td>32</td>
+                <td>23:9</td>
+                <td>71.9%</td>
+                <td class="negative">-35.81</td>
+                <td>42.1</td>
+                <td>123.7</td>
+                <td>0.33</td>
+                <td>0.34</td>
+                <td>36.0</td>
+                <td>50.0</td>
+                <td><b>150.0</b></td>
+                <td>1.5</td>
+                <td class="negative"><b>$-1,145.90</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>83.4</td>
+                <td>22</td>
+                <td>19:3</td>
+                <td>86.4%</td>
+                <td class="positive">+186.68</td>
+                <td>41.5</td>
+                <td>121.4</td>
+                <td>0.34</td>
+                <td>0.34</td>
+                <td>36.7</td>
+                <td>22.4</td>
+                <td><b>126.8</b></td>
+                <td>0.7</td>
+                <td class="positive"><b>$+4,107.00</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>84.2</td>
+                <td>26</td>
+                <td>23:3</td>
+                <td>88.5%</td>
+                <td class="positive">+470.02</td>
+                <td>52.1</td>
+                <td>122.3</td>
+                <td>0.42</td>
+                <td>0.43</td>
+                <td>46.0</td>
+                <td>14.1</td>
+                <td><b>122.8</b></td>
+                <td>0.5</td>
+                <td class="positive"><b>$+12,220.50</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>84.0</td>
+                <td>20</td>
+                <td>16:4</td>
+                <td>80.0%</td>
+                <td class="positive">+295.3</td>
+                <td>49.2</td>
+                <td>120.0</td>
+                <td>0.4</td>
+                <td>0.41</td>
+                <td>39.4</td>
+                <td>24.0</td>
+                <td><b>135.4</b></td>
+                <td>0.2</td>
+                <td class="positive"><b>$+5,906.00</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>79.0</td>
+                <td>23</td>
+                <td>17:6</td>
+                <td>73.9%</td>
+                <td class="positive">+108.0</td>
+                <td>41.8</td>
+                <td>102.4</td>
+                <td>0.4</td>
+                <td>0.41</td>
+                <td>30.9</td>
+                <td>29.9</td>
+                <td><b>106.1</b></td>
+                <td>0.4</td>
+                <td class="positive"><b>$+2,484.00</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 2 · MFE/MAE 散點分析
+          <span class="badge">每層一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>MFE/MAE 散點分析</b><br>
+            每層獨立嘅散點圖:X=MFE(最大有利波幅),Y=-MAE(最大不利波幅)。<br>
+            綠色 = 盈利交易 | 紅色 = 虧損交易<br>
+            Hover 可查看每筆交易詳情。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="scatter-grid">
+            <div class="scatter-card">
+              <div class="title"><b>L0.5</b> <span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span> (n=6) &nbsp; WR:100.0% EV:+218.75$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">19</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">26</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">15</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">52</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">10</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">78</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">5</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">103</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="108.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.2" y="194.0" width="221" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.2" y="204.0" fill="#eee" font-size="7">#1 MFE:26.1 MAE:0.0 $92.00 L0.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="84.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="90.4" y="194.0" width="221" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="94.4" y="204.0" fill="#eee" font-size="7">#2 MFE:17.6 MAE:0.0 $85.00 L0.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="257.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="161.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="165.4" y="204.0" fill="#eee" font-size="7">#3 MFE:79.3 MAE:0.0 $376.00 L0.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="46.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="52.8" y="194.0" width="216" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="56.8" y="204.0" fill="#eee" font-size="7">#4 MFE:4.2 MAE:0.0 $18.00 L0.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#5 MFE:94.0 MAE:0.0 $467.00 L0.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="190.7" cy="37.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="196.7" y="21.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="200.7" y="31.3" fill="#eee" font-size="7">#6 MFE:55.5 MAE:17.7 $274.50 L0.5 Hold:0.3h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L0.7</b> <span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span> (n=32) &nbsp; WR:71.9% EV:-35.81$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">165</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">29</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">124</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">58</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">82</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">88</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">41</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">117</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="121.3" cy="152.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="127.3" y="136.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="131.3" y="146.3" fill="#eee" font-size="7">#1 MFE:34.8 MAE:50.1 $184.80 L0.7 Hold:2.8h</text></g></g>
+<g class="dot"><circle cx="115.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="121.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="125.4" y="204.0" fill="#eee" font-size="7">#2 MFE:32.4 MAE:0.0 $222.60 L0.7 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="122.8" cy="192.2" r="3" fill="#2ecc71"/><g class="tip"><rect x="128.8" y="176.2" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="132.8" y="186.2" fill="#eee" font-size="7">#3 MFE:35.4 MAE:15.5 $205.10 L0.7 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="108.9" cy="207.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.9" y="191.7" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.9" y="201.7" fill="#eee" font-size="7">#4 MFE:29.8 MAE:2.0 $204.40 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="109.7" cy="146.9" r="3" fill="#2ecc71"/><g class="tip"><rect x="115.7" y="130.9" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="119.7" y="140.9" fill="#eee" font-size="7">#5 MFE:30.1 MAE:54.8 $206.50 L0.7 Hold:1.6h</text></g></g>
+<g class="dot"><circle cx="37.2" cy="71.9" r="3" fill="#e74c3c"/><g class="tip"><rect x="43.2" y="55.9" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="47.2" y="65.9" fill="#eee" font-size="7">#6 MFE:0.9 MAE:119.9 $-843.50 L0.7 Hold:2.3h</text></g></g>
+<g class="dot"><circle cx="169.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="175.2" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="179.2" y="204.0" fill="#eee" font-size="7">#7 MFE:54.1 MAE:0.0 $206.50 L0.7 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="109.9" cy="196.5" r="3" fill="#2ecc71"/><g class="tip"><rect x="115.9" y="180.5" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="119.9" y="190.5" fill="#eee" font-size="7">#8 MFE:30.2 MAE:11.7 $207.20 L0.7 Hold:0.5h</text></g></g>
+<g class="dot"><circle cx="116.6" cy="195.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="122.6" y="179.7" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="126.6" y="189.7" fill="#eee" font-size="7">#9 MFE:32.9 MAE:12.4 $196.70 L0.7 Hold:0.7h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="68.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="52.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="62.0" fill="#eee" font-size="7">#10 MFE:0.0 MAE:123.3 $-867.30 L0.7 Hold:3.9h</text></g></g>
+<g class="dot"><circle cx="102.2" cy="197.2" r="3" fill="#2ecc71"/><g class="tip"><rect x="108.2" y="181.2" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="112.2" y="191.2" fill="#eee" font-size="7">#11 MFE:27.1 MAE:11.1 $185.50 L0.7 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="39.2" cy="72.2" r="3" fill="#e74c3c"/><g class="tip"><rect x="45.2" y="56.2" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="49.2" y="66.2" fill="#eee" font-size="7">#12 MFE:1.7 MAE:119.7 $-842.10 L0.7 Hold:2.5h</text></g></g>
+<g class="dot"><circle cx="196.0" cy="207.2" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.0" y="191.2" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.0" y="201.2" fill="#eee" font-size="7">#13 MFE:64.9 MAE:2.4 $450.10 L0.7 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="45.7" cy="72.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="51.7" y="56.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="55.7" y="66.0" fill="#eee" font-size="7">#14 MFE:4.3 MAE:119.8 $-842.80 L0.7 Hold:4.7h</text></g></g>
+<g class="dot"><circle cx="125.0" cy="182.2" r="3" fill="#2ecc71"/><g class="tip"><rect x="131.0" y="166.2" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="135.0" y="176.2" fill="#eee" font-size="7">#15 MFE:36.3 MAE:24.1 $203.00 L0.7 Hold:0.7h</text></g></g>
+<g class="dot"><circle cx="108.4" cy="139.4" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.4" y="123.4" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.4" y="133.4" fill="#eee" font-size="7">#16 MFE:29.6 MAE:61.3 $203.00 L0.7 Hold:1.0h</text></g></g>
+<g class="dot"><circle cx="112.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="118.9" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="122.9" y="204.0" fill="#eee" font-size="7">#17 MFE:31.4 MAE:0.0 $215.60 L0.7 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="100.0" cy="70.9" r="3" fill="#e74c3c"/><g class="tip"><rect x="106.0" y="54.9" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="110.0" y="64.9" fill="#eee" font-size="7">#18 MFE:26.2 MAE:120.8 $-849.80 L0.7 Hold:3.0h</text></g></g>
+<g class="dot"><circle cx="108.7" cy="149.4" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.7" y="133.4" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.7" y="143.4" fill="#eee" font-size="7">#19 MFE:29.7 MAE:52.6 $203.70 L0.7 Hold:2.7h</text></g></g>
+<g class="dot"><circle cx="108.7" cy="128.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.7" y="112.7" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.7" y="122.7" fill="#eee" font-size="7">#20 MFE:29.7 MAE:70.6 $203.70 L0.7 Hold:3.6h</text></g></g>
+<g class="dot"><circle cx="84.4" cy="71.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="90.4" y="55.0" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="94.4" y="65.0" fill="#eee" font-size="7">#21 MFE:19.9 MAE:120.7 $-849.10 L0.7 Hold:1.7h</text></g></g>
+<g class="dot"><circle cx="69.5" cy="71.8" r="3" fill="#e74c3c"/><g class="tip"><rect x="75.5" y="55.8" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="79.5" y="65.8" fill="#eee" font-size="7">#22 MFE:13.9 MAE:120.0 $-844.20 L0.7 Hold:1.5h</text></g></g>
+<g class="dot"><circle cx="105.2" cy="73.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="111.2" y="57.0" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="115.2" y="67.0" fill="#eee" font-size="7">#23 MFE:28.3 MAE:119.0 $-837.20 L0.7 Hold:2.7h</text></g></g>
+<g class="dot"><circle cx="266.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="170.6" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="174.6" y="204.0" fill="#eee" font-size="7">#24 MFE:93.4 MAE:0.0 $649.60 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="77.9" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="83.9" y="21.3" width="252" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="87.9" y="31.3" fill="#eee" font-size="7">#25 MFE:17.3 MAE:150.0 $-1054.20 L0.7 Hold:6.1h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#26 MFE:106.3 MAE:0.0 $739.90 L0.7 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="156.0" cy="192.5" r="3" fill="#2ecc71"/><g class="tip"><rect x="162.0" y="176.5" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="166.0" y="186.5" fill="#eee" font-size="7">#27 MFE:48.8 MAE:15.2 $237.30 L0.7 Hold:0.6h</text></g></g>
+<g class="dot"><circle cx="118.3" cy="208.8" r="3" fill="#2ecc71"/><g class="tip"><rect x="124.3" y="192.8" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="128.3" y="202.8" fill="#eee" font-size="7">#28 MFE:33.6 MAE:1.0 $231.00 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="195.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="201.5" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="205.5" y="204.0" fill="#eee" font-size="7">#29 MFE:64.7 MAE:0.0 $401.80 L0.7 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="182.8" cy="176.1" r="3" fill="#2ecc71"/><g class="tip"><rect x="188.8" y="160.1" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="192.8" y="170.1" fill="#eee" font-size="7">#30 MFE:59.6 MAE:29.4 $413.00 L0.7 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="202.7" cy="124.9" r="3" fill="#2ecc71"/><g class="tip"><rect x="208.7" y="108.9" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="212.7" y="118.9" fill="#eee" font-size="7">#31 MFE:67.6 MAE:73.9 $469.00 L0.7 Hold:0.9h</text></g></g>
+<g class="dot"><circle cx="126.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="132.8" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="136.8" y="204.0" fill="#eee" font-size="7">#32 MFE:37.0 MAE:0.0 $244.30 L0.7 Hold:0.2h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L1.0</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=22) &nbsp; WR:86.4% EV:+186.68$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">139</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">25</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">105</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">49</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">70</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">74</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">35</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">99</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="211.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="217.3" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="221.3" y="204.0" fill="#eee" font-size="7">#1 MFE:60.0 MAE:0.0 $594.00 L1.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="117.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="123.3" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="127.3" y="204.0" fill="#eee" font-size="7">#2 MFE:28.0 MAE:0.0 $274.00 L1.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#3 MFE:89.7 MAE:0.0 $891.00 L1.0 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="49.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="33.3" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="43.3" fill="#eee" font-size="7">#4 MFE:0.0 MAE:118.0 $-1186.00 L1.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="114.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="120.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="124.4" y="204.0" fill="#eee" font-size="7">#5 MFE:27.0 MAE:0.0 $264.00 L1.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="120.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="126.2" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="130.2" y="204.0" fill="#eee" font-size="7">#6 MFE:29.0 MAE:0.0 $284.00 L1.0 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="123.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="129.8" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="133.8" y="204.0" fill="#eee" font-size="7">#7 MFE:30.2 MAE:0.0 $296.00 L1.0 Hold:0.9h</text></g></g>
+<g class="dot"><circle cx="276.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="180.3" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="184.3" y="204.0" fill="#eee" font-size="7">#8 MFE:82.1 MAE:0.0 $815.00 L1.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="122.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="128.9" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="132.9" y="204.0" fill="#eee" font-size="7">#9 MFE:29.9 MAE:0.0 $293.00 L1.0 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="118.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="124.8" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="128.8" y="204.0" fill="#eee" font-size="7">#10 MFE:28.5 MAE:0.0 $279.00 L1.0 Hold:3.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#11 MFE:0.0 MAE:126.8 $-1274.00 L1.0 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="212.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="218.5" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="222.5" y="204.0" fill="#eee" font-size="7">#12 MFE:60.4 MAE:0.0 $598.00 L1.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="122.0" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="128.0" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="132.0" y="204.0" fill="#eee" font-size="7">#13 MFE:29.6 MAE:0.0 $290.00 L1.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="112.0" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="118.0" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="122.0" y="204.0" fill="#eee" font-size="7">#14 MFE:26.2 MAE:0.0 $256.00 L1.0 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="124.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="130.6" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="134.6" y="204.0" fill="#eee" font-size="7">#15 MFE:30.5 MAE:0.0 $299.00 L1.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="209.0" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="215.0" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="219.0" y="204.0" fill="#eee" font-size="7">#16 MFE:59.2 MAE:0.0 $586.00 L1.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="124.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="130.3" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="134.3" y="204.0" fill="#eee" font-size="7">#17 MFE:30.4 MAE:0.0 $298.00 L1.0 Hold:0.5h</text></g></g>
+<g class="dot"><circle cx="141.7" cy="155.2" r="3" fill="#2ecc71"/><g class="tip"><rect x="147.7" y="139.2" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="151.7" y="149.2" fill="#eee" font-size="7">#18 MFE:36.3 MAE:40.2 $297.00 L1.0 Hold:0.6h</text></g></g>
+<g class="dot"><circle cx="208.4" cy="154.1" r="3" fill="#2ecc71"/><g class="tip"><rect x="214.4" y="138.1" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="218.4" y="148.1" fill="#eee" font-size="7">#19 MFE:59.0 MAE:41.0 $584.00 L1.0 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="118.2" cy="194.7" r="3" fill="#2ecc71"/><g class="tip"><rect x="124.2" y="178.7" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="128.2" y="188.7" fill="#eee" font-size="7">#20 MFE:28.3 MAE:11.2 $277.00 L1.0 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="70.0" cy="47.2" r="3" fill="#e74c3c"/><g class="tip"><rect x="76.0" y="31.2" width="252" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="80.0" y="41.2" fill="#eee" font-size="7">#21 MFE:11.9 MAE:119.5 $-1201.00 L1.0 Hold:4.1h</text></g></g>
+<g class="dot"><circle cx="125.8" cy="160.1" r="3" fill="#2ecc71"/><g class="tip"><rect x="131.8" y="144.1" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="135.8" y="154.1" fill="#eee" font-size="7">#22 MFE:30.9 MAE:36.6 $293.00 L1.0 Hold:1.2h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L1.5</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=26) &nbsp; WR:88.5% EV:+470.02$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">135</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">36</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">101</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">72</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">68</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">108</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">34</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">144</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="88.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="94.7" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="98.7" y="204.0" fill="#eee" font-size="7">#1 MFE:26.6 MAE:0.0 $390.00 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#2 MFE:0.0 MAE:122.8 $-1851.00 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="92.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="98.9" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="102.9" y="204.0" fill="#eee" font-size="7">#3 MFE:28.7 MAE:0.0 $421.50 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="38.7" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="22.7" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="32.7" fill="#eee" font-size="7">#4 MFE:0.0 MAE:121.8 $-1836.00 L1.5 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="96.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="102.9" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="106.9" y="204.0" fill="#eee" font-size="7">#5 MFE:30.7 MAE:0.0 $451.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="159.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="165.5" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="169.5" y="204.0" fill="#eee" font-size="7">#6 MFE:61.7 MAE:0.0 $916.50 L1.5 Hold:2.2h</text></g></g>
+<g class="dot"><circle cx="97.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="103.9" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="107.9" y="204.0" fill="#eee" font-size="7">#7 MFE:31.2 MAE:0.0 $459.00 L1.5 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="94.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="100.5" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="104.5" y="204.0" fill="#eee" font-size="7">#8 MFE:29.5 MAE:0.0 $433.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="174.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="180.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="184.4" y="204.0" fill="#eee" font-size="7">#9 MFE:69.1 MAE:0.0 $1027.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="94.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="100.5" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="104.5" y="204.0" fill="#eee" font-size="7">#10 MFE:29.5 MAE:0.0 $433.50 L1.5 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="94.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="100.7" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="104.7" y="204.0" fill="#eee" font-size="7">#11 MFE:29.6 MAE:0.0 $435.00 L1.5 Hold:0.5h</text></g></g>
+<g class="dot"><circle cx="89.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="95.5" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="99.5" y="204.0" fill="#eee" font-size="7">#12 MFE:27.0 MAE:0.0 $396.00 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="169.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="175.5" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="179.5" y="204.0" fill="#eee" font-size="7">#13 MFE:66.7 MAE:0.0 $991.50 L1.5 Hold:0.7h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#14 MFE:130.7 MAE:0.0 $1951.50 L1.5 Hold:0.5h</text></g></g>
+<g class="dot"><circle cx="89.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="95.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="99.1" y="204.0" fill="#eee" font-size="7">#15 MFE:26.8 MAE:0.0 $393.00 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="94.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="100.9" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="104.9" y="204.0" fill="#eee" font-size="7">#16 MFE:29.7 MAE:0.0 $436.50 L1.5 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="93.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="99.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="103.1" y="204.0" fill="#eee" font-size="7">#17 MFE:28.8 MAE:0.0 $423.00 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="93.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="99.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="103.1" y="204.0" fill="#eee" font-size="7">#18 MFE:28.8 MAE:0.0 $423.00 L1.5 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="174.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="180.8" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="184.8" y="204.0" fill="#eee" font-size="7">#19 MFE:69.3 MAE:0.0 $1030.50 L1.5 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="197.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="203.4" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="207.4" y="204.0" fill="#eee" font-size="7">#20 MFE:80.5 MAE:0.0 $1198.50 L1.5 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.8" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.8" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.8" fill="#eee" font-size="7">#21 MFE:0.0 MAE:122.4 $-1845.00 L1.5 Hold:1.9h</text></g></g>
+<g class="dot"><circle cx="167.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="173.9" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="177.9" y="204.0" fill="#eee" font-size="7">#22 MFE:65.9 MAE:0.0 $979.50 L1.5 Hold:3.4h</text></g></g>
+<g class="dot"><circle cx="176.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="182.6" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="186.6" y="204.0" fill="#eee" font-size="7">#23 MFE:70.2 MAE:0.0 $1044.00 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="253.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="157.5" y="194.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="161.5" y="204.0" fill="#eee" font-size="7">#24 MFE:108.3 MAE:0.0 $1615.50 L1.5 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="152.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="158.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="162.4" y="204.0" fill="#eee" font-size="7">#25 MFE:58.2 MAE:0.0 $864.00 L1.5 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="175.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="181.8" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="185.8" y="204.0" fill="#eee" font-size="7">#26 MFE:69.8 MAE:0.0 $1038.00 L1.5 Hold:0.1h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L2.0</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=20) &nbsp; WR:80.0% EV:+295.3$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">149</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">29</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">112</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">58</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">74</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">86</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">37</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">115</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="286.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="190.8" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="194.8" y="204.0" fill="#eee" font-size="7">#1 MFE:100.1 MAE:0.0 $1990.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="80.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="64.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="74.0" fill="#eee" font-size="7">#2 MFE:0.0 MAE:101.9 $-2050.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="208.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="214.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="218.1" y="204.0" fill="#eee" font-size="7">#3 MFE:68.8 MAE:0.0 $1364.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="295.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="199.9" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="203.9" y="204.0" fill="#eee" font-size="7">#4 MFE:103.7 MAE:0.0 $2062.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="50.5" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="34.5" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="44.5" fill="#eee" font-size="7">#5 MFE:0.0 MAE:125.0 $-2512.00 L2.0 Hold:1.1h</text></g></g>
+<g class="dot"><circle cx="95.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="101.6" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="105.6" y="204.0" fill="#eee" font-size="7">#6 MFE:24.1 MAE:0.0 $470.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="103.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="109.9" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="113.9" y="204.0" fill="#eee" font-size="7">#7 MFE:27.4 MAE:0.0 $536.00 L2.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="97.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="103.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="107.4" y="204.0" fill="#eee" font-size="7">#8 MFE:24.8 MAE:0.0 $484.00 L2.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="107.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="113.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="117.4" y="204.0" fill="#eee" font-size="7">#9 MFE:28.8 MAE:0.0 $564.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="188.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="194.7" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="198.7" y="204.0" fill="#eee" font-size="7">#10 MFE:61.1 MAE:0.0 $1210.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="111.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="117.2" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="121.2" y="204.0" fill="#eee" font-size="7">#11 MFE:30.3 MAE:0.0 $594.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="182.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="188.4" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="192.4" y="204.0" fill="#eee" font-size="7">#12 MFE:58.6 MAE:0.0 $1160.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="110.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="116.2" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="120.2" y="204.0" fill="#eee" font-size="7">#13 MFE:29.9 MAE:0.0 $586.00 L2.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="120.0" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="126.0" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="130.0" y="204.0" fill="#eee" font-size="7">#14 MFE:33.8 MAE:0.0 $664.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="112.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="118.5" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="122.5" y="204.0" fill="#eee" font-size="7">#15 MFE:30.8 MAE:0.0 $604.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#16 MFE:0.0 MAE:135.4 $-2720.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="60.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="44.0" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="54.0" fill="#eee" font-size="7">#17 MFE:0.0 MAE:117.6 $-2364.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="89.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="95.8" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="99.8" y="204.0" fill="#eee" font-size="7">#18 MFE:21.8 MAE:0.0 $424.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#19 MFE:104.8 MAE:0.0 $2084.00 L2.0 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="131.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="137.6" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="141.6" y="204.0" fill="#eee" font-size="7">#20 MFE:38.4 MAE:0.0 $756.00 L2.0 Hold:0.0h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L3.0</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=23) &nbsp; WR:73.9% EV:+108.0$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">117</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">29</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">88</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">59</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">58</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">88</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">29</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">118</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="82.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="88.8" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="92.8" y="204.0" fill="#eee" font-size="7">#1 MFE:19.4 MAE:0.0 $564.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="109.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="115.6" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="119.6" y="204.0" fill="#eee" font-size="7">#2 MFE:30.3 MAE:0.0 $891.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="208.3" cy="92.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="214.3" y="76.3" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="218.3" y="86.3" fill="#eee" font-size="7">#3 MFE:70.4 MAE:72.3 $2094.00 L3.0 Hold:4.4h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="47.2" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="31.2" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="41.2" fill="#eee" font-size="7">#4 MFE:0.0 MAE:100.0 $-3018.00 L3.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="43.8" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="27.8" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="37.8" fill="#eee" font-size="7">#5 MFE:0.0 MAE:102.1 $-3081.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="108.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.4" y="204.0" fill="#eee" font-size="7">#6 MFE:29.8 MAE:0.0 $876.00 L3.0 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#7 MFE:0.0 MAE:106.1 $-3201.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="44.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="28.3" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="38.3" fill="#eee" font-size="7">#8 MFE:0.0 MAE:101.8 $-3072.00 L3.0 Hold:1.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="46.9" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="30.9" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="40.9" fill="#eee" font-size="7">#9 MFE:0.0 MAE:100.2 $-3024.00 L3.0 Hold:0.5h</text></g></g>
+<g class="dot"><circle cx="99.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="105.2" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="109.2" y="204.0" fill="#eee" font-size="7">#10 MFE:26.1 MAE:0.0 $765.00 L3.0 Hold:0.8h</text></g></g>
+<g class="dot"><circle cx="232.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="238.9" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="242.9" y="204.0" fill="#eee" font-size="7">#11 MFE:80.4 MAE:0.0 $2394.00 L3.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="109.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="115.3" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="119.3" y="204.0" fill="#eee" font-size="7">#12 MFE:30.2 MAE:0.0 $888.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="110.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="116.3" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="120.3" y="204.0" fill="#eee" font-size="7">#13 MFE:30.6 MAE:0.0 $900.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="193.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="199.5" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="203.5" y="204.0" fill="#eee" font-size="7">#14 MFE:64.4 MAE:0.0 $1914.00 L3.0 Hold:0.6h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#15 MFE:107.1 MAE:0.0 $3195.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="104.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="110.2" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="114.2" y="204.0" fill="#eee" font-size="7">#16 MFE:28.1 MAE:0.0 $825.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="88.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="94.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="98.4" y="204.0" fill="#eee" font-size="7">#17 MFE:21.7 MAE:0.0 $633.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="110.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="116.6" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="120.6" y="204.0" fill="#eee" font-size="7">#18 MFE:30.7 MAE:0.0 $903.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="184.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="190.9" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="194.9" y="204.0" fill="#eee" font-size="7">#19 MFE:60.9 MAE:0.0 $1809.00 L3.0 Hold:0.7h</text></g></g>
+<g class="dot"><circle cx="108.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.8" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.8" y="204.0" fill="#eee" font-size="7">#20 MFE:30.0 MAE:0.0 $882.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="40.2" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="24.2" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="34.2" fill="#eee" font-size="7">#21 MFE:0.0 MAE:104.3 $-3147.00 L3.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="91.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="97.9" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="101.9" y="204.0" fill="#eee" font-size="7">#22 MFE:23.1 MAE:0.0 $675.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="103.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="109.7" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="113.7" y="204.0" fill="#eee" font-size="7">#23 MFE:27.9 MAE:0.0 $819.00 L3.0 Hold:0.1h</text></g></g>
+</svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 3 · TP/SL 建議(原始值,不乘倍數)
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>TP/SL 說明</b><br>
+            <b>TP</b> = 該層平均 MFE(不乘倍數)<br>
+            <b>Soft SL</b> = 該層平均 MAE(不乘倍數)<br>
+            <b>Hard SL</b> = 該層歷史最大 MAE(不乘倍數)<br>
+            <b>R:R</b> = TP / Soft SL(≥1.5x 可接受,≥3.0x 優秀)
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="font-size:10px;color:#888;margin-bottom:8px;">
+            TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Max MAE &nbsp;|&nbsp; 全部原始值,不乘倍數
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>n</th>
+                <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td><b>L0.5</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>6</td>
+                <td class="positive">46.1</td>
+                <td style="color:#f39c12">2.9</td>
+                <td class="negative">17.7</td>
+                <td class="positive"><b>15.90x</b></td>
+              </tr>
+              <tr>
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>32</td>
+                <td class="positive">36.0</td>
+                <td style="color:#f39c12">50.0</td>
+                <td class="negative">150.0</td>
+                <td class="negative"><b>0.72x</b></td>
+              </tr>
+              <tr>
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>22</td>
+                <td class="positive">36.7</td>
+                <td style="color:#f39c12">22.4</td>
+                <td class="negative">126.8</td>
+                <td class="positive"><b>1.64x</b></td>
+              </tr>
+              <tr>
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>26</td>
+                <td class="positive">46.0</td>
+                <td style="color:#f39c12">14.1</td>
+                <td class="negative">122.8</td>
+                <td class="positive"><b>3.26x</b></td>
+              </tr>
+              <tr>
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>20</td>
+                <td class="positive">39.4</td>
+                <td style="color:#f39c12">24.0</td>
+                <td class="negative">135.4</td>
+                <td class="positive"><b>1.64x</b></td>
+              </tr>
+              <tr>
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>23</td>
+                <td class="positive">30.9</td>
+                <td style="color:#f39c12">29.9</td>
+                <td class="negative">106.1</td>
+                <td class="negative"><b>1.03x</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">📊 Soft SL vs Hard SL 條形圖</div>
+<svg viewBox="0 0 700 324" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="700" height="324" fill="#0a0a18" rx="6"/><line x1="245.0" y1="20" x2="245.0" y2="304" stroke="#1a1a2a" stroke-width="0.5"/><text x="245.0" y="16" fill="#555" font-size="7" text-anchor="middle">38</text><line x1="390.0" y1="20" x2="390.0" y2="304" stroke="#1a1a2a" stroke-width="0.5"/><text x="390.0" y="16" fill="#555" font-size="7" text-anchor="middle">75</text><line x1="535.0" y1="20" x2="535.0" y2="304" stroke="#1a1a2a" stroke-width="0.5"/><text x="535.0" y="16" fill="#555" font-size="7" text-anchor="middle">112</text><line x1="680.0" y1="20" x2="680.0" y2="304" stroke="#1a1a2a" stroke-width="0.5"/><text x="680.0" y="16" fill="#555" font-size="7" text-anchor="middle">150</text><text x="4" y="36" fill="#ccc" font-size="8">L0.5</text><text x="4" y="46" fill="#FFD700" font-size="8" font-weight="bold">S+</text><rect x="100.0" y="30.0" width="11.2" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="114.2" y="41" fill="#ccc" font-size="7">SL 2.9</text><rect x="100.0" y="45.0" width="68.4" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="171.4" y="56" fill="#ccc" font-size="7">Hard 17.7</text><text x="4" y="80" fill="#ccc" font-size="8">L0.7</text><text x="4" y="90" fill="#3498db" font-size="8" font-weight="bold">B</text><rect x="100.0" y="74.0" width="193.3" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="296.3" y="85" fill="#ccc" font-size="7">SL 50.0</text><rect x="100.0" y="89.0" width="580.0" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="683.0" y="100" fill="#ccc" font-size="7">Hard 150.0</text><text x="4" y="124" fill="#ccc" font-size="8">L1.0</text><text x="4" y="134" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="118.0" width="86.6" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="189.6" y="129" fill="#ccc" font-size="7">SL 22.4</text><rect x="100.0" y="133.0" width="490.3" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="593.3" y="144" fill="#ccc" font-size="7">Hard 126.8</text><text x="4" y="168" fill="#ccc" font-size="8">L1.5</text><text x="4" y="178" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="162.0" width="54.5" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="157.5" y="173" fill="#ccc" font-size="7">SL 14.1</text><rect x="100.0" y="177.0" width="474.8" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="577.8" y="188" fill="#ccc" font-size="7">Hard 122.8</text><text x="4" y="212" fill="#ccc" font-size="8">L2.0</text><text x="4" y="222" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="206.0" width="92.8" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="195.8" y="217" fill="#ccc" font-size="7">SL 24.0</text><rect x="100.0" y="221.0" width="523.5" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="626.5" y="232" fill="#ccc" font-size="7">Hard 135.4</text><text x="4" y="256" fill="#ccc" font-size="8">L3.0</text><text x="4" y="266" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="250.0" width="115.6" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="218.6" y="261" fill="#ccc" font-size="7">SL 29.9</text><rect x="100.0" y="265.0" width="410.3" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="513.3" y="276" fill="#ccc" font-size="7">Hard 106.1</text><rect x="100" y="306" width="10" height="8" fill="#f39c12" rx="1"/><text x="114" y="314" fill="#aaa" font-size="8">Soft SL</text><rect x="170" y="306" width="10" height="8" fill="#e74c3c" rx="1"/><text x="184" y="314" fill="#aaa" font-size="8">Hard SL</text></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 4 · 排行榜(A 級以上)
+          <span class="badge">5 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>排行榜說明</b><br>
+            此 CCY×Direction 內 A 級以上嘅層級,按評級同 EV 降序排列。<br>
+            評級基於 WR(25%) + EV(30%) + Odds(20%) + Count(15%) + Hold(10%)。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Rating</th><th>Layer</th><th>n</th>
+                <th>WR%</th><th>EV$</th><th>Odds$</th><th>OddsPip</th>
+                <th>MFE</th><th>MAE</th><th>Total$</th><th>Hold(h)</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>1</td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td><b>L0.5</b></td>
+                <td>6</td>
+                <td>100.0%</td>
+                <td class="positive"><b>+218.75</b></td>
+                <td>999</td>
+                <td>999</td>
+                <td>46.1</td>
+                <td>2.9</td>
+                <td class="positive">+1,312.50</td>
+                <td>0</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L1.5</b></td>
+                <td>26</td>
+                <td>88.5%</td>
+                <td class="positive"><b>+470.02</b></td>
+                <td>0.42</td>
+                <td>0.43</td>
+                <td>46.0</td>
+                <td>14.1</td>
+                <td class="positive">+12,220.50</td>
+                <td>0</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L2.0</b></td>
+                <td>20</td>
+                <td>80.0%</td>
+                <td class="positive"><b>+295.3</b></td>
+                <td>0.4</td>
+                <td>0.41</td>
+                <td>39.4</td>
+                <td>24.0</td>
+                <td class="positive">+5,906.00</td>
+                <td>0</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L1.0</b></td>
+                <td>22</td>
+                <td>86.4%</td>
+                <td class="positive"><b>+186.68</b></td>
+                <td>0.34</td>
+                <td>0.34</td>
+                <td>36.7</td>
+                <td>22.4</td>
+                <td class="positive">+4,107.00</td>
+                <td>1</td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L3.0</b></td>
+                <td>23</td>
+                <td>73.9%</td>
+                <td class="positive"><b>+108.0</b></td>
+                <td>0.4</td>
+                <td>0.41</td>
+                <td>30.9</td>
+                <td>29.9</td>
+                <td class="positive">+2,484.00</td>
+                <td>0</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 5 · 黑名單(高危層級)
+          <span class="badge">5 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>黑名單說明</b><br>
+            此 CCY×Direction 內 Danger Score ≥ 1 嘅層級。<br>
+            危險因素:負 P&L、低 WR、負 EV、低 Odds、樣本少、深層級。<br>
+            ⚠️ WARNING: 1-3 &nbsp;|&nbsp; 💀 DEADLY: &gt;3
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>危險度</th><th>Danger</th><th>Layer</th><th>Rating</th>
+                <th>n</th><th>WR%</th><th>EV$</th><th>OddsPip</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>💀 DEADLY</td>
+                <td><b>7.9</b></td>
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>32</td>
+                <td>71.9%</td>
+                <td class="negative">-35.81</td>
+                <td>0.34</td>
+                <td class="negative">$-1,145.90</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>3.0</b></td>
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>23</td>
+                <td>73.9%</td>
+                <td class="positive">+108.0</td>
+                <td>0.41</td>
+                <td class="positive">$+2,484.00</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.0</b></td>
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>22</td>
+                <td>86.4%</td>
+                <td class="positive">+186.68</td>
+                <td>0.34</td>
+                <td class="positive">$+4,107.00</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.0</b></td>
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>26</td>
+                <td>88.5%</td>
+                <td class="positive">+470.02</td>
+                <td>0.43</td>
+                <td class="positive">$+12,220.50</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.0</b></td>
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>20</td>
+                <td>80.0%</td>
+                <td class="positive">+295.3</td>
+                <td>0.41</td>
+                <td class="positive">$+5,906.00</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 6 · 恢復力分析
+          <span class="badge">每層恢復天數</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>恢復力說明</b><br>
+            如果該層被止損,需要幾多次最佳 EV 層交易先可以追回損失。<br>
+            🟢 100%勝率或≤4次 &nbsp;|&nbsp; 🟡 5-20次 &nbsp;|&nbsp; 🔴 &gt;20次或EV≤0
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>狀態</th><th>Layer</th><th>Rating</th><th>損失$</th>
+                <th>Best EV$</th><th>恢復次數</th><th>恢復天數</th><th>說明</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.5</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td class="negative">$50.00</td>
+                <td class="positive">+470.02</td>
+                <td><b>1</b></td>
+                <td>1天</td>
+                <td>100% WR</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td class="negative">$870.02</td>
+                <td class="positive">+470.02</td>
+                <td><b>2</b></td>
+                <td>1天</td>
+                <td>安全 (2次)</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$1,220.33</td>
+                <td class="positive">+470.02</td>
+                <td><b>3</b></td>
+                <td>2天</td>
+                <td>安全 (3次)</td>
+              </tr>
+              <tr>
+                <td>🟢</td>
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$1,844.00</td>
+                <td class="positive">+470.02</td>
+                <td><b>4</b></td>
+                <td>3天</td>
+                <td>安全 (4次)</td>
+              </tr>
+              <tr>
+                <td>🟡</td>
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$2,411.50</td>
+                <td class="positive">+470.02</td>
+                <td><b>6</b></td>
+                <td>4天</td>
+                <td>需時 (6次)</td>
+              </tr>
+              <tr>
+                <td>🟡</td>
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$3,090.50</td>
+                <td class="positive">+470.02</td>
+                <td><b>7</b></td>
+                <td>5天</td>
+                <td>需時 (7次)</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 7 · 層級 TP/SL 盈利分析
+          <span class="badge">5/6 層盈利</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>層級 TP/SL 盈利分析說明</b><br>
+            基於 CCY 總覽統計,分析每層 TP/SL 是否有盈利邊緣。<br><br>
+            <b>TP/SL</b>: 該層實際 MFE(最大有利波幅)= TP 能力,MAE(最大不利波幅)= SL 風險<br>
+            <b>Edge</b>: WR × TP - (1-WR) × SL,正值 = 有盈利邊緣<br>
+            <b>vs CCY</b>: 與 CCY 平均嘅偏差百分比<br>
+            <span style="color:#2ecc71">綠色行</span> = 盈利層 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = 虧損層
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-bottom:8px">
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY WR</div><div style="color:#FFD700;font-size:14px;font-weight:bold">80.6%</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY EV$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+192.9</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY TP (Avg MFE)</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">38.2</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY SL (Avg MAE)</div><div style="color:#e74c3c;font-size:14px;font-weight:bold">28.3</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">盈利層數</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">5/6</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY Total$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+24,884.10</div></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>狀態</th><th>Trades</th><th>WR%</th>
+                <th>TP</th><th>SL</th><th>Hard SL</th><th>TP/SL比</th>
+                <th>Edge</th><th>vs CCY TP</th><th>vs CCY SL</th>
+                <th>EV$</th><th>Total$</th><th>盈利%</th>
+              </tr></thead>
+              <tbody>
+              <tr class="row-a">
+                <td><b>L0.5</b></td>
+                <td><span class="rating-badge" style="background:#FFF8E1;color:#FFD700">S+</span></td>
+                <td>✅</td>
+                <td>6</td>
+                <td>100.0%</td>
+                <td style="color:#2ecc71">46.1</td>
+                <td style="color:#f39c12">2.9</td>
+                <td style="color:#e74c3c">17.7</td>
+                <td>15.9</td>
+                <td class="positive">+46.1</td>
+                <td style="color:#2ecc71">+20.6%</td>
+                <td style="color:#2ecc71">-89.7%</td>
+                <td class="positive">+218.75</td>
+                <td class="positive"><b>+1,312.50</b></td>
+                <td>21875.0%</td>
+              </tr>
+              <tr class="row-d">
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>❌</td>
+                <td>32</td>
+                <td>71.9%</td>
+                <td style="color:#2ecc71">36.0</td>
+                <td style="color:#f39c12">50.0</td>
+                <td style="color:#e74c3c">150.0</td>
+                <td>0.72</td>
+                <td class="positive">+11.83</td>
+                <td style="color:#e74c3c">-5.8%</td>
+                <td style="color:#e74c3c">+77.0%</td>
+                <td class="negative">-35.81</td>
+                <td class="negative"><b>-1,145.90</b></td>
+                <td>-4.1%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>22</td>
+                <td>86.4%</td>
+                <td style="color:#2ecc71">36.7</td>
+                <td style="color:#f39c12">22.4</td>
+                <td style="color:#e74c3c">126.8</td>
+                <td>1.64</td>
+                <td class="positive">+28.66</td>
+                <td style="color:#e74c3c">-4.0%</td>
+                <td style="color:#2ecc71">-20.7%</td>
+                <td class="positive">+186.68</td>
+                <td class="positive"><b>+4,107.00</b></td>
+                <td>15.3%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>26</td>
+                <td>88.5%</td>
+                <td style="color:#2ecc71">46.0</td>
+                <td style="color:#f39c12">14.1</td>
+                <td style="color:#e74c3c">122.8</td>
+                <td>3.26</td>
+                <td class="positive">+39.09</td>
+                <td style="color:#2ecc71">+20.3%</td>
+                <td style="color:#2ecc71">-50.1%</td>
+                <td class="positive">+470.02</td>
+                <td class="positive"><b>+12,220.50</b></td>
+                <td>25.5%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>20</td>
+                <td>80.0%</td>
+                <td style="color:#2ecc71">39.4</td>
+                <td style="color:#f39c12">24.0</td>
+                <td style="color:#e74c3c">135.4</td>
+                <td>1.64</td>
+                <td class="positive">+26.72</td>
+                <td style="color:#2ecc71">+3.1%</td>
+                <td style="color:#2ecc71">-15.1%</td>
+                <td class="positive">+295.3</td>
+                <td class="positive"><b>+5,906.00</b></td>
+                <td>12.2%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>23</td>
+                <td>73.9%</td>
+                <td style="color:#2ecc71">30.9</td>
+                <td style="color:#f39c12">29.9</td>
+                <td style="color:#e74c3c">106.1</td>
+                <td>1.03</td>
+                <td class="positive">+15.03</td>
+                <td style="color:#e74c3c">-19.2%</td>
+                <td style="color:#e74c3c">+5.8%</td>
+                <td class="positive">+108.0</td>
+                <td class="positive"><b>+2,484.00</b></td>
+                <td>3.5%</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </details>
+
+
+    <details id="ccy-XAUUSD-sell" class="ccy-section">
+      <summary class="ccy-summary">
+        <span style="font-size:16px">📌</span> <b>XAUUSD SELL</b>
+        &nbsp;-&nbsp; <span class="positive">$+11,703.30</span>
+        &nbsp;·&nbsp; 109 trades
+        &nbsp;·&nbsp; WR 78.9%
+        &nbsp;·&nbsp; 5 layers
+      </summary>
+
+      <div class="section">
+        <div class="section-header">
+          Part 1 · 組合概覽
+          <span class="badge">5 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>組合概覽說明</b><br>
+            顯示此 CCY×Direction 下每一層嘅完整統計。<br>
+            <span style="color:#2ecc71">綠色行</span> = A 級以上 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = D 級以下<br><br>
+            <b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br>
+            <b>EV$</b>: 預期盈虧 | <b>Odds</b>: 盈虧比 | <b>MFE/MAE</b>: 最大有利/不利波幅
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
+                <th>WR%</th><th>EV$</th><th>WinPip</th><th>LossPip</th>
+                <th>Odds$</th><th>OddsPip</th><th>MFE</th><th>MAE</th><th>MaxMAE</th>
+                <th>Hold(h)</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+<tr class="row-a">
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>83.3</td>
+                <td>27</td>
+                <td>25:2</td>
+                <td>92.6%</td>
+                <td class="positive">+197.27</td>
+                <td>40.7</td>
+                <td>120.8</td>
+                <td>0.33</td>
+                <td>0.34</td>
+                <td>41.2</td>
+                <td>30.4</td>
+                <td><b>120.8</b></td>
+                <td>1.0</td>
+                <td class="positive"><b>$+5,326.30</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>75.6</td>
+                <td>9</td>
+                <td>7:2</td>
+                <td>77.8%</td>
+                <td class="positive">+72.22</td>
+                <td>45.5</td>
+                <td>124.2</td>
+                <td>0.36</td>
+                <td>0.37</td>
+                <td>35.4</td>
+                <td>37.2</td>
+                <td><b>128.2</b></td>
+                <td>0.7</td>
+                <td class="positive"><b>$+650.00</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>79.0</td>
+                <td>29</td>
+                <td>23:6</td>
+                <td>79.3%</td>
+                <td class="positive">+210.83</td>
+                <td>50.4</td>
+                <td>122.4</td>
+                <td>0.4</td>
+                <td>0.41</td>
+                <td>40.0</td>
+                <td>25.3</td>
+                <td><b>128.9</b></td>
+                <td>0.3</td>
+                <td class="positive"><b>$+6,114.00</b></td>
+              </tr>
+<tr class="row-a">
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>72.9</td>
+                <td>22</td>
+                <td>15:7</td>
+                <td>68.2%</td>
+                <td class="positive">+39.82</td>
+                <td>61.3</td>
+                <td>123.2</td>
+                <td>0.49</td>
+                <td>0.5</td>
+                <td>41.8</td>
+                <td>39.2</td>
+                <td><b>131.1</b></td>
+                <td>0.1</td>
+                <td class="positive"><b>$+876.00</b></td>
+              </tr>
+<tr>
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>48.5</td>
+                <td>22</td>
+                <td>16:6</td>
+                <td>72.7%</td>
+                <td class="negative">-57.41</td>
+                <td>36.0</td>
+                <td>100.9</td>
+                <td>0.35</td>
+                <td>0.36</td>
+                <td>26.3</td>
+                <td>27.5</td>
+                <td><b>102.4</b></td>
+                <td>0.2</td>
+                <td class="negative"><b>$-1,263.00</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 2 · MFE/MAE 散點分析
+          <span class="badge">每層一圖 · 綠=Win · 紅=Loss · Hover 查詳情</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>MFE/MAE 散點分析</b><br>
+            每層獨立嘅散點圖:X=MFE(最大有利波幅),Y=-MAE(最大不利波幅)。<br>
+            綠色 = 盈利交易 | 紅色 = 虧損交易<br>
+            Hover 可查看每筆交易詳情。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="scatter-grid">
+            <div class="scatter-card">
+              <div class="title"><b>L0.7</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=27) &nbsp; WR:92.6% EV:+197.27$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">133</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">29</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">100</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">59</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">66</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">88</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">33</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">117</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="109.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="115.3" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="119.3" y="204.0" fill="#eee" font-size="7">#1 MFE:30.0 MAE:0.0 $205.80 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="107.1" cy="123.9" r="3" fill="#2ecc71"/><g class="tip"><rect x="113.1" y="107.9" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="117.1" y="117.9" fill="#eee" font-size="7">#2 MFE:29.1 MAE:60.2 $199.50 L0.7 Hold:4.2h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#3 MFE:106.4 MAE:0.0 $740.60 L0.7 Hold:1.2h</text></g></g>
+<g class="dot"><circle cx="212.9" cy="197.1" r="3" fill="#2ecc71"/><g class="tip"><rect x="218.9" y="181.1" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="222.9" y="191.1" fill="#eee" font-size="7">#4 MFE:71.8 MAE:9.0 $498.40 L0.7 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="102.6" cy="106.5" r="3" fill="#2ecc71"/><g class="tip"><rect x="108.6" y="90.5" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="112.6" y="100.5" fill="#eee" font-size="7">#5 MFE:27.3 MAE:72.4 $186.90 L0.7 Hold:1.5h</text></g></g>
+<g class="dot"><circle cx="108.8" cy="157.4" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.8" y="141.4" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.8" y="151.4" fill="#eee" font-size="7">#6 MFE:29.8 MAE:36.8 $204.40 L0.7 Hold:0.6h</text></g></g>
+<g class="dot"><circle cx="230.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="236.7" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="240.7" y="204.0" fill="#eee" font-size="7">#7 MFE:79.0 MAE:0.0 $548.80 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="141.0" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="147.0" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="151.0" y="204.0" fill="#eee" font-size="7">#8 MFE:42.8 MAE:0.0 $200.20 L0.7 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="135.6" cy="118.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="141.6" y="102.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="145.6" y="112.3" fill="#eee" font-size="7">#9 MFE:40.6 MAE:64.1 $205.10 L0.7 Hold:0.9h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#10 MFE:0.0 MAE:120.8 $-849.80 L0.7 Hold:4.9h</text></g></g>
+<g class="dot"><circle cx="109.6" cy="73.4" r="3" fill="#2ecc71"/><g class="tip"><rect x="115.6" y="57.4" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="119.6" y="67.4" fill="#eee" font-size="7">#11 MFE:30.1 MAE:95.5 $206.50 L0.7 Hold:5.8h</text></g></g>
+<g class="dot"><circle cx="149.0" cy="201.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="155.0" y="185.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="159.0" y="195.0" fill="#eee" font-size="7">#12 MFE:46.0 MAE:6.3 $194.60 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="123.2" cy="165.4" r="3" fill="#2ecc71"/><g class="tip"><rect x="129.2" y="149.4" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="133.2" y="159.4" fill="#eee" font-size="7">#13 MFE:35.6 MAE:31.2 $202.30 L0.7 Hold:0.9h</text></g></g>
+<g class="dot"><circle cx="102.6" cy="195.8" r="3" fill="#2ecc71"/><g class="tip"><rect x="108.6" y="179.8" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="112.6" y="189.8" fill="#eee" font-size="7">#14 MFE:27.3 MAE:9.9 $186.90 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="129.9" cy="199.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="135.9" y="183.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="139.9" y="193.3" fill="#eee" font-size="7">#15 MFE:38.3 MAE:7.5 $191.80 L0.7 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="104.9" cy="189.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="110.9" y="173.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="114.9" y="183.0" fill="#eee" font-size="7">#16 MFE:28.2 MAE:14.7 $193.20 L0.7 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="87.8" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="93.8" y="21.3" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="97.8" y="31.3" fill="#eee" font-size="7">#17 MFE:21.3 MAE:120.8 $-849.80 L0.7 Hold:1.4h</text></g></g>
+<g class="dot"><circle cx="118.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="124.7" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="128.7" y="204.0" fill="#eee" font-size="7">#18 MFE:33.8 MAE:0.0 $217.70 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="119.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="125.5" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="129.5" y="204.0" fill="#eee" font-size="7">#19 MFE:34.1 MAE:0.0 $234.50 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="102.1" cy="151.9" r="3" fill="#2ecc71"/><g class="tip"><rect x="108.1" y="135.9" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="112.1" y="145.9" fill="#eee" font-size="7">#20 MFE:27.1 MAE:40.6 $185.50 L0.7 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="108.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.1" y="204.0" fill="#eee" font-size="7">#21 MFE:29.5 MAE:0.0 $202.30 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="125.2" cy="74.2" r="3" fill="#2ecc71"/><g class="tip"><rect x="131.2" y="58.2" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="135.2" y="68.2" fill="#eee" font-size="7">#22 MFE:36.4 MAE:95.0 $206.50 L0.7 Hold:2.8h</text></g></g>
+<g class="dot"><circle cx="102.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="108.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="112.1" y="204.0" fill="#eee" font-size="7">#23 MFE:27.1 MAE:0.0 $185.50 L0.7 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="187.9" cy="183.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="193.9" y="167.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="197.9" y="177.0" fill="#eee" font-size="7">#24 MFE:61.7 MAE:18.9 $427.70 L0.7 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="231.0" cy="183.8" r="3" fill="#2ecc71"/><g class="tip"><rect x="237.0" y="167.8" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="241.0" y="177.8" fill="#eee" font-size="7">#25 MFE:79.1 MAE:18.3 $549.50 L0.7 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="181.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="187.9" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="191.9" y="204.0" fill="#eee" font-size="7">#26 MFE:59.3 MAE:0.0 $410.90 L0.7 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="136.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="142.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="146.1" y="204.0" fill="#eee" font-size="7">#27 MFE:40.8 MAE:0.0 $240.80 L0.7 Hold:0.3h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L1.0</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=9) &nbsp; WR:77.8% EV:+72.22$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">141</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">24</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">106</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">48</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">71</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">72</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">35</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">95</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="280.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="184.1" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="188.1" y="204.0" fill="#eee" font-size="7">#1 MFE:80.6 MAE:0.0 $800.00 L1.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="124.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="130.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="134.4" y="204.0" fill="#eee" font-size="7">#2 MFE:29.4 MAE:0.0 $288.00 L1.0 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#3 MFE:0.0 MAE:128.2 $-1288.00 L1.0 Hold:1.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="48.1" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="32.1" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="42.1" fill="#eee" font-size="7">#4 MFE:0.0 MAE:120.2 $-1208.00 L1.0 Hold:1.3h</text></g></g>
+<g class="dot"><circle cx="129.0" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="135.0" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="139.0" y="204.0" fill="#eee" font-size="7">#5 MFE:30.9 MAE:0.0 $303.00 L1.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="124.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="130.7" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="134.7" y="204.0" fill="#eee" font-size="7">#6 MFE:29.5 MAE:0.0 $289.00 L1.0 Hold:1.0h</text></g></g>
+<g class="dot"><circle cx="132.0" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="138.0" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="142.0" y="204.0" fill="#eee" font-size="7">#7 MFE:31.9 MAE:0.0 $313.00 L1.0 Hold:1.3h</text></g></g>
+<g class="dot"><circle cx="125.6" cy="150.3" r="3" fill="#2ecc71"/><g class="tip"><rect x="131.6" y="134.3" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="135.6" y="144.3" fill="#eee" font-size="7">#8 MFE:29.8 MAE:44.3 $292.00 L1.0 Hold:1.0h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="153.4" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="137.4" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="147.4" fill="#eee" font-size="7">#9 MFE:86.7 MAE:42.0 $861.00 L1.0 Hold:0.3h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L1.5</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=29) &nbsp; WR:79.3% EV:+210.83$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">142</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">37</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">106</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">74</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">71</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">111</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">35</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">149</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#1 MFE:135.1 MAE:0.0 $2017.50 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="88.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="94.5" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="98.5" y="204.0" fill="#eee" font-size="7">#2 MFE:27.4 MAE:0.0 $402.00 L1.5 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="49.2" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="33.2" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="43.2" fill="#eee" font-size="7">#3 MFE:0.0 MAE:120.0 $-1809.00 L1.5 Hold:0.7h</text></g></g>
+<g class="dot"><circle cx="287.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="191.7" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="195.7" y="204.0" fill="#eee" font-size="7">#4 MFE:129.5 MAE:0.0 $1933.50 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="286.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="190.3" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="194.3" y="204.0" fill="#eee" font-size="7">#5 MFE:128.8 MAE:0.0 $1923.00 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="99.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="105.6" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="109.6" y="204.0" fill="#eee" font-size="7">#6 MFE:33.1 MAE:0.0 $487.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="93.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="99.5" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="103.5" y="204.0" fill="#eee" font-size="7">#7 MFE:30.0 MAE:0.0 $441.00 L1.5 Hold:3.6h</text></g></g>
+<g class="dot"><circle cx="93.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="99.7" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="103.7" y="204.0" fill="#eee" font-size="7">#8 MFE:30.1 MAE:0.0 $442.50 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="90.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="96.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="100.4" y="204.0" fill="#eee" font-size="7">#9 MFE:28.4 MAE:0.0 $417.00 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="147.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="153.2" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="157.2" y="204.0" fill="#eee" font-size="7">#10 MFE:57.5 MAE:0.0 $853.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="92.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="98.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="102.4" y="204.0" fill="#eee" font-size="7">#11 MFE:29.4 MAE:0.0 $432.00 L1.5 Hold:1.1h</text></g></g>
+<g class="dot"><circle cx="93.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="99.2" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="103.2" y="204.0" fill="#eee" font-size="7">#12 MFE:29.8 MAE:0.0 $438.00 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="72.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="78.9" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="82.9" y="204.0" fill="#eee" font-size="7">#13 MFE:19.4 MAE:0.0 $282.00 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="45.7" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="29.7" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="39.7" fill="#eee" font-size="7">#14 MFE:0.0 MAE:122.6 $-1848.00 L1.5 Hold:1.7h</text></g></g>
+<g class="dot"><circle cx="86.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="92.3" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="96.3" y="204.0" fill="#eee" font-size="7">#15 MFE:26.3 MAE:0.0 $385.50 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="47.7" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="31.7" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="41.7" fill="#eee" font-size="7">#16 MFE:0.0 MAE:121.1 $-1825.50 L1.5 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="104.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="110.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="114.1" y="204.0" fill="#eee" font-size="7">#17 MFE:35.4 MAE:0.0 $522.00 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="45.2" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="29.2" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="39.2" fill="#eee" font-size="7">#18 MFE:0.0 MAE:123.0 $-1854.00 L1.5 Hold:1.1h</text></g></g>
+<g class="dot"><circle cx="90.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="96.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="100.4" y="204.0" fill="#eee" font-size="7">#19 MFE:28.4 MAE:0.0 $417.00 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="189.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="195.4" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="199.4" y="204.0" fill="#eee" font-size="7">#20 MFE:79.1 MAE:0.0 $1177.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="177.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="183.6" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="187.6" y="204.0" fill="#eee" font-size="7">#21 MFE:73.1 MAE:0.0 $1087.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="90.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="96.6" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="100.6" y="204.0" fill="#eee" font-size="7">#22 MFE:28.5 MAE:0.0 $418.50 L1.5 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="89.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="95.8" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="99.8" y="204.0" fill="#eee" font-size="7">#23 MFE:28.1 MAE:0.0 $412.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="205.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="211.6" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="215.6" y="204.0" fill="#eee" font-size="7">#24 MFE:87.4 MAE:0.0 $1302.00 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="91.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="97.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="101.4" y="204.0" fill="#eee" font-size="7">#25 MFE:28.9 MAE:0.0 $424.50 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="94.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="100.5" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="104.5" y="204.0" fill="#eee" font-size="7">#26 MFE:30.5 MAE:0.0 $448.50 L1.5 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#27 MFE:0.0 MAE:128.9 $-1942.50 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="51.1" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="35.1" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="45.1" fill="#eee" font-size="7">#28 MFE:0.0 MAE:118.6 $-1788.00 L1.5 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="103.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="109.3" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="113.3" y="204.0" fill="#eee" font-size="7">#29 MFE:35.0 MAE:0.0 $516.00 L1.5 Hold:0.0h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L2.0</b> <span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span> (n=22) &nbsp; WR:68.2% EV:+39.82$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">144</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">44</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">108</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">88</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">72</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">133</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">36</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">177</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="84.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="90.7" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="94.7" y="204.0" fill="#eee" font-size="7">#1 MFE:30.3 MAE:0.0 $594.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="151.2" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="157.2" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="161.2" y="204.0" fill="#eee" font-size="7">#2 MFE:70.9 MAE:0.0 $1406.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="86.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="92.5" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="96.5" y="204.0" fill="#eee" font-size="7">#3 MFE:31.4 MAE:0.0 $616.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="77.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="83.6" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="87.6" y="204.0" fill="#eee" font-size="7">#4 MFE:26.0 MAE:0.0 $508.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="230.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="236.4" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="240.4" y="204.0" fill="#eee" font-size="7">#5 MFE:119.2 MAE:0.0 $2372.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="50.1" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="34.1" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="44.1" fill="#eee" font-size="7">#6 MFE:0.0 MAE:121.4 $-2440.00 L2.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="76.3" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="82.3" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="86.3" y="204.0" fill="#eee" font-size="7">#7 MFE:25.2 MAE:0.0 $492.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="87.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="93.8" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="97.8" y="204.0" fill="#eee" font-size="7">#8 MFE:32.2 MAE:0.0 $632.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="51.9" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="35.9" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="45.9" fill="#eee" font-size="7">#9 MFE:0.0 MAE:120.0 $-2412.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#10 MFE:0.0 MAE:131.1 $-2634.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="48.2" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="32.2" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="42.2" fill="#eee" font-size="7">#11 MFE:0.0 MAE:122.8 $-2468.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#12 MFE:160.8 MAE:0.0 $3204.00 L2.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="80.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="86.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="90.1" y="204.0" fill="#eee" font-size="7">#13 MFE:27.5 MAE:0.0 $538.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="210.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="216.6" y="194.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="220.6" y="204.0" fill="#eee" font-size="7">#14 MFE:107.1 MAE:0.0 $2130.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="44.5" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="28.5" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="38.5" fill="#eee" font-size="7">#15 MFE:0.0 MAE:125.6 $-2524.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="64.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="70.8" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="74.8" y="204.0" fill="#eee" font-size="7">#16 MFE:18.2 MAE:0.0 $352.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="50.4" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="34.4" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="44.4" fill="#eee" font-size="7">#17 MFE:0.0 MAE:121.1 $-2434.00 L2.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="82.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="88.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="92.1" y="204.0" fill="#eee" font-size="7">#18 MFE:28.7 MAE:0.0 $562.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="58.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="64.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="68.1" y="204.0" fill="#eee" font-size="7">#19 MFE:14.1 MAE:0.0 $270.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="240.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="246.9" y="194.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="250.9" y="204.0" fill="#eee" font-size="7">#20 MFE:125.6 MAE:0.0 $2500.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="202.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="208.4" y="194.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="212.4" y="204.0" fill="#eee" font-size="7">#21 MFE:102.1 MAE:0.0 $2030.00 L2.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="51.5" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="35.5" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="45.5" fill="#eee" font-size="7">#22 MFE:0.0 MAE:120.3 $-2418.00 L2.0 Hold:0.6h</text></g></g>
+</svg>
+            </div>
+            <div class="scatter-card">
+              <div class="title"><b>L3.0</b> <span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span> (n=22) &nbsp; WR:72.7% EV:-57.41$</div>
+              <svg viewBox="0 0 340 240" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="340" height="240" fill="#0a0a18" rx="4"/><line x1="35.0" y1="20" x2="35.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="20.0" x2="325" y2="20.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="35.0" y="232" fill="#555" font-size="7" text-anchor="middle">0</text><text x="31" y="23.0" fill="#555" font-size="7" text-anchor="end">113</text><line x1="107.5" y1="20" x2="107.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="67.5" x2="325" y2="67.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="107.5" y="232" fill="#555" font-size="7" text-anchor="middle">28</text><text x="31" y="70.5" fill="#555" font-size="7" text-anchor="end">84</text><line x1="180.0" y1="20" x2="180.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="115.0" x2="325" y2="115.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="180.0" y="232" fill="#555" font-size="7" text-anchor="middle">57</text><text x="31" y="118.0" fill="#555" font-size="7" text-anchor="end">56</text><line x1="252.5" y1="20" x2="252.5" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="162.5" x2="325" y2="162.5" stroke="#1a1a2a" stroke-width="0.5"/><text x="252.5" y="232" fill="#555" font-size="7" text-anchor="middle">85</text><text x="31" y="165.5" fill="#555" font-size="7" text-anchor="end">28</text><line x1="325.0" y1="20" x2="325.0" y2="210" stroke="#1a1a2a" stroke-width="0.5"/><line x1="35" y1="210.0" x2="325" y2="210.0" stroke="#1a1a2a" stroke-width="0.5"/><text x="325.0" y="232" fill="#555" font-size="7" text-anchor="middle">114</text><text x="31" y="213.0" fill="#555" font-size="7" text-anchor="end">0</text><text x="180" y="239" fill="#777" font-size="8" text-anchor="middle">MFE →</text><text x="8" y="115" fill="#777" font-size="8" text-anchor="middle" transform="rotate(-90,8,115)">-MAE →</text><style>.dot{opacity:0.85;cursor:pointer} .dot:hover{opacity:1;r:5} .dot .tip{display:none} .dot:hover .tip{display:block}</style><g class="dot"><circle cx="110.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="116.7" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="120.7" y="204.0" fill="#eee" font-size="7">#1 MFE:29.7 MAE:0.0 $831.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="108.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.9" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.9" y="204.0" fill="#eee" font-size="7">#2 MFE:29.0 MAE:0.0 $852.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="111.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="117.4" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="121.4" y="204.0" fill="#eee" font-size="7">#3 MFE:30.0 MAE:0.0 $882.00 L3.0 Hold:0.6h</text></g></g>
+<g class="dot"><circle cx="244.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="148.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="152.1" y="204.0" fill="#eee" font-size="7">#4 MFE:82.1 MAE:0.0 $2445.00 L3.0 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="37.3" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="21.3" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="31.3" fill="#eee" font-size="7">#5 MFE:0.0 MAE:102.4 $-3090.00 L3.0 Hold:0.4h</text></g></g>
+<g class="dot"><circle cx="113.5" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="119.5" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="123.5" y="204.0" fill="#eee" font-size="7">#6 MFE:30.8 MAE:0.0 $906.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="298.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="202.6" y="194.0" width="237" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="206.6" y="204.0" fill="#eee" font-size="7">#7 MFE:103.5 MAE:0.0 $3087.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="104.8" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="110.8" y="194.0" width="226" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="114.8" y="204.0" fill="#eee" font-size="7">#8 MFE:27.4 MAE:0.0 $804.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="40.5" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="24.5" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="34.5" fill="#eee" font-size="7">#9 MFE:0.0 MAE:100.5 $-3033.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="108.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.4" y="204.0" fill="#eee" font-size="7">#10 MFE:28.8 MAE:0.0 $846.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="39.6" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="23.6" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="33.6" fill="#eee" font-size="7">#11 MFE:0.0 MAE:101.0 $-3048.00 L3.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="108.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.4" y="204.0" fill="#eee" font-size="7">#12 MFE:28.8 MAE:0.0 $846.00 L3.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="110.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="116.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="120.1" y="204.0" fill="#eee" font-size="7">#13 MFE:29.5 MAE:0.0 $867.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="108.4" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="114.4" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="118.4" y="204.0" fill="#eee" font-size="7">#14 MFE:28.8 MAE:0.0 $846.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="43.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="27.0" width="242" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="37.0" fill="#eee" font-size="7">#15 MFE:0.0 MAE:99.0 $-2988.00 L3.0 Hold:0.2h</text></g></g>
+<g class="dot"><circle cx="98.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="104.9" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="108.9" y="204.0" fill="#eee" font-size="7">#16 MFE:25.1 MAE:0.0 $735.00 L3.0 Hold:0.3h</text></g></g>
+<g class="dot"><circle cx="112.9" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="118.9" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="122.9" y="204.0" fill="#eee" font-size="7">#17 MFE:30.6 MAE:0.0 $900.00 L3.0 Hold:1.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="39.1" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="23.1" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="33.1" fill="#eee" font-size="7">#18 MFE:0.0 MAE:101.3 $-3057.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="100.7" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="106.7" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="110.7" y="204.0" fill="#eee" font-size="7">#19 MFE:25.8 MAE:0.0 $756.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="35.0" cy="39.0" r="3" fill="#e74c3c"/><g class="tip"><rect x="41.0" y="23.0" width="247" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="45.0" y="33.0" fill="#eee" font-size="7">#20 MFE:0.0 MAE:101.4 $-3060.00 L3.0 Hold:0.0h</text></g></g>
+<g class="dot"><circle cx="96.1" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="102.1" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="106.1" y="204.0" fill="#eee" font-size="7">#21 MFE:24.0 MAE:0.0 $702.00 L3.0 Hold:0.1h</text></g></g>
+<g class="dot"><circle cx="96.6" cy="210.0" r="3" fill="#2ecc71"/><g class="tip"><rect x="102.6" y="194.0" width="232" height="14" fill="#1a1a3e" stroke="#4a3f8a" rx="3"/><text x="106.6" y="204.0" fill="#eee" font-size="7">#22 MFE:24.2 MAE:0.0 $708.00 L3.0 Hold:0.0h</text></g></g>
+</svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 3 · TP/SL 建議(原始值,不乘倍數)
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>TP/SL 說明</b><br>
+            <b>TP</b> = 該層平均 MFE(不乘倍數)<br>
+            <b>Soft SL</b> = 該層平均 MAE(不乘倍數)<br>
+            <b>Hard SL</b> = 該層歷史最大 MAE(不乘倍數)<br>
+            <b>R:R</b> = TP / Soft SL(≥1.5x 可接受,≥3.0x 優秀)
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="font-size:10px;color:#888;margin-bottom:8px;">
+            TP = Avg MFE &nbsp;|&nbsp; Soft SL = Avg MAE &nbsp;|&nbsp; Hard SL = Max MAE &nbsp;|&nbsp; 全部原始值,不乘倍數
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>n</th>
+                <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>27</td>
+                <td class="positive">41.2</td>
+                <td style="color:#f39c12">30.4</td>
+                <td class="negative">120.8</td>
+                <td class="negative"><b>1.36x</b></td>
+              </tr>
+              <tr>
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>9</td>
+                <td class="positive">35.4</td>
+                <td style="color:#f39c12">37.2</td>
+                <td class="negative">128.2</td>
+                <td class="negative"><b>0.95x</b></td>
+              </tr>
+              <tr>
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>29</td>
+                <td class="positive">40.0</td>
+                <td style="color:#f39c12">25.3</td>
+                <td class="negative">128.9</td>
+                <td class="positive"><b>1.58x</b></td>
+              </tr>
+              <tr>
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>22</td>
+                <td class="positive">41.8</td>
+                <td style="color:#f39c12">39.2</td>
+                <td class="negative">131.1</td>
+                <td class="negative"><b>1.07x</b></td>
+              </tr>
+              <tr>
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>22</td>
+                <td class="positive">26.3</td>
+                <td style="color:#f39c12">27.5</td>
+                <td class="negative">102.4</td>
+                <td class="negative"><b>0.96x</b></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">📊 Soft SL vs Hard SL 條形圖</div>
+<svg viewBox="0 0 700 280" style="width:100%;height:auto;font-family:sans-serif" xmlns="http://www.w3.org/2000/svg"><rect width="700" height="280" fill="#0a0a18" rx="6"/><line x1="245.0" y1="20" x2="245.0" y2="260" stroke="#1a1a2a" stroke-width="0.5"/><text x="245.0" y="16" fill="#555" font-size="7" text-anchor="middle">33</text><line x1="390.0" y1="20" x2="390.0" y2="260" stroke="#1a1a2a" stroke-width="0.5"/><text x="390.0" y="16" fill="#555" font-size="7" text-anchor="middle">66</text><line x1="535.0" y1="20" x2="535.0" y2="260" stroke="#1a1a2a" stroke-width="0.5"/><text x="535.0" y="16" fill="#555" font-size="7" text-anchor="middle">98</text><line x1="680.0" y1="20" x2="680.0" y2="260" stroke="#1a1a2a" stroke-width="0.5"/><text x="680.0" y="16" fill="#555" font-size="7" text-anchor="middle">131</text><text x="4" y="36" fill="#ccc" font-size="8">L0.7</text><text x="4" y="46" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="30.0" width="134.5" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="237.5" y="41" fill="#ccc" font-size="7">SL 30.4</text><rect x="100.0" y="45.0" width="534.4" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="637.4" y="56" fill="#ccc" font-size="7">Hard 120.8</text><text x="4" y="80" fill="#ccc" font-size="8">L1.0</text><text x="4" y="90" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="74.0" width="164.6" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="267.6" y="85" fill="#ccc" font-size="7">SL 37.2</text><rect x="100.0" y="89.0" width="567.2" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="670.2" y="100" fill="#ccc" font-size="7">Hard 128.2</text><text x="4" y="124" fill="#ccc" font-size="8">L1.5</text><text x="4" y="134" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="118.0" width="111.9" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="214.9" y="129" fill="#ccc" font-size="7">SL 25.3</text><rect x="100.0" y="133.0" width="570.3" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="673.3" y="144" fill="#ccc" font-size="7">Hard 128.9</text><text x="4" y="168" fill="#ccc" font-size="8">L2.0</text><text x="4" y="178" fill="#9b59b6" font-size="8" font-weight="bold">S</text><rect x="100.0" y="162.0" width="173.4" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="276.4" y="173" fill="#ccc" font-size="7">SL 39.2</text><rect x="100.0" y="177.0" width="580.0" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="683.0" y="188" fill="#ccc" font-size="7">Hard 131.1</text><text x="4" y="212" fill="#ccc" font-size="8">L3.0</text><text x="4" y="222" fill="#3498db" font-size="8" font-weight="bold">B</text><rect x="100.0" y="206.0" width="121.7" height="14" fill="#f39c12" rx="2" opacity="0.85"/><text x="224.7" y="217" fill="#ccc" font-size="7">SL 27.5</text><rect x="100.0" y="221.0" width="453.0" height="14" fill="#e74c3c" rx="2" opacity="0.85"/><text x="556.0" y="232" fill="#ccc" font-size="7">Hard 102.4</text><rect x="100" y="262" width="10" height="8" fill="#f39c12" rx="1"/><text x="114" y="270" fill="#aaa" font-size="8">Soft SL</text><rect x="170" y="262" width="10" height="8" fill="#e74c3c" rx="1"/><text x="184" y="270" fill="#aaa" font-size="8">Hard SL</text></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 4 · 排行榜(A 級以上)
+          <span class="badge">4 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>排行榜說明</b><br>
+            此 CCY×Direction 內 A 級以上嘅層級,按評級同 EV 降序排列。<br>
+            評級基於 WR(25%) + EV(30%) + Odds(20%) + Count(15%) + Hold(10%)。
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Rating</th><th>Layer</th><th>n</th>
+                <th>WR%</th><th>EV$</th><th>Odds$</th><th>OddsPip</th>
+                <th>MFE</th><th>MAE</th><th>Total$</th><th>Hold(h)</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>1</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L1.5</b></td>
+                <td>29</td>
+                <td>79.3%</td>
+                <td class="positive"><b>+210.83</b></td>
+                <td>0.4</td>
+                <td>0.41</td>
+                <td>40.0</td>
+                <td>25.3</td>
+                <td class="positive">+6,114.00</td>
+                <td>0</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L0.7</b></td>
+                <td>27</td>
+                <td>92.6%</td>
+                <td class="positive"><b>+197.27</b></td>
+                <td>0.33</td>
+                <td>0.34</td>
+                <td>41.2</td>
+                <td>30.4</td>
+                <td class="positive">+5,326.30</td>
+                <td>1</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L1.0</b></td>
+                <td>9</td>
+                <td>77.8%</td>
+                <td class="positive"><b>+72.22</b></td>
+                <td>0.36</td>
+                <td>0.37</td>
+                <td>35.4</td>
+                <td>37.2</td>
+                <td class="positive">+650.00</td>
+                <td>1</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td><b>L2.0</b></td>
+                <td>22</td>
+                <td>68.2%</td>
+                <td class="positive"><b>+39.82</b></td>
+                <td>0.49</td>
+                <td>0.5</td>
+                <td>41.8</td>
+                <td>39.2</td>
+                <td class="positive">+876.00</td>
+                <td>0</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 5 · 黑名單(高危層級)
+          <span class="badge">5 層</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>黑名單說明</b><br>
+            此 CCY×Direction 內 Danger Score ≥ 1 嘅層級。<br>
+            危險因素:負 P&L、低 WR、負 EV、低 Odds、樣本少、深層級。<br>
+            ⚠️ WARNING: 1-3 &nbsp;|&nbsp; 💀 DEADLY: &gt;3
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>危險度</th><th>Danger</th><th>Layer</th><th>Rating</th>
+                <th>n</th><th>WR%</th><th>EV$</th><th>OddsPip</th><th>Total$</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>💀 DEADLY</td>
+                <td><b>9.5</b></td>
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>22</td>
+                <td>72.7%</td>
+                <td class="negative">-57.41</td>
+                <td>0.36</td>
+                <td class="negative">$-1,263.00</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.0</b></td>
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>27</td>
+                <td>92.6%</td>
+                <td class="positive">+197.27</td>
+                <td>0.34</td>
+                <td class="positive">$+5,326.30</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.0</b></td>
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>9</td>
+                <td>77.8%</td>
+                <td class="positive">+72.22</td>
+                <td>0.37</td>
+                <td class="positive">$+650.00</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.0</b></td>
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>29</td>
+                <td>79.3%</td>
+                <td class="positive">+210.83</td>
+                <td>0.41</td>
+                <td class="positive">$+6,114.00</td>
+              </tr>
+              <tr>
+                <td>⚠️ WARNING</td>
+                <td><b>2.0</b></td>
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>22</td>
+                <td>68.2%</td>
+                <td class="positive">+39.82</td>
+                <td>0.5</td>
+                <td class="positive">$+876.00</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 6 · 恢復力分析
+          <span class="badge">每層恢復天數</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>恢復力說明</b><br>
+            如果該層被止損,需要幾多次最佳 EV 層交易先可以追回損失。<br>
+            🟢 100%勝率或≤4次 &nbsp;|&nbsp; 🟡 5-20次 &nbsp;|&nbsp; 🔴 &gt;20次或EV≤0
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>狀態</th><th>Layer</th><th>Rating</th><th>損失$</th>
+                <th>Best EV$</th><th>恢復次數</th><th>恢復天數</th><th>說明</th>
+              </tr></thead>
+              <tbody>
+              <tr>
+                <td>🟡</td>
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$849.80</td>
+                <td class="positive">+210.83</td>
+                <td><b>5</b></td>
+                <td>4天</td>
+                <td>需時 (5次)</td>
+              </tr>
+              <tr>
+                <td>🟡</td>
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$1,248.00</td>
+                <td class="positive">+210.83</td>
+                <td><b>6</b></td>
+                <td>5天</td>
+                <td>需時 (6次)</td>
+              </tr>
+              <tr>
+                <td>🟡</td>
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$1,844.50</td>
+                <td class="positive">+210.83</td>
+                <td><b>9</b></td>
+                <td>7天</td>
+                <td>需時 (9次)</td>
+              </tr>
+              <tr>
+                <td>🟡</td>
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td class="negative">$2,475.71</td>
+                <td class="positive">+210.83</td>
+                <td><b>12</b></td>
+                <td>10天</td>
+                <td>需時 (12次)</td>
+              </tr>
+              <tr>
+                <td>🟡</td>
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td class="negative">$3,046.00</td>
+                <td class="positive">+210.83</td>
+                <td><b>15</b></td>
+                <td>12天</td>
+                <td>需時 (15次)</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          Part 7 · 層級 TP/SL 盈利分析
+          <span class="badge">4/5 層盈利</span>
+          <i class="info-icon" tabindex="0">i<span class="info-tip">
+            <b>層級 TP/SL 盈利分析說明</b><br>
+            基於 CCY 總覽統計,分析每層 TP/SL 是否有盈利邊緣。<br><br>
+            <b>TP/SL</b>: 該層實際 MFE(最大有利波幅)= TP 能力,MAE(最大不利波幅)= SL 風險<br>
+            <b>Edge</b>: WR × TP - (1-WR) × SL,正值 = 有盈利邊緣<br>
+            <b>vs CCY</b>: 與 CCY 平均嘅偏差百分比<br>
+            <span style="color:#2ecc71">綠色行</span> = 盈利層 &nbsp;|&nbsp;
+            <span style="color:#e74c3c">紅色行</span> = 虧損層
+          </span></i>
+        </div>
+        <div class="section-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-bottom:8px">
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY WR</div><div style="color:#FFD700;font-size:14px;font-weight:bold">78.9%</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY EV$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+107.37</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY TP (Avg MFE)</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">37.5</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY SL (Avg MAE)</div><div style="color:#e74c3c;font-size:14px;font-weight:bold">30.8</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">盈利層數</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">4/5</div></div>
+            <div style="background:#1a1a2e;padding:6px 8px;border-radius:4px"><div style="color:#888;font-size:9px">CCY Total$</div><div style="color:#2ecc71;font-size:14px;font-weight:bold">+11,703.30</div></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Layer</th><th>Rating</th><th>狀態</th><th>Trades</th><th>WR%</th>
+                <th>TP</th><th>SL</th><th>Hard SL</th><th>TP/SL比</th>
+                <th>Edge</th><th>vs CCY TP</th><th>vs CCY SL</th>
+                <th>EV$</th><th>Total$</th><th>盈利%</th>
+              </tr></thead>
+              <tbody>
+              <tr class="row-a">
+                <td><b>L0.7</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>27</td>
+                <td>92.6%</td>
+                <td style="color:#2ecc71">41.2</td>
+                <td style="color:#f39c12">30.4</td>
+                <td style="color:#e74c3c">120.8</td>
+                <td>1.36</td>
+                <td class="positive">+35.9</td>
+                <td style="color:#2ecc71">+9.8%</td>
+                <td style="color:#2ecc71">-1.3%</td>
+                <td class="positive">+197.27</td>
+                <td class="positive"><b>+5,326.30</b></td>
+                <td>23.2%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L1.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>9</td>
+                <td>77.8%</td>
+                <td style="color:#2ecc71">35.4</td>
+                <td style="color:#f39c12">37.2</td>
+                <td style="color:#e74c3c">128.2</td>
+                <td>0.95</td>
+                <td class="positive">+19.28</td>
+                <td style="color:#e74c3c">-5.6%</td>
+                <td style="color:#e74c3c">+20.8%</td>
+                <td class="positive">+72.22</td>
+                <td class="positive"><b>+650.00</b></td>
+                <td>5.8%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L1.5</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>29</td>
+                <td>79.3%</td>
+                <td style="color:#2ecc71">40.0</td>
+                <td style="color:#f39c12">25.3</td>
+                <td style="color:#e74c3c">128.9</td>
+                <td>1.58</td>
+                <td class="positive">+26.48</td>
+                <td style="color:#2ecc71">+6.6%</td>
+                <td style="color:#2ecc71">-17.8%</td>
+                <td class="positive">+210.83</td>
+                <td class="positive"><b>+6,114.00</b></td>
+                <td>11.4%</td>
+              </tr>
+              <tr class="row-a">
+                <td><b>L2.0</b></td>
+                <td><span class="rating-badge" style="background:#F3E5F5;color:#9b59b6">S</span></td>
+                <td>✅</td>
+                <td>22</td>
+                <td>68.2%</td>
+                <td style="color:#2ecc71">41.8</td>
+                <td style="color:#f39c12">39.2</td>
+                <td style="color:#e74c3c">131.1</td>
+                <td>1.07</td>
+                <td class="positive">+16.04</td>
+                <td style="color:#2ecc71">+11.4%</td>
+                <td style="color:#e74c3c">+27.3%</td>
+                <td class="positive">+39.82</td>
+                <td class="positive"><b>+876.00</b></td>
+                <td>1.6%</td>
+              </tr>
+              <tr class="row-d">
+                <td><b>L3.0</b></td>
+                <td><span class="rating-badge" style="background:#E3F2FD;color:#3498db">B</span></td>
+                <td>❌</td>
+                <td>22</td>
+                <td>72.7%</td>
+                <td style="color:#2ecc71">26.3</td>
+                <td style="color:#f39c12">27.5</td>
+                <td style="color:#e74c3c">102.4</td>
+                <td>0.96</td>
+                <td class="positive">+11.61</td>
+                <td style="color:#e74c3c">-29.9%</td>
+                <td style="color:#2ecc71">-10.7%</td>
+                <td class="negative">-57.41</td>
+                <td class="negative"><b>-1,263.00</b></td>
+                <td>-1.9%</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </details>
+
+
+    <div class="footer">
+        馬丁剖析法 V3 · 按 CCY×Direction 分組 · 數據說話,紀律至上 · Quant 📊
+    </div>
+</div>
+<script src="../sidebar.js"></script>
+</body>
+</html>

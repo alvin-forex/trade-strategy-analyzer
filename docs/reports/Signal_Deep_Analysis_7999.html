@@ -1,0 +1,578 @@
+<!DOCTYPE html><html lang='zh-Hant'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Signal Deep Analysis #7999</title><style>
+:root {
+  --primary: #0f3460;
+  --accent: #e94560;
+  --bg: #f5f7fa;
+  --card: #fff;
+  --text: #333;
+  --text2: #666;
+  --green: #28a745;
+  --yellow: #ffc107;
+  --orange: #fd7e14;
+  --red: #dc3545;
+  --grade-a: #28a745;
+  --grade-b: #ffc107;
+  --grade-c: #fd7e14;
+  --grade-d: #dc3545;
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+.container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+
+/* Header */
+.header { text-align: center; padding: 40px 20px 24px; background: linear-gradient(135deg, var(--primary) 0%, #16213e 100%); margin: -24px -16px 24px; padding-left: 36px; padding-right: 36px; }
+.header h1 { color: #fff; font-size: 1.8em; }
+.header .sub { color: #a8d8ea; font-size: 0.9em; margin-top: 4px; }
+
+/* Cards */
+.card { background: var(--card); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow); }
+.card h2 { font-size: 1.15em; color: var(--primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.card h2 .icon { font-size: 1.2em; }
+
+/* Upload */
+.upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+@media (max-width: 500px) { .upload-grid { grid-template-columns: 1fr; } }
+.upload-zone { border: 2px dashed #c0c8d8; border-radius: var(--radius); padding: 28px 16px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.upload-zone:hover { border-color: var(--accent); background: #fef5f7; }
+.upload-zone.has-file { border-color: var(--green); background: #f0faf3; border-style: solid; }
+.upload-zone .icon { font-size: 2.4em; }
+.upload-zone .label { font-weight: 600; color: var(--primary); font-size: 0.95em; }
+.upload-zone .hint { font-size: 0.8em; color: #999; }
+
+.file-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: #eef2f7; padding: 4px 10px; border-radius: 20px; font-size: 0.82em; }
+.chip .remove { cursor: pointer; color: var(--red); font-weight: bold; }
+
+.btn { display: block; width: 100%; padding: 14px; border: none; border-radius: var(--radius); font-size: 1.05em; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.btn-primary { background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; }
+.btn-primary:hover { box-shadow: 0 4px 20px rgba(233,69,96,0.35); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.progress { height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; margin-top: 12px; display: none; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); width: 0%; transition: width 0.4s; }
+.error { color: var(--red); background: #fde8ea; padding: 10px 14px; border-radius: 8px; margin-top: 10px; display: none; font-size: 0.9em; }
+
+/* Stats Grid */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.stat-box { background: #f8f9fb; border-radius: 10px; padding: 14px 12px; text-align: center; }
+.stat-box .val { font-size: 1.3em; font-weight: 700; color: var(--primary); }
+.stat-box .val.positive { color: var(--green); }
+.stat-box .val.negative { color: var(--red); }
+.stat-box .lbl { font-size: 0.75em; color: var(--text2); margin-top: 2px; }
+
+/* Copy Grade */
+.copy-grade { text-align: center; padding: 16px; background: linear-gradient(135deg, #e8f5e9, #fff8e1); border-radius: var(--radius); margin-bottom: 16px; }
+.copy-grade .stars { font-size: 2em; }
+.copy-grade .verdict { font-weight: 600; margin-top: 4px; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+th { background: var(--primary); color: #fff; padding: 10px 8px; text-align: center; white-space: nowrap; position: sticky; top: 0; }
+td { padding: 8px; border-bottom: 1px solid #eee; text-align: center; white-space: nowrap; }
+tr:hover td { background: #f0f4ff; }
+.sortable th { cursor: pointer; user-select: none; }
+.sortable th:hover { background: #1a4a8a; }
+.sort-arrow { font-size: 0.7em; margin-left: 2px; }
+
+/* Grade Badges */
+.grade { display: inline-block; width: 28px; height: 28px; line-height: 28px; border-radius: 50%; font-weight: 700; color: #fff; font-size: 0.85em; text-align: center; }
+.grade-a { background: var(--grade-a); }
+.grade-b { background: var(--grade-b); color: #333; }
+.grade-c { background: var(--grade-c); }
+.grade-d { background: var(--grade-d); }
+
+/* Score bar */
+.score-bar { display: inline-block; width: 60px; height: 8px; background: #e0e0e0; border-radius: 4px; vertical-align: middle; margin-left: 4px; }
+.score-bar-fill { height: 100%; border-radius: 4px; }
+
+/* Expandable rows */
+.expand-btn { cursor: pointer; color: var(--primary); text-decoration: underline; font-size: 0.9em; }
+.sub-row { display: none; }
+.sub-row.open { display: table-row; }
+.sub-row td { background: #f8f9fb; padding: 4px 8px 4px 40px; }
+.detail-table { width: 100%; font-size: 0.82em; }
+.detail-table td { padding: 3px 6px; text-align: left; border-bottom: 1px dotted #ddd; }
+
+/* Charts */
+.chart-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.chart-box { flex: 1; min-width: 260px; background: #fafbfc; border-radius: 10px; padding: 16px; }
+.chart-box h3 { font-size: 0.95em; color: var(--primary); margin-bottom: 10px; }
+svg text { font-family: -apple-system, sans-serif; }
+
+/* SET params */
+.param-group { margin-bottom: 12px; }
+.param-group h4 { font-size: 0.9em; color: var(--primary); margin-bottom: 6px; cursor: pointer; }
+.param-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 4px; }
+.param-item { display: flex; justify-content: space-between; padding: 3px 8px; background: #f8f9fb; border-radius: 4px; font-size: 0.82em; }
+.param-item .pk { color: var(--primary); font-family: monospace; }
+.param-item .pv { color: var(--accent); font-weight: 600; font-family: monospace; }
+
+/* Tabs - Vertical Sidebar Layout */
+.tabs { display: flex; flex-direction: column; gap: 2px; width: 180px; min-width: 180px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding-right: 8px; }
+.tab { padding: 8px 12px; cursor: pointer; font-size: 0.82em; font-weight: 600; color: var(--text2); border-left: 3px solid transparent; border-radius: 0 6px 6px 0; transition: all 0.2s; white-space: nowrap; }
+.tab:hover { color: var(--primary); background: rgba(15,52,96,0.04); }
+.tab.active { color: var(--primary); border-left-color: var(--accent); background: rgba(15,52,96,0.08); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.tabs-layout { display: flex; gap: 20px; align-items: flex-start; }
+.tabs-content { flex: 1; min-width: 0; }
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .tabs-layout { flex-direction: column; }
+  .tabs { flex-direction: row; width: 100%; min-width: unset; position: static; max-height: unset; overflow-x: auto; overflow-y: hidden; gap: 0; border-bottom: 2px solid #e0e0e0; margin-bottom: 12px; padding-right: 0; }
+  .tab { padding: 8px 12px; font-size: 0.78em; border-left: none; border-bottom: 3px solid transparent; border-radius: 0; }
+  .tab.active { border-left-color: transparent; border-bottom-color: var(--accent); }
+  .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .param-grid { grid-template-columns: 1fr !important; }
+  .data-table { font-size: 0.75em; }
+  .card { padding: 12px; }
+  body { padding: 8px; }
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #64b5f6;
+    --accent: #e94560;
+    --bg: #0a0e17;
+    --card: #111520;
+    --text: #d0d0d0;
+    --text2: #888;
+    --green: #4CAF50;
+    --red: #FF5722;
+    --yellow: #FFC107;
+    --orange: #fd7e14;
+    --grade-a: #4CAF50;
+    --grade-b: #FFC107;
+    --grade-c: #fd7e14;
+    --grade-d: #FF5722;
+  }
+  .tab:hover { background: rgba(100,181,246,0.06); }
+  .tab.active { background: rgba(100,181,246,0.1); }
+  .card { border: 1px solid #1e2433; }
+  table { border-color: #1e2433; }
+  td { border-color: #1a1f2e; }
+  th { background: #111520; color: #64b5f6; }
+  .data-table tr:hover { background: #1a1f2e; }
+  select, input { background: #1a1f2e; color: #d0d0d0; border-color: #2a3040; }
+  .btn { border-color: #2a3040; }
+  .btn:hover { background: #283593; }
+}
+
+/* Footer */
+.footer { text-align: center; color: #aab; font-size: 0.78em; margin-top: 32px; padding: 16px 0; }
+
+/* Market Context */
+.mc-symbol-card { background: #fafbfc; border-radius: 10px; padding: 16px; margin-bottom: 14px; border: 1px solid #e8ecf0; }
+.mc-symbol-card h4 { font-size: 1.05em; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mc-verdict { display: inline-block; padding: 3px 10px; border-radius: 14px; font-size: 0.82em; font-weight: 700; }
+.mc-verdict-ok { background: #d4edda; color: #155724; }
+.mc-verdict-warn { background: #fff3cd; color: #856404; }
+.mc-verdict-neutral { background: #e2e3e5; color: #383d41; }
+.mc-info-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.88em; color: var(--text2); }
+.mc-info-row span { white-space: nowrap; }
+.mc-note { font-size: 0.82em; color: #999; font-style: italic; margin-top: 12px; padding-top: 8px; border-top: 1px dashed #ddd; }
+.mc-loading { text-align: center; padding: 32px; color: var(--text2); font-size: 0.95em; }
+.mc-loading .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e0e0e0; border-top-color: var(--accent); border-radius: 50%; animation: mc-spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes mc-spin { to { transform: rotate(360deg); } }
+.mc-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.mc-summary-item { background: #f0f4ff; border-radius: 8px; padding: 12px; text-align: center; }
+.mc-summary-item .sym { font-weight: 700; color: var(--primary); font-size: 1.1em; }
+.mc-summary-item .trend { font-size: 0.85em; color: var(--text2); margin-top: 2px; }
+
+/* Info Tooltips */
+.info-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e8eaf6;
+  color: #5c6bc0;
+  font-size: 13px;
+  cursor: pointer;
+  margin-left: 6px;
+  vertical-align: middle;
+  user-select: none;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.info-toggle:hover { background: #c5cae9; }
+.info-toggle.active { background: #5c6bc0; color: #fff; }
+.info-panel {
+  display: none;
+  background: #f0f4ff;
+  border: 1px solid #c5cae9;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0 16px;
+  font-size: 0.85em;
+  color: #333;
+  line-height: 1.7;
+}
+.info-panel.show { display: block; }
+.info-panel b { color: var(--primary); }
+
+/* Volatility Sweet Spot */
+.vol-optimal-box {
+  background: linear-gradient(135deg, #e8f5e9, #f0f4ff);
+  border: 2px solid #28a745;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  text-align: center;
+}
+.vol-optimal-box .opt-label { font-size: 1.05em; font-weight: 700; color: var(--primary); }
+.vol-optimal-box .opt-range { font-size: 1.3em; font-weight: 700; color: #28a745; margin: 6px 0; }
+.vol-optimal-box .opt-desc { font-size: 0.88em; color: var(--text2); }
+.vol-symbol-rec {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.vol-symbol-rec .vsr-item {
+  flex: 1;
+  min-width: 200px;
+  background: #fafbfc;
+  border-radius: 10px;
+  padding: 12px;
+  border-left: 4px solid var(--primary);
+}
+.vol-symbol-rec .vsr-item .vsr-sym { font-weight: 700; color: var(--primary); font-size: 1.1em; }
+.vol-symbol-rec .vsr-item .vsr-range { color: #28a745; font-weight: 600; margin-top: 4px; }
+.vol-symbol-rec .vsr-item .vsr-hint { font-size: 0.82em; color: var(--text2); margin-top: 4px; }
+.vol-advice-box {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 12px 0;
+  border-left: 4px solid #5c6bc0;
+  font-size: 0.9em;
+  line-height: 1.8;
+}
+.vol-advice-box b { color: var(--primary); }
+
+/* Archive History */
+.archive-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+.archive-toolbar .at-btn { padding: 8px 14px; border: 1px solid #ddd; border-radius: 8px; background: #f8f9fa; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: all 0.2s; }
+.archive-toolbar .at-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.archive-toolbar .at-btn.danger:hover { background: var(--red); border-color: var(--red); }
+.archive-list { margin-top: 12px; }
+.archive-item { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; padding: 12px 14px; background: #f8f9fb; border-radius: 10px; margin-bottom: 8px; border: 1px solid #e8ecf0; }
+.archive-item:hover { border-color: var(--accent); }
+.archive-item .ai-check { width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); }
+.archive-item .ai-info { min-width: 0; }
+.archive-item .ai-label { font-weight: 700; color: var(--primary); font-size: 0.95em; }
+.archive-item .ai-meta { font-size: 0.8em; color: var(--text2); margin-top: 2px; }
+.archive-item .ai-stats { display: flex; gap: 12px; font-size: 0.82em; }
+.archive-item .ai-stat { text-align: center; }
+.archive-item .ai-stat .sv { font-weight: 700; color: var(--primary); }
+.archive-item .ai-stat .sl { font-size: 0.75em; color: #999; }
+.archive-item .ai-actions { display: flex; gap: 6px; }
+.archive-item .ai-actions button { padding: 4px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.8em; transition: all 0.2s; }
+.archive-item .ai-actions button:hover { background: var(--red); color: #fff; border-color: var(--red); }
+.archive-compare { margin-top: 16px; }
+.archive-compare table { font-size: 0.85em; }
+.archive-compare table th { background: var(--primary); color: #fff; padding: 8px 12px; }
+.archive-compare table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+.archive-trend { margin-top: 16px; background: #fafbfc; border-radius: 10px; padding: 16px; }
+.archive-trend h4 { font-size: 0.95em; color: var(--primary); margin-bottom: 10px; }
+.archive-empty { text-align: center; padding: 40px 20px; color: #999; }
+.archive-empty .ae-icon { font-size: 3em; margin-bottom: 8px; }
+.archive-cmp-btn { padding: 8px 16px; border: 1px solid var(--primary); border-radius: 8px; background: var(--primary); color: #fff; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: all 0.2s; }
+.archive-cmp-btn:hover { box-shadow: 0 4px 16px rgba(15,52,96,0.25); }
+.archive-cmp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.archive-storage-warn { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 8px 14px; font-size: 0.85em; margin-bottom: 12px; }
+.archive-dup-dialog { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.archive-dup-dialog .add-inner { background: #fff; border-radius: 14px; padding: 24px 28px; max-width: 400px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+.archive-dup-dialog .add-inner h3 { color: var(--primary); margin-bottom: 12px; }
+.archive-dup-dialog .add-inner p { font-size: 0.9em; color: var(--text2); margin-bottom: 16px; }
+.archive-dup-dialog .add-inner button { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; margin: 0 6px; }
+
+/* Market Regime */
+.regime-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 0.82em; font-weight: 600; color: #fff; }
+.regime-best { background: linear-gradient(135deg, #28a745, #20c997); padding: 16px; border-radius: var(--radius); margin: 16px 0; text-align: center; }
+.regime-best h3 { color: #fff; margin-bottom: 4px; }
+.regime-best .regime-stat { font-size: 1.2em; font-weight: 700; }
+.regime-timeline { position: relative; height: 60px; margin: 16px 0; overflow-x: auto; }
+.regime-timeline-inner { display: flex; height: 30px; border-radius: 6px; overflow: hidden; min-width: 100%; }
+.regime-timeline-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.65em; color: #fff; font-weight: 600; min-width: 2px; position: relative; }
+.regime-timeline-markers { position: relative; height: 24px; }
+.regime-timeline-markers .dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; top: 8px; transform: translateX(-4px); border: 1px solid #fff; }
+.regime-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; font-size: 0.82em; }
+.regime-legend-item { display: flex; align-items: center; gap: 4px; }
+.regime-legend-item .swatch { width: 12px; height: 12px; border-radius: 3px; }
+.regime-cmp-table th { background: var(--primary); }
+.regime-cmp-table .csv-a-header { background: #1a5276; }
+.regime-cmp-table .csv-b-header { background: #7d3c98; }
+.regime-cmp-label { display: inline-flex; align-items: center; gap: 4px; }
+.regime-cmp-label input { width: 120px; border: 1px solid #ddd; border-radius: 6px; padding: 4px 8px; font-size: 0.85em; text-align: center; }
+.csv2-zone { border: 2px dashed #a0a8b8; border-radius: var(--radius); padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.2s; margin-top: 12px; }
+.csv2-zone:hover { border-color: #7d3c98; background: #f9f0ff; }
+.csv2-zone.has-file { border-color: var(--green); background: #f0faf3; border-style: solid; }
+.csv2-zone .icon { font-size: 1.8em; }
+.csv2-zone .label { font-weight: 600; color: var(--primary); font-size: 0.9em; }
+.csv2-zone .hint { font-size: 0.78em; color: #999; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .header h1 { font-size: 1.4em; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-box .val { font-size: 1.1em; }
+  .chart-row { flex-direction: column; }
+  th, td { padding: 6px 4px; font-size: 0.78em; }
+  .card { padding: 16px 12px; }
+  .param-grid { grid-template-columns: 1fr; }
+}
+</style></head><body style='max-width:900px;margin:0 auto;padding:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif'>
+
+  <!-- Copy Grade -->
+  <div class="card" id="copyGradeCard"></div>
+
+  <!-- Executive Summary -->
+  <div class="card" id="execSummaryCard" style="display:none">
+    <h2><span class="icon">📋</span> Executive Summary</h2>
+    <div id="execSummary"></div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="card">
+    <h2><span class="icon">📊</span> 摘要統計</h2>
+    <div class="stats-grid" id="statsGrid"></div>
+  </div>
+
+  <!-- Tabs Layout -->
+  <div class="tabs-layout">
+  <div class="tabs" id="mainTabs">
+    <div class="tab active" data-tab="tab-equity">📈 收益曲線</div>
+    <div class="tab" data-tab="tab-score">🎯 質量評分</div>
+    <div class="tab" data-tab="tab-symbol">💱 貨幣對</div>
+    <div class="tab" data-tab="tab-layer">📚 層數分析</div>
+    <div class="tab" data-tab="tab-session">🕐 時段分析</div>
+    <div class="tab" data-tab="tab-holding">⏱️ 持倉時間</div>
+    <div class="tab" data-tab="tab-direction">↔️ 方向分析</div>
+    <div class="tab" data-tab="tab-market">🌐 市場語境</div>
+    <div class="tab" data-tab="tab-regime">🔄 市況×策略</div>
+    <div class="tab" data-tab="tab-compare">⚖️ 策略對比</div>
+    <div class="tab" data-tab="tab-symbol-drill">🔍 貨幣穿透</div>
+    <div class="tab" data-tab="tab-copy">🏆 Copy 推薦</div>
+    <div class="tab" data-tab="tab-volatility">📏 波幅分析</div>
+    <div class="tab" data-tab="tab-martin">🎲 馬丁風險</div>
+    <div class="tab" data-tab="tab-martin-v3">👑 馬丁V3</div>
+    <div class="tab" data-tab="tab-tpsl">📐 TP/SL</div>
+    <div class="tab" data-tab="tab-simulate">💰 Copy 模擬</div>
+    <div class="tab" data-tab="tab-positions">📋 倉位明細</div>
+    <div class="tab" data-tab="tab-set">⚙️ SET 參數</div>
+    <div class="tab" data-tab="tab-archive">📁 歷史記錄</div>
+    <div class="tab" data-tab="tab-v2tech">📊 V2 技術分析</div>
+    <div class="tab" data-tab="tab-news">📰 外匯新聞</div>
+  </div>
+  <div class="tabs-content">
+
+  <div class="card tab-panel active" id="tab-equity">
+    <div id="equityChart"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-score">
+    <h2><span class="icon">🎯</span> 入市質量評分</h2>
+    <div id="scoreChart"></div>
+    <div id="scoreSummary"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-symbol">
+    <h2><span class="icon">💱</span> 貨幣對排名</h2>
+    <div class="table-wrap" id="symbolTable"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-layer">
+    <h2><span class="icon">📚</span> 層數分析</h2>
+    <div id="layerChart"></div>
+    <div id="layerTable"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-session">
+    <h2><span class="icon">🕐</span> 時段分析</h2>
+    <div id="sessionChart"></div>
+    <div id="sessionTable"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-holding">
+    <h2><span class="icon">⏱️</span> 持倉時間分析</h2>
+    <div id="holdingChart"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-direction">
+    <h2><span class="icon">↔️</span> 方向分析</h2>
+    <div id="directionChart"></div>
+    <div id="directionTable"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-market">
+    <h2><span class="icon">🌐</span> 市場語境分析</h2>
+    <div id="marketContext"><div class="mc-loading"><div class="spinner"></div>載入市場數據中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-regime">
+    <h2><span class="icon">🔄</span> 市況×策略分析</h2>
+    <div id="regimeContent"><div class="mc-loading">載入市況數據中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-compare">
+    <h2><span class="icon">⚖️</span> 策略對比分析</h2>
+    <div id="compareContent"><p style="color:#999;padding:20px">請上載第二份 CSV 以啟用對比分析</p></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-symbol-drill">
+    <h2><span class="icon">🔍</span> 貨幣對穿透分析</h2>
+    <div id="symbolDrillContent">
+      <div style="padding:16px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="symbolDrillInput" type="text" placeholder="輸入貨幣對（如 EURCHF）" style="flex:1;min-width:200px;padding:10px 14px;border:2px solid #c0c8d8;border-radius:8px;font-size:1em">
+          <button class="btn btn-primary" onclick="searchSymbolDrill()">🔍 搜尋</button>
+        </div>
+        <div id="symbolDrillResults" style="margin-top:16px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card tab-panel" id="tab-volatility">
+    <h2><span class="icon">📏</span> 波幅適配分析</h2>
+    <div id="volatilityAnalysis"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-martin">
+    <h2><span class="icon">🎲</span> 馬丁風險分析</h2>
+    <div id="martinAnalysis"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-martin-v3">
+    <h2><span class="icon">👑</span> 馬丁剖析法 V3 — 絕對數據分析</h2>
+    <div id="martinV3Analysis"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-tpsl">
+    <h2><span class="icon">📐</span> TP/SL 分析</h2>
+    <div id="tpslAnalysis"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-simulate">
+    <h2><span class="icon">💰</span> Copy 模擬</h2>
+    <div id="simulateAnalysis"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-copy">
+    <h2><span class="icon">🏆</span> Copy Trade 推薦矩陣</h2>
+    <div id="copyMatrix"><div class="mc-loading">計算中...</div></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-positions">
+    <h2><span class="icon">📋</span> 倉位明細（全部）</h2>
+    <div class="table-wrap" id="posTable"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-autopsy">
+    <h2><span class="icon">🔬</span> 馬丁剖析法 V3</h2>
+    <style>
+      .v3-subtabs { display:flex; gap:0; border-bottom:2px solid #e0e0e0; margin-bottom:12px; overflow-x:auto; }
+      .v3-subtab { padding:7px 14px; cursor:pointer; font-size:0.82em; font-weight:600; color:var(--text2); border-bottom:2px solid transparent; transition:all 0.2s; white-space:nowrap; }
+      .v3-subtab:hover { color:var(--primary); }
+      .v3-subtab.active { color:var(--accent); border-bottom-color:var(--accent); }
+      .v3-section { display:none; }
+      .v3-section.active { display:block; }
+      .v3-kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-bottom:14px; }
+      .v3-kpi { background:#f8f9fb; border-radius:8px; padding:10px 8px; text-align:center; }
+      .v3-kpi .lbl { font-size:0.72em; color:var(--text2); text-transform:uppercase; letter-spacing:0.3px; }
+      .v3-kpi .val { font-size:1.15em; font-weight:700; color:var(--primary); margin-top:2px; }
+      .v3-kpi .val.green { color:var(--green); }
+      .v3-kpi .val.red { color:var(--red); }
+      .v3-kpi .val.gold { color:#FFD700; }
+      .v3-rating { display:inline-block; padding:1px 7px; border-radius:4px; font-weight:700; font-size:0.85em; min-width:24px; text-align:center; }
+      .v3-rating.SP { background:#FFF8E1; color:#B8860B; }
+      .v3-rating.S { background:#E8F5E9; color:#2e7d32; }
+      .v3-rating.A { background:#E3F2FD; color:#1565C0; }
+      .v3-rating.B { background:#F3E5F5; color:#7B1FA2; }
+      .v3-rating.C { background:#FFF3E0; color:#E65100; }
+      .v3-rating.D { background:#FBE9E7; color:#BF360C; }
+      .v3-rating.E { background:#FFEBEE; color:#C62828; }
+      .v3-scatter-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
+      .v3-scatter-card { background:#fafbfc; border:1px solid #e0e0e0; border-radius:8px; padding:8px; }
+      .v3-scatter-card .stitle { font-size:0.85em; font-weight:700; color:var(--primary); margin-bottom:2px; }
+      .v3-scatter-card .smeta { font-size:0.72em; color:#888; margin-bottom:4px; }
+      .v3-scatter-card canvas { width:100%; height:200px; }
+      .v3-danger { font-size:1.1em; }
+    </style>
+    <div id="autopsyV3Content">
+      <div class="v3-subtabs">
+        <div class="v3-subtab active" onclick="switchV3Tab('v3p1')">Part 1 · CCY總覽</div>
+        <div class="v3-subtab" onclick="switchV3Tab('v3p2')">Part 2 · MFE/MAE</div>
+        <div class="v3-subtab" onclick="switchV3Tab('v3p3')">Part 3 · TP/SL</div>
+        <div class="v3-subtab" onclick="switchV3Tab('v3p4')">Part 4 · 排行榜</div>
+        <div class="v3-subtab" onclick="switchV3Tab('v3p5')">Part 5 · 黑名單</div>
+        <div class="v3-subtab" onclick="switchV3Tab('v3p6')">Part 6 · 恢復力</div>
+      </div>
+      <div id="v3p1" class="v3-section active"><div class="table-wrap" id="v3p1Table">計算中...</div></div>
+      <div id="v3p2" class="v3-section"><div id="v3p2Charts">計算中...</div></div>
+      <div id="v3p3" class="v3-section"><div class="table-wrap" id="v3p3Table">計算中...</div></div>
+      <div id="v3p4" class="v3-section"><div class="table-wrap" id="v3p4Table">計算中...</div></div>
+      <div id="v3p5" class="v3-section"><div id="v3p5Content">計算中...</div></div>
+      <div id="v3p6" class="v3-section"><div class="table-wrap" id="v3p6Table">計算中...</div></div>
+    </div>
+  </div>
+
+  <div class="card tab-panel" id="tab-set">
+    <h2><span class="icon">⚙️</span> SET 參數</h2>
+    <div id="setParams"></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-archive">
+    <h2><span class="icon">📁</span> 歷史記錄</h2>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-secondary" onclick="loadArchiveFromAPI()">🔄 載入記錄</button>
+      <button class="btn btn-secondary" onclick="$('jsonImportInput').click()">📥 匯入 JSON</button>
+      <input type="file" id="jsonImportInput" accept=".json" hidden="" onchange="importAnalysisJSON(this.files[0])">
+      <span id="archiveStatus" style="font-size:0.85em;color:#999"></span>
+    </div>
+    <div id="archiveContent"><p style="color:#999">點擊「載入記錄」從本地 API 載入，或「匯入 JSON」匯入之前下載的分析檔案</p></div>
+  </div>
+
+  <div class="card tab-panel" id="tab-v2tech">
+    <h2><span class="icon">📊</span> V2 技術分析</h2>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-secondary" onclick="loadV2Latest()">🔄 載入最新數據</button>
+      <button class="btn btn-secondary" onclick="loadV2History()">📅 歷史記錄</button>
+      <span id="v2Status" style="font-size:0.85em;color:#999"></span>
+    </div>
+    <div id="v2Content">
+      <p style="color:#999">點擊「載入最新數據」查看 V2 技術分析報告</p>
+    </div>
+    <div id="v2History" style="display:none">
+      <h3>歷史快照</h3>
+      <div id="v2HistoryList"></div>
+    </div>
+  </div>
+
+  <div class="card tab-panel" id="tab-news">
+    <h2><span class="icon">📰</span> 外匯新聞</h2>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-secondary" onclick="loadNewsLatest()">🔄 載入最新新聞</button>
+      <button class="btn btn-secondary" onclick="loadNewsHistory()">📅 歷史新聞</button>
+      <span id="newsStatus" style="font-size:0.85em;color:#999"></span>
+    </div>
+    <div id="newsContent">
+      <p style="color:#999">點擊「載入最新新聞」查看每日早晚外匯報告</p>
+    </div>
+    <div id="newsHistory" style="display:none">
+      <h3>歷史新聞記錄</h3>
+      <div id="newsHistoryList"></div>
+    </div>
+  </div>
+
+  </div>
+  </div><!-- /tabs-content -->
+  <footer style='text-align:center;color:#999;padding:20px;font-size:0.85em'>Generated by TSA v3.9</footer></body></html>
