@@ -29,7 +29,6 @@
       <div class="sidebar-sep"></div>
       <a href="${depth}admin/reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
       <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
-      <a href="${depth}admin/forex_news.html" class="sidebar-link" data-page="forex_news"><span class="icon">📄</span>外匯新聞</a>
       <div class="sidebar-sep"></div>
       <div class="sidebar-section-title"><span class="icon">📊</span>外匯分析</div>
       <a href="${depth}admin/forex_hub/index.html#4h" class="sidebar-link sub-link" data-page="forex_hub_4h"><span class="icon">🦀</span>4H 市場分析</a>
