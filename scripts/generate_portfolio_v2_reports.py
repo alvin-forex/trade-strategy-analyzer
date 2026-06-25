@@ -104,7 +104,7 @@ def render_signal_table(signals):
         score = s.get("opportunity_score", {})
         rows.append(f"""
 <tr>
-<td><a href="../reports/martin_final_{escape(s['signal_id'])}.html">{escape(s['signal_id'])}</a></td>
+<td><a href="../reports/martin_v4_{escape(s['signal_id'])}.html">{escape(s['signal_id'])}</a></td>
 <td>{s.get('total_trades',0):,}</td>
 <td>{s.get('active_months',0)}</td>
 <td>{s.get('avg_monthly_trades',0)}</td>
