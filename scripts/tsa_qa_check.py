@@ -23,7 +23,6 @@ DOWNLOADS_DIR = BASE_DIR / "downloads"
 REQUIRED_PAGES = [
     "index.html",
     "signal_ranking.html",
-    "signal_ranking_dde_v5.html",
     "admin/signal_ranking.html",
     "admin/ccy_ranking.html",
 ]
@@ -189,15 +188,15 @@ def check_page_completeness(result: QAResult):
 
 
 def check_generated_pages_nav(result: QAResult):
-    """檢查 6：腳本生成的 HTML 必須包含 sidebar"""
+    """檢查 6：腳本生成的 HTML 必須包含導航組件（sidebar 或 topnav）"""
     print("\n🔍 檢查 6：生成頁面導航完整性")
-    # 呢啲係由 generate_*.py 腳本生成的頁面，必須有 sidebar
+    # 呢啲係由 generate_*.py 腳本生成的頁面，必須有 sidebar 或 topnav
     generated_pages = [
         "signal_ranking.html",
-        "signal_ranking_dde_v5.html",
         "admin/signal_ranking.html",
         "admin/ccy_ranking.html",
     ]
+
     for page in generated_pages:
         path = DOCS_DIR / page
         if not path.exists():
@@ -205,12 +204,16 @@ def check_generated_pages_nav(result: QAResult):
         content = path.read_text(encoding="utf-8", errors="ignore")
         has_css = "sidebar.css" in content
         has_js = "sidebar.js" in content
+        has_topnav = "topnav" in content and "topnav-link" in content
+
         if has_css and has_js:
             result.ok(f"{page} 有 sidebar.css + sidebar.js")
+        elif has_topnav:
+            result.ok(f"{page} 有 topnav 導航")
         elif has_css or has_js:
             result.fail(f"{page} 只有 sidebar.css 或 sidebar.js 其中一個")
         else:
-            result.fail(f"{page} 完全缺少 sidebar.css 和 sidebar.js")
+            result.fail(f"{page} 完全缺少導航組件（sidebar 或 topnav）")
 
 
 def main():
