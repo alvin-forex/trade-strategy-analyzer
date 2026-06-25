@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>覆盤報告 | Trade Strategy Analyzer</title>
+<link rel="stylesheet" href="../../sidebar.css">
+<script src="../../sidebar.js"></script>
+<script>
+(function(){
+  const saved=localStorage.getItem('tsa-theme');
+  const t=saved||'dark';
+  document.documentElement.setAttribute('data-theme',t);
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{--font-main:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif}
+[data-theme="dark"]{--bg:#0d1117;--bg-card:#161b22;--bg-hover:#21262d;--bg-input:#0d1117;--text:#c9d1d9;--text2:#8b949e;--border:#21262d;--border2:#30363d;--primary:#58a6ff;--green:#3fb950;--red:#f85149}
+[data-theme="light"]{--bg:#f5f7fa;--bg-card:#ffffff;--bg-hover:#eef2f7;--bg-input:#fff;--text:#333;--text2:#666;--border:#ddd;--border2:#ccc;--primary:#0f3460;--green:#28a745;--red:#dc3545}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-main);background:var(--bg);color:var(--text)}
+body.has-sidebar{padding-left:240px}
+.container{max-width:1200px;margin:auto;padding:20px}
+h1{color:var(--primary);font-size:1.5em;margin-bottom:8px}
+.subtitle{color:var(--text2);font-size:0.85em;margin-bottom:24px}
+
+/* 日期選擇器 */
+.date-picker{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.date-picker h2{color:var(--primary);font-size:1em;margin-bottom:12px}
+.date-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:0.75em;color:var(--text2)}
+.field input[type="date"]{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:0.9em}
+.field input[type="date"]:focus{outline:none;border-color:var(--primary)}
+.field input[type="text"]{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:0.9em;width:120px}
+.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:600}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:hover{background:#2ea043}
+.btn-secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border2)}
+.btn-secondary:hover{background:var(--border2)}
+.btn-group{display:flex;gap:8px;margin-top:8px}
+
+/* 預設期間按鈕 */
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.preset-btn{padding:4px 12px;background:var(--bg-hover);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:0.75em;cursor:pointer}
+.preset-btn:hover{background:var(--border2);color:var(--text)}
+
+/* 命令顯示 */
+.cmd-box{background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:12px;font-family:monospace;font-size:0.8em;color:var(--text);position:relative;display:none}
+.cmd-box code{word-break:break-all}
+.cmd-copy{position:absolute;top:8px;right:8px;padding:4px 8px;background:var(--bg-hover);border:1px solid var(--border2);border-radius:4px;color:var(--text2);cursor:pointer;font-size:0.75em}
+.cmd-copy:hover{background:var(--border2);color:var(--text)}
+
+/* 搜尋匹配結果 */
+.match-result{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;display:none}
+.match-result.show{display:block}
+
+.section{background:var(--bg-card);border-radius:8px;padding:20px;margin-bottom:16px;border:1px solid var(--border)}
+h2.section-title{color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:16px;font-size:1.1em}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:var(--bg);border-radius:8px;padding:16px;border:1px solid var(--border);transition:border-color 0.2s}
+.card:hover{border-color:var(--primary)}
+.card-title{font-size:1em;font-weight:600;color:var(--text);margin-bottom:8px}
+.card-meta{color:var(--text2);font-size:0.8em;margin-bottom:12px}
+.card-stats{display:flex;gap:12px;flex-wrap:wrap}
+.stat{display:flex;align-items:center;gap:4px}
+.stat-label{color:var(--text2);font-size:0.75em}
+.stat-value{font-weight:600;font-size:0.9em}
+.positive{color:#3fb950}
+.negative{color:#f85149}
+.card-link{display:inline-block;margin-top:12px;padding:6px 12px;background:var(--bg-hover);border-radius:6px;color:var(--primary);font-size:0.8em;text-decoration:none}
+.card-link:hover{background:var(--border2)}
+.empty{color:var(--text2);font-size:0.9em;text-align:center;padding:40px}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:8px 16px;background:var(--bg-hover);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:0.85em}
+.tab:hover{background:var(--border2)}
+.tab.active{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+footer{text-align:center;margin-top:24px;color:var(--text2);font-size:0.7em}
+
+/* ═══ Filter Panel (from review_filter.html, adapted to dark theme) ═══ */
+.filter-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.filter-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.filter-group{flex:1;min-width:200px}
+.filter-group label{display:block;font-size:0.8em;font-weight:600;color:var(--primary);margin-bottom:6px}
+.filter-group input[type="date"]{width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:0.85em}
+
+/* Multi-select blocks */
+.ms-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+.ms-block{background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.ms-header{padding:10px 14px;background:var(--bg-card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.ms-header .ms-title{font-size:0.85em;font-weight:700;color:var(--primary)}
+.ms-header .ms-count{font-size:0.72em;color:var(--text2)}
+.ms-search{padding:8px 10px;border-bottom:1px solid var(--border);position:relative}
+.ms-search input{width:100%;padding:6px 8px 6px 28px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:0.8em}
+.ms-search .search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:0.8em;color:var(--text2)}
+.ms-actions{padding:6px 10px;border-bottom:1px solid var(--border);display:flex;gap:8px}
+.ms-actions a{font-size:0.72em;color:var(--primary);cursor:pointer;text-decoration:none;padding:2px 6px;border-radius:3px}
+.ms-actions a:hover{background:var(--bg-hover)}
+.ms-list{max-height:180px;overflow-y:auto;padding:4px 0}
+.ms-item{display:flex;align-items:center;gap:6px;padding:4px 14px;cursor:pointer;font-size:0.8em}
+.ms-item:hover{background:var(--bg-card)}
+.ms-item input{accent-color:var(--primary);cursor:pointer}
+.ms-item label{cursor:pointer;flex:1;font-size:0.85em;color:var(--text)}
+.ms-item .badge{font-size:0.7em;color:var(--text2);background:var(--bg-card);padding:1px 6px;border-radius:8px}
+
+/* Filter buttons */
+.btn-row{display:flex;gap:12px;justify-content:center;margin-top:16px}
+
+/* Loading */
+.loading{text-align:center;padding:40px;color:var(--text2)}
+.loading .spinner{display:inline-block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Filter Results */
+.results-area{margin-top:20px}
+.result-section-title{font-size:1.1em;font-weight:700;color:var(--primary);margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+/* Stat cards */
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px}
+.stat-card .stat-name{font-size:0.85em;font-weight:700;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.stat-card .stat-row{display:flex;justify-content:space-between;padding:3px 0;font-size:0.8em}
+.stat-card .stat-row .label{color:var(--text2)}
+.stat-card .stat-row .val{font-weight:600}
+.stat-card .stat-row .val.pos{color:#3fb950}
+.stat-card .stat-row .val.neg{color:#f85149}
+
+/* Comparison table */
+.cmp-table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:0.82em;overflow-x:auto;display:block}
+.cmp-table table{width:100%;border-collapse:collapse;min-width:700px}
+.cmp-table th{background:var(--bg-card);padding:8px 10px;text-align:left;border-bottom:2px solid var(--primary);color:var(--primary);font-size:0.8em;white-space:nowrap}
+.cmp-table td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:0.82em}
+.cmp-table tr:hover td{background:var(--bg-card)}
+.cmp-table .pos{color:#3fb950;font-weight:600}
+.cmp-table .neg{color:#f85149;font-weight:600}
+.cmp-table .best{background:rgba(63,185,80,0.08);color:#3fb950;font-weight:700}
+.cmp-table .worst{background:rgba(248,81,73,0.08);color:#f85149;font-weight:700}
+
+/* No data */
+.no-data{text-align:center;padding:40px;color:var(--text2);font-size:0.9em}
+
+/* Responsive */
+@media(max-width:768px){
+  .ms-grid{grid-template-columns:1fr}
+  .filter-row{flex-direction:column}
+  .stat-cards{grid-template-columns:1fr}
+  .btn-row{flex-direction:column}
+  .btn{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>覆盤報告</h1>
+<p class="subtitle">按日期範圍分析交易表現 — 月報、週報、日報 + 自訂多維度篩選分析</p>
+
+<!-- Tabs -->
+<div class="tabs">
+<div class="tab active" onclick="showPeriod('monthly',this)">月報</div>
+<div class="tab" onclick="showPeriod('weekly',this)">週報</div>
+<div class="tab" onclick="showPeriod('daily',this)">日報</div>
+<div class="tab" onclick="showPeriod('custom',this)">🔍 自訂分析</div>
+</div>
+
+<!-- ═══ Monthly / Weekly / Daily Report Sections ═══ -->
+<div id="monthly" class="section">
+<h2 class="section-title">月度覆盤</h2>
+<div class="grid" id="monthly-grid"><div class="empty">載入中...</div></div>
+</div>
+
+<div id="weekly" class="section" style="display:none">
+<h2 class="section-title">週度覆盤</h2>
+<div class="grid" id="weekly-grid"><div class="empty">載入中...</div></div>
+</div>
+
+<div id="daily" class="section" style="display:none">
+<h2 class="section-title">每日覆盤</h2>
+<div class="grid" id="daily-grid"><div class="empty">載入中...</div></div>
+</div>
+
+<!-- ═══ Custom Analysis Section (merged from review_filter.html) ═══ -->
+<div id="custom" class="section" style="display:none">
+<!-- 日期選擇器 -->
+<div class="date-picker">
+<h2>📅 選擇日期範圍</h2>
+<div class="date-row">
+<div class="field">
+<label>開始日期</label>
+<input type="date" id="start-date">
+</div>
+<div class="field">
+<label>結束日期</label>
+<input type="date" id="end-date">
+</div>
+<div class="field">
+<label>報告類型</label>
+<select id="report-type" style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:0.9em">
+<option value="auto">自動判斷</option>
+<option value="monthly">月報</option>
+<option value="weekly">週報</option>
+<option value="daily">日報</option>
+</select>
+</div>
+<div class="field">
+<label>指定 Signal (可選)</label>
+<input type="text" id="signal-id" placeholder="例如: 31593">
+</div>
+</div>
+<div class="btn-group">
+<button class="btn btn-primary" onclick="generateReview()">🔍 搵報告 / 生成指令</button>
+</div>
+<div class="presets">
+<button class="preset-btn" onclick="setPreset('this-month')">今個月</button>
+<button class="preset-btn" onclick="setPreset('last-month')">上個月</button>
+<button class="preset-btn" onclick="setPreset('this-week')">今個星期</button>
+<button class="preset-btn" onclick="setPreset('last-week')">上個星期</button>
+<button class="preset-btn" onclick="setPreset('last-30d')">過去 30 日</button>
+</div>
+<div class="match-result" id="match-result"></div>
+<div class="cmd-box" id="cmd-box">
+<button class="cmd-copy" onclick="copyCmd()">📋 複製</button>
+<code id="cmd-text"></code>
+</div>
+</div>
+
+<!-- Filter Panel -->
+<div class="filter-panel">
+  <!-- Date Range -->
+  <div class="filter-row">
+    <div class="filter-group">
+      <label>📅 篩選開始日期</label>
+      <input type="date" id="dateFrom">
+    </div>
+    <div class="filter-group">
+      <label>📅 篩選結束日期</label>
+      <input type="date" id="dateTo">
+    </div>
+  </div>
+
+  <!-- Multi-select Grid -->
+  <div class="ms-grid">
+    <!-- EA Type -->
+    <div class="ms-block">
+      <div class="ms-header">
+        <span class="ms-title">🤖 EA 類型</span>
+        <span class="ms-count" id="eaCount">0 selected</span>
+      </div>
+      <div class="ms-search">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="搜尋 EA..." id="eaSearch" oninput="filterList('eaList',this.value)">
+      </div>
+      <div class="ms-actions">
+        <a onclick="toggleAll('eaList',true)">全選</a>
+        <a onclick="toggleAll('eaList',false)">全不選</a>
+      </div>
+      <div class="ms-list" id="eaList"></div>
+    </div>
+
+    <!-- Symbol -->
+    <div class="ms-block">
+      <div class="ms-header">
+        <span class="ms-title">💱 貨幣對</span>
+        <span class="ms-count" id="symCount">0 selected</span>
+      </div>
+      <div class="ms-search">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="搜尋貨幣對..." id="symSearch" oninput="filterList('symList',this.value)">
+      </div>
+      <div class="ms-actions">
+        <a onclick="toggleAll('symList',true)">全選</a>
+        <a onclick="toggleAll('symList',false)">全不選</a>
+      </div>
+      <div class="ms-list" id="symList"></div>
+    </div>
+
+    <!-- Signal ID -->
+    <div class="ms-block">
+      <div class="ms-header">
+        <span class="ms-title">📡 Signal ID</span>
+        <span class="ms-count" id="sigCount">0 selected</span>
+      </div>
+      <div class="ms-search">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="搜尋 Signal..." id="sigSearch" oninput="filterList('sigList',this.value)">
+      </div>
+      <div class="ms-actions">
+        <a onclick="toggleAll('sigList',true)">全選</a>
+        <a onclick="toggleAll('sigList',false)">全不選</a>
+      </div>
+      <div class="ms-list" id="sigList"></div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="btn-row">
+    <button class="btn btn-primary" id="generateBtn" onclick="generateReport()" disabled>📊 生成覆盤報告</button>
+    <button class="btn btn-secondary" onclick="resetFilters()">🔄 重置</button>
+  </div>
+</div>
+
+<!-- Filter Results Area -->
+<div class="results-area" id="resultsArea"></div>
+
+</div><!-- /custom section -->
+
+<footer>Trade Strategy Analyzer | 按日期覆盤系統 + 多維度篩選分析</footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Part 1: Tab Switching + Report Index (original reviews/index.html)
+// ═══════════════════════════════════════════════════════════════
+
+function showPeriod(id, el){
+  document.querySelectorAll('.section').forEach(e=>e.style.display='none');
+  document.getElementById(id).style.display='block';
+  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+  if(el) el.classList.add('active');
+  else document.querySelector('.tab')?.classList.add('active');
+}
+
+// ═══ Presets ═══
+function setPreset(p){
+  const now = new Date();
+  let start, end;
+  const fmt = d => d.toISOString().split('T')[0];
+
+  if(p === 'this-month'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if(p === 'last-month'){
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if(p === 'this-week'){
+    const day = now.getDay() || 7;
+    start = new Date(now); start.setDate(now.getDate() - day + 1);
+    end = new Date(start); end.setDate(start.getDate() + 6);
+  } else if(p === 'last-week'){
+    const day = now.getDay() || 7;
+    start = new Date(now); start.setDate(now.getDate() - day - 6);
+    end = new Date(start); end.setDate(start.getDate() + 6);
+  } else if(p === 'last-30d'){
+    end = new Date(now);
+    start = new Date(now); start.setDate(now.getDate() - 29);
+  }
+
+  document.getElementById('start-date').value = fmt(start);
+  document.getElementById('end-date').value = fmt(end);
+}
+
+// ═══ Load report indexes ═══
+let allReports = [];
+
+async function loadReports(){
+  const periods = ['monthly', 'weekly', 'daily'];
+  for(const p of periods){
+    try{
+      const res = await fetch(`${p}/index.json`);
+      if(res.ok){
+        const data = await res.json();
+        allReports = allReports.concat((data.reports || []).map(r => ({...r, period: p})));
+        renderReports(p, data.reports || []);
+      }
+    }catch(e){}
+  }
+  allReports.sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
+}
+
+function renderReports(period, reports){
+  const grid = document.getElementById(`${period}-grid`);
+  if(!reports.length){
+    grid.innerHTML = '<div class="empty">暫無報告</div>';
+    return;
+  }
+  grid.innerHTML = reports.map(r => {
+    const pnlClass = r.total_pnl >= 0 ? 'positive' : 'negative';
+    const pnlSign = r.total_pnl >= 0 ? '+' : '';
+    return `
+    <div class="card">
+      <div class="card-title">${r.start_date} - ${r.end_date}</div>
+      <div class="card-meta">${r.signals ? `${r.signals} Signals` : ''} | ${r.trades ? `${r.trades.toLocaleString()} Trades` : ''}</div>
+      <div class="card-stats">
+        <div class="stat"><span class="stat-label">勝率</span><span class="stat-value">${r.win_rate ? `${r.win_rate}%` : '-'}</span></div>
+        <div class="stat"><span class="stat-label">盈虧</span><span class="stat-value ${pnlClass}">${pnlSign}$${r.total_pnl ? r.total_pnl.toLocaleString() : '-'}</span></div>
+      </div>
+      <a href="${period}/${r.filename}" class="card-link">查看報告 →</a>
+    </div>`;
+  }).join('');
+}
+
+// ═══ Generate / Find review ═══
+function generateReview(){
+  const start = document.getElementById('start-date').value;
+  const end = document.getElementById('end-date').value;
+  const type = document.getElementById('report-type').value;
+  const signalId = document.getElementById('signal-id').value.trim();
+
+  if(!start || !end){
+    alert('請選擇開始同結束日期');
+    return;
+  }
+  if(start > end){
+    alert('開始日期唔可以晚於結束日期');
+    return;
+  }
+
+  const match = findReport(start, end, signalId);
+  const matchEl = document.getElementById('match-result');
+  const cmdBox = document.getElementById('cmd-box');
+
+  if(match){
+    matchEl.className = 'match-result show';
+    matchEl.innerHTML = `
+      <p style="color:#3fb950;margin-bottom:8px">✅ 搵到相近報告：</p>
+      <div class="card" style="margin:0">
+        <div class="card-title">${match.start_date} - ${match.end_date}</div>
+        <div class="card-meta">${match.period} | ${match.signals ? `${match.signals} Signals` : ''} | ${match.trades ? `${match.trades.toLocaleString()} Trades` : ''}</div>
+        <a href="${match.period}/${match.filename}" class="card-link">查看報告 →</a>
+      </div>`;
+    cmdBox.style.display = 'none';
+    return;
+  }
+
+  matchEl.className = 'match-result';
+  matchEl.innerHTML = '';
+
+  const base = (type === 'auto') ? inferPeriod(start, end) : type;
+  let cmd = `cd ~/trade_strategy_analyzer && python3 scripts/date_range_review.py --start-date ${start} --end-date ${end} --period ${base}`;
+  if(signalId) cmd += ` --signal-id ${signalId}`;
+
+  document.getElementById('cmd-text').textContent = cmd;
+  cmdBox.style.display = 'block';
+}
+
+function findReport(start, end, signalId){
+  for(const r of allReports){
+    if(r.start_date === start && r.end_date === end){
+      if(!signalId || (r.filename && r.filename.includes(signalId))) return r;
+    }
+  }
+  for(const r of allReports){
+    if(start >= r.start_date && end <= r.end_date){
+      return r;
+    }
+  }
+  return null;
+}
+
+function inferPeriod(start, end){
+  const s = new Date(start), e = new Date(end);
+  const days = Math.round((e - s) / (1000*60*60*24)) + 1;
+  if(days <= 1) return 'daily';
+  if(days <= 7) return 'weekly';
+  return 'monthly';
+}
+
+function copyCmd(){
+  const text = document.getElementById('cmd-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.cmd-copy');
+    btn.textContent = '✅ 已複製';
+    setTimeout(() => btn.textContent = '📋 複製', 2000);
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// Part 2: Custom Filter Analysis (from review_filter.html)
+// EA Filter uses EA_MAP from ea_map.json (not extractEA)
+// ═══════════════════════════════════════════════════════════════
+
+var SIGNAL_IDS = [];
+var EA_MAP = {};       // signal_id → ea_type (from ea_map.json)
+var EA_TYPES = {};     // ea_type → trade count
+var SYMBOLS = {};
+var ALL_TRADES = [];
+var FILTER_LOADED = false;
+
+// CSV Files — in ../downloads/ relative to reviews/index.html
+var CSV_FILES_RAW = [
+  "10947","12023","12167","19625","31557","31732","31739","4022","4200","5117","7999","7999_fixed",
+  "signal_11141","signal_31823","signal_3894",
+  "forex-forest-signals-page-106","forex-forest-signals-page-165","forex-forest-signals-page-537",
+  "forex-forest-signals-page-971","forex-forest-signals-page-1165","forex-forest-signals-page-1470",
+  "forex-forest-signals-page-1491","forex-forest-signals-page-1584","forex-forest-signals-page-1980",
+  "forex-forest-signals-page-2260","forex-forest-signals-page-2351","forex-forest-signals-page-2377",
+  "forex-forest-signals-page-2739","forex-forest-signals-page-3291","forex-forest-signals-page-3736",
+  "forex-forest-signals-page-3894","forex-forest-signals-page-4022","forex-forest-signals-page-4200",
+  "forex-forest-signals-page-4666","forex-forest-signals-page-4734","forex-forest-signals-page-5001",
+  "forex-forest-signals-page-5077","forex-forest-signals-page-5117","forex-forest-signals-page-5120",
+  "forex-forest-signals-page-5275","forex-forest-signals-page-5566","forex-forest-signals-page-5636",
+  "forex-forest-signals-page-6797","forex-forest-signals-page-7452","forex-forest-signals-page-7919",
+  "forex-forest-signals-page-8027","forex-forest-signals-page-8325","forex-forest-signals-page-9085",
+  "forex-forest-signals-page-10344","forex-forest-signals-page-10437","forex-forest-signals-page-10843",
+  "forex-forest-signals-page-10864","forex-forest-signals-page-10947","forex-forest-signals-page-11141",
+  "forex-forest-signals-page-11598","forex-forest-signals-page-11889","forex-forest-signals-page-11984",
+  "forex-forest-signals-page-12023","forex-forest-signals-page-12167","forex-forest-signals-page-12173",
+  "forex-forest-signals-page-12733","forex-forest-signals-page-12962","forex-forest-signals-page-13461",
+  "forex-forest-signals-page-13790","forex-forest-signals-page-13798","forex-forest-signals-page-13863",
+  "forex-forest-signals-page-14158","forex-forest-signals-page-14341","forex-forest-signals-page-14581",
+  "forex-forest-signals-page-14592","forex-forest-signals-page-14724","forex-forest-signals-page-16266",
+  "forex-forest-signals-page-16596","forex-forest-signals-page-16698","forex-forest-signals-page-16706",
+  "forex-forest-signals-page-16777","forex-forest-signals-page-17547","forex-forest-signals-page-17611",
+  "forex-forest-signals-page-17823","forex-forest-signals-page-17962","forex-forest-signals-page-19625",
+  "forex-forest-signals-page-19849","forex-forest-signals-page-20805","forex-forest-signals-page-20846",
+  "forex-forest-signals-page-21698","forex-forest-signals-page-22200","forex-forest-signals-page-22278",
+  "forex-forest-signals-page-23617","forex-forest-signals-page-25260","forex-forest-signals-page-25668",
+  "forex-forest-signals-page-25830","forex-forest-signals-page-27226","forex-forest-signals-page-30359",
+  "forex-forest-signals-page-31593","forex-forest-signals-page-31781","forex-forest-signals-page-31823",
+  "forex-forest-signals-page-32278","forex-forest-signals-page-32541","forex-forest-signals-page-32719",
+  "forex-forest-signals-page-33101","forex-forest-signals-page-34259","forex-forest-signals-page-34574",
+  "forex-forest-signals-page-35362","forex-forest-signals-page-35434","forex-forest-signals-page-35436",
+  "forex-forest-signals-page-36338","forex-forest-signals-page-36397","forex-forest-signals-page-36511",
+  "forex-forest-signals-page-38678"
+];
+
+// Derive clean Signal ID from filename
+function signalIdFromFilename(fn) {
+  if (fn.indexOf('forex-forest-signals-page-') === 0) return fn.replace('forex-forest-signals-page-', '');
+  if (fn.indexOf('signal_') === 0) return fn.replace('signal_', '');
+  return fn;
+}
+
+// === Get EA type from EA_MAP lookup (NOT from comment parsing) ===
+function getEA(signalId) {
+  return EA_MAP[String(signalId)] || null;
+}
+
+// === Load CSV Files ===
+function loadCSV(filename) {
+  return fetch('../downloads/' + filename + '.csv')
+    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(text) {
+      if (!text) return [];
+      var parsed = Papa.parse(text, {header: true, skipEmptyLines: true});
+      var signalId = signalIdFromFilename(filename);
+      var ea = getEA(signalId);  // Use EA_MAP lookup
+      var trades = [];
+      for (var i = 0; i < parsed.data.length; i++) {
+        var row = parsed.data[i];
+        var type = (row['Type'] || '').toLowerCase().trim();
+        if (type !== 'buy' && type !== 'sell') continue;
+        var sym = (row['Symbol'] || '').trim();
+        if (!sym) continue;
+        var netProfit = parseFloat(row['Net Profit']) || 0;
+        var openTime = row['Open Time'] || '';
+        var closeTime = row['Close Time'] || '';
+        var holdingHours = parseFloat(row['Holding Time (Hours)']) || 0;
+        var maxProfit = parseFloat(row['Max Profit']) || 0;
+        var maxLoss = parseFloat(row['Max Loss']) || 0;
+        trades.push({
+          signalId: signalId,
+          ea: ea,
+          symbol: sym,
+          type: type,
+          netProfit: netProfit,
+          openTime: openTime,
+          closeTime: closeTime,
+          openDate: parseDate(openTime),
+          closeDate: parseDate(closeTime),
+          holdingHours: holdingHours,
+          maxProfit: maxProfit,
+          maxLoss: maxLoss,
+          lots: parseFloat(row['Lots']) || 0,
+          netPips: parseFloat(row['Net Pips']) || 0
+        });
+      }
+      return trades;
+    })
+    .catch(function() { return []; });
+}
+
+// Parse DD/MM/YYYY HH:mm:ss format
+function parseDate(str) {
+  if (!str) return null;
+  var m = str.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+  return null;
+}
+
+// === Initialize Filter Page ===
+function initFilterPage() {
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+
+  var loadBtn = document.getElementById('generateBtn');
+  loadBtn.textContent = '⏳ 載入數據中...';
+
+  // Load EA_MAP first, then load CSVs
+  fetch('../ea_map.json')
+    .then(function(r) { return r.ok ? r.json() : {}; })
+    .then(function(data) {
+      EA_MAP = data;
+
+      // Build EA type list from EA_MAP unique values
+      var eaTypeSet = {};
+      for (var k in EA_MAP) {
+        eaTypeSet[EA_MAP[k]] = (eaTypeSet[EA_MAP[k]] || 0) + 1;
+      }
+
+      // Load all CSVs
+      var promises = CSV_FILES_RAW.map(function(f) { return loadCSV(f); });
+
+      Promise.all(promises).then(function(results) {
+        ALL_TRADES = [];
+        var symSet = {};
+        var sigSet = {};
+        var eaTradeCounts = {};
+
+        for (var i = 0; i < results.length; i++) {
+          var trades = results[i];
+          for (var j = 0; j < trades.length; j++) {
+            var t = trades[j];
+            ALL_TRADES.push(t);
+            if (t.ea) eaTradeCounts[t.ea] = (eaTradeCounts[t.ea] || 0) + 1;
+            if (t.symbol) symSet[t.symbol] = (symSet[t.symbol] || 0) + 1;
+            sigSet[t.signalId] = (sigSet[t.signalId] || 0) + 1;
+          }
+        }
+
+        EA_TYPES = eaTradeCounts;
+        SYMBOLS = symSet;
+
+        // Populate EA filter list — use EA_MAP unique values (correct EA types)
+        var eaKeys = Object.keys(eaTypeSet).sort();
+        populateList('eaList', eaKeys, eaTypeSet);
+        populateList('symList', Object.keys(symSet).sort(), symSet);
+
+        // Build signal ID list from raw filenames (deduped)
+        var sigIds = CSV_FILES_RAW.map(signalIdFromFilename);
+        sigIds = sigIds.filter(function(v, i, a) { return a.indexOf(v) === i; });
+        sigIds.sort(function(a,b){ var na=parseInt(a),nb=parseInt(b); return (isNaN(na)?999999:na)-(isNaN(nb)?999999:nb); });
+        SIGNAL_IDS = sigIds;
+        populateList('sigList', SIGNAL_IDS, sigSet);
+
+        FILTER_LOADED = true;
+        loadBtn.disabled = false;
+        loadBtn.textContent = '📊 生成覆盤報告';
+
+        // Default dates from trade data
+        var dates = ALL_TRADES.filter(function(t){return t.openDate;}).map(function(t){return t.openDate;});
+        if (dates.length) {
+          var minD = new Date(Math.min.apply(null, dates.map(function(d){return d.getTime();})));
+          var maxD = new Date(Math.max.apply(null, dates.map(function(d){return d.getTime();})));
+          document.getElementById('dateFrom').value = minD.toISOString().split('T')[0];
+          document.getElementById('dateTo').value = maxD.toISOString().split('T')[0];
+        }
+      });
+    })
+    .catch(function() {
+      loadBtn.textContent = '❌ EA Map 載入失敗';
+    });
+}
+
+// Populate multi-select list
+function populateList(containerId, items, countMap) {
+  var container = document.getElementById(containerId);
+  container.innerHTML = '';
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var count = countMap ? (countMap[item] || 0) : 0;
+    var div = document.createElement('div');
+    div.className = 'ms-item';
+    var html = '<input type="checkbox" value="' + item + '" id="' + containerId + '_cb_' + i + '">';
+    html += '<label for="' + containerId + '_cb_' + i + '">' + item;
+    if (count > 0) html += ' <span class="badge">' + count + '</span>';
+    html += '</label>';
+    div.innerHTML = html;
+    container.appendChild(div);
+  }
+  updateCount(containerId);
+}
+
+// Update selection count
+function updateCount(containerId) {
+  var checks = document.querySelectorAll('#' + containerId + ' input[type="checkbox"]');
+  var selected = 0;
+  for (var i = 0; i < checks.length; i++) if (checks[i].checked) selected++;
+  var labelMap = {eaList: 'eaCount', symList: 'symCount', sigList: 'sigCount'};
+  var el = document.getElementById(labelMap[containerId]);
+  if (el) el.textContent = selected + ' / ' + checks.length + ' selected';
+}
+
+// Filter list by search
+function filterList(containerId, query) {
+  query = query.toLowerCase();
+  var items = document.querySelectorAll('#' + containerId + ' .ms-item');
+  for (var i = 0; i < items.length; i++) {
+    var text = items[i].textContent.toLowerCase();
+    items[i].style.display = text.indexOf(query) >= 0 ? '' : 'none';
+  }
+}
+
+// Toggle all checkboxes in a list
+function toggleAll(containerId, checked) {
+  var checks = document.querySelectorAll('#' + containerId + ' input[type="checkbox"]');
+  var items = document.querySelectorAll('#' + containerId + ' .ms-item');
+  for (var i = 0; i < checks.length; i++) {
+    if (items[i].style.display !== 'none') checks[i].checked = checked;
+  }
+  updateCount(containerId);
+}
+
+// Get selected values from a multi-select list
+function getSelected(containerId) {
+  var checks = document.querySelectorAll('#' + containerId + ' input[type="checkbox"]:checked');
+  var vals = [];
+  for (var i = 0; i < checks.length; i++) vals.push(checks[i].value);
+  return vals;
+}
+
+// Reset filters
+function resetFilters() {
+  var containers = ['eaList', 'symList', 'sigList'];
+  for (var i = 0; i < containers.length; i++) toggleAll(containers[i], false);
+  document.getElementById('resultsArea').innerHTML = '';
+}
+
+// === Generate Report ===
+function generateReport() {
+  if (!FILTER_LOADED) return;
+
+  var dateFrom = document.getElementById('dateFrom').value;
+  var dateTo = document.getElementById('dateTo').value;
+  var selectedEAs = getSelected('eaList');
+  var selectedSyms = getSelected('symList');
+  var selectedSigs = getSelected('sigList');
+
+  // Filter trades
+  var filtered = ALL_TRADES.filter(function(t) {
+    if (dateFrom && t.openDate) {
+      var f = new Date(dateFrom);
+      if (t.openDate < f) return false;
+    }
+    if (dateTo && t.openDate) {
+      var d = new Date(dateTo);
+      d.setDate(d.getDate() + 1);
+      if (t.openDate >= d) return false;
+    }
+    if (selectedEAs.length > 0 && (!t.ea || selectedEAs.indexOf(t.ea) < 0)) return false;
+    if (selectedSyms.length > 0 && selectedSyms.indexOf(t.symbol) < 0) return false;
+    if (selectedSigs.length > 0 && selectedSigs.indexOf(t.signalId) < 0) return false;
+    return true;
+  });
+
+  var resultsEl = document.getElementById('resultsArea');
+
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '<div class="no-data">⚠️ 沒有符合篩選條件的交易數據</div>';
+    return;
+  }
+
+  var html = '';
+  var hasEA = selectedEAs.length > 0;
+  var hasSym = selectedSyms.length > 0;
+  var hasSig = selectedSigs.length > 0;
+
+  // Overall stats
+  html += '<div class="result-section-title">📋 整體統計（' + filtered.length + ' 筆交易）</div>';
+  var overall = calcStats(filtered);
+  html += renderStatCard('全部篩選結果', overall);
+
+  // Per-dimension breakdown
+  if (hasEA) {
+    html += '<div class="result-section-title">🤖 按 EA 類型分析</div>';
+    var groups = groupBy(filtered, 'ea');
+    var groupStats = [];
+    for (var ea in groups) {
+      groupStats.push({name: ea, stats: calcStats(groups[ea])});
+    }
+    html += renderStatCards(groupStats);
+    if (Object.keys(groups).length > 1) {
+      html += renderComparisonTable(groupStats, 'EA');
+    }
+  }
+
+  if (hasSym) {
+    html += '<div class="result-section-title">💱 按貨幣對分析</div>';
+    var symGroups = groupBy(filtered, 'symbol');
+    var symStats = [];
+    for (var sym in symGroups) {
+      symStats.push({name: sym, stats: calcStats(symGroups[sym])});
+    }
+    symStats.sort(function(a, b) { return b.stats.totalProfit - a.stats.totalProfit; });
+    html += renderStatCards(symStats);
+    if (Object.keys(symGroups).length > 1) {
+      html += renderComparisonTable(symStats, '貨幣對');
+    }
+  }
+
+  if (hasSig) {
+    html += '<div class="result-section-title">📡 按 Signal ID 分析</div>';
+    var sigGroups = groupBy(filtered, 'signalId');
+    var sigStatsArr = [];
+    for (var sig in sigGroups) {
+      sigStatsArr.push({name: sig, stats: calcStats(sigGroups[sig])});
+    }
+    sigStatsArr.sort(function(a, b) { return b.stats.totalProfit - a.stats.totalProfit; });
+    html += renderStatCards(sigStatsArr);
+    if (Object.keys(sigGroups).length > 1) {
+      html += renderComparisonTable(sigStatsArr, 'Signal ID');
+    }
+  }
+
+  resultsEl.innerHTML = html;
+}
+
+// === Calculate Statistics ===
+function calcStats(trades) {
+  var totalTrades = trades.length;
+  if (totalTrades === 0) return {totalTrades:0,winRate:0,totalProfit:0,avgHolding:0,maxProfit:0,maxLoss:0,profitFactor:0,wins:0,losses:0,avgProfit:0};
+
+  var wins = 0, losses = 0;
+  var totalProfit = 0;
+  var totalHolding = 0;
+  var maxProfit = -Infinity;
+  var maxLoss = Infinity;
+  var grossProfit = 0, grossLoss = 0;
+
+  for (var i = 0; i < trades.length; i++) {
+    var t = trades[i];
+    var p = t.netProfit;
+    totalProfit += p;
+    totalHolding += t.holdingHours;
+    if (t.maxProfit > maxProfit) maxProfit = t.maxProfit;
+    if (t.maxLoss < maxLoss) maxLoss = t.maxLoss;
+    if (p > 0) {
+      wins++;
+      grossProfit += p;
+    } else if (p < 0) {
+      losses++;
+      grossLoss += Math.abs(p);
+    }
+  }
+
+  var winRate = totalTrades > 0 ? (wins / totalTrades * 100) : 0;
+  var avgHolding = totalTrades > 0 ? (totalHolding / totalTrades) : 0;
+  var profitFactor = grossLoss > 0 ? (grossProfit / grossLoss) : (grossProfit > 0 ? 999 : 0);
+  var avgProfit = totalTrades > 0 ? (totalProfit / totalTrades) : 0;
+
+  if (maxProfit === -Infinity) maxProfit = 0;
+  if (maxLoss === Infinity) maxLoss = 0;
+
+  return {
+    totalTrades: totalTrades,
+    winRate: winRate,
+    totalProfit: totalProfit,
+    avgHolding: avgHolding,
+    maxProfit: maxProfit,
+    maxLoss: maxLoss,
+    profitFactor: profitFactor,
+    wins: wins,
+    losses: losses,
+    avgProfit: avgProfit,
+    grossProfit: grossProfit,
+    grossLoss: grossLoss
+  };
+}
+
+function fmt(n, dec) {
+  dec = dec || 2;
+  if (n === 0 || !isFinite(n)) return '0.00';
+  return n.toFixed(dec);
+}
+
+function fmtHours(h) {
+  if (h < 1) return (h * 60).toFixed(0) + ' 分鐘';
+  if (h < 24) return h.toFixed(1) + ' 小時';
+  return (h / 24).toFixed(1) + ' 天';
+}
+
+function profitClass(v) {
+  return v >= 0 ? 'pos' : 'neg';
+}
+
+function groupBy(trades, key) {
+  var groups = {};
+  for (var i = 0; i < trades.length; i++) {
+    var val = trades[i][key];
+    if (!val) continue;
+    if (!groups[val]) groups[val] = [];
+    groups[val].push(trades[i]);
+  }
+  return groups;
+}
+
+function renderStatCard(name, s) {
+  return '<div class="stat-cards"><div class="stat-card">' +
+    '<div class="stat-name">' + name + '</div>' +
+    '<div class="stat-row"><span class="label">交易筆數</span><span class="val">' + s.totalTrades + '</span></div>' +
+    '<div class="stat-row"><span class="label">勝率</span><span class="val ' + (s.winRate >= 50 ? 'pos' : 'neg') + '">' + fmt(s.winRate, 1) + '%</span></div>' +
+    '<div class="stat-row"><span class="label">勝/負</span><span class="val"><span class="pos">' + s.wins + '</span> / <span class="neg">' + s.losses + '</span></span></div>' +
+    '<div class="stat-row"><span class="label">總盈虧</span><span class="val ' + profitClass(s.totalProfit) + '">' + (s.totalProfit >= 0 ? '+' : '') + fmt(s.totalProfit) + '</span></div>' +
+    '<div class="stat-row"><span class="label">平均盈虧</span><span class="val ' + profitClass(s.avgProfit) + '">' + (s.avgProfit >= 0 ? '+' : '') + fmt(s.avgProfit) + '</span></div>' +
+    '<div class="stat-row"><span class="label">平均持倉</span><span class="val">' + fmtHours(s.avgHolding) + '</span></div>' +
+    '<div class="stat-row"><span class="label">最大盈利</span><span class="val pos">' + fmt(s.maxProfit) + '</span></div>' +
+    '<div class="stat-row"><span class="label">最大虧損</span><span class="val neg">' + fmt(s.maxLoss) + '</span></div>' +
+    '<div class="stat-row"><span class="label">Profit Factor</span><span class="val ' + (s.profitFactor >= 1 ? 'pos' : 'neg') + '">' + (s.profitFactor >= 999 ? '∞' : fmt(s.profitFactor)) + '</span></div>' +
+    '</div></div>';
+}
+
+function renderStatCards(groups) {
+  var html = '<div class="stat-cards">';
+  for (var i = 0; i < groups.length; i++) {
+    var s = groups[i].stats;
+    html += '<div class="stat-card">' +
+      '<div class="stat-name">' + groups[i].name + '</div>' +
+      '<div class="stat-row"><span class="label">交易筆數</span><span class="val">' + s.totalTrades + '</span></div>' +
+      '<div class="stat-row"><span class="label">勝率</span><span class="val ' + (s.winRate >= 50 ? 'pos' : 'neg') + '">' + fmt(s.winRate, 1) + '%</span></div>' +
+      '<div class="stat-row"><span class="label">勝/負</span><span class="val"><span class="pos">' + s.wins + '</span> / <span class="neg">' + s.losses + '</span></span></div>' +
+      '<div class="stat-row"><span class="label">總盈虧</span><span class="val ' + profitClass(s.totalProfit) + '">' + (s.totalProfit >= 0 ? '+' : '') + fmt(s.totalProfit) + '</span></div>' +
+      '<div class="stat-row"><span class="label">平均盈虧</span><span class="val ' + profitClass(s.avgProfit) + '">' + (s.avgProfit >= 0 ? '+' : '') + fmt(s.avgProfit) + '</span></div>' +
+      '<div class="stat-row"><span class="label">平均持倉</span><span class="val">' + fmtHours(s.avgHolding) + '</span></div>' +
+      '<div class="stat-row"><span class="label">最大盈利</span><span class="val pos">' + fmt(s.maxProfit) + '</span></div>' +
+      '<div class="stat-row"><span class="label">最大虧損</span><span class="val neg">' + fmt(s.maxLoss) + '</span></div>' +
+      '<div class="stat-row"><span class="label">Profit Factor</span><span class="val ' + (s.profitFactor >= 1 ? 'pos' : 'neg') + '">' + (s.profitFactor >= 999 ? '∞' : fmt(s.profitFactor)) + '</span></div>' +
+      '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderComparisonTable(groups, dimLabel) {
+  if (groups.length < 2) return '';
+
+  var bestWR = -1, worstWR = 999, bestPF = -1, worstPF = 999, bestTP = -Infinity, worstTP = Infinity;
+  for (var i = 0; i < groups.length; i++) {
+    var s = groups[i].stats;
+    if (s.totalTrades < 1) continue;
+    if (s.winRate > bestWR) bestWR = s.winRate;
+    if (s.winRate < worstWR) worstWR = s.winRate;
+    if (s.profitFactor > bestPF) bestPF = s.profitFactor;
+    if (s.profitFactor < worstPF) worstPF = s.profitFactor;
+    if (s.totalProfit > bestTP) bestTP = s.totalProfit;
+    if (s.totalProfit < worstTP) worstTP = s.totalProfit;
+  }
+
+  var html = '<div class="result-section-title">⚡ ' + dimLabel + ' 對比分析</div>';
+  html += '<div class="cmp-table"><table>';
+  html += '<thead><tr><th>' + dimLabel + '</th><th>交易數</th><th>勝率</th><th>勝/負</th><th>總盈虧</th><th>平均盈虧</th><th>平均持倉</th><th>最大盈利</th><th>最大虧損</th><th>PF</th></tr></thead>';
+  html += '<tbody>';
+  for (var j = 0; j < groups.length; j++) {
+    var s2 = groups[j].stats;
+    var wrClass = s2.winRate === bestWR ? 'best' : (s2.winRate === worstWR ? 'worst' : '');
+    var pfClass = s2.profitFactor === bestPF ? 'best' : (s2.profitFactor === worstPF ? 'worst' : '');
+    var tpClass = s2.totalProfit === bestTP ? 'best' : (s2.totalProfit === worstTP ? 'worst' : (s2.totalProfit >= 0 ? 'pos' : 'neg'));
+    html += '<tr>';
+    html += '<td><strong>' + groups[j].name + '</strong></td>';
+    html += '<td>' + s2.totalTrades + '</td>';
+    html += '<td class="' + wrClass + '">' + fmt(s2.winRate, 1) + '%</td>';
+    html += '<td>' + s2.wins + '/' + s2.losses + '</td>';
+    html += '<td class="' + tpClass + '">' + (s2.totalProfit >= 0 ? '+' : '') + fmt(s2.totalProfit) + '</td>';
+    html += '<td class="' + (s2.avgProfit >= 0 ? 'pos' : 'neg') + '">' + (s2.avgProfit >= 0 ? '+' : '') + fmt(s2.avgProfit) + '</td>';
+    html += '<td>' + fmtHours(s2.avgHolding) + '</td>';
+    html += '<td class="pos">' + fmt(s2.maxProfit) + '</td>';
+    html += '<td class="neg">' + fmt(s2.maxLoss) + '</td>';
+    html += '<td class="' + pfClass + '">' + (s2.profitFactor >= 999 ? '∞' : fmt(s2.profitFactor)) + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+// Attach change listeners to update counts
+document.addEventListener('change', function(e) {
+  if (e.target.type === 'checkbox') {
+    var container = e.target.closest('.ms-list');
+    if (container) updateCount(container.id);
+  }
+});
+
+// ═══ Init ═══
+setPreset('this-month');
+loadReports();
+initFilterPage();
+</script>
+</body>
+</html>
