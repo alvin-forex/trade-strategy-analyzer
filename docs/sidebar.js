@@ -111,7 +111,6 @@
     else if(dp==='ccy_ranking' && filename==='ccy_ranking') link.classList.add('active');
     else if(dp==='volatility' && (filename==='volatility' || filename==='ccy_timeframe_volatility')) link.classList.add('active');
     else if(dp==='ccy_power' && (path.includes('/admin/ccy_power/') || filename==='ccy_power')) link.classList.add('active');
-    else if(dp==='forex_news' && (filename==='forex_news' || path.includes('/admin/forex_reports/'))) link.classList.add('active');
     else if(dp==='portfolios' && path.includes('/admin/portfolios/')) link.classList.add('active');
     else if(dp==='reviews' && path.includes('/admin/reviews/')) link.classList.add('active');
     else if(dp==='review_filter' && filename==='review_filter') link.classList.add('active');
