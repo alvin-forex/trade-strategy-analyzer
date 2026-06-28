@@ -104,3 +104,10 @@
 
 <!-- openclaw-memory-promotion:memory:memory/2026-06-25.md:3:5 -->
 - MT4 日報 cron (00:30 HKT): 帳戶 #7737997 餘額 $0.14，零持倉，連續7日無交易; 6/18 大幅虧損後帳戶近歸零（$58.51 → $0.14）; WhatsApp 日報已發送，messageId=3EB04FA37D0B0A7CA3BD22 [score=0.861 recalls=0 avg=0.620 source=memory/2026-06-25.md:3-5]
+
+## Promoted From Short-Term Memory (2026-06-29)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-26.md:4:4 -->
+- MT4 Daily Report - 2026-06-26 (Fri): **Status:** Sent ✅ WhatsApp messageId=`3EB0B4C3BD468FDFC73B42` [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-26.md:4-4]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-26.md:6:6 -->
+- MT4 Daily Report - 2026-06-26 (Fri): **Account:** Vantage Markets #7737997 (Wayne Manuial Order) [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-26.md:6-6]
