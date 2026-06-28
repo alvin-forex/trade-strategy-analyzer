@@ -30,6 +30,13 @@ REQUIRED_PAGES = [
 # 導航組件 (sidebar 或 topnav 二擇一即可)
 NAV_PATTERNS = ["sidebar.css", "sidebar.js", "topnav"]
 
+# 豁免 sidebar 檢查嘅獨立報告頁面（非 TSA 主體頁面）
+NAV_EXEMPT = {
+    "ea_strategy_masterplan.html",  # 獨立策略報告
+    "ff54_report.html",             # 獨立活動報告
+    "forex_news.html",              # 獨立新聞頁面
+}
+
 
 class QAResult:
     def __init__(self):
@@ -81,7 +88,7 @@ def check_sidebar_consistency(result: QAResult):
         has_nav = any(p in content for p in NAV_PATTERNS)
 
         # 排除 index.html（主頁可能有獨立導航）
-        if rel.name == "index.html":
+        if rel.name == "index.html" or name in NAV_EXEMPT:
             if has_nav:
                 result.ok(f"{name} 有導航組件")
             else:
