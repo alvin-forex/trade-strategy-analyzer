@@ -1,21 +1,6 @@
 # Long-Term Memory
 
 
-## Promoted From Short-Term Memory (2026-06-14)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:19:21 -->
-- 新事件摘要（6月4-8日）: USDCHF SELL +$23.88; Nikkei225 x6 淨利 +$80.64（最大 +$31.97）; Nikkei225 x1 小虧 -$0.16 [score=0.855 recalls=0 avg=0.620 source=memory/2026-06-09.md:19-21]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-07.md:26:26 -->
-- 已完成: pending_events.json 已清理 [score=0.847 recalls=0 avg=0.620 source=memory/2026-06-07.md:26-26]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:26:26 -->
-- 待解決: [ ] WhatsApp allowFrom 配置未修復 [score=0.845 recalls=0 avg=0.620 source=memory/2026-06-09.md:26-26]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:11:11 -->
-- 新事件摘要（6月4-8日）: **新倉 (33筆):** [score=0.835 recalls=0 avg=0.620 source=memory/2026-06-09.md:11-11]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-09.md:18:18 -->
-- 新事件摘要（6月4-8日）: **平倉 (9筆):** [score=0.825 recalls=0 avg=0.620 source=memory/2026-06-09.md:18-18]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-08.md:52:53 -->
-- 待辦事項: [ ] 檢查 WhatsApp allowFrom 配置; [ ] 確認 daily summary cron 正常運作 [score=0.808 recalls=0 avg=0.620 source=memory/2026-06-08.md:52-53]
-
 ## Promoted From Short-Term Memory (2026-06-15)
 
 <!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:14:15 -->
@@ -111,3 +96,8 @@
 - MT4 Daily Report - 2026-06-26 (Fri): **Status:** Sent ✅ WhatsApp messageId=`3EB0B4C3BD468FDFC73B42` [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-26.md:4-4]
 <!-- openclaw-memory-promotion:memory:memory/2026-06-26.md:6:6 -->
 - MT4 Daily Report - 2026-06-26 (Fri): **Account:** Vantage Markets #7737997 (Wayne Manuial Order) [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-26.md:6-6]
+
+## Promoted From Short-Term Memory (2026-06-30)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-26.md:7:10 -->
+- MT4 Daily Report - 2026-06-26 (Fri): Balance: $0.14 | Equity: $0.14 | Positions: 0; No trading activity for 8 consecutive days (since 6/18); Account was nearly wiped out on 6/18 (-$58.37, -99.8%) from forced closes on Nikkei225/USDCHF/USDCAD/USDJPY SELL positions against strong uptrend; Weekend (Saturday) ahead — no trading expected [score=0.888 recalls=0 avg=0.620 source=memory/2026-06-26.md:7-10]
