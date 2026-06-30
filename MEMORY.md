@@ -1,13 +1,6 @@
 # Long-Term Memory
 
 
-## Promoted From Short-Term Memory (2026-06-15)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:14:15 -->
-- 今日活動摘要: 最後狀態更新: 2026.06.12 19:25:49; 帳戶從 5.47 增至 4.89 (+.42) [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-13.md:14-15]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:23:23 -->
-- 備註: 帳戶處於低資金狀態，需注意風控。 [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-13.md:23-23]
-
 ## Promoted From Short-Term Memory (2026-06-16)
 
 <!-- openclaw-memory-promotion:memory:memory/2026-06-13.md:7:10 -->
@@ -101,3 +94,18 @@
 
 <!-- openclaw-memory-promotion:memory:memory/2026-06-26.md:7:10 -->
 - MT4 Daily Report - 2026-06-26 (Fri): Balance: $0.14 | Equity: $0.14 | Positions: 0; No trading activity for 8 consecutive days (since 6/18); Account was nearly wiped out on 6/18 (-$58.37, -99.8%) from forced closes on Nikkei225/USDCHF/USDCAD/USDJPY SELL positions against strong uptrend; Weekend (Saturday) ahead — no trading expected [score=0.888 recalls=0 avg=0.620 source=memory/2026-06-26.md:7-10]
+
+## Promoted From Short-Term Memory (2026-07-01)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-28.md:25:25 -->
+- 備註: ⚠️ 帳戶餘額極低，需要關注 [score=0.888 recalls=0 avg=0.620 source=memory/2026-06-28.md:25-25]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-28.md:4:5 -->
+- 執行記錄: 時間：2026-06-28 00:30 HKT; 任務：MT4 帳戶日報生成（cron: mt4-daily-summary） [score=0.869 recalls=0 avg=0.620 source=memory/2026-06-28.md:4-5]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-28.md:15:18 -->
+- 近期活動摘要: 最後狀態更新：2026.06.26 23:59:59; 最後交易日期：2026.06.18; 6月18日大量平倉，帳戶資金從 ~$54 跌至接近零; 主要虧損來源：Nikkei225（日經指數）交易 [score=0.837 recalls=0 avg=0.620 source=memory/2026-06-28.md:15-18]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-28.md:8:10 -->
+- 帳戶狀態: 帳戶：Vantage Markets #7737997 (Wayne Manual Order); 餘額：$0.14; 淨值：$0.14 [score=0.837 recalls=0 avg=0.620 source=memory/2026-06-28.md:8-10]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-28.md:21:22 -->
+- 已發送: WhatsApp 日報已發送至 +85295424877; messageId: 3EB03B7A0A61A531B02942 [score=0.827 recalls=0 avg=0.620 source=memory/2026-06-28.md:21-22]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-28.md:12:12 -->
+- 帳戶狀態: 槓桿：1:500 [score=0.807 recalls=0 avg=0.620 source=memory/2026-06-28.md:12-12]
