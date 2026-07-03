@@ -695,21 +695,8 @@ def opportunity_score(monthly: dict, sim: dict) -> dict:
 
 
 # ── Main ───────────────────────────────────────────────────
-def main(args):
-    cd = Path(__file__).parent.parent  # trade_strategy_analyzer/
-    csv_dir = cd / args.csv_dir
-    out_dir = cd / args.output_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    pdef = None
-    for p in PORTFOLIO_DEFS:
-        if p["id"] == args.portfolio:
-            pdef = p
-            break
-    if not pdef:
-        log.error(f"Portfolio {args.portfolio} not found")
-        return
-
+def generate_one(pdef, csv_dir, out_dir):
+    """Generate a single portfolio HTML."""
     log.info(f"Generating Portfolio {pdef['id']} ({pdef['name']}) with signals: {pdef['signals']}")
 
     # Load and analyze each signal
@@ -741,8 +728,8 @@ def main(args):
         log.info(f"  Signal {sid}: {stats['count']} trades, WR={stats['win_rate']}%, PF={stats['profit_factor']}")
 
     if not signal_analyses:
-        log.error("No signal data found")
-        return
+        log.error(f"No signal data found for {pdef['id']}")
+        return None
 
     # Portfolio-level sequential sim (combined)
     portfolio_sim = sequential_simulation(all_trades_combined)
@@ -764,7 +751,36 @@ def main(args):
     out_path.write_text(html, encoding="utf-8")
     size = out_path.stat().st_size
     log.info(f"✅ Generated: {out_path} ({size:,} bytes)")
-    print(f"Output: {out_path} ({size:,} bytes)")
+    return out_path
+
+
+def main(args):
+    cd = Path(__file__).parent.parent  # trade_strategy_analyzer/
+    csv_dir = cd / args.csv_dir
+    out_dir = cd / args.output_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.portfolio.upper() == "ALL":
+        results = []
+        for pdef in PORTFOLIO_DEFS:
+            out = generate_one(pdef, csv_dir, out_dir)
+            if out:
+                results.append(out)
+        log.info(f"🎉 Generated {len(results)}/{len(PORTFOLIO_DEFS)} portfolios")
+        for r in results:
+            print(f"Output: {r}")
+    else:
+        pdef = None
+        for p in PORTFOLIO_DEFS:
+            if p["id"] == args.portfolio:
+                pdef = p
+                break
+        if not pdef:
+            log.error(f"Portfolio {args.portfolio} not found")
+            return
+        out = generate_one(pdef, csv_dir, out_dir)
+        if out:
+            print(f"Output: {out}")
 
 
 if __name__ == "__main__":
