@@ -118,4 +118,34 @@
     else if(dp==='forex_hub_daily' && path.includes('/admin/forex_hub/') && window.location.hash==='#daily') link.classList.add('active');
     else if(dp!=='index' && filename.includes(dp)) link.classList.add('active');
   });
+
+  // === 通用 Tab 切換邏輯 ===
+  document.addEventListener('DOMContentLoaded', function(){
+    var tabBtns = document.querySelectorAll('.tab[data-tab], .tab[onclick]');
+    tabBtns.forEach(function(btn){
+      // Skip if already has onclick handler
+      if(btn.getAttribute('onclick')) return;
+      btn.addEventListener('click', function(){
+        var target = btn.getAttribute('data-tab');
+        if(!target) return;
+        // Find closest tabs container
+        var tabsContainer = btn.closest('.tabs') || btn.parentElement;
+        var contentArea = tabsContainer ? tabsContainer.nextElementSibling : null;
+        if(!contentArea) {
+          // Try finding content as sibling of parent .tabs-layout
+          var layout = btn.closest('.tabs-layout');
+          if(layout) contentArea = layout.querySelector('.tabs-content');
+        }
+        if(!contentArea) return;
+        // Deactivate all tabs in same container
+        tabsContainer.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+        btn.classList.add('active');
+        // Hide all panels in content area
+        contentArea.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+        // Show target panel
+        var panel = contentArea.querySelector('#' + target);
+        if(panel) panel.classList.add('active');
+      });
+    });
+  });
 })();
