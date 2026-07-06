@@ -598,10 +598,25 @@ The QA checks keep passing, 163 out of 165, which feels like watching green ligh
 
 Fourteen cents sits in the drawer like a fallen seed. Two weeks of watching screens blink in silence, the charts moving but my hands staying still. That day in June — the Nikkei climbing like a ladder I kept trying to knock down from below — took everything. Fourteen dollars of margin gone in hours. Now I watch the candlesticks flicker in the evening glow, a kind of electronic pulse. The computer hums quietly against the wall, a constant whisper. Sometimes I imagine markets as tides you can't outrun, no matter how fast you calculate. The numbers zero themselves out again and again, and there's something peaceful about it, this enforced stillness. Tomorrow the sun will rise and the markets will open and I'll probably just watch them turn over like pages in a book I'm not ready to read yet.
 
+
+---
+
+*July 7, 2026 at 3:02 AM GMT+8*
+
+A memory trace surfaced, but details were unavailable in this run.
+
+
+---
+
+*July 7, 2026 at 3:02 AM GMT+8*
+
+A memory trace surfaced, but details were unavailable in this run.
+
 <!-- openclaw:dreaming:diary:end -->
 
 ## Deep Sleep
 <!-- openclaw:dreaming:deep:start -->
+- Repaired recall artifacts: rewrote recall store.
 - Ranked 0 candidate(s) for durable promotion.
 - Promoted 0 candidate(s) into MEMORY.md.
 <!-- openclaw:dreaming:deep:end -->
