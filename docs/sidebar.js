@@ -9,6 +9,7 @@
   var depth = '';
   if(path.includes('/admin/ccy_power/') || path.includes('/admin/forex_reports/') || path.includes('/admin/forex_hub/') || path.includes('/admin/reviews/') || path.includes('/admin/portfolios/') || path.includes('/admin/4h_reports/')) depth='../../';
   else if(path.includes('/admin/')) depth='../';
+  else if(path.includes('/reports/')) depth='../';
   else depth='';
 
   // === 建立 Sidebar HTML ===
