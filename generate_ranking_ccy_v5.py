@@ -181,7 +181,7 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
         martin_pct: str = f'{r["martin_pct"]:.0f}'
 
         # Signal链接：AlgoForest + 🔍 马丁报告 (V4)
-        martin_link: str = f"../reports/martin_final_{r['signal_id']}.html"
+        martin_link: str = f"../reports/martin_v4_{r['signal_id']}.html"
         signal_cell: str = f'<td><a href="https://signals.algoforest.com/signals/{r["signal_id"]}">{r["signal_id"]}</a> <a href="{martin_link}" title="馬丁剖析 V4">🔍</a></td>'
 
         # Type 标签 (BUY/SELL)
