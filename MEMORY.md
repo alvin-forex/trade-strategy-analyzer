@@ -1,17 +1,6 @@
 # Long-Term Memory
 
 
-## Promoted From Short-Term Memory (2026-06-17)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:14:14 -->
-- 帳戶摘要: 最近活動：6/11-6/12 多單平倉，淨利 .36 [score=0.888 recalls=0 avg=0.620 source=memory/2026-06-14.md:14-14]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:11:12 -->
-- 帳戶摘要: 帳戶：Vantage Markets #7737997 (Wayne Manual Order); 餘額/淨值：4.89 [score=0.837 recalls=0 avg=0.620 source=memory/2026-06-14.md:11-12]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:8:8 -->
-- Cron: mt4-daily-summary: **目標：** +85295424877 [score=0.827 recalls=0 avg=0.620 source=memory/2026-06-14.md:8-8]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-14.md:17:17 -->
-- 執行時間: 2026-06-14 00:30 HKT [score=0.807 recalls=0 avg=0.620 source=memory/2026-06-14.md:17-17]
-
 ## Promoted From Short-Term Memory (2026-06-18)
 
 <!-- openclaw-memory-promotion:memory:memory/2026-06-15.md:6:9 -->
@@ -101,3 +90,14 @@
 - MT4 Daily Report - 2026-07-10 (Fri): **Status:** Sent ✅ WhatsApp messageId=`3EB0AE8E373CDBDA0210AE` [score=0.815 recalls=0 avg=0.620 source=memory/2026-07-10.md:3-3]
 <!-- openclaw-memory-promotion:memory:memory/2026-07-10.md:5:5 -->
 - MT4 Daily Report - 2026-07-10 (Fri): **Account:** Vantage Markets #7737997 (Wayne Manuial Order) [score=0.815 recalls=0 avg=0.620 source=memory/2026-07-10.md:5-5]
+
+## Promoted From Short-Term Memory (2026-07-13)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-07-10.md:12:15 -->
+- MT4 Daily Report - 2026-07-10 (Fri): Account balance remains at critical low of $0.14; No open positions or trading activity for 22 days; Account effectively non-operational due to insufficient capital; Recommended: Account review and potential re-funding [score=0.888 recalls=0 avg=0.620 source=memory/2026-07-10.md:12-15]
+<!-- openclaw-memory-promotion:memory:memory/2026-07-10.md:16:16 -->
+- MT4 Daily Report - 2026-07-10 (Fri): Risk management review needed to prevent similar losses [score=0.869 recalls=0 avg=0.620 source=memory/2026-07-10.md:16-16]
+<!-- openclaw-memory-promotion:memory:memory/2026-07-10.md:6:9 -->
+- MT4 Daily Report - 2026-07-10 (Fri): Balance: $0.14 | Equity: $0.14 | Positions: 0; No trading activity for 22 consecutive days (since 6/18); Account was nearly wiped out on 6/18 (-$58.37, -99.8%) from forced closes on Nikkei225/USDCHF/USDCAD/USDJPY SELL positions against strong uptrend; Weekend (Friday) ahead — market open but account inactive [score=0.869 recalls=0 avg=0.620 source=memory/2026-07-10.md:6-9]
+<!-- openclaw-memory-promotion:memory:memory/2026-07-10.md:11:11 -->
+- MT4 Daily Report - 2026-07-10 (Fri): **Key Observations:** [score=0.827 recalls=0 avg=0.620 source=memory/2026-07-10.md:11-11]
