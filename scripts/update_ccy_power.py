@@ -54,17 +54,28 @@ def read_csv():
                     tf = row.get('timeframe', '')
                     if tf in tf_rows:
                         tf_rows[tf].append(row)
-                # Get latest row for each TF
+                # Valid CCY names whitelist
+                VALID_CCYS = {'AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD', 'XAU'}
+                # Get latest VALID row for each TF (skip corrupted rows)
                 for tf, rows in tf_rows.items():
-                    if rows:
-                        latest = rows[-1]  # Last row is latest
+                    latest = None
+                    for r in reversed(rows):
+                        # Check if row is valid (first CCY must be a real currency)
+                        first_name = r.get('ccy1_name', '').strip()
+                        third_name = r.get('ccy3_name', '').strip()
+                        if first_name in VALID_CCYS and third_name in VALID_CCYS:
+                            latest = r
+                            break
+                        else:
+                            print(f"[SKIP] Corrupted {tf} row @ {r.get('timestamp','')}: ccy1={first_name} ccy3={third_name}")
+                    if latest:
                         ccy = {}
                         for i in range(1, 10):
                             name = latest.get(f'ccy{i}_name', '').strip()
                             val = latest.get(f'ccy{i}_power', '0').strip()
-                            if name:
+                            if name in VALID_CCYS:
                                 ccy[name] = float(val)
-                        if ccy:
+                        if len(ccy) >= 5:  # At least 5 valid currencies
                             data[tf] = ccy
             if len(data) >= 2:  # At least 2 TFs with data
                 print(f"[OK] Using ccy_power_reader.csv: {len(data)} TFs with distinct values")
