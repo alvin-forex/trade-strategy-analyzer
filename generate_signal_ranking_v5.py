@@ -182,7 +182,11 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
             # Use martin_v4 report (available for all signals)
             report_link: str = f"../reports/martin_v4_{s['signal_id']}.html"
             deep_link: str = f"../reports/index_{s['signal_id']}.html"
-            deep_icon: str = '🔍' if (OUTPUT_DIR / f"index_{s['signal_id']}.html").exists() or (BASE_DIR / "docs" / "reports" / f"index_{s['signal_id']}.html").exists() else ''
+            _deep_exists: bool = any(
+                (p / f"index_{s['signal_id']}.html").exists()
+                for p in (OUTPUT_DIR, BASE_DIR / "reports", DOCS_DIR / "reports")
+            )
+            deep_icon: str = '🔍' if _deep_exists else ''
 
             rows_html += f'''<tr{row_class}>
 <td>{rank}</td>
@@ -390,6 +394,20 @@ def main() -> None:
     admin_path.parent.mkdir(parents=True, exist_ok=True)
     with open(admin_path, 'w', encoding='utf-8') as f:
         f.write(html)
+
+    # Copy index_*.html deep-analysis reports to reports/ so relative links resolve
+    import shutil
+    reports_dir: Path = BASE_DIR / 'reports'
+    reports_dir.mkdir(exist_ok=True)
+    copied: int = 0
+    for src_dir in (OUTPUT_DIR, DOCS_DIR / 'reports'):
+        for idx_file in src_dir.glob('index_*.html'):
+            dest: Path = reports_dir / idx_file.name
+            if not dest.exists() or dest.stat().st_mtime < idx_file.stat().st_mtime:
+                shutil.copy2(idx_file, dest)
+                copied += 1
+    if copied:
+        print(f"   Copied {copied} index_*.html reports → reports/")
 
     print(f"\n✅ Generated: {output_path}")
     print(f"   Size: {len(html):,} bytes")
