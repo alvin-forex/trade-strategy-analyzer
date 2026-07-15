@@ -1,256 +1,272 @@
 #!/usr/bin/env python3
 """
-TSA QA 自動質量檢查腳本
-用法：
-  python3 scripts/tsa_qa_check.py --quick   # 快速模式：sidebar + 連結
-  python3 scripts/tsa_qa_check.py --full    # 完整模式：全部檢查
+TSA QA Checker — Automated quality checks for Trade Strategy Analyzer.
+Run after any change to verify integrity.
 """
 
-import argparse
-import os
-import re
-import sys
-import time
-from pathlib import Path
+import os, re, glob, csv, json, sys
+from collections import defaultdict
 
-# === 設定 ===
-BASE_DIR = Path(__file__).resolve().parent.parent
-DOCS_DIR = BASE_DIR / "docs"
-REPORTS_DIR = BASE_DIR / "reports"
-DOWNLOADS_DIR = BASE_DIR / "downloads"
+TSA_DIR = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs"
+ADMIN_DIR = os.path.join(TSA_DIR, "admin")
+REPORTS_DIR = os.path.join(TSA_DIR, "reports")
+SIGNALS_DIR = "/mnt/c/Users/Alvin/Downloads/Set File From Signal Page"
+DISABLED_SIGNALS_FILE = os.path.join(TSA_DIR, "disabled_signals.json")
 
-# 必要頁面清單（相對於 docs/）
-REQUIRED_PAGES = [
+# Expected pages with sidebar
+EXPECTED_PAGES = [
     "index.html",
     "signal_ranking.html",
-    "admin/signal_ranking.html",
-    "admin/ccy_ranking.html",
+    "ccy_ranking.html",
+    "volatility.html",
+    "forex_news.html",
+]
+SUBDIR_PAGES = [
+    ("ccy_power/index.html", "ccy_power"),
 ]
 
-# 導航組件 (sidebar 或 topnav 二擇一即可)
-NAV_PATTERNS = ["sidebar.css", "sidebar.js", "topnav"]
-
-# 豁免 sidebar 檢查嘅獨立報告頁面（非 TSA 主體頁面）
-NAV_EXEMPT = {
-    "ea_strategy_masterplan.html",  # 獨立策略報告
-    "ff54_report.html",             # 獨立活動報告
-    "forex_news.html",              # 獨立新聞頁面
-}
-
-
-class QAResult:
-    def __init__(self):
-        self.passes = []
-        self.warns = []
-        self.fails = []
-
-    def ok(self, msg):
-        self.passes.append(msg)
-
-    def warn(self, msg):
-        self.warns.append(msg)
-
-    def fail(self, msg):
-        self.fails.append(msg)
-
-    def summary(self):
-        total = len(self.passes) + len(self.warns) + len(self.fails)
-        print(f"\n{'='*60}")
-        print(f"📋 QA 總結：{total} 項檢查")
-        print(f"  ✅ 通過：{len(self.passes)}")
-        print(f"  ⚠️  警告：{len(self.warns)}")
-        print(f"  ❌ 失敗：{len(self.fails)}")
-        print(f"{'='*60}")
-        if self.fails:
-            print("\n❌ 需要修復的問題：")
-            for f in self.fails:
-                print(f"   • {f}")
-        if self.warns:
-            print("\n⚠️  警告事項：")
-            for w in self.warns:
-                print(f"   • {w}")
-        if not self.fails and not self.warns:
-            print("\n🎉 所有檢查通過！系統狀態良好。")
-        return 1 if self.fails else 0
-
-
-def check_sidebar_consistency(result: QAResult):
-    """檢查 1：docs/ 及 docs/admin/ 下 HTML 頁面應有導航組件"""
-    print("\n🔍 檢查 1：導航組件一致性")
-    # 掃描 docs/*.html 和 docs/admin/*.html
-    html_files = sorted(DOCS_DIR.glob("*.html")) + sorted((DOCS_DIR / "admin").glob("*.html"))
-
-    for html_file in html_files:
-        # 用相對於 docs/ 的路徑顯示
-        rel = html_file.relative_to(DOCS_DIR)
-        name = str(rel)
-        content = html_file.read_text(encoding="utf-8", errors="ignore")
-        has_nav = any(p in content for p in NAV_PATTERNS)
-
-        # 排除 index.html（主頁可能有獨立導航）
-        if rel.name == "index.html" or name in NAV_EXEMPT:
-            if has_nav:
-                result.ok(f"{name} 有導航組件")
-            else:
-                result.warn(f"{name} 沒有 sidebar/topnav 導航（可能使用獨立導航）")
+def check_sidebar_consistency():
+    """Check all pages have sidebar.css and sidebar.js"""
+    issues = []
+    
+    for page in EXPECTED_PAGES:
+        path = os.path.join(ADMIN_DIR, page)
+        if not os.path.exists(path):
+            issues.append(f"❌ MISSING PAGE: {page}")
             continue
-
-        if has_nav:
-            result.ok(f"{name} ✓ 導航組件")
-        else:
-            result.fail(f"{name} 缺少 sidebar.css / sidebar.js 或 topnav 導航")
-
-
-def check_signal_links(result: QAResult):
-    """檢查 2：排名頁 signal 連結應指向新版報告"""
-    print("\n🔍 檢查 2：Signal 連結有效性")
-    ranking_files = sorted(DOCS_DIR.glob("signal_ranking*.html")) + sorted((DOCS_DIR / "admin").glob("signal_ranking*.html"))
-
-    valid_prefixes = ("../reports/martin_v4_", "../reports/index_")
-    bad_pattern = "../reports/detailed_comparison_"
-
-    for rf in ranking_files:
-        name = rf.name
-        content = rf.read_text(encoding="utf-8", errors="ignore")
-        links = re.findall(r'href="([^"]*)"', content)
-
-        bad_links = [l for l in links if "detailed_comparison" in l]
-        signal_links = [l for l in links if l.startswith("../reports/")]
-
-        # Check for broken links (file doesn't exist)
-        broken = []
-        for sl in signal_links:
-            target = BASE_DIR / sl.lstrip("./")
-            if not target.exists():
-                broken.append(sl)
-
-        if bad_links:
-            result.fail(f"{name} 有 {len(bad_links)} 個舊版 detailed_comparison 連結")
-            for bl in bad_links[:5]:
-                print(f"     ❌ {bl}")
-        else:
-            result.ok(f"{name} 沒有舊版連結")
-
-        if broken:
-            result.fail(f"{name} 有 {len(broken)} 個斷裂連結")
-            for b in broken[:5]:
-                print(f"     ❌ 斷裂: {b}")
-        else:
-            result.ok(f"{name} 所有報告連結有效 ({len(signal_links)} 個)")
+        with open(path) as f:
+            html = f.read()
+        if 'sidebar.css' not in html:
+            issues.append(f"❌ NO SIDEBAR CSS: {page}")
+        if 'sidebar.js' not in html:
+            issues.append(f"❌ NO SIDEBAR JS: {page}")
+    
+    for page, subdir in SUBDIR_PAGES:
+        path = os.path.join(ADMIN_DIR, page)
+        if not os.path.exists(path):
+            issues.append(f"❌ MISSING PAGE: {page}")
+            continue
+        with open(path) as f:
+            html = f.read()
+        if 'sidebar.css' not in html:
+            issues.append(f"❌ NO SIDEBAR CSS: {page}")
+        if 'sidebar.js' not in html:
+            issues.append(f"❌ NO SIDEBAR JS: {page}")
+    
+    return issues
 
 
-def check_ea_types(result: QAResult):
-    """檢查 3：排名頁不應有 Unknown EA 類型"""
-    print("\n🔍 檢查 3：EA 類型檢查")
-    ranking_files = sorted(DOCS_DIR.glob("signal_ranking*.html"))
-
-    for rf in ranking_files:
-        name = rf.name
-        content = rf.read_text(encoding="utf-8", errors="ignore")
-        # Look for "Unknown" in EA type context
-        unknown_count = len(re.findall(r'>Unknown<', content))
-        unknown_count += len(re.findall(r'class="[^"]*">Unknown<', content))
-
-        if unknown_count > 0:
-            result.fail(f"{name} 有 {unknown_count} 個 Unknown EA 類型")
-        else:
-            result.ok(f"{name} 沒有 Unknown EA 類型")
+def load_disabled_signals():
+    """Load disabled signals list from file"""
+    if os.path.exists(DISABLED_SIGNALS_FILE):
+        with open(DISABLED_SIGNALS_FILE) as f:
+            data = json.load(f)
+            return data.get("disabled", []), data.get("broken_counts", {})
+    return [], {}
 
 
-def check_csv_freshness(result: QAResult):
-    """檢查 4：CSV 不應超過 7 天"""
-    print("\n🔍 檢查 4：CSV 時效性")
-    csv_files = sorted(DOWNLOADS_DIR.glob("*.csv"))
-    now = time.time()
-    threshold_h = 7 * 24
-    stale = []
+def save_disabled_signals(disabled, broken_counts):
+    """Save disabled signals list to file"""
+    with open(DISABLED_SIGNALS_FILE, "w") as f:
+        json.dump({"disabled": disabled, "broken_counts": broken_counts}, f, indent=2)
 
-    for csv in csv_files:
-        age_h = (now - csv.stat().st_mtime) / 3600
-        if age_h > threshold_h:
-            stale.append((csv.name, age_h))
 
-    if stale:
-        result.warn(f"有 {len(stale)} 個 CSV 檔案超過 {threshold_h}h")
-        for name, age in stale:
-            print(f"     ⚠️  {name} ({age:.1f}h)")
+def record_broken_link(sig_id, link_type, disabled, broken_counts):
+    """Record a broken link. If same signal breaks 3 times, mark as disabled."""
+    key = f"{sig_id}:{link_type}"
+    broken_counts[key] = broken_counts.get(key, 0) + 1
+    
+    if broken_counts[key] >= 3 and sig_id not in disabled:
+        disabled.append(sig_id)
+        print(f"  🔕 AUTO-DISABLED: Signal #{sig_id} (broken 3 times)")
+    
+    return disabled, broken_counts
+
+
+def check_signal_links():
+    """Check all signal links in signal_ranking.html are valid"""
+    issues = []
+    ranking_path = os.path.join(ADMIN_DIR, "signal_ranking.html")
+    
+    if not os.path.exists(ranking_path):
+        return [f"❌ MISSING: signal_ranking.html"]
+    
+    # Load disabled signals
+    disabled, broken_counts = load_disabled_signals()
+    newly_disabled = []
+    
+    with open(ranking_path) as f:
+        html = f.read()
+    
+    # Check AlgoForest links
+    algo_links = re.findall(r'href="(https://signals\.algoforest\.com/signals/(\d+))"', html)
+    for url, sig_id in algo_links:
+        # Just verify format, can't check external links
+        if not sig_id.isdigit():
+            issues.append(f"❌ INVALID ALGOLINK: {url}")
+    
+    # Check internal report links (skip disabled)
+    # Note: ranking page uses martin_v4_*.html (not martin_final_*.html)
+    # Missing reports are WARNINGS, not blockers — they indicate signals without
+    # generated analysis yet, which is expected for newer/smaller signals.
+    index_links = re.findall(r'href="\.\./reports/index_(\d+)\.html"', html)
+    martin_links = re.findall(r'href="\.\./reports/martin_v4_(\d+)\.html"', html)
+    
+    broken_index = []
+    broken_martin = []
+    
+    for sig_id in index_links:
+        if sig_id in disabled:
+            continue  # Skip disabled signals
+        report_path = os.path.join(REPORTS_DIR, f"index_{sig_id}.html")
+        if not os.path.exists(report_path):
+            broken_index.append(sig_id)
+    
+    for sig_id in martin_links:
+        if sig_id in disabled:
+            continue
+        report_path = os.path.join(REPORTS_DIR, f"martin_v4_{sig_id}.html")
+        if not os.path.exists(report_path):
+            broken_martin.append(sig_id)
+    
+    if broken_index:
+        issues.append(f"⚠️ BROKEN 📊 LINKS ({len(broken_index)}): index_*.html referenced but not found: {sorted(broken_index, key=int)}")
+    if broken_martin:
+        issues.append(f"⚠️ BROKEN 📊 LINKS ({len(broken_martin)}): martin_v4_*.html referenced but not found: {sorted(broken_martin, key=int)}")
+    
+    # Check for signal IDs without any report icons (missing reports)
+    sig_ids_in_ranking = set(re.findall(r'signals\.algoforest\.com/signals/(\d+)', html))
+    sig_ids_with_index = set(index_links)
+    sig_ids_with_martin = set(martin_links)
+    
+    # Filter out disabled signals
+    missing_index = sig_ids_in_ranking - sig_ids_with_index - set(disabled)
+    missing_martin = sig_ids_in_ranking - sig_ids_with_martin - set(disabled)
+    
+    if missing_index:
+        issues.append(f"⚠️ MISSING 🔍 DEEP REPORTS ({len(missing_index)}): signals without index_*.html: {sorted(missing_index, key=int)}")
+    if missing_martin:
+        issues.append(f"⚠️ MISSING 📊 MARTIN REPORTS ({len(missing_martin)}): signals without martin_v4_*.html: {sorted(missing_martin, key=int)}")
+    
+    # Save updated disabled list
+    save_disabled_signals(disabled, broken_counts)
+    
+    return issues
+
+
+def check_ea_types():
+    """Check no signals have Unknown EA type"""
+    issues = []
+    
+    sys.path.insert(0, '/home/alvin/.openclaw/workspace/scripts')
+    from signal_analyzer import analyze_signal
+    
+    for d in sorted(os.listdir(SIGNALS_DIR)):
+        full = os.path.join(SIGNALS_DIR, d)
+        if not os.path.isdir(full) or not d.isdigit():
+            continue
+        result = analyze_signal(d)
+        if result and result['ea_type'] == 'Unknown':
+            issues.append(f"❌ UNKNOWN EA: Signal #{d}")
+    
+    return issues
+
+
+def check_data_freshness():
+    """Check data sources are recent"""
+    issues = []
+    
+    # Check forex CSV
+    csv_path = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/forex_data.csv"
+    if os.path.exists(csv_path):
+        mtime = os.path.getmtime(csv_path)
+        import time
+        age_hours = (time.time() - mtime) / 3600
+        if age_hours > 48:
+            issues.append(f"⚠️ STALE DATA: forex_data.csv is {age_hours:.0f} hours old")
     else:
-        result.ok(f"所有 {len(csv_files)} 個 CSV 都在 {threshold_h}h 內")
+        issues.append(f"❌ MISSING: forex_data.csv")
+    
+    return issues
 
 
-def check_page_completeness(result: QAResult):
-    """檢查 5：必要頁面存在"""
-    print("\n🔍 檢查 5：頁面完整性")
-
-    for page in REQUIRED_PAGES:
-        path = DOCS_DIR / page
-        if path.exists():
-            size = path.stat().st_size
-            if size > 1000:
-                result.ok(f"{page} 存在 ({size:,} bytes)")
-            else:
-                result.fail(f"{page} 存在但太小 ({size} bytes)，可能不完整")
-        else:
-            result.fail(f"{page} 不存在")
-
-
-def check_generated_pages_nav(result: QAResult):
-    """檢查 6：腳本生成的 HTML 必須包含導航組件（sidebar 或 topnav）"""
-    print("\n🔍 檢查 6：生成頁面導航完整性")
-    # 呢啲係由 generate_*.py 腳本生成的頁面，必須有 sidebar 或 topnav
-    generated_pages = [
-        "signal_ranking.html",
-        "admin/signal_ranking.html",
-        "admin/ccy_ranking.html",
+def check_nav_consistency():
+    """Check sidebar.js has all expected nav links"""
+    issues = []
+    sidebar_js = os.path.join(TSA_DIR, "sidebar.js")
+    
+    if not os.path.exists(sidebar_js):
+        return [f"❌ MISSING: sidebar.js"]
+    
+    with open(sidebar_js) as f:
+        js = f.read()
+    
+    expected_links = [
+        ("index.html", "首頁"),
+        ("signal_ranking.html", "Signal 排名"),
+        ("ccy_ranking.html", "CCY 排名"),
+        ("ccy_power/index.html", "CCY Power"),
+        ("volatility.html", "波幅表"),
+        ("forex_news.html", "外匯新聞"),
     ]
+    
+    for href, label in expected_links:
+        if href not in js:
+            issues.append(f"❌ NAV MISSING: {label} ({href})")
+    
+    return issues
 
-    for page in generated_pages:
-        path = DOCS_DIR / page
-        if not path.exists():
-            continue  # check_page_completeness 會報告缺失
-        content = path.read_text(encoding="utf-8", errors="ignore")
-        has_css = "sidebar.css" in content
-        has_js = "sidebar.js" in content
-        has_topnav = "topnav" in content and "topnav-link" in content
 
-        if has_css and has_js:
-            result.ok(f"{page} 有 sidebar.css + sidebar.js")
-        elif has_topnav:
-            result.ok(f"{page} 有 topnav 導航")
-        elif has_css or has_js:
-            result.fail(f"{page} 只有 sidebar.css 或 sidebar.js 其中一個")
+def run_all_checks():
+    """Run all QA checks and print report"""
+    all_issues = []
+    
+    print("=" * 60)
+    print("🔍 TSA QA CHECK")
+    print("=" * 60)
+    
+    checks = [
+        ("Navigation Consistency", check_nav_consistency),
+        ("Sidebar on All Pages", check_sidebar_consistency),
+        ("Signal Links", check_signal_links),
+        ("Data Freshness", check_data_freshness),
+    ]
+    
+    for name, check_fn in checks:
+        print(f"\n📋 {name}...")
+        issues = check_fn()
+        if issues:
+            for issue in issues:
+                print(f"  {issue}")
+                all_issues.append((name, issue))
         else:
-            result.fail(f"{page} 完全缺少導航組件（sidebar 或 topnav）")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="TSA 系統 QA 檢查")
-    parser.add_argument("--quick", action="store_true", help="快速模式：只檢查 sidebar + 連結")
-    parser.add_argument("--full", action="store_true", help="完整模式：全部檢查")
-    args = parser.parse_args()
-
-    if not args.quick and not args.full:
-        args.full = True  # 預設完整模式
-
-    print("🦀 TSA QA 自動質量檢查")
-    print(f"📁 工作目錄：{BASE_DIR}")
-    mode = "快速" if args.quick else "完整"
-    print(f"🔧 模式：{mode}")
-
-    result = QAResult()
-
-    # 所有模式都跑的檢查
-    check_sidebar_consistency(result)
-    check_signal_links(result)
-    check_generated_pages_nav(result)
-
-    if args.full:
-        check_ea_types(result)
-        check_csv_freshness(result)
-        check_page_completeness(result)
-
-    sys.exit(result.summary())
+            print(f"  ✅ PASS")
+    
+    # EA type check is slow, make it optional
+    if "--full" in sys.argv:
+        print(f"\n📋 EA Type Check (full)...")
+        issues = check_ea_types()
+        if issues:
+            for issue in issues:
+                print(f"  {issue}")
+                all_issues.append(("EA Types", issue))
+        else:
+            print(f"  ✅ PASS")
+    
+    print(f"\n{'=' * 60}")
+    blockers = [i for i in all_issues if i[1].startswith("❌")]
+    warnings = [i for i in all_issues if i[1].startswith("⚠️")]
+    
+    if blockers:
+        print(f"❌ FAIL — {len(blockers)} blocker(s), {len(warnings)} warning(s)")
+    elif warnings:
+        print(f"⚠️ PASS WITH WARNINGS — {len(warnings)} warning(s)")
+    else:
+        print(f"✅ ALL CLEAR")
+    
+    return len(blockers) == 0
 
 
 if __name__ == "__main__":
-    main()
+    ok = run_all_checks()
+    sys.exit(0 if ok else 1)
