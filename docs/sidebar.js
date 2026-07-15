@@ -34,6 +34,7 @@
       <div class="sidebar-section-title"><span class="icon">📊</span>外匯分析</div>
       <a href="${depth}admin/forex_hub/index.html#4h" class="sidebar-link sub-link" data-page="forex_hub_4h"><span class="icon">🦀</span>4H 市場分析</a>
       <a href="${depth}admin/forex_hub/index.html#daily" class="sidebar-link sub-link" data-page="forex_hub_daily"><span class="icon">📰</span>每日報告</a>
+      <a href="${depth}admin/forex_news.html" class="sidebar-link sub-link" data-page="forex_news"><span class="icon">📄</span>外匯新聞</a>
     </div>
     <!-- 主題切換按鈕（底部）-->
     <div class="sidebar-footer">
