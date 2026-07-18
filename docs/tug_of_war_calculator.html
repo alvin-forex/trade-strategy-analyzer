@@ -302,17 +302,30 @@
 </div>
 
 <script>
-// ====== 商品設定（價格、合約規模、最小手數、點值、貨幣） ======
+// ====== 商品設定（價格、合約規模、最小手數、點值、貨幣、point大小） ======
+// pointSize = MT4 Points to Price 換算（1 Point = pointSize 價格）
+// digits=2 → 1 point = 0.01;  digits=1 → 1 point = 0.1;  digits=5 → 1 point = 0.00001
 const SYMBOL_SPECS = {
- 'XAUUSD':  { price: 4018.8,  contract: 100,  minLot: 0.01, symCurrency: 'USD',  multiplierPer: 1.0,  digits: 2 },
- 'BTCUSD':  { price: 63982.4, contract: 1,    minLot: 0.01, symCurrency: 'USD',  multiplierPer: 0.01, digits: 2 },
- 'NAS100':  { price: 28773,   contract: 1,    minLot: 0.01, symCurrency: 'USD',  multiplierPer: 0.01, digits: 1 },
- 'HK50':    { price: 24562,   contract: 10,   minLot: 0.01, symCurrency: 'HKD',  multiplierPer: 1.0,  digits: 1 },
- 'JPN225':  { price: 64141,   contract: 100,  minLot: 0.01, symCurrency: 'JPY',  multiplierPer: 0.01, digits: 1 },
- 'GER40':   { price: 24831,   contract: 25,   minLot: 0.01, symCurrency: 'EUR',  multiplierPer: 0.01, digits: 1 },
- 'UK100':   { price: 10600,   contract: 10,   minLot: 0.01, symCurrency: 'GBP',  multiplierPer: 0.01, digits: 1 },
- 'EU50':    { price: 6231,    contract: 25,   minLot: 0.01, symCurrency: 'EUR',  multiplierPer: 0.01, digits: 1 }
+ 'XAUUSD':  { price: 4018.8,  contract: 100,  minLot: 0.01, symCurrency: 'USD',  multiplierPer: 1.0,  digits: 2, pointSize: 0.01 },
+ 'BTCUSD':  { price: 63982.4, contract: 1,    minLot: 0.01, symCurrency: 'USD',  multiplierPer: 0.01, digits: 2, pointSize: 0.01 },
+ 'NAS100':  { price: 28773,   contract: 1,    minLot: 0.01, symCurrency: 'USD',  multiplierPer: 0.01, digits: 1, pointSize: 0.1 },
+ 'HK50':    { price: 24562,   contract: 10,   minLot: 0.01, symCurrency: 'HKD',  multiplierPer: 1.0,  digits: 1, pointSize: 1.0 },
+ 'JPN225':  { price: 64141,   contract: 100,  minLot: 0.01, symCurrency: 'JPY',  multiplierPer: 0.01, digits: 1, pointSize: 1.0 },
+ 'GER40':   { price: 24831,   contract: 25,   minLot: 0.01, symCurrency: 'EUR',  multiplierPer: 0.01, digits: 1, pointSize: 0.1 },
+ 'UK100':   { price: 10600,   contract: 10,   minLot: 0.01, symCurrency: 'GBP',  multiplierPer: 0.01, digits: 1, pointSize: 0.1 },
+ 'EU50':    { price: 6231,    contract: 25,   minLot: 0.01, symCurrency: 'EUR',  multiplierPer: 0.01, digits: 1, pointSize: 0.1 }
 };
+
+// Points → Price 換算
+function ptsToPrice(symbol, pts) {
+ const spec = SYMBOL_SPECS[symbol];
+ return pts * spec.pointSize;
+}
+
+function fmtPrice(symbol, price) {
+ const spec = SYMBOL_SPECS[symbol];
+ return price.toFixed(spec.digits);
+}
 
 window.onload = function() { onSymbolChange(); };
 
@@ -669,11 +682,13 @@ function runOscillationSimulation() {
 
  const upValueEl = document.getElementById('upValue');
  if (foundUp) {
- upValueEl.innerText = `+${upDelta.toLocaleString()} Points`; upValueEl.style.color = "#22c55e";
+ const upTPprice = mp.curPrice + ptsToPrice(p.symbol, upDelta);
+ upValueEl.innerHTML = `+${upDelta.toLocaleString()} Pts → <strong>$${fmtPrice(p.symbol, upTPprice)}</strong>`; upValueEl.style.color = "#22c55e";
  document.getElementById('upProfit').innerHTML = `目標獲利: <strong style="color:#22c55e;">${profitDisplay}</strong>`;
  document.getElementById('upMaxDD').innerHTML = formatDD(maxDDPointsUp, maxDDPointsUp * pv, maxDDPointsUp * cConfig.localMultiplier);
  let ddAnchor = effectiveSells > 0 ? `第 ${effectiveSells} 張 Sell @ ${extremeSellPos.toLocaleString()} Pts` : `無反向訂單`;
- document.getElementById('upDetails').innerHTML = `• 夾倉位置：${ddAnchor}<br>• 最終 Buy: ${upFinalBuys} 張 / Sell: ${upFinalSells} 張<br>• 離場坐標: ${(p.P + upDelta).toLocaleString()} Pts`;
+ const upExitPrice = mp.curPrice + ptsToPrice(p.symbol, p.P + upDelta);
+ document.getElementById('upDetails').innerHTML = `• 當前價: $${fmtPrice(p.symbol, mp.curPrice)} → TP 價: <strong>$${fmtPrice(p.symbol, upTPprice)}</strong><br>• 夾倉位置：${ddAnchor}<br>• 最終 Buy: ${upFinalBuys} 張 / Sell: ${upFinalSells} 張`;
  const upMaxOrders = upFinalBuys + upFinalSells; const upMaxMargin = upMaxOrders * marginPerOrder;
  document.getElementById('upMarginInfo').style.display = 'block';
  document.getElementById('upMarginInfo').innerHTML = `🔒 <strong>Margin (上升):</strong><br>• 加倉到最盡: ${upMaxOrders} 張 × $${marginPerOrder.toFixed(2)} = <strong>$${upMaxMargin.toFixed(2)} USD</strong>` +
@@ -682,11 +697,13 @@ function runOscillationSimulation() {
 
  const downValueEl = document.getElementById('downValue');
  if (foundDown) {
- downValueEl.innerText = `-${downDelta.toLocaleString()} Points`; downValueEl.style.color = "#ef4444";
+ const downTPprice = mp.curPrice - ptsToPrice(p.symbol, downDelta);
+ downValueEl.innerHTML = `-${downDelta.toLocaleString()} Pts → <strong>$${fmtPrice(p.symbol, downTPprice)}</strong>`; downValueEl.style.color = "#ef4444";
  document.getElementById('downProfit').innerHTML = `目標獲利: <strong style="color:#22c55e;">${profitDisplay}</strong>`;
  document.getElementById('downMaxDD').innerHTML = formatDD(maxDDPointsDown, maxDDPointsDown * pv, maxDDPointsDown * cConfig.localMultiplier);
  let ddAnchor = effectiveBuys > 0 ? `第 ${effectiveBuys} 張 Buy @ ${extremeBuyPos.toLocaleString()} Pts` : `無反向訂單`;
- document.getElementById('downDetails').innerHTML = `• 夾倉位置：${ddAnchor}<br>• 最終 Buy: ${downFinalBuys} 張 / Sell: ${downFinalSells} 張<br>• 離場坐標: ${(p.P - downDelta).toLocaleString()} Pts`;
+ const downExitPrice = mp.curPrice - ptsToPrice(p.symbol, downDelta);
+ document.getElementById('downDetails').innerHTML = `• 當前價: $${fmtPrice(p.symbol, mp.curPrice)} → TP 價: <strong>$${fmtPrice(p.symbol, downTPprice)}</strong><br>• 夾倉位置：${ddAnchor}<br>• 最終 Buy: ${downFinalBuys} 張 / Sell: ${downFinalSells} 張`;
  const downMaxOrders = downFinalBuys + downFinalSells; const downMaxMargin = downMaxOrders * marginPerOrder;
  document.getElementById('downMarginInfo').style.display = 'block';
  document.getElementById('downMarginInfo').innerHTML = `🔒 <strong>Margin (下跌):</strong><br>• 加倉到最盡: ${downMaxOrders} 張 × $${marginPerOrder.toFixed(2)} = <strong>$${downMaxMargin.toFixed(2)} USD</strong>` +
