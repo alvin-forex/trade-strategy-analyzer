@@ -1,16 +1,31 @@
-/* TSA Sidebar Navigation JS - 統一導航 + 主題切換 */
+/* TSA Sidebar Navigation JS - 統一導航 + 主題切換 + 自動注入 CSS */
 (function(){
+  // === 自動注入 sidebar.css（新頁面只需加 <script src="sidebar.js">）===
+  var path = window.location.pathname;
+  var cssDepth = '';
+  if(path.includes('/admin/ccy_power/') || path.includes('/admin/forex_reports/') || path.includes('/admin/forex_hub/') || path.includes('/admin/reviews/') || path.includes('/admin/portfolios/') || path.includes('/admin/4h_reports/')) cssDepth='../../';
+  else if(path.includes('/admin/') || path.includes('/reports/')) cssDepth='../';
+  else cssDepth='';
+
+  // Check if sidebar.css already loaded
+  var cssLoaded = false;
+  var links = document.querySelectorAll('link[rel="stylesheet"]');
+  for(var i=0; i<links.length; i++){
+    if(links[i].href.indexOf('sidebar.css') >= 0) { cssLoaded = true; break; }
+  }
+  if(!cssLoaded){
+    var cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = cssDepth + 'sidebar.css';
+    document.head.appendChild(cssLink);
+  }
+
   // === 主題初始化（必須最先執行，避免閃屏）===
   var savedTheme = localStorage.getItem('tsa-theme') || 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
 
   // === 計算相對路徑深度 ===
-  var path = window.location.pathname;
-  var depth = '';
-  if(path.includes('/admin/ccy_power/') || path.includes('/admin/forex_reports/') || path.includes('/admin/forex_hub/') || path.includes('/admin/reviews/') || path.includes('/admin/portfolios/') || path.includes('/admin/4h_reports/')) depth='../../';
-  else if(path.includes('/admin/')) depth='../';
-  else if(path.includes('/reports/')) depth='../';
-  else depth='';
+  var depth = cssDepth; // reuse computed depth
 
   // === 建立 Sidebar HTML ===
   var sidebar = document.createElement('nav');
