@@ -181,6 +181,8 @@
  <option value="GER40">GER40 (德指 - 0.01lot 升 100 Points 賺 EUR€1)</option>
  <option value="UK100">UK100 (富時 - 0.01lot 升 100 Points 賺 GBP£1)</option>
  <option value="EU50">EU50 (歐指 - 0.01lot 升 100 Points 賺 EUR€1)</option>
+ <option value="SP500">SP500 (標普 - 0.01lot 升 100 Points 賺 USD$1)</option>
+ <option value="DJ30">DJ30 (道指 - 0.01lot 升 100 Points 賺 USD$1)</option>
  </select>
  </div>
  <div class="form-group">
@@ -381,13 +383,51 @@ function onSymbolChange() {
  exGroup.style.display = 'none'; exInput.value = '1';
  document.getElementById('contractSize').value = 1;
  document.getElementById('curPrice').value = 20000;
+ } else if (symbol === 'SP500') {
+ exGroup.style.display = 'none'; exInput.value = '1';
+ document.getElementById('contractSize').value = 1;
+ document.getElementById('curPrice').value = 5600;
+ } else if (symbol === 'DJ30') {
+ exGroup.style.display = 'none'; exInput.value = '1';
+ document.getElementById('contractSize').value = 1;
+ document.getElementById('curPrice').value = 42000;
  } else {
  exGroup.style.display = 'none'; exInput.value = '1';
  }
 
+ // Auto-set spread based on symbol (user can override)
+ setDefaultSpread(symbol);
+
  onGridChange();
  updateMarginDisplay();
 }
+
+// === 預設 Spread 表（從 MT4 symbols.raw 讀取）===
+const SYMBOL_SPREADS = {
+ 'XAUUSD': 30,
+ 'BTCUSD': 1700,
+ 'NAS100': 20,
+ 'HK50': 50,
+ 'JPN225': 150,
+ 'GER40': 15,
+ 'UK100': 10,
+ 'EU50': 10,
+ 'SP500': 30,
+ 'DJ30': 90,
+};
+
+function setDefaultSpread(symbol) {
+ const spreadInput = document.getElementById('spread');
+ const defaultSpreads = Object.values(SYMBOL_SPREADS).map(String);
+ // Only auto-update if current value is a known default (so we don't override user's custom value)
+ if (defaultSpreads.includes(spreadInput.value) || spreadInput.value === '30') {
+ const s = SYMBOL_SPREADS[symbol];
+ if (s !== undefined) {
+ spreadInput.value = s;
+ updateUI();
+ }
+ }
+ }
 
 function getBaseParams() {
  return {
@@ -416,6 +456,8 @@ function getCurrencyConfig(symbol, lotSize) {
  case 'GER40': localMultiplier = lotSize * 1.0; currency = 'EUR'; isDivide = false; break;
  case 'EU50': localMultiplier = lotSize * 1.0; currency = 'EUR'; isDivide = false; break;
  case 'UK100': localMultiplier = lotSize * 1.0; currency = 'GBP'; isDivide = false; break;
+ case 'SP500': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
+ case 'DJ30': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
  }
 
  let usdMultiplier = isDivide ? (localMultiplier / rate) : (localMultiplier * rate);
