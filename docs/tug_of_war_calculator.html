@@ -346,56 +346,40 @@ window.onload = function() {
 function onSymbolChange() {
  const symbol = document.getElementById('symbol').value;
  const exGroup = document.getElementById('exchangeRateGroup');
- const exLabel = document.getElementById('exchangeRateLabel');
  const exInput = document.getElementById('exchangeRate');
 
- const defaultRates = ['1', '7.8', '162', '1.08', '1.27'];
+ // 全部用 USD 計算，唔再顯示匯率
+ exGroup.style.display = 'none';
+ exInput.value = '1';
 
- if (symbol === 'HK50') {
- exGroup.style.display = 'block'; exLabel.innerText = 'USDHKD 匯率:';
- if (defaultRates.includes(exInput.value)) exInput.value = '7.8';
- document.getElementById('contractSize').value = 10;
- document.getElementById('curPrice').value = 17000;
- } else if (symbol === 'JPN225') {
- exGroup.style.display = 'block'; exLabel.innerText = 'USDJPY 匯率:';
- if (defaultRates.includes(exInput.value)) exInput.value = '162';
- document.getElementById('contractSize').value = 100;
- document.getElementById('curPrice').value = 38000;
- } else if (symbol === 'GER40' || symbol === 'EU50') {
- exGroup.style.display = 'block'; exLabel.innerText = 'EURUSD 匯率:';
- if (defaultRates.includes(exInput.value)) exInput.value = '1.08';
- document.getElementById('contractSize').value = 25;
- document.getElementById('curPrice').value = 18500;
- } else if (symbol === 'UK100') {
- exGroup.style.display = 'block'; exLabel.innerText = 'GBPUSD 匯率:';
- if (defaultRates.includes(exInput.value)) exInput.value = '1.27';
- document.getElementById('contractSize').value = 10;
- document.getElementById('curPrice').value = 8200;
- } else if (symbol === 'XAUUSD') {
- exGroup.style.display = 'none'; exInput.value = '1';
- document.getElementById('contractSize').value = 100;
- document.getElementById('curPrice').value = 2400;
- } else if (symbol === 'BTCUSD') {
- exGroup.style.display = 'none'; exInput.value = '1';
- document.getElementById('contractSize').value = 1;
- document.getElementById('curPrice').value = 60000;
- } else if (symbol === 'NAS100') {
- exGroup.style.display = 'none'; exInput.value = '1';
- document.getElementById('contractSize').value = 1;
- document.getElementById('curPrice').value = 20000;
- } else if (symbol === 'SP500') {
- exGroup.style.display = 'none'; exInput.value = '1';
- document.getElementById('contractSize').value = 1;
- document.getElementById('curPrice').value = 5600;
- } else if (symbol === 'DJ30') {
- exGroup.style.display = 'none'; exInput.value = '1';
- document.getElementById('contractSize').value = 1;
- document.getElementById('curPrice').value = 42000;
- } else {
- exGroup.style.display = 'none'; exInput.value = '1';
+ // 商品規格表（從 MT4 symbols.raw 提取）
+ const SYMBOL_SPECS = {
+ 'XAUUSD': { price: 2400, contract: 100, minLot: 0.01 },
+ 'BTCUSD': { price: 60000, contract: 1, minLot: 0.01 },
+ 'NAS100': { price: 20000, contract: 1, minLot: 0.01 },
+ 'HK50':   { price: 17000, contract: 10, minLot: 0.01 },
+ 'JPN225': { price: 38000, contract: 100, minLot: 0.01 },
+ 'GER40':  { price: 18500, contract: 25, minLot: 0.01 },
+ 'UK100':  { price: 8200, contract: 10, minLot: 0.01 },
+ 'EU50':   { price: 5000, contract: 25, minLot: 0.01 },
+ 'SP500':  { price: 5600, contract: 1, minLot: 0.01 },
+ 'DJ30':   { price: 42000, contract: 1, minLot: 0.01 },
+ };
+
+ const spec = SYMBOL_SPECS[symbol];
+ if (spec) {
+ document.getElementById('contractSize').value = spec.contract;
+ document.getElementById('curPrice').value = spec.price;
+ // 同步最小手數
+ const lotInput = document.getElementById('lotSize');
+ lotInput.min = spec.minLot;
+ lotInput.step = spec.minLot;
+ if (parseFloat(lotInput.value) < spec.minLot) {
+ lotInput.value = spec.minLot;
+ }
  }
 
- // Auto-set spread based on symbol (user can override)
+ // Auto-set spread based on symbol
  setDefaultSpread(symbol);
 
  onGridChange();
@@ -442,25 +426,25 @@ function getBaseParams() {
 }
 
 function getCurrencyConfig(symbol, lotSize) {
- let localMultiplier = 1;
+ let localMultiplier = lotSize * 1.0;
  let currency = 'USD';
- let isDivide = true;
- let rate = parseFloat(document.getElementById('exchangeRate').value) || 1;
+ let isDivide = false;
+ let rate = 1;
 
  switch(symbol) {
  case 'XAUUSD': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
  case 'BTCUSD': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
- case 'NAS100': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break; // already correct
- case 'HK50': localMultiplier = lotSize * 1.0; currency = 'HKD'; isDivide = true; break;
- case 'JPN225': localMultiplier = lotSize * 1.0; currency = 'JPY'; isDivide = true; break;
- case 'GER40': localMultiplier = lotSize * 1.0; currency = 'EUR'; isDivide = false; break;
- case 'EU50': localMultiplier = lotSize * 1.0; currency = 'EUR'; isDivide = false; break;
- case 'UK100': localMultiplier = lotSize * 1.0; currency = 'GBP'; isDivide = false; break;
+ case 'NAS100': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
+ case 'HK50': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
+ case 'JPN225': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
+ case 'GER40': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
+ case 'EU50': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
+ case 'UK100': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
  case 'SP500': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
  case 'DJ30': localMultiplier = lotSize * 1.0; currency = 'USD'; rate = 1; break;
  }
 
- let usdMultiplier = isDivide ? (localMultiplier / rate) : (localMultiplier * rate);
+ let usdMultiplier = localMultiplier; // 全部 USD，唔再轉匯率
  return { usdMultiplier, localMultiplier, currency };
 }
 
