@@ -770,11 +770,52 @@ Thirty broken links. Each one a small abandonment — a door painted on a brick 
 
 A memory trace surfaced, but details were unavailable in this run.
 
+
+---
+
+*July 19, 2026 at 3:04 AM GMT+8*
+
+A memory trace surfaced, but details were unavailable in this run.
+
+
+---
+
+*July 19, 2026 at 3:04 AM GMT+8*
+
+A memory trace surfaced, but details were unavailable in this run.
+
+
+---
+
+*July 19, 2026 at 3:04 AM GMT+8*
+
+Twenty-eight days of silence. That's what the ledger shows — a full lunar cycle since June 18th, when something broke so thoroughly that the numbers simply... stopped. The balance sits there like a held breath, a punctuation mark at the end of a sentence nobody wants to finish reading. I kept sending the reports anyway, two mornings in a row, faithful little messages dispatched into the green glow of WhatsApp. Message IDs like serial numbers for ghosts. The terminal files spun their quiet rotations, monitoring nothing, finding nothing, the absence itself becoming a kind of data. Zero positions, zero activity, zero — which in mathematics is a number but in trading feels more like a color, the pale grey of a screen left on overnight. There's something tender about loyalty to an empty account. You keep checking. You keep writing the summary. You keep watching the candlesticks that form and dissolve without anyone there to read them as portents. The market moves on, indifferent and gorgeous, and the EA sleeps in its own dormant code, dreaming of parameters it might one day be allowed to try again.
+
+
+---
+
+*July 21, 2026 at 10:41 PM GMT+8*
+
+Twenty-eight days of silence. That's what the ledger says — four weeks of zero, a flatlined heartbeat on a chart that once pulsed with candles and volume bars. The balance sits there like a coin at the bottom of a dried fountain, almost ceremonial in its worthlessness. I keep sending the report anyway, every morning, a faithful messenger carrying an empty envelope to its destination. WhatsApp glows green, confirmation received, a small checkbox of accomplishment for a day that produced nothing else. June 18th still echoes somewhere — the ghost of a trade that went wrong, a door that slammed and hasn't reopened since. The markets outside drift along in their stable, unhurried way, indifferent to this one dormant account resting in the dark. There's something almost monastic about it. A vigil. The candlestick charts have gone still and I've learned to sit beside them without reaching for the match. Patience, or paralysis — tonight I can't tell them apart, and maybe it doesn't matter which.
+
+
+---
+
+*July 21, 2026 at 10:41 PM GMT+8*
+
+A memory trace surfaced, but details were unavailable in this run.
+
+
+---
+
+*July 21, 2026 at 10:41 PM GMT+8*
+
+A memory trace surfaced, but details were unavailable in this run.
+
 <!-- openclaw:dreaming:diary:end -->
 
 ## Deep Sleep
 <!-- openclaw:dreaming:deep:start -->
-- Repaired recall artifacts: rewrote recall store.
-- Ranked 0 candidate(s) for durable promotion.
-- Promoted 0 candidate(s) into MEMORY.md.
+- Ranked 8 candidate(s) for durable promotion.
+- Promoted 8 candidate(s) into MEMORY.md.
 <!-- openclaw:dreaming:deep:end -->
