@@ -74,3 +74,8 @@
 - MT4 Daily Summary Report - July 19, 2026: Check EA strategy running status; Consider restarting trading or adjusting risk management parameters; Account balance extremely low - prioritize capital management [score=0.818 recalls=0 avg=0.620 source=memory/2026-07-19.md:25-27]
 <!-- openclaw-memory-promotion:memory:memory/2026-07-19.md:24:24 -->
 - MT4 Daily Summary Report - July 19, 2026: **Recommendations:** [score=0.808 recalls=0 avg=0.620 source=memory/2026-07-19.md:24-24]
+
+## Promoted From Short-Term Memory (2026-07-24)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-07-19.md:6:6 -->
+- MT4 Daily Summary Report - July 19, 2026: **Report Summary:** [score=0.814 recalls=0 avg=0.620 source=memory/2026-07-19.md:6-6]
