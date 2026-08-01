@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TSA v2 SAMPLE — Signal 36912</title>
+<link rel="stylesheet" href="../sidebar.css">
+<style>
+:root{
+  --bg:#0a0e17;--bg2:#0f1320;--card:#111520;--card-h:#161b2d;
+  --border:#1e2433;--border2:#2a3040;
+  --text:#e0e0e0;--text2:#8892a6;--text3:#5a6478;--white:#fff;
+  --pri:#FFD700;--acc:#64b5f6;--acc-dim:rgba(100,181,246,.12);
+  --green:#4CAF50;--green-bg:rgba(76,175,80,.12);
+  --red:#FF5252;--red-bg:rgba(255,82,82,.12);
+  --yellow:#FFC107;--yellow-bg:rgba(255,193,7,.12);
+  --orange:#FF9800;--orange-bg:rgba(255,152,0,.12);
+  --radius:12px;--radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  --mono:'SF Mono','Fira Code',Consolas,monospace;
+}
+[data-theme="light"]{
+  --bg:#f5f7fa;--bg2:#eef2f7;--card:#fff;--card-h:#f8f9fa;
+  --border:#dde2e8;--border2:#c8d0d8;
+  --text:#1a1a2e;--text2:#64748b;--text3:#94a3b8;--white:#fff;
+  --pri:#0f3460;--acc:#e94560;--acc-dim:rgba(233,69,96,.08);
+  --green:#28a745;--green-bg:rgba(40,167,69,.08);
+  --red:#dc3545;--red-bg:rgba(220,53,69,.08);
+  --yellow:#ffc107;--yellow-bg:rgba(255,193,7,.08);
+  --orange:#fd7e14;--orange-bg:rgba(253,126,20,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;font-size:14px}
+a{color:var(--acc);text-decoration:none}
+
+/* === HEADER ===*/
+.report-header{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.report-header h1{font-size:1.4em;color:var(--pri);font-weight:800}
+.report-header .sub{color:var(--text2);font-size:.85em;margin-top:2px}
+.report-header .meta{display:flex;gap:12px;flex-wrap:wrap}
+.report-header .meta span{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:.78em;color:var(--text2)}
+.report-header .meta span b{color:var(--text)}
+
+/* === MAIN NAV (5 tabs) ===*/
+.main-nav{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-bottom:16px;position:sticky;top:8px;z-index:100;overflow-x:auto;-webkit-overflow-scrolling:touch;box-shadow:var(--shadow)}
+.main-nav::-webkit-scrollbar{height:0}
+.nav-tab{flex:1;min-width:90px;padding:10px 14px;border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:600;border-radius:var(--radius-sm);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.nav-tab:hover{background:var(--bg2);color:var(--text)}
+.nav-tab.active{background:var(--acc-dim);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(100,181,246,.3)}
+
+/* === SUB NAV ===*/
+.sub-nav{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.sub-nav::-webkit-scrollbar{height:0}
+.sub-tab{padding:8px 14px;border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;border-bottom:2px solid transparent}
+.sub-tab:hover{color:var(--text);background:var(--bg2)}
+.sub-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+
+/* === CONTENT PANELS ===*/
+.panel{display:none}
+.panel.active{display:block}
+
+/* === CARD ===*/
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.card h2{font-size:1.05em;color:var(--white);margin-bottom:12px;display:flex;align-items:center;gap:8px;font-weight:700}
+.card h2 .icon{font-size:1.15em}
+.card h3{font-size:.95em;color:var(--text);margin-bottom:8px;font-weight:600}
+
+/* === HERO STATS ===*/
+.hero-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.hero-stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 16px;text-align:center;position:relative;overflow:hidden}
+.hero-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.5}
+.hero-stat .val{font-size:28px;font-weight:800;letter-spacing:-1px}
+.hero-stat .val.pos{color:var(--green)}.hero-stat .val.neg{color:var(--red)}.hero-stat .val.gold{color:var(--pri)}
+.hero-stat .lbl{font-size:11px;color:var(--text2);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+
+/* === STAT GRID ===*/
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 10px;text-align:center;transition:all .2s}
+.stat-box:hover{border-color:var(--border2);background:var(--card-h)}
+.stat-box .v{font-size:18px;font-weight:700;color:var(--white)}
+.stat-box .v.pos{color:var(--green)}.stat-box .v.neg{color:var(--red)}.stat-box .v.gold{color:var(--pri)}
+.stat-box .l{font-size:11px;color:var(--text2);margin-top:2px}
+
+/* === RISK STATUS ===*/
+.risk-status{border-radius:var(--radius);padding:14px 20px;display:flex;align-items:center;gap:14px;border-left:4px solid;margin-bottom:16px}
+.risk-status.low{background:var(--green-bg);border-left-color:var(--green)}
+.risk-status.med{background:var(--yellow-bg);border-left-color:var(--yellow)}
+.risk-status.high{background:var(--red-bg);border-left-color:var(--red)}
+.risk-status .ri{font-size:22px}
+.risk-status .rt{font-size:16px;font-weight:700}
+.risk-status.low .rt{color:var(--green)}
+.risk-status.med .rt{color:var(--yellow)}
+.risk-status.high .rt{color:var(--red)}
+.risk-status .rd{color:var(--text2);font-size:.85em}
+
+/* === TWO COL ===*/
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* === TABLE ===*/
+.tbl{width:100%;border-collapse:collapse;font-size:.85em}
+.tbl th{background:var(--bg2);color:var(--text2);padding:10px 12px;text-align:left;font-weight:600;border-bottom:1px solid var(--border);font-size:.8em;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+.tbl tr:hover td{background:var(--card-h)}
+.tbl .pos{color:var(--green);font-weight:600}
+.tbl .neg{color:var(--red);font-weight:600}
+.tbl .gold{color:var(--pri);font-weight:600}
+
+/* === BADGE ===*/
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75em;font-weight:700;letter-spacing:.5px}
+.badge.green{background:var(--green-bg);color:var(--green)}
+.badge.red{background:var(--red-bg);color:var(--red)}
+.badge.yellow{background:var(--yellow-bg);color:var(--yellow)}
+.badge.blue{background:var(--acc-dim);color:var(--acc)}
+
+/* === CHART CONTAINER ===*/
+.chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;position:relative}
+
+/* === EQUITY SVG ===*/
+.equity-chart{width:100%;height:200px}
+
+/* === BAR CHART ===*/
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:160px;padding:8px 0}
+.bar{flex:1;border-radius:3px 3px 0 0;min-height:4px;transition:opacity .2s;position:relative;cursor:default}
+.bar:hover{opacity:.8}
+.bar.green{background:linear-gradient(180deg,var(--green),rgba(76,175,80,.4))}
+.bar.red{background:linear-gradient(180deg,var(--red),rgba(255,82,82,.4))}
+.bar.blue{background:linear-gradient(180deg,var(--acc),rgba(100,181,246,.4))}
+.bar.gold{background:linear-gradient(180deg,var(--pri),rgba(255,215,0,.4))}
+
+/* === DONUT ===*/
+.donut-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.donut-legend{display:flex;flex-direction:column;gap:8px;flex:1;min-width:200px}
+.donut-item{display:flex;align-items:center;gap:8px;font-size:.85em}
+.donut-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.donut-item .v{margin-left:auto;font-weight:700;color:var(--white)}
+
+/* === SECTION DIVIDER ===*/
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+
+/* === RESPONSIVE ===*/
+@media(max-width:768px){
+  .hero-row{grid-template-columns:1fr}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .two-col{grid-template-columns:1fr}
+  .nav-tab{min-width:70px;font-size:12px;padding:8px 10px}
+  .nav-tab .nav-text{display:none}
+  .report-header{flex-direction:column;align-items:flex-start}
+}
+
+/* === COPY GRADE ===*/
+.grade-display{text-align:center;padding:20px}
+.grade-stars{font-size:36px;letter-spacing:4px}
+.grade-label{font-size:14px;font-weight:700;margin-top:8px;text-transform:uppercase;letter-spacing:2px}
+.grade-desc{font-size:.85em;color:var(--text2);margin-top:4px}
+
+/* === MINI CHART ===*/
+.mini-stat{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border)}
+.mini-stat .ms-v{font-weight:700;color:var(--white)}
+.mini-stat .ms-l{font-size:.75em;color:var(--text2)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="report-header">
+  <div>
+    <h1>📊 Signal 36912 深度分析</h1>
+    <div class="sub">FF48 SMAPv5 XAU B&S (Atom-8) · XAUUSD · Alpari-Demo</div>
+  </div>
+  <div class="meta">
+    <span>📅 <b>2026.04.13 – 2026.07.31</b></span>
+    <span>🔄 <b>779 筆交易</b></span>
+    <span>⏱ <b>15 週</b></span>
+  </div>
+</div>
+
+<!-- MAIN NAV -->
+<div class="main-nav">
+  <button class="nav-tab active" onclick="switchPanel('dash')">📊 <span class="nav-text">儀表板</span></button>
+  <button class="nav-tab" onclick="switchPanel('perf')">📈 <span class="nav-text">表現分析</span></button>
+  <button class="nav-tab" onclick="switchPanel('risk')">⚠️ <span class="nav-text">風險評估</span></button>
+  <button class="nav-tab" onclick="switchPanel('copy')">💡 <span class="nav-text">Copy 決策</span></button>
+  <button class="nav-tab" onclick="switchPanel('data')">📋 <span class="nav-text">數據明細</span></button>
+</div>
+
+<!-- ====== PANEL 1: DASHBOARD ====== -->
+<div class="panel active" id="panel-dash">
+
+  <!-- Hero Stats -->
+  <div class="hero-row">
+    <div class="hero-stat">
+      <div class="val gold">⭐⭐⭐</div>
+      <div class="lbl">Copy 評級 · 首選</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val pos">88.7%</div>
+      <div class="lbl">勝率（691W / 88L）</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val pos">+$7,695</div>
+      <div class="lbl">總盈利 USD</div>
+    </div>
+  </div>
+
+  <!-- Mini Equity Curve -->
+  <div class="card">
+    <h2><span class="icon">📈</span> 收益曲線</h2>
+    <div class="chart-box">
+      <svg class="equity-chart" viewBox="0 0 800 200" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#64b5f6" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#64b5f6" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- Grid lines -->
+        <line x1="0" y1="50" x2="800" y2="50" stroke="#1a1f2e" stroke-width="1"/>
+        <line x1="0" y1="100" x2="800" y2="100" stroke="#1a1f2e" stroke-width="1"/>
+        <line x1="0" y1="150" x2="800" y2="150" stroke="#1a1f2e" stroke-width="1"/>
+        <!-- Equity line: 65 points, mapping $3290-$12695 to y 190-10 -->
+        <path id="eqPath" d="" fill="none" stroke="#64b5f6" stroke-width="2"/>
+        <path id="eqArea" d="" fill="url(#eqFill)"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Secondary Stats -->
+  <div class="stat-grid">
+    <div class="stat-box"><div class="v gold">2.77</div><div class="l">盈虧比 (PF)</div></div>
+    <div class="stat-box"><div class="v neg">37.0%</div><div class="l">最大回撤</div></div>
+    <div class="stat-box"><div class="v">$5,000</div><div class="l">最大單筆盈利</div></div>
+    <div class="stat-box"><div class="v neg">-$1,087</div><div class="l">最大單筆虧損</div></div>
+    <div class="stat-box"><div class="v">53.9%</div><div class="l">總增長率</div></div>
+    <div class="stat-box"><div class="v">2.66h</div><div class="l">平均持倉時間</div></div>
+    <div class="stat-box"><div class="v gold">2</div><div class="l">交易層數</div></div>
+    <div class="stat-box"><div class="v">$12,695</div><div class="l">最終權益</div></div>
+  </div>
+
+  <!-- Risk Traffic Light -->
+  <div class="risk-status med">
+    <div class="ri">⚠️</div>
+    <div>
+      <div class="rt">中等風險 · MEDIUM</div>
+      <div class="rd">最大回撤 37% · 最大層數 L4 · 單筆最大虧損 $1,087</div>
+    </div>
+  </div>
+
+  <!-- Strong/Weak & Layer Summary -->
+  <div class="two-col">
+    <div class="card">
+      <h2><span class="icon">💰</span> 方向表現</h2>
+      <table class="tbl">
+        <thead><tr><th>方向</th><th>筆數</th><th>勝率</th><th>盈虧</th></tr></thead>
+        <tbody>
+          <tr><td>🟢 BUY</td><td>316</td><td class="pos">86.7%</td><td class="pos">+$1,930</td></tr>
+          <tr><td>🔴 SELL</td><td>462</td><td class="pos">90.0%</td><td class="pos">+$765</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2><span class="icon">📚</span> 層數分析</h2>
+      <table class="tbl">
+        <thead><tr><th>層</th><th>筆數</th><th>勝率</th><th>盈虧</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge blue">H1</span></td><td>~500</td><td class="pos">~89%</td><td class="pos">主要盈利</td></tr>
+          <tr><td><span class="badge blue">M30</span></td><td>~280</td><td class="pos">~88%</td><td class="pos">穩定增益</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Holding Time Distribution -->
+  <div class="card">
+    <h2><span class="icon">⏱️</span> 持倉時間分佈</h2>
+    <div class="bar-chart">
+      <div class="bar green" style="height:100%" title="< 15min: 454筆 (58%)"></div>
+      <div class="bar blue" style="height:35%" title="15-60min: 161筆 (21%)"></div>
+      <div class="bar gold" style="height:18%" title="1-4hr: 83筆 (11%)"></div>
+      <div class="bar yellow" style="height:10%" title="4-12hr: 44筆 (6%)"></div>
+      <div class="bar red" style="height:8%" title="12hr+: 37筆 (5%)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.75em;color:var(--text2);margin-top:6px">
+      <span>&lt;15min (58%)</span><span>15-60min (21%)</span><span>1-4hr (11%)</span><span>4-12hr (6%)</span><span>12hr+ (5%)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ====== PANEL 2: PERFORMANCE ====== -->
+<div class="panel" id="panel-perf">
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'perf-equity')">📈 收益曲線</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-time')">🕐 時段分析</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-hold')">⏱️ 持倉時間</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-dir')">↔️ 方向分析</button>
+  </div>
+
+  <div id="perf-equity">
+    <div class="card">
+      <h2><span class="icon">📈</span> 完整收益曲線</h2>
+      <div class="chart-box" style="height:400px">
+        <svg width="100%" height="100%" viewBox="0 0 800 380" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="eqFill2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#64b5f6" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#64b5f6" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <!-- Grid -->
+          <g stroke="#1a1f2e" stroke-width="1">
+            <line x1="0" y1="0" x2="800" y2="0"/><line x1="0" y1="95" x2="800" y2="95"/>
+            <line x1="0" y1="190" x2="800" y2="190"/><line x1="0" y1="285" x2="800" y2="285"/>
+            <line x1="0" y1="380" x2="800" y2="380"/>
+          </g>
+          <!-- Y axis labels -->
+          <g fill="#5a6478" font-size="10" font-family="monospace">
+            <text x="4" y="8">$13K</text><text x="4" y="103">$11K</text>
+            <text x="4" y="198">$8K</text><text x="4" y="293">$5K</text>
+            <text x="4" y="375">$3K</text>
+          </g>
+          <path id="eqPath2" d="" fill="none" stroke="#64b5f6" stroke-width="2"/>
+          <path id="eqArea2" d="" fill="url(#eqFill2)"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div id="perf-time" style="display:none">
+    <div class="card">
+      <h2><span class="icon">🕐</span> 交易時段分析</h2>
+      <p style="color:var(--text2);padding:20px 0;text-align:center">📊 時段熱力圖 + 逐小時盈虧柱狀圖<br><small>（SAMPLE 展示 — 實際報告會有完整數據）</small></p>
+    </div>
+  </div>
+
+  <div id="perf-hold" style="display:none">
+    <div class="card">
+      <h2><span class="icon">⏱️</span> 持倉時間分佈</h2>
+      <div class="bar-chart" style="height:240px">
+        <div class="bar green" style="height:100%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">454</span></div>
+        <div class="bar blue" style="height:35%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">161</span></div>
+        <div class="bar gold" style="height:18%"></div>
+        <div class="bar yellow" style="height:10%"></div>
+        <div class="bar red" style="height:8%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="perf-dir" style="display:none">
+    <div class="two-col">
+      <div class="card">
+        <h2>🟢 BUY 表現</h2>
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-box"><div class="v">316</div><div class="l">筆數</div></div>
+          <div class="stat-box"><div class="v pos">86.7%</div><div class="l">勝率</div></div>
+          <div class="stat-box"><div class="v pos">+$1,930</div><div class="l">總盈虧</div></div>
+          <div class="stat-box"><div class="v">$6.11</div><div class="l">平均/筆</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>🔴 SELL 表現</h2>
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-box"><div class="v">462</div><div class="l">筆數</div></div>
+          <div class="stat-box"><div class="v pos">90.0%</div><div class="l">勝率</div></div>
+          <div class="stat-box"><div class="v pos">+$765</div><div class="l">總盈虧</div></div>
+          <div class="stat-box"><div class="v">$1.66</div><div class="l">平均/筆</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== PANEL 3: RISK ====== -->
+<div class="panel" id="panel-risk">
+  <div class="risk-status med" style="margin-top:0">
+    <div class="ri">⚠️</div>
+    <div>
+      <div class="rt">中等風險 · MEDIUM</div>
+      <div class="rd">最大回撤 37% · 單筆最大虧損 $1,087 · 建議關注 L3+ 層級風險</div>
+    </div>
+  </div>
+
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'risk-martin')">🎲 馬丁風險</button>
+    <button class="sub-tab" onclick="switchSub(this,'risk-layer')">📚 層數</button>
+    <button class="sub-tab" onclick="switchSub(this,'risk-vol')">📏 波幅</button>
+  </div>
+
+  <div id="risk-martin">
+    <div class="card">
+      <h2><span class="icon">🎲</span> 馬丁風險摘要</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v gold">2</div><div class="l">最大層數</div></div>
+        <div class="stat-box"><div class="v pos">$1,087</div><div class="l">最大層虧損</div></div>
+        <div class="stat-box"><div class="v">H1 / M30</div><div class="l">策略類型</div></div>
+        <div class="stat-box"><div class="v pos">🟢</div><div class="l">破產風險</div></div>
+      </div>
+      <p style="color:var(--text2);font-size:.85em;margin-top:8px">此策略主要使用 2 層（H1 + M30），屬於低馬丁風險。大部分虧損可以快速恢復。</p>
+    </div>
+    <div class="card">
+      <h2><span class="icon">⚠️</span> 黑名單 / 高風險交易</h2>
+      <table class="tbl">
+        <thead><tr><th>時間</th><th>方向</th><th>手數</th><th>盈虧</th><th>持倉</th><th>備註</th></tr></thead>
+        <tbody>
+          <tr><td>07.27 02:47</td><td>SELL</td><td>0.90</td><td class="neg">-$1,087</td><td>0.36h</td><td><span class="badge red">大手數虧損</span></td></tr>
+          <tr><td>07.27 03:01</td><td>SELL</td><td>1.05</td><td class="neg">-$240</td><td>0.13h</td><td><span class="badge red">大手數虧損</span></td></tr>
+          <tr><td>07.24 08:18</td><td>SELL</td><td>0.01</td><td class="neg">-$82</td><td>2.79d</td><td><span class="badge yellow">長持倉虧損</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="risk-layer" style="display:none">
+    <div class="card">
+      <h2><span class="icon">📚</span> 層數分析</h2>
+      <table class="tbl">
+        <thead><tr><th>層</th><th>策略</th><th>筆數</th><th>勝率</th><th>盈虧</th><th>評級</th></tr></thead>
+        <tbody>
+          <tr><td>L1</td><td>H1</td><td>~500</td><td class="pos">~89%</td><td class="pos">+$5,800</td><td><span class="badge green">A</span></td></tr>
+          <tr><td>L2</td><td>M30</td><td>~280</td><td class="pos">~88%</td><td class="pos">+$1,900</td><td><span class="badge green">A</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="risk-vol" style="display:none">
+    <div class="card">
+      <h2><span class="icon">📏</span> 波幅分析</h2>
+      <p style="color:var(--text2);padding:20px 0;text-align:center">📊 XAUUSD 波幅分佈圖<br><small>（SAMPLE 展示 — 實際報告會有 ATR + Bollinger 分析）</small></p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== PANEL 4: COPY DECISION ====== -->
+<div class="panel" id="panel-copy">
+  <div class="card grade-display">
+    <div class="grade-stars">⭐⭐⭐</div>
+    <div class="grade-label" style="color:var(--green)">首選 COPY</div>
+    <div class="grade-desc">高勝率（88.7%）+ 合理 PF（2.77）+ 低層數（L2）+ 純 XAUUSD</div>
+  </div>
+
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'copy-tpsl')">📐 TP/SL 建議</button>
+    <button class="sub-tab" onclick="switchSub(this,'copy-score')">🎯 評分詳情</button>
+    <button class="sub-tab" onclick="switchSub(this,'copy-sim')">💰 模擬</button>
+  </div>
+
+  <div id="copy-tpsl">
+    <div class="two-col">
+      <div class="card">
+        <h2><span class="icon">📐</span> TP/SL 建議</h2>
+        <table class="tbl">
+          <tbody>
+            <tr><td>🎯 建議止賺 (TP)</td><td class="gold">25-35 pips</td></tr>
+            <tr><td>🛡️ 軟止蝕 (Soft SL)</td><td class="neg">50-80 pips</td></tr>
+            <tr><td>🛡️ 硬止蝕 (Hard SL)</td><td class="neg">120-150 pips</td></tr>
+            <tr><td>📊 平均盈利</td><td class="pos">+$9.88/筆</td></tr>
+            <tr><td>📊 平均虧損</td><td class="neg">-$24.58/筆</td></tr>
+            <tr><td>⚖️ 盈虧比</td><td>1 : 2.49</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2><span class="icon">💰</span> 倉位建議</h2>
+        <table class="tbl">
+          <tbody>
+            <tr><td>💵 建議本金</td><td>$5,000+</td></tr>
+            <tr><td>📊 手數</td><td>0.01 標準</td></tr>
+            <tr><td>⚡ 最大同時持倉</td><td>4 個</td></tr>
+            <tr><td>🔮 預期月增長</td><td class="pos">12.12%</td></tr>
+            <tr><td>📉 預期最大回撤</td><td class="neg">15-20%</td></tr>
+            <tr><td>⏱️ 建議持倉時間</td><td>&lt; 4 小時</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="copy-score" style="display:none">
+    <div class="card">
+      <h2><span class="icon">🎯</span> 質量評分（8維度）</h2>
+      <table class="tbl">
+        <thead><tr><th>維度</th><th>評分</th><th>加權</th><th>得分</th><th>評級</th></tr></thead>
+        <tbody>
+          <tr><td>勝率</td><td>88.7%</td><td>25%</td><td class="pos">22.2</td><td><span class="badge green">S</span></td></tr>
+          <tr><td>盈虧比</td><td>2.77</td><td>30%</td><td class="pos">24.9</td><td><span class="badge green">S</span></td></tr>
+          <tr><td>盈虧比</td><td>1 : 2.49</td><td>20%</td><td>12.4</td><td><span class="badge yellow">B</span></td></tr>
+          <tr><td>樣本量</td><td>779</td><td>15%</td><td class="pos">15.0</td><td><span class="badge green">S</span></td></tr>
+          <tr><td>持倉效率</td><td>2.66h</td><td>10%</td><td class="pos">9.0</td><td><span class="badge green">A</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="copy-sim" style="display:none">
+    <div class="card">
+      <h2><span class="icon">💰</span> Copy 模擬</h2>
+      <p style="color:var(--text2);padding:20px 0;text-align:center">📊 $1,000 本金模擬增長曲線<br><small>（SAMPLE 展示）</small></p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== PANEL 5: DATA DETAILS ====== -->
+<div class="panel" id="panel-data">
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'data-pos')">📋 倉位明細</button>
+    <button class="sub-tab" onclick="switchSub(this,'data-set')">⚙️ SET 參數</button>
+    <button class="sub-tab" onclick="switchSub(this,'data-raw')">📄 原始數據</button>
+  </div>
+
+  <div id="data-pos">
+    <div class="card">
+      <h2><span class="icon">📋</span> 最近 10 筆交易</h2>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>開倉時間</th><th>方向</th><th>手數</th><th>開倉價</th><th>平倉價</th><th>Pips</th><th>盈虧</th><th>持倉</th><th>Magic</th></tr></thead>
+        <tbody>
+          <tr><td>07.31 13:00</td><td>SELL</td><td>0.01</td><td>4053.64</td><td>4051.17</td><td class="pos">+24</td><td class="pos">+$2.47</td><td>1.72h</td><td>168212</td></tr>
+          <tr><td>07.31 12:49</td><td>SELL</td><td>0.01</td><td>4056.39</td><td>4053.71</td><td class="pos">+26</td><td class="pos">+$2.68</td><td>0.18h</td><td>168212</td></tr>
+          <tr><td>07.31 12:23</td><td>BUY</td><td>0.90</td><td>4054.17</td><td>4056.11</td><td class="pos">+19</td><td class="pos">+$174.60</td><td>0.44h</td><td>168211</td></tr>
+          <tr><td>07.31 12:09</td><td>BUY</td><td>0.01</td><td>4058.32</td><td>4056.12</td><td class="neg">-22</td><td class="neg">-$2.20</td><td>0.68h</td><td>168211</td></tr>
+          <tr><td>07.31 12:00</td><td>BUY</td><td>0.01</td><td>4061.35</td><td>4056.39</td><td class="neg">-49</td><td class="neg">-$4.96</td><td>0.83h</td><td>168211</td></tr>
+          <tr><td>07.30 19:24</td><td>BUY</td><td>0.01</td><td>4118.10</td><td>4056.12</td><td class="neg">-619</td><td class="neg">-$62.61</td><td>17.42h</td><td>168211</td></tr>
+          <tr><td>07.30 19:04</td><td>BUY</td><td>0.01</td><td>4113.69</td><td>4117.70</td><td class="pos">+40</td><td class="pos">+$4.01</td><td>0.33h</td><td>168211</td></tr>
+          <tr><td>07.30 17:45</td><td>BUY</td><td>0.01</td><td>4110.87</td><td>4113.49</td><td class="pos">+26</td><td class="pos">+$2.62</td><td>1.32h</td><td>168211</td></tr>
+          <tr><td>07.30 02:07</td><td>BUY</td><td>0.01</td><td>4098.06</td><td>4100.46</td><td class="pos">+24</td><td class="pos">+$2.40</td><td>14.68h</td><td>168211</td></tr>
+          <tr><td>07.30 02:03</td><td>BUY</td><td>0.01</td><td>4095.10</td><td>4097.59</td><td class="pos">+24</td><td class="pos">+$2.49</td><td>0.07h</td><td>168211</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="data-set" style="display:none">
+    <div class="card">
+      <h2><span class="icon">⚙️</span> SET 參數</h2>
+      <table class="tbl">
+        <tbody>
+          <tr><td>Magic Number</td><td class="gold">168211 / 168212</td></tr>
+          <tr><td>策略類型</td><td>SMA Pro v5.00</td></tr>
+          <tr><td>時間框架</td><td>H1 + M30</td></tr>
+          <tr><td>手數</td><td>0.01</td></tr>
+          <tr><td>止賺</td><td>變動（市場跟蹤）</td></tr>
+          <tr><td>止蝕</td><td>變動（市場跟蹤）</td></tr>
+        </tbody>
+      </table>
+      <p style="color:var(--text2);font-size:.85em;margin-top:8px">⚠️ 完整 SET 參數需從 AlgoForest Settings tab 下載</p>
+    </div>
+  </div>
+
+  <div id="data-raw" style="display:none">
+    <div class="card">
+      <h2><span class="icon">📄</span> 原始數據</h2>
+      <p style="color:var(--text2);padding:20px 0;text-align:center">📥 <a href="../downloads/36912.csv">下載完整 CSV（779 筆）</a></p>
+    </div>
+  </div>
+</div>
+
+<script src="../sidebar.js"></script>
+<script>
+// === Panel switching ===
+function switchPanel(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// === Sub-tab switching ===
+function switchSub(btn, id){
+  var parent = btn.closest('.panel');
+  parent.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  parent.querySelectorAll('[id^="'+btn.closest('.panel').id.replace('panel-','')+'-"]').forEach(d=>{});
+  btn.classList.add('active');
+  // Hide all sub-content in this panel
+  var subs = parent.querySelectorAll('[id]');
+  subs.forEach(s=>{
+    if(s.id.startsWith(parent.id.replace('panel-','')+'-')){
+      s.style.display='none';
+    }
+  });
+  document.getElementById(id).style.display='block';
+}
+
+// === Draw equity curve ===
+(function(){
+  var equity=[5002.47,5129.99,5166.62,3990.1,3298.51,3334.39,3366.36,3627.85,3671.01,3789.04,3842.08,3874.69,3996.34,4126.34,4152.3,4186.57,4225.03,4324.85,4362.3,4391.09,4425.48,4458.45,4466.25,4689.41,4649.56,5507.68,5550.3,5582.42,5635.56,5671.21,5759.59,5713.18,5746.54,5751.4,5995.88,5944.54,5976.23,6011.13,6120.47,6146.45,6233.45,6851.74,6621.78,6660.78,6696.08,6756.86,6786.86,6871.52,6880.74,7021.05,7054.68,7087.23,7163.27,7195.4,7246.29,7301.28,7332.48,7360.81,7393.16,7428.12,7469.36,7474.24,7516.18,7569.15,7578.88,12695.12];
+  var min=3290,max=12700;
+  var W=800,H=200;
+  var pts=equity.map(function(v,i){
+    var x=(i/(equity.length-1))*W;
+    var y=H-((v-min)/(max-min))*H;
+    return x.toFixed(1)+','+y.toFixed(1);
+  });
+  var pathD='M'+pts.join(' L');
+  var areaD=pathD+' L'+W+','+H+' L0,'+H+' Z';
+
+  // Mini chart
+  var p1=document.getElementById('eqPath');if(p1)p1.setAttribute('d',pathD);
+  var a1=document.getElementById('eqArea');if(a1)a1.setAttribute('d',areaD);
+
+  // Large chart (H=380)
+  var pts2=equity.map(function(v,i){
+    var x=(i/(equity.length-1))*800;
+    var y=380-((v-min)/(max-min))*380;
+    return x.toFixed(1)+','+y.toFixed(1);
+  });
+  var pathD2='M'+pts2.join(' L');
+  var areaD2=pathD2+' L800,380 L0,380 Z';
+  var p2=document.getElementById('eqPath2');if(p2)p2.setAttribute('d',pathD2);
+  var a2=document.getElementById('eqArea2');if(a2)a2.setAttribute('d',areaD2);
+})();
+</script>
+</body>
+</html>
