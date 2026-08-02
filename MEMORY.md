@@ -70,3 +70,18 @@
 - MT4 Daily Summary Report - July 29, 2026: **Execution Results:** ✅ **MT4 帳戶日報已成功生成並發送至 WhatsApp** [score=0.818 recalls=0 avg=0.620 source=memory/2026-07-29.md:3-4]
 <!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:13:13 -->
 - MT4 Daily Summary Report - July 29, 2026: **Data Sources Analyzed:** [score=0.818 recalls=0 avg=0.620 source=memory/2026-07-29.md:13-13]
+
+## Promoted From Short-Term Memory (2026-08-02)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:11:11 -->
+- MT4 Daily Summary Report - July 29, 2026: **WhatsApp Message ID:** 3EB017C94EA3A76FE3B067 [score=0.835 recalls=0 avg=0.620 source=memory/2026-07-29.md:11-11]
+<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:18:18 -->
+- MT4 Daily Summary Report - July 29, 2026: **Key Observations:** [score=0.835 recalls=0 avg=0.620 source=memory/2026-07-29.md:18-18]
+<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:19:22 -->
+- MT4 Daily Summary Report - July 29, 2026: Account balance remains extremely low at $0.14; No new trading activity since June 18, 2026; MT4 Terminal last connected on July 1, 2026 and has been offline since; Previous reports show same dormant status - no change [score=0.835 recalls=0 avg=0.620 source=memory/2026-07-29.md:19-22]
+<!-- openclaw-memory-promotion:memory:memory/2026-07-26.md:7:7 -->
+- MT4 Daily Summary Report - July 26, 2026: **Report Summary:** [score=0.811 recalls=0 avg=0.620 source=memory/2026-07-26.md:7-7]
+<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:14:16 -->
+- MT4 Daily Summary Report - July 29, 2026: MT4 Terminal State files (last update: 2026.07.01 12:37:33); MT4 Events CSV (last event: 2026.07.01 12:38:54 SHUTDOWN); Memory corpus searched for recent forex reports and TSA analysis [score=0.803 recalls=0 avg=0.620 source=memory/2026-07-29.md:14-16]
+<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:23:23 -->
+- MT4 Daily Summary Report - July 29, 2026: Recommended: evaluate account restart, review EA strategy, confirm MT4 Terminal status [score=0.803 recalls=0 avg=0.620 source=memory/2026-07-29.md:23-23]
