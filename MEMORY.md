@@ -85,3 +85,8 @@
 - MT4 Daily Summary Report - July 29, 2026: MT4 Terminal State files (last update: 2026.07.01 12:37:33); MT4 Events CSV (last event: 2026.07.01 12:38:54 SHUTDOWN); Memory corpus searched for recent forex reports and TSA analysis [score=0.803 recalls=0 avg=0.620 source=memory/2026-07-29.md:14-16]
 <!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:23:23 -->
 - MT4 Daily Summary Report - July 29, 2026: Recommended: evaluate account restart, review EA strategy, confirm MT4 Terminal status [score=0.803 recalls=0 avg=0.620 source=memory/2026-07-29.md:23-23]
+
+## Promoted From Short-Term Memory (2026-08-04)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:6:6 -->
+- MT4 Daily Summary Report - July 29, 2026: **Report Summary:** [score=0.844 recalls=0 avg=0.620 source=memory/2026-07-29.md:6-6]
