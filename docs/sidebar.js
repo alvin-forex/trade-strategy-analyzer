@@ -1,5 +1,7 @@
 /* TSA Sidebar Navigation JS - 統一導航 + 主題切換 + 自動注入 CSS */
 (function(){
+  // 如果喺 iframe 內，唔注入 sidebar（外層 shell 已有）
+  if(window !== window.top) return;
   // === 自動注入 sidebar.css（新頁面只需加 <script src="sidebar.js">）===
   var path = window.location.pathname;
   var cssDepth = '';
