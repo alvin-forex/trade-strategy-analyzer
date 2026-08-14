@@ -173,20 +173,45 @@ def check_ea_types():
 
 
 def check_data_freshness():
-    """Check data sources are recent"""
+    """Check data sources are recent (primary source + weekend-market aware)"""
+    import time
+    from datetime import datetime, timedelta
     issues = []
-    
-    # Check forex CSV
-    csv_path = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/forex_data.csv"
-    if os.path.exists(csv_path):
-        mtime = os.path.getmtime(csv_path)
-        import time
+
+    base = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files"
+    # Primary source first (feeds the CCY Power pipeline), then EA fallback export
+    sources = ["ccy_power_reader.csv", "forex_data.csv"]
+    existing = [f for f in sources if os.path.exists(os.path.join(base, f))]
+    if not existing:
+        issues.append(f"❌ MISSING: ccy_power_reader.csv and forex_data.csv")
+        return issues
+
+    # Weekend closure window: Sat 05:00 HKT → Mon 08:00 HKT (same rule as update_ccy_power.py)
+    now = datetime.now()
+    wd, hr = now.weekday(), now.hour
+    closure_started = None
+    if wd == 5 and hr >= 5:
+        closure_started = now.replace(hour=5, minute=0, second=0, microsecond=0)
+    elif wd == 6:
+        closure_started = (now - timedelta(days=1)).replace(hour=5, minute=0, second=0, microsecond=0)
+    elif wd == 0 and hr < 8:
+        closure_started = (now - timedelta(days=2)).replace(hour=5, minute=0, second=0, microsecond=0)
+
+    grace = 0.0
+    if closure_started:
+        # During weekend closure the EA legitimately stops writing — allow closure duration + 3h slack
+        grace = (now - closure_started).total_seconds() / 3600 + 3
+
+    for name in existing:
+        mtime = os.path.getmtime(os.path.join(base, name))
         age_hours = (time.time() - mtime) / 3600
-        if age_hours > 48:
-            issues.append(f"⚠️ STALE DATA: forex_data.csv is {age_hours:.0f} hours old")
-    else:
-        issues.append(f"❌ MISSING: forex_data.csv")
-    
+        threshold = 48 + grace
+        if age_hours > threshold:
+            issues.append(
+                f"⚠️ STALE DATA: {name} is {age_hours:.0f} hours old "
+                f"(threshold {threshold:.0f}h incl. weekend allowance) — MT4/EA export likely stopped"
+            )
+
     return issues
 
 
