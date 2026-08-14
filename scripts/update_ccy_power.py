@@ -79,9 +79,11 @@ def read_csv():
                             data[tf] = ccy
             if len(data) >= 2:  # At least 2 TFs with data
                 print(f"[OK] Using ccy_power_reader.csv: {len(data)} TFs with distinct values")
-                ts = tf_rows['D1'][-1]['timestamp'] if tf_rows['D1'] else datetime.now().strftime("%Y.%m.%d %H:%M")
-                print(f"     Latest: {ts} | D1: {list(data.get('D1', {}).keys())[:3]} H4: {list(data.get('H4', {}).keys())[:3]} H1: {list(data.get('H1', {}).keys())[:3]} M30: {list(data.get('M30', {}).keys())[:3]}")
-                return data, []
+                # Per-TF real source timestamps (don't fake refresh with datetime.now())
+                ts_map = {tf: rows[-1]['timestamp'] for tf, rows in tf_rows.items() if rows and tf in data}
+                print(f"     Source ts: {ts_map}")
+                print(f"     D1: {list(data.get('D1', {}).keys())[:3]} H4: {list(data.get('H4', {}).keys())[:3]} H1: {list(data.get('H1', {}).keys())[:3]} M30: {list(data.get('M30', {}).keys())[:3]}")
+                return data, [], ts_map
         except Exception as e:
             print(f"[WARN] ccy_power_reader.csv read failed: {e}")
     
@@ -91,11 +93,13 @@ def read_csv():
             conn = sq3.connect(DB_PATH)
             c = conn.cursor()
             data = {}
+            ts_map = {}
             for tf in ['D1', 'H4', 'H1', 'M30']:
                 c.execute('''SELECT timestamp, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU
                              FROM ccy_power_v2 WHERE timeframe=? ORDER BY timestamp DESC LIMIT 1''', (tf,))
                 row = c.fetchone()
                 if row:
+                    ts_map[tf] = row[0]
                     vals = {}
                     for i, name in enumerate(CCY_NAMES):
                         vals[name] = round(float(row[1+i]), 4) if row[1+i] else 0
@@ -103,7 +107,7 @@ def read_csv():
             conn.close()
             if len(data) >= 2:  # At least 2 TFs with distinct data
                 print(f"[OK] Using ccy_power_v2 DB: {len(data)} TFs with distinct values")
-                return data, []
+                return data, [], ts_map
         except Exception as e:
             print(f"[WARN] ccy_power_v2 read failed: {e}")
     
@@ -129,15 +133,22 @@ def read_csv():
                 if ccy:
                     data[tf] = ccy
     print(f"[WARN] Fallback to forex_data.csv (values may be identical across TFs)")
-    return data, all_rows
+    ts_map = {}
+    for row in all_rows:
+        tf = row.get('timeframe', '')
+        if tf in data and tf not in ts_map:
+            ts_map[tf] = row.get('timestamp', '')
+    return data, all_rows, ts_map
 
-def update_data_json(ccy_data):
+def update_data_json(ccy_data, ts_map=None):
     """Update data.json with latest CCY Power values"""
     out = {
         "success": True,
         "timestamp": datetime.now().strftime("%Y.%m.%d %H:%M"),
         "data": ccy_data
     }
+    if ts_map:
+        out["data_timestamps"] = ts_map  # real source reading times (per TF)
     
     with open(DATA_JSON, 'w') as f:
         json.dump(out, f, indent=2)
@@ -147,7 +158,7 @@ def update_data_json(ccy_data):
         top = sorted(vals.items(), key=lambda x: -x[1])[:3]
         print(f"  {tf}: {', '.join(f'{k}={v:.1f}' for k,v in top)}")
 
-def save_to_db(ccy_data):
+def save_to_db(ccy_data, ts_map=None):
     """Save CCY Power data to ccy_power_v3 for timeline history.
     Always write - this is our primary timeline data source.
     """
@@ -163,15 +174,17 @@ def save_to_db(ccy_data):
                   JPY REAL, NZD REAL, USD REAL, XAU REAL,
                   UNIQUE(timestamp, timeframe))''')
     
-    now = datetime.now().strftime("%Y.%m.%d %H:%M")
     count = 0
+    now = datetime.now().strftime("%Y.%m.%d %H:%M")
+    warned_stale = False
     
     for tf, vals in ccy_data.items():
         try:
+            ts = (ts_map or {}).get(tf) or now  # real source timestamp, not wall-clock
             c.execute('''INSERT OR REPLACE INTO ccy_power_v3 
                         (timestamp, timeframe, AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, XAU)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                     (now, tf,
+                     (ts, tf,
                       vals.get('AUD', 0), vals.get('CAD', 0), vals.get('CHF', 0),
                       vals.get('EUR', 0), vals.get('GBP', 0), vals.get('JPY', 0),
                       vals.get('NZD', 0), vals.get('USD', 0), vals.get('XAU', 0)))
@@ -360,14 +373,26 @@ if __name__ == "__main__":
     if result is None:
         sys.exit(1)
     
-    ccy_data, all_rows = result
+    ccy_data, all_rows, ts_map = result
     
     if not ccy_data:
         print("ERROR: No CCY Power data in CSV")
         sys.exit(1)
     
-    update_data_json(ccy_data)
-    save_to_db(ccy_data)
+    # Warn loudly if source data is stale (MT4/EA stopped writing)
+    if ts_map:
+        try:
+            src_latest = max(ts_map.values())
+            src_dt = datetime.strptime(src_latest, "%Y.%m.%d %H:%M")
+            age_h = (datetime.now() - src_dt).total_seconds() / 3600
+            if age_h > 24:
+                print(f"[WARN] ⚠️ SOURCE DATA STALE: latest source reading is {age_h:.0f}h old ({src_latest}). "
+                      f"MT4/EA likely stopped — writing DB with REAL timestamps (no fake refresh).")
+        except ValueError:
+            pass
+
+    update_data_json(ccy_data, ts_map)
+    save_to_db(ccy_data, ts_map)
     update_timeline_json()
     
     # Generate pairs.json from forex_data.csv (EA data has all 29 pairs)
