@@ -1,31 +1,6 @@
 # Long-Term Memory
 
 
-## Promoted From Short-Term Memory (2026-07-30)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-07-26.md:4:5 -->
-- MT4 Daily Summary Report - July 26, 2026: **Execution Results:** ✅ MT4 帳戶日報已成功生成並發送至 WhatsApp [score=0.836 recalls=0 avg=0.620 source=memory/2026-07-26.md:4-5]
-<!-- openclaw-memory-promotion:memory:memory/2026-07-26.md:16:16 -->
-- MT4 Daily Summary Report - July 26, 2026: **Key Observations:** [score=0.836 recalls=0 avg=0.620 source=memory/2026-07-26.md:16-16]
-<!-- openclaw-memory-promotion:memory:memory/2026-07-26.md:17:20 -->
-- MT4 Daily Summary Report - July 26, 2026: Account remains dormant with $0.14 balance; No trading activity for 39 consecutive days; MT4 Terminal offline since July 1; Recommendations: consider recapitalizing or strategy review [score=0.836 recalls=0 avg=0.620 source=memory/2026-07-26.md:17-20]
-
-## Promoted From Short-Term Memory (2026-07-31)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-07-26.md:8:11 -->
-- MT4 Daily Summary Report - July 26, 2026: Account: Vantage Markets #7737997 (Wayne Manual Order); Balance: $0.14 | Equity: $0.14 | Daily P&L: $0.00; Trading: 0 trades, 0 lots, 0 open positions; Last trading day: June 18, 2026 (39 days ago) [score=0.835 recalls=0 avg=0.620 source=memory/2026-07-26.md:8-11]
-<!-- openclaw-memory-promotion:memory:memory/2026-07-26.md:12:14 -->
-- MT4 Daily Summary Report - July 26, 2026: MT4 Terminal last seen: July 1, 2026; Account dormant since June 18 major loss (-99.7%); WhatsApp Message ID: 3EB0A1EF7CE7107CA7EC38 [score=0.835 recalls=0 avg=0.620 source=memory/2026-07-26.md:12-14]
-
-## Promoted From Short-Term Memory (2026-08-01)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:7:10 -->
-- MT4 Daily Summary Report - July 29, 2026: **Account Status:** Vantage Markets #7737997 (Wayne Manual Order); **Current Condition:** Balance $0.14, Zero trading activity, No positions; **Trading Statistics:** 41 days since last trade (June 18), 28 days since last connection (July 1); **Key Issue:** Account dormant since June 18 major loss (-99.7%) [score=0.836 recalls=0 avg=0.620 source=memory/2026-07-29.md:7-10]
-<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:3:4 -->
-- MT4 Daily Summary Report - July 29, 2026: **Execution Results:** ✅ **MT4 帳戶日報已成功生成並發送至 WhatsApp** [score=0.818 recalls=0 avg=0.620 source=memory/2026-07-29.md:3-4]
-<!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:13:13 -->
-- MT4 Daily Summary Report - July 29, 2026: **Data Sources Analyzed:** [score=0.818 recalls=0 avg=0.620 source=memory/2026-07-29.md:13-13]
-
 ## Promoted From Short-Term Memory (2026-08-02)
 
 <!-- openclaw-memory-promotion:memory:memory/2026-07-29.md:11:11 -->
@@ -92,3 +67,22 @@
 - 帳戶摘要: 當日交易：0（無交易活動）; 最近活動：7/1 帳戶重啟，無交易 [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-25.md:14-15]
 <!-- openclaw-memory-promotion:memory:memory/2026-08-25.md:21:23 -->
 - 市場分析摘要: 連續53天無交易活動; 帳戶餘額極低，風險較小; 建議重新評估交易策略 [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-25.md:21-23]
+
+## Promoted From Short-Term Memory (2026-08-31)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-15.md:1:21 -->
+- # 2026-06-15 Daily Log ## MT4 日報執行紀錄 - 2026-06-15 ### Cron: mt4-daily-summary - **狀態：** ✅ 成功 - **MT4 狀態讀取：** ✅ (monitor_state_7737997.json) - **交易事件讀取：** ✅ (monitor_events_7737997.csv) - **WhatsApp 發送：** ✅ messageId=3EB088872BA0257BAB2758 - **目標：** +85295424877 ### 帳戶摘要 - 帳戶：Vantage Markets #7737997 (Wayne Manual Order) - 餘額/淨值：$54.89 - 持倉：0 - 當日交易：0（週末休市） - 最近活動：6/12 清倉 20 張，淨利 +$9.36 ### 執行時間 - 2026-06-16 00:30 HKT [score=0.817 recalls=3 avg=0.514 source=memory/2026-06-15.md:1-21]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-25.md:8:8 -->
+- Cron: mt4-daily-summary: **目標：** +85295424877 [score=0.808 recalls=0 avg=0.620 source=memory/2026-08-25.md:8-8]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-24.md:6:6 -->
+- MT4 Daily Summary Report - August 24, 2026: **Report Summary:** [score=0.805 recalls=0 avg=0.620 source=memory/2026-08-24.md:6-6]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-26.md:3:3 -->
+- MT4 Daily Summary Report - August 26, 2026: **Execution Results:** ✅ **MT4 帳戶日報已成功生成並發送至 WhatsApp** [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-26.md:3-3]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-26.md:6:9 -->
+- MT4 Daily Summary Report - August 26, 2026: **Account Status:** Vantage Markets #7737997 (Wayne Manual Order); **Current Condition:** Balance /bin/bash.14, Zero trading activity, No positions; **Trading Statistics:** 41 days since last trade (June 18), 25 days since last connection (July 1); **Key Issue:** Account dormant since June 18 major loss (-99.7%) [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-26.md:6-9]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-26.md:10:10 -->
+- MT4 Daily Summary Report - August 26, 2026: **WhatsApp Message ID:** 3EB0ABA44A38581AA58570 [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-26.md:10-10]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-26.md:12:12 -->
+- MT4 Daily Summary Report - August 26, 2026: **Data Sources Analyzed:** [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-26.md:12-12]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-26.md:13:15 -->
+- MT4 Daily Summary Report - August 26, 2026: MT4 Terminal State files (last update: 2026.07.01 12:37:33); MT4 Events CSV (last event: 2026.07.01 12:38:54 SHUTDOWN); Memory corpus searched for recent forex reports and TSA analysis [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-26.md:13-15]
