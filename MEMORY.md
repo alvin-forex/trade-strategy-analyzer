@@ -1,11 +1,6 @@
 # Long-Term Memory
 
 
-## Promoted From Short-Term Memory (2026-07-24)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-07-19.md:6:6 -->
-- MT4 Daily Summary Report - July 19, 2026: **Report Summary:** [score=0.814 recalls=0 avg=0.620 source=memory/2026-07-19.md:6-6]
-
 ## Promoted From Short-Term Memory (2026-07-30)
 
 <!-- openclaw-memory-promotion:memory:memory/2026-07-26.md:4:5 -->
@@ -84,3 +79,16 @@
 - MT4 Daily Summary Report - August 24, 2026: **Key Observations:** [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-24.md:18-18]
 <!-- openclaw-memory-promotion:memory:memory/2026-08-24.md:19:22 -->
 - MT4 Daily Summary Report - August 24, 2026: Account balance remains extremely low (/bin/bash.14); No trading activity for consecutive 52 days; Last major trading activity resulted in significant losses on June 18; Account status: Completely dormant since June 18 [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-24.md:19-22]
+
+## Promoted From Short-Term Memory (2026-08-29)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-08-23.md:6:6 -->
+- MT4 Daily Summary Report - August 23, 2026: **Report Summary:** [score=0.811 recalls=0 avg=0.620 source=memory/2026-08-23.md:6-6]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-25.md:4:7 -->
+- Cron: mt4-daily-summary: **狀態：** ✅ 成功 **MT4 狀態讀取：** ✅ (monitor_state_7737997.json) **交易事件讀取：** ✅ (monitor_events_7737997.csv) **WhatsApp 發送：** ✅ messageId=3EB086D3A1B37725EC36EC [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-25.md:4-7]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-25.md:11:12 -->
+- 帳戶摘要: 帳戶：Vantage Markets #7737997 (Wayne Manual Order); 餘額/淨值：/bin/bash.14 [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-25.md:11-12]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-25.md:14:15 -->
+- 帳戶摘要: 當日交易：0（無交易活動）; 最近活動：7/1 帳戶重啟，無交易 [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-25.md:14-15]
+<!-- openclaw-memory-promotion:memory:memory/2026-08-25.md:21:23 -->
+- 市場分析摘要: 連續53天無交易活動; 帳戶餘額極低，風險較小; 建議重新評估交易策略 [score=0.803 recalls=0 avg=0.620 source=memory/2026-08-25.md:21-23]
