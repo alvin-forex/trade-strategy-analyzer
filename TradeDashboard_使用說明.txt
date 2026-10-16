@@ -1,0 +1,206 @@
+============================================================
+  TradeDashboard v1.43 (MT4) / v1.14 (MT5) — 使用說明
+  作者: FF48 Alvin · 更新: 2026-10-17
+  ============================================================
+
+【簡介】
+TradeDashboard 是一個 MT4/MT5 圖表面板 EA，
+掛載後會在圖表左上角顯示深色主題面板，
+即時呈現帳戶交易數據，並持續記錄 Margin、
+FreeMargin、浮動盈虧等歷史數據，方便復盤分析。
+內置三層風控：NewsGuard（新聞守門）/
+DDGuard（回撤保護）/ SymbolGuard（逐商品管控）。
+
+
+【安裝步驟】
+
+1. 將 TradeDashboard.ex4 (MT4) 或 TradeDashboard5.ex5 (MT5) 複製到：
+   MT4: 安裝目錄/MQL4/Experts/
+   MT5: 安裝目錄/MQL5/Experts/
+
+2. 開啟 MT4/MT5 → 工具 → 選項 → EA交易
+   ✅ 勾選「允許即時自動交易」
+   ✅ 勾選「允許DLL輸入」（要 Telegram 直推 / 自動停AT 先需要）
+
+3. 在導航器（Navigator）面板找到 TradeDashboard
+   → 雙點擊 或 拖拉到圖表上
+
+4. 在彈出的參數設定視窗中，按「確定」
+
+5. 確認圖表右上角出現 😊 笑臉（代表 EA 運行中）
+
+6.（可選）Telegram 通知設定：
+   - 喺 MQL4/Files/（MT4）或 MQL5/Files/（MT5）放 tg_token.txt
+   - 內容 = Telegram bot token（純文字，無換行）
+   - 參數 TG_ChatID = 你嘅 Telegram user id（例如 920593269）
+
+
+【面板說明】
+
+面板分為四個 Tab（右上角切換）：
+
+■ Positions（主統計）
+  - 標題列 + 帳戶資訊（AC/Balance/Equity/Free Margin/Float P/L）
+  - 四視圖掣 [H][D][W][M] + [<][>] 翻頁
+  - Symbol / Comment 過濾器
+  - 主統計表：最多 10 行 × 21 欄
+
+■ Alerts（警示）
+  - 即將來臨新聞 + 受影響商品
+  - 逐商品 SymbolGuard 三態掣（[ON] / [ALERT] / [CLOSE]）
+
+■ DDGuard（回撤保護）
+  - 帳戶級 / 逐商品浮動虧損實時表
+  - 觸發後出現橙色「確認恢復 / Reset Peak」掣（見風控章節）
+
+■ Set（設定快覽）
+  - 顯示關鍵參數（Refresh / Record / Scale / 風控開關）
+
+
+【視圖模式】
+
+■ H = 逐小時（預設，過去 24 小時）
+■ D = 每日（日曆日）
+■ W = 每週（ISO 週）
+■ M = 每月
+■ [<] [>] 翻頁睇更早歷史
+
+
+【欄位說明（21 欄）】
+
+欄位        | 說明                          | 預設
+------------|-------------------------------|----
+Day         | 時段標籤                       | ✅
+Trades      | 交易筆數                       | ✅
+B/S         | 買入倉 / 賣出倉筆數            | ✅
+WR%         | 勝率                           | ✅
+Gain$       | 盈虧（含 Swap + Commission）   | ✅
+Gain%       | 對時段起始 Balance 百分比      | ✅
+WPips       | 加權點數                       | ❌
+Lot         | 時段手數                       | ✅
+TotalLot    | 累計手數                       | ✅
+Balance     | 時段結束餘額                   | ✅
+Margin      | 時段內最大保證金               | ❌
+FreeMarg    | 時段內最小可用保證金           | ❌
+MaxP        | 時段內最高浮盈（盤中）         | ✅
+MaxDD       | 時段內最深浮虧（盤中）         | ✅
+PF          | 利潤因子（全勝時 = 99.99）     | ❌
+AvgP&L      | 平均每筆盈虧                   | ❌
+Best        | 最佳單筆                       | ❌
+Worst       | 最差單筆                       | ❌
+MaxDD$      | 歷史已實現回撤（金額）         | ❌
+MaxDD%      | 歷史已實現回撤（百分比）       | ❌
+Events      | 事件標記                       | ❌
+
+💡 所有欄位可透過 EA 參數 ShowXxx 開關。
+
+
+【風控功能（三層）】
+
+■ NewsGuard（新聞守門）
+  - 讀取 MQL#/Files/news_guard.csv（每日自動更新）
+  - 模式：OFF / ALERT（提示）/ GUARD（熱窗內擋新倉）
+  - 熱窗 = 事件前 30 分鐘 至 後 15 分鐘（可調）
+  - 時間用 HKT 直接比對，DST 自動正確
+
+■ DDGuard（回撤保護）— v1.43 強化
+  - 帳戶級：DD% = (Peak−Equity)/Peak ≥ 20% → 全平 + 停 AT
+  - Symbol 級：單一商品浮虧 ÷ 餘額 ≥ 12% → 平該 symbol
+  - 觸發後 60 分鐘鎖盤（peak 唔會下調，防棘輪）
+  - 平倉自動重試至零殘留（DDG_CloseRetry=4）
+  - 出入金自動校正 peak（唔會因入金出金誤觸發）
+  - ⚠️ 停 AT 後**唔會自動重開**：去 DDGuard tab 按
+    「確認恢復 / Reset Peak」先會解除鎖定（人手確認機制）
+
+■ SymbolGuard
+  - Alerts tab 內逐商品撳 [ON]→[ALERT]→[CLOSE] 循環切換
+  - CLOSE = 該商品立即平倉 + 鎖（唔開新倉）
+  - ALERT = 有新聞時警示
+
+
+【Telegram 通知事件】
+
+  🚨 帳戶級 DD≥20% 觸發（AC/DD%/Peak/Equity/全平/鎖盤至）
+  ⚠️ 單 symbol DD≥12% 觸發（Symbol/浮虧/平倉/鎖盤至）
+  🛡 NewsGuard 熱窗開啟（事件/貨幣/窗口/模式）
+  ✅ 鎖盤結束（AlgoTrading 已恢復 + 時間戳）
+
+參數：TG_ChatID / TG_TokenFile / TG_Enable / TG_MinGapMin（同 key 10 分鐘內唔重發）
+
+
+【數據記錄】
+
+  - tick 級快照 → ring buffer（最多 20,000 筆）
+  - 二進位持久化 td4_snap.bin / td5_snap.bin（重啟唔斷史）
+  - CSV 匯出：TD_trades.csv / TD_summary.csv
+  - RecordSec 控制記錄間隔（預設 1 秒）
+  - BackupTime 每日自動備份 profile
+
+
+【常見問題】
+
+Q: 面板沒有出現？
+A: 確認右上角 😊 笑臉。如果 😐 哭臉，
+   檢查「允許即時自動交易」是否勾選。
+
+Q: Telegram 收唔到通知？
+A: 1) 檢查 tg_token.txt 喺 MQL#/Files/ 2) 確認 TG_ChatID 正確
+   3) 確認 DLL 權限已開 4) 睇 Journal 有冇 wininet 錯誤
+
+Q: 停咗 AT 之後幾時會自動恢復？
+A: v1.43 起**唔會自動恢復**。人手檢查完去 DDGuard tab
+   按「確認恢復 / Reset Peak」先會解除。呢個係設計 —
+   防止 EA 喺你唔知嘅情況下重新開返交易。
+
+Q: MaxDD 同 MaxDD$ 有咩分別？
+A: MaxDD = 盤中實時觀察到嘅最深浮虧（短窗真相源）；
+   MaxDD$ = 歷史已實現回撤（由平倉 PnL 計，長窗）。
+   兩個概念唔同，唔好撈埋。
+
+Q: Margin / FreeMargin 顯示 "-"？
+A: 需要 EA 運行時記錄。EA 掛載前嘅歷史時段冇數據，
+   隨住運行時間增長會越嚟越完整。
+
+Q: 出入金之後 DD 會唔會亂？
+A: 唔會。v1.43 會自動掃描出入金並校正 peak，
+   入金唔會製造假回撤，出金唔會製造假高峰。
+
+
+【參數一覽表（主要）】
+
+參數              | 預設值 | 說明
+-----------------|--------|------------------
+DDG_Enable       | true   | DDGuard 開關
+DDG_MaxDDPct     | 20.0   | 帳戶級回撤觸發 %
+DDG_SymMaxDDPct  | 12.0   | 單商品回撤觸發 %
+DDG_CloseOnHit   | true   | 觸發時全平
+DDG_StopAutoTrade| true   | 觸發時停 AT
+DDG_AccStopAT    | true   | 帳戶級觸發先停全局 AT
+DDG_SymStopAT    | false  | 單商品觸發唔停全局 AT
+DDG_CloseRetry   | 4      | 平倉重試次數（歸零為止）
+DDG_LockMinutes  | 60     | 鎖盤分鐘
+NG_Mode          | 1      | 0=OFF / 1=ALERT / 2=GUARD
+NG_BeforeMin     | 30     | 新聞前窗口（分）
+NG_AfterMin      | 15     | 新聞後窗口（分）
+SG_Enable        | true   | SymbolGuard 開關
+SG_DefaultMode   | 0      | 新 symbol 預設模式
+TG_Enable        | true   | Telegram 通知開關
+TG_ChatID        | 920593269 | 收件人 ID
+TG_TokenFile     | tg_token.txt | token 檔名
+TG_MinGapMin     | 10     | 同 key 最短重發間隔
+RecordSec        | 1      | 快照記錄間隔（秒）
+RefreshSec       | 10     | 面板刷新間隔（秒）
+SnapHours        | 72     | CSV 快照保留時數
+BackupTime       | 05:30  | 每日自動備份時間
+
+
+【版本資訊】
+
+MT4 v1.43 / MT5 v1.14（2026-10-17）
+編譯：0 errors, 0 warnings（雙平台）
+主要更新：8 項風控強化（T1-T8）+ POSITION 欄位修正
+  + 分桶 bug 修復 + 雙平台 .bin 持久化
+
+------------------------------------------------------------
+如有問題或功能建議，請聯繫 Alvin。
+------------------------------------------------------------
