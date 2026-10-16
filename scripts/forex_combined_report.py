@@ -424,6 +424,25 @@ h3 { font-size: 13px; color: #58a6ff; margin: 18px 0 8px 0; padding: 6px 10px;
 .ccy-val { font-size: 14px; font-weight: bold; margin-top: 1px; }
 .ccy-bar { height: 4px; border-radius: 2px; margin-top: 3px; }
 
+/* CCY Power TF Table */
+.ccy-power-tf { background: #161b22; border-radius: 8px; padding: 10px; margin-bottom: 14px; }
+.ccy-tf-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+.ccy-tf-table th, .ccy-tf-table td { padding: 3px 4px; text-align: center; border-bottom: 1px solid #21262d; }
+.ccy-tf-table th { color: #8b949e; font-weight: 600; }
+.ccy-tf-sum { font-size: 10px; color: #8b949e; margin-top: 6px; padding-left: 4px; }
+
+/* Pair Signal Summary Table */
+.pair-signal-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; background: #161b22; border-radius: 8px; }
+.pair-signal-table th, .pair-signal-table td { padding: 4px 5px; text-align: left; border-bottom: 1px solid #21262d; }
+.pair-signal-table th { color: #8b949e; font-weight: 600; background: #0d1117; }
+.pair-signal-table tr:hover { background: #1f2937; }
+.pst-sym { font-weight: 700; color: #e6edf3; }
+.pst-price { font-family: monospace; }
+.pst-dir-up { color: #3fb950; }
+.pst-dir-down { color: #f85149; }
+.pst-dir-neutral { color: #8b949e; }
+.pst-note { font-size: 10px; color: #8b949e; }
+
 /* Market Glance */
 .market-glance { background: #161b22; border-radius: 8px; padding: 10px; margin-bottom: 14px; }
 .mg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
@@ -434,9 +453,15 @@ h3 { font-size: 13px; color: #58a6ff; margin: 18px 0 8px 0; padding: 6px 10px;
 .mg-up { color: #3fb950; }
 .mg-down { color: #f85149; }
 
-/* Technical table */
-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-th { background: #161b22; color: #484f58; padding: 4px 2px; text-align: center;
+/* Top 5 Opportunities */
+.top5-card { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 10px; margin: 8px 0; }
+.top5-head { font-size: 13px; margin-bottom: 6px; color: #e6edf3; }
+.top5-row { display: flex; gap: 10px; font-size: 11px; padding: 2px 0; border-bottom: 1px solid #1e293b; }
+.top5-label { color: #8b949e; min-width: 65px; }
+
+/* All 29 pair signal table */
+.pair-signal-section { margin-bottom: 14px; }
+
      font-size: 9px; font-weight: bold; border-bottom: 1px solid #21262d; }
 td { padding: 3px 1px; text-align: center; border-bottom: 1px solid #161b22; }
 tr:nth-child(even) { background: rgba(255,255,255,0.02); }
@@ -517,21 +542,83 @@ tr:hover { background: #161b22; }
 """
 
 
+VALID_CCY = {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "XAU"}
+
+def load_ccy_power_tf(csv_path):
+    """Return dict {tf: {ccy: power}} for D1/H4/H1.
+    Filters out corrupted rows (e.g. BUY/SELL in ccy name fields from EA glitches).
+    Picks the last row with >= 6 valid currencies for each timeframe."""
+    tf_map = {"D1": {}, "H4": {}, "H1": {}}
+    try:
+        with open(csv_path, "r", encoding="utf-8") as f:
+            rd = csv.DictReader(f)
+            rows = list(rd)
+        for tf in ["D1", "H4", "H1"]:
+            tf_rows = [r for r in rows if (r.get("timeframe") or "").upper() == tf]
+            # Find last valid row: must have >= 6 currencies with valid names and power > 0
+            best_row = None
+            for r in reversed(tf_rows):
+                valid_count = 0
+                valid_data = {}
+                for i in range(1, 10):
+                    name = (r.get(f"ccy{i}_name", "") or "").strip().upper()
+                    power = pf(r.get(f"ccy{i}_power", 0))
+                    if name in VALID_CCY and power > 0:
+                        valid_count += 1
+                        valid_data[name] = power
+                if valid_count >= 6:
+                    best_row = valid_data
+                    break
+            if best_row:
+                tf_map[tf] = best_row
+            else:
+                # Fallback: use last row even if incomplete (old behavior)
+                if tf_rows:
+                    last = tf_rows[-1]
+                    for i in range(1, 10):
+                        name = (last.get(f"ccy{i}_name", "") or "").strip().upper()
+                        power = pf(last.get(f"ccy{i}_power", 0))
+                        if name in VALID_CCY and power > 0:
+                            tf_map[tf][name] = power
+    except Exception as e:
+        print(f"⚠️ ccy_power_reader.csv read failed: {e}", file=sys.stderr)
+    return tf_map
+
 def build_ccy_power_html(ccy_power):
     max_power = max(ccy_power.values()) if ccy_power else 10
     html = '<div class="ccy-power"><div class="ccy-grid">\n'
     for ccy in DISPLAY_CURRENCIES:
         val = ccy_power.get(ccy, 0)
         color = CCY_COLORS.get(ccy, "#666")
-        bar_w = int(val / max(max_power, 1) * 100) if max_power > 0 else 0
-        html += (
-            f'<a href="#group-{ccy}" class="ccy-item" style="background:{color}18">'
-            f'<div class="ccy-name" style="color:{color}">{ccy}</div>'
-            f'<div class="ccy-val" style="color:{color}">{val:.1f}</div>'
-            f'<div class="ccy-bar" style="background:{color};width:{bar_w}%"></div>'
-            f'</a>\n'
-        )
-    html += '</div>\n</div>\n'
+def build_ccy_power_tf_table_html(tf_map):
+    """Build D1/H4/H1 horizontal comparison table."""
+    html = '<div class="ccy-power-tf"><h3>💪 CCY Power 三時段排行</h3>\n'
+    html += '<table class="ccy-tf-table"><thead><tr><th>#</th>'
+    for tf in ["D1", "H4", "H1"]:
+        html += f'<th>{tf}</th><th>{tf}分</th>'
+    html += '</tr></thead><tbody>\n'
+    for i in range(9):
+        row = []
+        for tf in ["D1", "H4", "H1"]:
+            sorted_ccy = sorted(tf_map[tf].items(), key=lambda x: x[1], reverse=True)
+            if i < len(sorted_ccy):
+                ccy, val = sorted_ccy[i]
+                color = CCY_COLORS.get(ccy, "#666")
+                row.append(f'<td style="color:{color};font-weight:600">{ccy}</td><td>{val:.1f}</td>')
+            else:
+                row.append('<td>—</td><td>—</td>')
+        html += f'<tr><td>{i+1}</td>{"".join(row)}</tr>\n'
+    html += '</tbody></table>\n'
+    # summary line
+    for tf in ["D1", "H4", "H1"]:
+        sorted_ccy = sorted(tf_map[tf].items(), key=lambda x: x[1], reverse=True)
+        if sorted_ccy:
+            strongest, strongest_val = sorted_ccy[0]
+            weakest, weakest_val = sorted_ccy[-1]
+            sc = CCY_COLORS.get(strongest, "#666")
+            wc = CCY_COLORS.get(weakest, "#666")
+            html += f'<div class="ccy-tf-sum"><b>{tf}</b> 最強 <span style="color:{sc}">{strongest}</span>({strongest_val:.1f}) / 最弱 <span style="color:{wc}">{weakest}</span>({weakest_val:.1f})</div>\n'
+    html += '</div>\n'
     return html
 
 
@@ -579,7 +666,7 @@ def build_technical_table_html(symbol_data, pair_signals):
         html += f'<th>{ind}<br><span style="font-weight:normal;color:#30363d">D1|H4|H1</span></th>\n'
     html += '</tr>\n</thead>\n<tbody>\n'
 
-    sorted_pairs = sorted(symbol_data.keys())  # 按字母排列
+    sorted_pairs = sorted(symbol_data.keys(), key=lambda s: pair_signals.get(s, 0), reverse=True)  # 按分數由高至低
     for sym in sorted_pairs:
         html += f'<tr><td class="sym"><a href="#card-{sym}" style="color:inherit;text-decoration:none">{sym}</a></td>'
         net = pair_signals.get(sym, 0)
@@ -607,6 +694,122 @@ def build_technical_table_html(symbol_data, pair_signals):
         html += '</tr>\n'
 
     html += '</tbody>\n</table>\n'
+    return html
+
+
+def direction_arrow(score):
+    if score >= 1.5:
+        return ('↑', 'pst-dir-up')
+    elif score <= -1.5:
+        return ('↓', 'pst-dir-down')
+    else:
+        return ('—', 'pst-dir-neutral')
+
+def build_pair_signal_summary_table(symbol_data, pair_scores, tf_scores):
+    """Build 29-pair summary table with D1/H4/H1 directions + notes."""
+    html = '<div class="pair-signal-section"><h3>📋 配對信號總表（29 對）</h3>\n'
+    html += '<table class="pair-signal-table"><thead><tr>'
+    html += '<th>Pair</th><th>Price</th><th>D1</th><th>H4</th><th>H1</th><th>Score</th><th>Signal</th><th>備註</th>'
+    html += '</tr></thead><tbody>\n'
+    # sort by net score descending
+    sorted_pairs = sorted(pair_scores.items(), key=lambda x: x[1], reverse=True)
+    for sym, net in sorted_pairs:
+        close = 0.0
+        d1_row = symbol_data.get(sym, {}).get("D1", {})
+        h4_row = symbol_data.get(sym, {}).get("H4", {})
+        h1_row = symbol_data.get(sym, {}).get("H1", {})
+        if d1_row:
+            close = pf(d1_row.get("close", 0))
+        d1_s, d1_c = direction_arrow(tf_scores.get(sym, {}).get("D1", 0))
+        h4_s, h4_c = direction_arrow(tf_scores.get(sym, {}).get("H4", 0))
+        h1_s, h1_c = direction_arrow(tf_scores.get(sym, {}).get("H1", 0))
+        # Signal
+        if net >= 5:
+            sig = '<span style="color:#3fb950">🟢 偏多</span>'
+        elif net <= -5:
+            sig = '<span style="color:#f85149">🔴 偏空</span>'
+        else:
+            sig = '<span style="color:#8b949e">🟡 中性</span>'
+        # Note: resonance/divergence
+        notes = []
+        dirs = [d1_s, h4_s, h1_s]
+        if d1_s == h4_s == h1_s and d1_s != '—':
+            notes.append('共振')
+        elif (d1_s == '↑' and h1_s == '↓') or (d1_s == '↓' and h1_s == '↑'):
+            notes.append('背離')
+        note_str = ', '.join(notes) if notes else ''
+        price_str = f'{close:.5f}' if close > 0 else 'N/A'
+        html += (
+            f'<tr>'
+            f'<td class="pst-sym">{sym}</td>'
+            f'<td class="pst-price">{price_str}</td>'
+            f'<td class="{d1_c}">{d1_s}</td>'
+            f'<td class="{h4_c}">{h4_s}</td>'
+            f'<td class="{h1_c}">{h1_s}</td>'
+            f'<td>{net:+.0f}</td>'
+            f'<td>{sig}</td>'
+            f'<td class="pst-note">{note_str}</td>'
+            f'</tr>\n'
+        )
+    html += '</tbody></table></div>\n'
+    return html
+
+
+def build_top5_opportunities_html(symbol_data, pair_scores, tf_scores, tf_map, screenshot_info=None):
+    """Build Top 5 trading opportunities with full analysis."""
+    html = '<div class="top5-section"><h3>🎯 Top 5 交易機會</h3>\n'
+    # Get top 5 by net score
+    sorted_pairs = sorted(pair_scores.items(), key=lambda x: x[1], reverse=True)[:5]
+    for idx, (sym, net) in enumerate(sorted_pairs, 1):
+        d1_row = symbol_data.get(sym, {}).get("D1", {})
+        close = pf(d1_row.get("close", 0)) if d1_row else 0.0
+        atr = pf(d1_row.get("atr14", 0)) if d1_row else 0.0
+        # CCY Power direction
+        ccy1, ccy2 = sym[:3], sym[3:6]
+        d1_strong = sorted(tf_map["D1"].items(), key=lambda x: x[1], reverse=True)
+        d1_weak = sorted(tf_map["D1"].items(), key=lambda x: x[1])
+        ccy1_rank = next((i for i, (c, v) in enumerate(d1_strong) if c == ccy1), 9)
+        ccy2_rank = next((i for i, (c, v) in enumerate(d1_strong) if c == ccy2), 9)
+        ccy_dir = f"{ccy1}(#{ccy1_rank+1}) vs {ccy2}(#{ccy2_rank+1})"
+        # Signal
+        if net >= 5:
+            sig = '<span style="color:#3fb950">🟢 偏多</span>'
+        elif net <= -5:
+            sig = '<span style="color:#f85149">🔴 偏空</span>'
+        else:
+            sig = '<span style="color:#8b949e">🟡 中性</span>'
+        # S/R
+        if close and atr:
+            supp = close - atr * 1.5
+            res = close + atr * 1.5
+            sr_str = f"Support: {supp:.5f} | Resistance: {res:.5f}"
+        else:
+            sr_str = "Support/Resistance: N/A"
+        # Note
+        notes = []
+        dirs = [direction_arrow(tf_scores.get(sym, {}).get("D1", 0))[0],
+                direction_arrow(tf_scores.get(sym, {}).get("H4", 0))[0],
+                direction_arrow(tf_scores.get(sym, {}).get("H1", 0))[0]]
+        if dirs[0] == dirs[1] == dirs[2] and dirs[0] != '—':
+            notes.append('三時段共振')
+        elif (dirs[0] == '↑' and dirs[2] == '↓') or (dirs[0] == '↓' and dirs[2] == '↑'):
+            notes.append('長短線背離')
+        # Screenshot info (placeholder)
+        screenshot_note = screenshot_info.get(sym, "") if screenshot_info else ""
+        if screenshot_note:
+            notes.append(screenshot_note)
+        note_str = ' | '.join(notes) if notes else '—'
+        html += (
+            f'<div class="top5-card">'
+            f'<div class="top5-head"><b>{idx}. {sym}</b> {sig} <span style="color:#8b949e;font-size:11px">Score: {net:+.0f}</span></div>'
+            f'<div class="top5-row"><span class="top5-label">現價</span><span>{close:.5f}</span></div>'
+            f'<div class="top5-row"><span class="top5-label">CCY方向</span><span>{ccy_dir}</span></div>'
+            f'<div class="top5-row"><span class="top5-label">D1/H4/H1</span><span>{dirs[0]} / {dirs[1]} / {dirs[2]}</span></div>'
+            f'<div class="top5-row"><span class="top5-label">支撐阻力</span><span>{sr_str}</span></div>'
+            f'<div class="top5-row"><span class="top5-label">備註</span><span>{note_str}</span></div>'
+            f'</div>\n'
+        )
+    html += '</div>\n'
     return html
 
 
@@ -762,7 +965,7 @@ def build_verdict_html(pair_signals):
 
 # ─── 主函數 ──────────────────────────────────────────────────────────────────
 
-def generate_report(data, ccy_power, output_path):
+def generate_report(data, tf_map, output_path):
     # Index data by symbol -> timeframe
     symbol_data = defaultdict(dict)
     for row in data:
@@ -771,12 +974,14 @@ def generate_report(data, ccy_power, output_path):
         if sym and tf:
             symbol_data[sym][tf] = row
 
-    # Calculate pair signals
+    # Calculate pair signals (overall + per TF)
     pair_signals = {}
+    tf_pair_scores = {}
     for sym in ALL_PAIRS:
         if sym not in symbol_data:
             continue
         total_bull = total_bear = 0
+        tf_scores = {}
         for tf in TIMEFRAMES:
             if tf in symbol_data[sym]:
                 scores = score_one(symbol_data[sym][tf])
@@ -784,7 +989,17 @@ def generate_report(data, ccy_power, output_path):
                     sb, se = scores[ind]
                     total_bull += sb
                     total_bear += se
+                # Net TF score
+                tf_bull = tf_bear = 0
+                for ind in INDICATORS:
+                    sb, se = scores[ind]
+                    tf_bull += sb
+                    tf_bear += se
+                tf_scores[tf] = tf_bull - tf_bear
+            else:
+                tf_scores[tf] = 0
         pair_signals[sym] = total_bull - total_bear
+        tf_pair_scores[sym] = tf_scores
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M HKT")
 
@@ -808,9 +1023,13 @@ def generate_report(data, ccy_power, output_path):
 <h1>📊 外匯綜合分析報告</h1>
 <h2>Combined Forex Analysis | {now}</h2>
 
-{build_ccy_power_html(ccy_power)}
+{build_ccy_power_tf_table_html(tf_map)}
 
 {build_market_glance_html(symbol_data)}
+
+{build_pair_signal_summary_table(symbol_data, pair_signals, tf_pair_scores)}
+
+{build_top5_opportunities_html(symbol_data, pair_signals, tf_pair_scores, tf_map)}
 
 {build_technical_table_html(symbol_data, pair_signals)}
 
@@ -851,29 +1070,33 @@ def main():
         print("ERROR: No data rows found.", file=sys.stderr)
         sys.exit(1)
 
-    # Extract CCY power from first row
-    ccy_power = {}
-    for i in range(1, 10):
-        name = data[0].get(f"ccy_{i}_name", "")
-        power = pf(data[0].get(f"ccy_{i}_power", 0))
-        if name:
-            ccy_power[name] = power
+    # Extract CCY power: priority 1 = ccy_power_reader.csv (from CCYPowerReader EA)
+    # Priority 2 = forex_data.csv built-in columns
+    READER_CSV = (
+        "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/"
+        "A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/ccy_power_reader.csv"
+    )
+    tf_map = load_ccy_power_tf(READER_CSV)
+    if any(tf_map.values()):
+        counts = {tf: len(vals) for tf, vals in tf_map.items()}
+        print(f"ℹ️ CCY Power loaded from ccy_power_reader.csv: {counts}", file=sys.stderr)
 
-    # Fallback: if CSV CCY Power is all zeros, fetch from API
-    if not ccy_power or all(v == 0 for v in ccy_power.values()):
-        try:
-            import urllib.request, json as _json
-            req = urllib.request.Request("http://localhost:8788/api/ccy_power/current")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                api_data = _json.loads(resp.read())
-            if api_data.get("success") and api_data.get("data", {}).get("D1"):
-                ccy_power = {k: round(v, 2) for k, v in api_data["data"]["D1"].items() if k != "AVG"}
-                print(f"ℹ️ CCY Power loaded from API (:8788): {ccy_power}", file=sys.stderr)
-        except Exception as e:
-            print(f"⚠️ CCY Power API fallback failed: {e}", file=sys.stderr)
+    # Fallback: forex_data.csv built-in CCY columns (usually D1 only)
+    if not any(tf_map.values()):
+        ccy_power = {}
+        for i in range(1, 10):
+            name = data[0].get(f"ccy_{i}_name", "")
+            power = pf(data[0].get(f"ccy_{i}_power", 0))
+            if name:
+                ccy_power[name] = power
+        if ccy_power:
+            tf_map["D1"] = ccy_power
+            print(f"ℹ️ CCY Power loaded from forex_data.csv: {len(ccy_power)} CCYs", file=sys.stderr)
+        else:
+            print("⚠️ No CCY power data found", file=sys.stderr)
 
     output_path = args.output or f"/tmp/openclaw/forex_combined_{datetime.now().strftime('%Y%m%d_%H%M')}.html"
-    result = generate_report(data, ccy_power, output_path)
+    result = generate_report(data, tf_map, output_path)
 
     # Stats
     import os
