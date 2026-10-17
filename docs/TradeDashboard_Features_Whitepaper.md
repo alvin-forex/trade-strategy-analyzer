@@ -1,5 +1,6 @@
-# TradeDashboard 功能規格書（v1.43 MT4 / v1.14 MT5）
+# TradeDashboard 功能規格書（v1.43 統一版 · MT4 + MT5）
 > FF48 Alvin · 2026-10-17 · 白皮書 + 完整功能列表
+> **v1.43 統一制（2026-10-17）**：MT4 同 MT5 共用同一版本號 `1.43`，唔再分開 1.43/1.14。兩個平台功能對等（同一份 8 tasks + 分桶修復 + POSITION 欄位修正）。
 
 ## 一、產品定位
 MT4/MT5 圖表面板 EA：本地時序快照 + 四視圖統計 + 三層風控（NewsGuard / DDGuard / SymbolGuard），一個 panel 睇晒實倉狀態與歷史表現。
@@ -29,9 +30,14 @@ H=逐小時、D=日曆日、W=ISO週、M=月份；ReportStart 起算日過濾；
 **v1.43 分桶修復（cross-day merge guard）**：MT5 以 posId 合併 partial close 時，若同一 posId 相隔 > 48 小時，視為獨立交易（改用 deal ticket 做 key）— 根治「9月到10月全部交易堆埋最新一日」嘅歷史堆疊 bug。
 
 ### 2.4 NewsGuard（新聞守門）
-- 讀 news_guard.csv（每日 06:10 job 抓 ForexFactory 自動 push GitHub）
+- 讀 news_guard.csv（每日 06:10 job 自動抓＋push GitHub）
+- **雙來源（v1.43.1）**：主 FF（ForexFactory 週曆 JSON）＋副 TradingView 經濟日曆 API
+  - **Fallback**：任一源死（429/403/timeout）另一源單獨出檔，唔會空白
+  - **交叉驗證**：按「時間 ±20 分鐘 + 貨幣」配對；impact 唔一致會寫入 audit log，唔會靜靜地合併
+  - 兩源都在：FF 為權威（EA 校準基礎），TV-only 只補 HIGH 事件（避免 TV 分級唔同導致過度封鎖）
+  - Audit：`docs/admin/news_guard_audit.log`（matched / impact mismatch / only-in-FF / only-in-TV 清單）
 - 模式：OFF / ALERT（提示）/ GUARD（熱窗內擋新倉）
-- 熱窗 = 事件前 NG_BeforeMin(90) 至後 NG_AfterMin(120)
+- 熱窗 = 事件前 NG_BeforeMin(30) 至後 NG_AfterMin(15)
 - **時區（v1.43 T7 根治 DST）**：CSV 原時間即 **HKT（+8）**；熱窗判斷全部用 `TimeGMT()+8h`（`NG_NowHKT()`），不再依賴 `NG_ServerOffsetHours`（該參數只保留做顯示/fallback）。DST 切換自動正確，唔使再人手改 offset。
 - HIGH 影響事件過濾（NG_HighOnly）
 
@@ -66,8 +72,7 @@ SAVE profile 掣、input 指紋自動備份、週末/字體規範（內文 9pt�
 | **DDG_StopAutoTrade**（default ON） | DDGuard 觸發 | WM_COMMAND(33020/32851) 撳停 terminal AutoTrading 掣 → 成個 terminal 所有 EA 即停；**唔會自動重開**（v1.43 T3：人手按 Reset Peak 先恢復） |
 | **DDG_Popup**（default OFF） | DDGuard 觸發 | MessageBoxW 原生 Windows 彈窗（注意：彈窗會 block EA 直到撳OK，建議只喺人手睇盤時開） |
 
-### 2.10 Telegram 直推通知（v1.43 T5 強化）
-> wininet.dll HTTP POST → api.telegram.org（免白名單、免 WebRequest）；token 由 MQL# Files tg_token.txt 讀入（唔入 source，v1.43 加 CR/LF strip）
+### 2.10 Telegram 直推通知（v1.43 T5 強化）> wininet.dll HTTP POST → api.telegram.org（免白名單、免 WebRequest）；token 由 MQL# Files tg_token.txt 讀入（唔入 source，v1.43 加 CR/LF strip）
 
 | 事件 | 訊息內容 |
 |---|---|
@@ -119,7 +124,7 @@ MT4 ObjectsDeleteAll(0, prefix) 批次刪取代硬編碼清單 — tab 切換疊
 ### 3.7 已知限制
 - ring 深度 ~5.5h（可調 20,000 筆）
 - GV 4 週無存取會被 terminal 清（長假後 peak 或需重建）；bin 檔水合（T6）緩解
-- NewsGuard CSV 依賴每日 job + 人手落檔（WebRequest 自動化為未來項）
+- NewsGuard CSV 依賴每日 06:10 job（雙源 + fallback，2026-10-17 起）；EA 讀本地檔仍要人手落檔或 WebRequest 拉（自動化為未來項）
 - ShellExecuteW SAVE 掣需開 DLL 權限（VPS 合規環境或禁）
 
 ## 四、版本史
@@ -144,4 +149,4 @@ MT4 ObjectsDeleteAll(0, prefix) 批次刪取代硬編碼清單 — tab 切換疊
 | TD5 v1.11 | DLL：AlgoTrading 自動撳停（cmd 32851）+ 彈窗 |
 | TD5 v1.12 | 老闆設定 20%/12% |
 | TD5 v1.13 | TG 直推通知（MT5 版 wininet） |
-| **TD5 v1.14** | **MT5 port of v1.43（8 tasks + 分桶修復 + POSITION 欄位修正，0 errors / 0 warnings）** |
+| **v1.43（MT5）** | **MT5 port of v1.43（8 tasks + 分桶修復 + POSITION 欄位修正，0 errors / 0 warnings）— 2026-10-17 起版本號同 MT4 統一為 1.43** |
