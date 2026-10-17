@@ -5,8 +5,8 @@
 //|               NewsGuard / DDGuard / SymbolGuard, snap bin        |
 //+------------------------------------------------------------------+
 #property copyright "FF48 Alvin"
-#property version   "1.43"
-#property description "TradeDashboard v1.43 (MT5 build)"
+#property version   "1.44"
+#property description "TradeDashboard v1.44 (MT5 build)"
 
 #include <Trade/Trade.mqh>
 
@@ -27,6 +27,11 @@
 CTrade trade;
 
 //=== INPUTS ===
+//--- v1.44: Panel Label first; NewsGuard/DDGuard default OFF (enable when needed)
+input string ___LABEL___     = "=== Label ===";
+input string Title1          = "TradeDashboard";        // Line 1 (max 30 chars) - no version in panel
+input string Title2          = "Flying to the moon";    // Line 2 Subtitle
+
 input string ___SCALE___     = "=== Panel Scale ===";
 input int    Scale           = 1;
 input string ___VIEW___      = "=== Default View ===";
@@ -64,36 +69,36 @@ input bool   ShowBest        = true;
 input bool   ShowWorst       = true;
 input bool   ShowMaxDD       = true;    // Max drawdown $
 input bool   ShowMaxDDPct    = true;    // Max drawdown %
-input string ___LABEL___     = "=== Label ===";
-input string Title1          = "TradeDashboard v1.43"; // Line 1 (max 30 chars)
-input string Title2          = "Flying to the moon";     // Line 2 Subtitle
 input string ___CHART___     = "=== Chart ===";
 input bool   ChartEnable     = false;   // Show cumulative P&L chart
 input string ___NEWSGUARD___  = "=== NewsGuard ===";
-input int    NG_Mode          = 1;      // 0=OFF 1=ALERT 2=GUARD(close positions)
+input int    NG_Mode          = 0;      // 0=OFF(default) 1=ALERT 2=GUARD(close) - enable when needed
 input int    NG_BeforeMin     = 30;
 input int    NG_AfterMin      = 15;
 input bool   NG_HighOnly      = true;
 input string NG_NewsFile      = "news_guard.csv";
 input int    NG_ServerOffsetHours = -5;  // news CSV(HKT+8) -> broker server hours
+
 input string ___DDGUARD___    = "=== DD Guard ===";
-input bool   DDG_Enable       = true;
-input double DDG_MaxDDPct     = 20.0;   // v1.12: boss setting
+input bool   DDG_Enable       = false;  // default OFF - enable when needed
+input double DDG_MaxDDPct     = 20.0;   // account max drawdown % (peak-to-equity)
 input int    DDG_Scope        = 1;      // 0=per-symbol 1=whole account
 input string DDG_Symbols      = "";
-input double DDG_SymMaxDDPct  = 12.0;   // v1.12: boss setting
-input bool   DDG_CloseOnHit   = true;
-input int    DDG_LockMinutes  = 60;
-input bool   DDG_StopAutoTrade = true;   // v1.11: toggle terminal AlgoTrading button OFF on trigger (DLL)
+input double DDG_SymMaxDDPct  = 12.0;   // per-symbol max drawdown %
+input bool   DDG_CloseOnHit   = true;   // close positions on trigger
+input int    DDG_LockMinutes  = 60;     // lockout minutes after DD trigger (peak NOT lowered)
+input bool   DDG_StopAutoTrade = true;  // toggle terminal AutoTrading OFF on trigger (DLL)
 input bool   DDG_Popup        = false;
-input string ___DDG_V143___   = "=== DDGuard v1.43 ===";
-input bool   DDG_AccStopAT    = true;   // v1.14: account-level DD triggers stop global AT
-input bool   DDG_SymStopAT    = false;  // v1.14: per-symbol DD triggers stop global AT (default OFF)
-input int    DDG_CloseRetry   = 4;      // v1.14: close retry attempts before giving up
-input string TG_ChatID        = "920593269";   // v1.13: Telegram chat id
-input string TG_TokenFile     = "tg_token.txt"; // token file in MQL5\Files
+input bool   DDG_AccStopAT    = true;   // account-level DD stops global AutoTrading
+input bool   DDG_SymStopAT    = false;  // per-symbol DD stops global AutoTrading (default OFF)
+input int    DDG_CloseRetry   = 4;      // close retry attempts before giving up
+
+input string ___TELEGRAM___   = "=== Telegram ===";
+input string TG_ChatID        = "920593269";
+input string TG_TokenFile     = "tg_token.txt";
 input bool   TG_Enable       = true;
-input int    TG_MinGapMin    = 10;  // v1.11: native popup window on trigger     // lockout minutes after DD trigger (peak NOT lowered)
+input int    TG_MinGapMin    = 10;      // min minutes between notifications per key
+
 input string ___SYMGUARD___  = "=== Symbol Guard ===";
 input bool   SG_Enable       = true;    // Symbol Guard: monitor per-symbol trading
 input int    SG_DefaultMode  = 0;       // New symbol default: 0=ON 1=ALERT 2=CLOSE
@@ -326,7 +331,7 @@ int OnInit()
    CollectData();
    RenderOnly();
 
-   Print("=== TradeDashboard v1.43 (MT5) STARTED === Trades: ", t_tradeCount,
+   Print("=== TradeDashboard v1.44 (MT5) STARTED === Trades: ", t_tradeCount,
          " | Records: ", r_count,
          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
@@ -1816,7 +1821,7 @@ void RenderOnly()
    if(g_reportStart > 0)
       filterInfo += "  |  From: " + TimeToString(g_reportStart, TIME_DATE);
 
-   UpdTxt("FT", "v1.43  |  Updated: "+TimeToString(TimeCurrent(),TIME_DATE|TIME_SECONDS)+
+   UpdTxt("FT", "Updated: "+TimeToString(TimeCurrent(),TIME_DATE|TIME_SECONDS)+
       "  |  Refresh: "+IntegerToString(RefreshSec)+"s"+
       "  |  Rec: "+IntegerToString(RecordSec)+"s ("+IntegerToString(r_count)+" recs)"+
       "  |  Trades: "+IntegerToString(t_tradeCount)+filterInfo,

@@ -1,6 +1,6 @@
-# TradeDashboard 功能規格書（v1.43 統一版 · MT4 + MT5）
+# TradeDashboard 功能規格書（v1.44 統一版 · MT4 + MT5）
 > FF48 Alvin · 2026-10-17 · 白皮書 + 完整功能列表
-> **v1.43 統一制（2026-10-17）**：MT4 同 MT5 共用同一版本號 `1.43`，唔再分開 1.43/1.14。兩個平台功能對等（同一份 8 tasks + 分桶修復 + POSITION 欄位修正）。
+> **v1.44（2026-10-17）**：UI/參數整理版 — Label 參數移到最前、Title1 去除版本號、NewsGuard/DDGuard 預設關（有需要先開）、Telegram 參數獨立分組。功能對等，雙平台同一版本號。
 
 ## 一、產品定位
 MT4/MT5 圖表面板 EA：本地時序快照 + 四視圖統計 + 三層風控（NewsGuard / DDGuard / SymbolGuard），一個 panel 睇晒實倉狀態與歷史表現。
@@ -30,6 +30,7 @@ H=逐小時、D=日曆日、W=ISO週、M=月份；ReportStart 起算日過濾；
 **v1.43 分桶修復（cross-day merge guard）**：MT5 以 posId 合併 partial close 時，若同一 posId 相隔 > 48 小時，視為獨立交易（改用 deal ticket 做 key）— 根治「9月到10月全部交易堆埋最新一日」嘅歷史堆疊 bug。
 
 ### 2.4 NewsGuard（新聞守門）
+> **v1.44：預設 OFF（NG_Mode=0）**，有需要先開 — 1=ALERT（只提示）/ 2=GUARD（擋新倉+平倉）。
 - 讀 news_guard.csv（每日 06:10 job 自動抓＋push GitHub）
 - **雙來源（v1.43.1）**：主 FF（ForexFactory 週曆 JSON）＋副 TradingView 經濟日曆 API
   - **Fallback**：任一源死（429/403/timeout）另一源單獨出檔，唔會空白
@@ -42,6 +43,7 @@ H=逐小時、D=日曆日、W=ISO週、M=月份；ReportStart 起算日過濾；
 - HIGH 影響事件過濾（NG_HighOnly）
 
 ### 2.5 DDGuard（回撤保護，v1.43 大改）
+> **v1.44：預設 OFF（DDG_Enable=false）**，有需要先開；開啟後參數如下。
 - **帳戶級**：DD% = (Peak−Equity)/Peak，≥20%（`DDG_MaxDDPct`）全平 + 停 AutoTrading（`DDG_AccStopAT=true` 先停全局 AT）
 - **Symbol 級**：單一商品浮虧 ÷ 結餘 ≥12%（`DDG_SymMaxDDPct`）平該 symbol；`DDG_SymStopAT=false` 預設**唔鎖全局 AT**（只鎖該 symbol）
 - **T2 平倉重試歸零**：`DDG_CloseRetry=4` — 先刪 pending 再平倉，重試直至零殘留；殘留數 TG 緊急警告
@@ -73,6 +75,7 @@ SAVE profile 掣、input 指紋自動備份、週末/字體規範（內文 9pt�
 | **DDG_Popup**（default OFF） | DDGuard 觸發 | MessageBoxW 原生 Windows 彈窗（注意：彈窗會 block EA 直到撳OK，建議只喺人手睇盤時開） |
 
 ### 2.10 Telegram 直推通知（v1.43 T5 強化）> wininet.dll HTTP POST → api.telegram.org（免白名單、免 WebRequest）；token 由 MQL# Files tg_token.txt 讀入（唔入 source，v1.43 加 CR/LF strip）
+> **v1.44：TG 參數（TG_ChatID / TG_TokenFile / TG_Enable / TG_MinGapMin）獨立成「Telegram」分組**，同 DDGuard 分開。
 
 | 事件 | 訊息內容 |
 |---|---|
@@ -144,6 +147,7 @@ MT4 ObjectsDeleteAll(0, prefix) 批次刪取代硬編碼清單 — tab 切換疊
 | v1.41 | 老闆設定：全倉 20% / 單 symbol 12% 停 AT |
 | v1.42 | TG 直推通知（wininet，4 事件 template + 防轟炸 + token 檔案化） |
 | **v1.43** | **T1 DLL 前置攔截 + T2 平倉重試歸零 + T3 手動確認恢復（唔自動重開 AT）+ T4 帳戶/symbol 鎖拆分 + T5 TG timeout/JSON/token strip + T6 雙平台 .bin 持久化 + T7 NewsGuard HKT 根治 DST + T8 出入金 peak 校正；POSITION 欄位修正（已實現 MaxDD$/% 分家、PF 全勝 99.99、CSV 重複欄刪除）；分桶 cross-day merge guard** |
+| **v1.44** | **UI/參數整理：① Label 參數移到最前 ② Title1 去除版本號（面板淨寫 TradeDashboard）③ NewsGuard/DDGuard 預設關（有需要先開）④ Telegram 參數獨立分組；footer 移除版本字串；雙平台統一 1.44** |
 | TD5 v1.00 | MT5 骨架（核心保護 + 10 欄） |
 | TD5 v1.10 | MT5 全功能移植（✅ 已完成：2,190 行、21 欄齊、0 errors） |
 | TD5 v1.11 | DLL：AlgoTrading 自動撳停（cmd 32851）+ 彈窗 |
