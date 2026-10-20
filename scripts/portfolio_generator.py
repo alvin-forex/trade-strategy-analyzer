@@ -442,6 +442,9 @@ def generate_portfolio_html(portfolio_id: str, portfolio: dict, signals_data: Di
     lines.append('<table><thead><tr><th>Signal ID</th><th>EA</th><th>Trades</th><th>WR</th><th>PnL</th><th>Pips</th><th>PF</th><th>Max DD</th></tr></thead><tbody>')
     for s in signal_perfs:
         sig_id = s['signal_id']
+        # Depth contract: default output is docs/portfolios/ (one level under
+        # docs/) so '../reports/' resolves to docs/reports/ — correct as-is;
+        # recompute from output_dir if the default ever changes.
         sig_link = f'<a href="../reports/Signal_Deep_Analysis_{sig_id}.html" class="signal-link">{sig_id}</a>'
         ea = s.get('ea', 'UNK')
         ea_style = f'background:{EA_COLORS.get(ea, EA_COLORS["UNK"])[0]};color:{EA_COLORS.get(ea, EA_COLORS["UNK"])[1]}'
