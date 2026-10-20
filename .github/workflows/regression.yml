@@ -1,0 +1,31 @@
+name: regression
+
+# L17 測試金字塔 — CI 門禁(白皮書 v1.3 §8.2 Task C)
+# 紅燈 = 禁止 merge main。
+# 覆蓋:golden 回歸(91 信號 baseline)、CSV 漂移偵測、門檻一致性、L2 性質測試。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout(sparse:tests + downloads,根檔案自動包含)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tests
+            downloads
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Golden regression tests(引擎行為 vs 凍結 baseline)
+        run: node --test tests/golden.test.mjs
