@@ -2,25 +2,26 @@ name: regression
 
 # L17 測試金字塔 — CI 門禁(白皮書 v1.3 §8.2 Task C)
 # 紅燈 = 禁止 merge main。
-# 覆蓋:golden 回歸(91 信號 baseline)、CSV 漂移偵測、門檻一致性、L2 性質測試。
+# 覆蓋:golden 回歸(凍結 baseline) + L21 dead-link 門禁(P1-fast 介面快修)。
+#
+# v1.3.1 修復:
+#   - push 觸發原為 branches: ain](typo 致 main push 從未觸發 golden job),改為全 branch 觸發
+#   - 移除 sparse-checkout(引擎檔案 docs/martin_v4_engine.js 等不在 sparse 集內,golden 測試環境不完整)
+#   - 新增 link-check job:L21 站內死連結門禁(941 頁全掃,Pages 語義,2026-10-21)
 
 on:
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
 jobs:
   golden:
+    name: Golden baseline (engine regression)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout(sparse:tests + downloads,根檔案自動包含)
+      - name: Checkout(full — engine + tests + data 均在 repo)
         uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            tests
-            downloads
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
@@ -29,3 +30,19 @@ jobs:
 
       - name: Golden regression tests(引擎行為 vs 凍結 baseline)
         run: node --test tests/golden.test.mjs
+
+  link-check:
+    name: L21 dead-link gate (docs/ = Pages root)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Site-wide link check(941 頁 / 全站內連結)
+        run: python tests/link_check.py
