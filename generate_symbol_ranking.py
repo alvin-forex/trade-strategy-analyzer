@@ -444,6 +444,10 @@ def generate_symbol_table(sym, rankings):
         dim_info = (f"WR%={r['wr_pct']:.0f} PF%={r['pf_pct']:.0f} "
                     f"DD%={r['dd_pct']:.0f} Martin%={r['martin_pct']:.0f}")
 
+        # Depth contract: this page is written ONLY to output/ (repo root), so
+        # '../reports/' resolves to the root reports/ dir — correct as-is (local
+        # copy; not published to Pages, which serves main /docs). Recheck if an
+        # output_dir parameter is ever added.
         html += f'''<tr{row_class}>
 <td title="{dim_info}">{rank}</td>
 <td class="sig"><a href="https://signals.algoforest.com/signals/{r['signal_id']}" style="color:#64b5f6;font-weight:bold;text-decoration:none">{r['signal_id']}</a> <a href="../reports/index_{r['signal_id']}.html" style="text-decoration:none;font-size:14px" title="深度分析">📊</a> <a href="../reports/Signal_Deep_Analysis_{r['signal_id']}.html" style="text-decoration:none;font-size:14px" title="馬丁剖析法">🔍</a></td>
