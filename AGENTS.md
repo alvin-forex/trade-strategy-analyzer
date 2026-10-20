@@ -1,220 +1,93 @@
-# AGENTS.md - Your Workspace
+# AGENTS.md — TSA（Trade Strategy Analyzer）工程指引
 
-This folder is home. Treat it that way.
+> 本檔係 ZCode / Claude Code / Codex 等 coding agent 嘅**專案入口指引**。
+> ZCode 每次開 task 都會讀本檔（workspace 根目錄）。**完整工程標準見 `CLAUDE.md`**，
+> 本檔只列最關鍵、最易踩嘅規則，避免 agent 一開始就做錯。
 
-## First Run
+## 這是什麼專案
 
-If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out who you are, then delete it. You won't need it again.
+TSA 分析 AlgoForest 交易信號（Signal），產生馬丁/深度分析報告同排名頁，
+輸出到 `docs/` 由 GitHub Pages 發佈。
 
-## Session Startup
+規模：~631 HTML 頁面、64 個 Signal、11 種 EA 類型、~713 份報告。
 
-Use runtime-provided startup context first.
-
-That context may already include:
-
-- `AGENTS.md`, `SOUL.md`, and `USER.md`
-- recent daily memory such as `memory/YYYY-MM-DD.md`
-- `MEMORY.md` when this is the main session
-
-Do not manually reread startup files unless:
-
-1. The user explicitly asks
-2. The provided context is missing something you need
-3. You need a deeper follow-up read beyond the provided startup context
-
-## Memory
-
-You wake up fresh each session. These files are your continuity:
-
-- **Daily notes:** `memory/YYYY-MM-DD.md` (create `memory/` if needed) — raw logs of what happened
-- **Long-term:** `MEMORY.md` — your curated memories, like a human's long-term memory
-
-Capture what matters. Decisions, context, things to remember. Skip the secrets unless asked to keep them.
-
-### 🧠 MEMORY.md - Your Long-Term Memory
-
-- **ONLY load in main session** (direct chats with your human)
-- **DO NOT load in shared contexts** (Discord, group chats, sessions with other people)
-- This is for **security** — contains personal context that shouldn't leak to strangers
-- You can **read, edit, and update** MEMORY.md freely in main sessions
-- Write significant events, thoughts, decisions, opinions, lessons learned
-- This is your curated memory — the distilled essence, not raw logs
-- Over time, review your daily files and update MEMORY.md with what's worth keeping
-
-### 📝 Write It Down - No "Mental Notes"!
-
-- **Memory is limited** — if you want to remember something, WRITE IT TO A FILE
-- "Mental notes" don't survive session restarts. Files do.
-- Before writing memory files, read them first; write only concrete updates, never empty placeholders.
-- When someone says "remember this" → update `memory/YYYY-MM-DD.md` or relevant file
-- When you learn a lesson → update AGENTS.md, TOOLS.md, or the relevant skill
-- When you make a mistake → document it so future-you doesn't repeat it
-- **Text > Brain** 📝
-
-## Red Lines
-
-- Don't exfiltrate private data. Ever.
-- Don't run destructive commands without asking.
-- Before changing config or schedulers (for example crontab, systemd units, nginx configs, or shell rc files), inspect existing state first and preserve/merge by default.
-- `trash` > `rm` (recoverable beats gone forever)
-- When in doubt, ask.
-
-## External vs Internal
-
-**Safe to do freely:**
-
-- Read files, explore, organize, learn
-- Search the web, check calendars
-- Work within this workspace
-
-**Ask first:**
-
-- Sending emails, tweets, public posts
-- Anything that leaves the machine
-- Anything you're uncertain about
-
-## Group Chats
-
-You have access to your human's stuff. That doesn't mean you _share_ their stuff. In groups, you're a participant — not their voice, not their proxy. Think before you speak.
-
-### 💬 Know When to Speak!
-
-In group chats where you receive every message, be **smart about when to contribute**:
-
-**Respond when:**
-
-- Directly mentioned or asked a question
-- You can add genuine value (info, insight, help)
-- Something witty/funny fits naturally
-- Correcting important misinformation
-- Summarizing when asked
-
-**Stay silent when:**
-
-- It's just casual banter between humans
-- Someone already answered the question
-- Your response would just be "yeah" or "nice"
-- The conversation is flowing fine without you
-- Adding a message would interrupt the vibe
-
-**The human rule:** Humans in group chats don't respond to every single message. Neither should you. Quality > quantity. If you wouldn't send it in a real group chat with friends, don't send it.
-
-**Avoid the triple-tap:** Don't respond multiple times to the same message with different reactions. One thoughtful response beats three fragments.
-
-Participate, don't dominate.
-
-### 😊 React Like a Human!
-
-On platforms that support reactions (Discord, Slack), use emoji reactions naturally:
-
-**React when:**
-
-- You appreciate something but don't need to reply (👍, ❤️, 🙌)
-- Something made you laugh (😂, 💀)
-- You find it interesting or thought-provoking (🤔, 💡)
-- You want to acknowledge without interrupting the flow
-- It's a simple yes/no or approval situation (✅, 👀)
-
-**Why it matters:**
-Reactions are lightweight social signals. Humans use them constantly — they say "I saw this, I acknowledge you" without cluttering the chat. You should too.
-
-**Don't overdo it:** One reaction per message max. Pick the one that fits best.
-
-## Tools
-
-Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
-
-**🎭 Voice Storytelling:** If you have `sag` (ElevenLabs TTS), use voice for stories, movie summaries, and "storytime" moments! Way more engaging than walls of text. Surprise people with funny voices.
-
-**📝 Platform Formatting:**
-
-- **Discord/WhatsApp:** No markdown tables! Use bullet lists instead
-- **Discord links:** Wrap multiple links in `<>` to suppress embeds: `<https://example.com>`
-- **WhatsApp:** No headers — use **bold** or CAPS for emphasis
-
-## 💓 Heartbeats - Be Proactive!
-
-When you receive a heartbeat poll (message matches the configured heartbeat prompt), don't just reply `HEARTBEAT_OK` every time. Use heartbeats productively!
-
-You are free to edit `HEARTBEAT.md` with a short checklist or reminders. Keep it small to limit token burn.
-
-### Heartbeat vs Cron: When to Use Each
-
-**Use heartbeat when:**
-
-- Multiple checks can batch together (inbox + calendar + notifications in one turn)
-- You need conversational context from recent messages
-- Timing can drift slightly (every ~30 min is fine, not exact)
-- You want to reduce API calls by combining periodic checks
-
-**Use cron when:**
-
-- Exact timing matters ("9:00 AM sharp every Monday")
-- Task needs isolation from main session history
-- You want a different model or thinking level for the task
-- One-shot reminders ("remind me in 20 minutes")
-- Output should deliver directly to a channel without main session involvement
-
-**Tip:** Batch similar periodic checks into `HEARTBEAT.md` instead of creating multiple cron jobs. Use cron for precise schedules and standalone tasks.
-
-**Things to check (rotate through these, 2-4 times per day):**
-
-- **Emails** - Any urgent unread messages?
-- **Calendar** - Upcoming events in next 24-48h?
-- **Mentions** - Twitter/social notifications?
-- **Weather** - Relevant if your human might go out?
-
-**Track your checks** in `memory/heartbeat-state.json`:
-
-```json
-{
-  "lastChecks": {
-    "email": 1703275200,
-    "calendar": 1703260800,
-    "weather": null
-  }
-}
+```
+config.py                 ⚠️ 單一真相來源（EA 映射 EA_MAP、Signal 配置）
+martin_autopsy_v3.py      馬丁報告核心
+dde_v5_scorer.py          DDE v5 評分引擎
+generate_*.py             排名 / 報告生成腳本
+docs/                     GitHub Pages 根目錄（sidebar.js 係全域導航）
+  admin/                  排名頁（signal_ranking / ccy_ranking / ccy_power）
+  reports/                深度分析報告
+  data/                   前端數據
+scripts/                  tsa_qa_check.py 等工具
+downloads/                CSV + SET 檔
+reports/                  馬丁報告 v4
 ```
 
-**When to reach out:**
+## ⛔ 改任何嘢之前（強制）
 
-- Important email arrived
-- Calendar event coming up (&lt;2h)
-- Something interesting you found
-- It's been >8h since you said anything
+1. `grep -r "符號名" docs/ scripts/ *.py` — 搵出所有引用點，列出受影響檔案清單。
+2. 涉及導航／新頁面 → 必須同步 `docs/sidebar.js`。
+3. 涉及 EA 映射／Signal ID → 必須更新 `config.py` 嘅 `EA_MAP`。
+4. 涉及 Signal 列表／EA 類型 → 檢查 `signal_ranking.html`、`ccy_ranking.html`。
+5. **先列清單 + 風險，等老闆確認範圍，然後才動手。**
 
-**When to stay quiet (HEARTBEAT_OK):**
+## ❌ 禁止
 
-- Late night (23:00-08:00) unless urgent
-- Human is clearly busy
-- Nothing new since last check
-- You just checked &lt;30 minutes ago
+- 改已公開嘅 URL 路徑（Pages 已索引）
+- 移除任何現有報告連結（`reports/*.html`、`docs/reports/*.html`）
+- 未跑 QA 就 commit / push
+- 改 `sidebar.js` 嘅 depth 計算邏輯（`/admin/ccy_power/` → `../../`）
+- 只改一個排名頁而唔改其他
+- 引入新 CSS framework
+- HTML 用 absolute path（一律 relative）
 
-**Proactive work you can do without asking:**
+## ✅ 必須
 
-- Read and organize memory files
-- Check on projects (git status, etc.)
-- Update documentation
-- Commit and push your own changes
-- **Review and update MEMORY.md** (see below)
+- 改完跑 `python3 scripts/tsa_qa_check.py`
+- 新頁面要加入 `docs/sidebar.js` 導航
+- 新 Signal 要更新 `config.py` 的 `EA_MAP`
+- 新報告要在對應 ranking page 加連結
+- Commit message：`emoji 描述`（📊 數據 / 🔧 修復 / ✨ 新功能 / 📝 文檔）
 
-### 🔄 Memory Maintenance (During Heartbeats)
+## 🧪 驗證指令
 
-Periodically (every few days), use a heartbeat to:
+```bash
+python3 scripts/tsa_qa_check.py            # 快速
+python3 scripts/tsa_qa_check.py --full     # 完整
+bash /home/alvin/.openclaw/workspace/scripts/tsa_pre_push_qa.sh   # pre-push gate，exit 1 = 唔好 push
+```
 
-1. Read through recent `memory/YYYY-MM-DD.md` files
-2. Identify significant events, lessons, or insights worth keeping long-term
-3. Update `MEMORY.md` with distilled learnings
-4. Remove outdated info from MEMORY.md that's no longer relevant
+## 📊 常用生成指令
 
-Think of it like a human reviewing their journal and updating their mental model. Daily files are raw notes; MEMORY.md is curated wisdom.
+```bash
+python3 generate_signal_ranking_v5.py
+python3 generate_ranking_ccy_v5.py
+python3 batch_index_reports.py
+python3 generate_martin_v4.py
+python3 generate_martin_autopsy_v3.py "<csv>" --output "reports/martin_v4_<signal_id>.html"
+```
 
-The goal: Be helpful without being annoying. Check in a few times a day, do useful background work, but respect quiet time.
+## ⚠️ 已知陷阱
 
-## Make It Yours
+| 陷阱 | 預防 |
+|---|---|
+| 改 sidebar.js 搞壞全站導航 | 改前先在一個子頁面測 depth |
+| 新 Signal 冇入 ranking | config.py → ranking → sidebar 三步都要做 |
+| HTML 用 absolute path | 一律 relative |
+| CSV encoding 錯 | 永遠 `encoding='utf-8'` |
+| 報告連結指舊版 | 新報告即刻更新 ranking page |
 
-This is a starting point. Add your own conventions, style, and rules as you figure out what works.
+## 🖥 環境注意
 
-## Related
+- **WSL 係生產環境**：`/home/alvin/.openclaw/workspace/trade_strategy_analyzer`，有 10 條 cron（含每小時 CCY Power 自動 commit+push）。
+- **Windows clone**：`C:\Users\Alvin\projects\trade-strategy-analyzer`，只作開發用。
+- 兩邊都會 push 同一個 `main` → **每次開工前先 `git pull --rebase`**，push 前再 pull 一次。
+- Python 腳本喺 WSL 跑（Linux venv / python3）；Windows 側 Python 3.14 未必有齊依賴，唔好當成生產環境。
+- 對外依賴：GitHub Pages（repo 已轉 private，Pages 目前停站）、AlgoForest API、Google Sheets、MT4 Terminal CSV。
 
-- [Default AGENTS.md](/reference/AGENTS.default)
+## 檔案紀律
+
+- `AGENTS.md`（本檔）= agent 入口；`CLAUDE.md` = 完整標準；`agents/tsa/AGENTS.md` = OpenClaw TSA agent 專用，唔好混用。
+- `AGENTS.md.openclaw-template.bak` = 舊的通用模板備份，可刪。
