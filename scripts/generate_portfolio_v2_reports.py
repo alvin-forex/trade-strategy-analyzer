@@ -102,6 +102,8 @@ def render_signal_table(signals):
             continue
         sim = s.get("simulation") or {}
         score = s.get("opportunity_score", {})
+        # Depth contract: OUT_DIR is docs/portfolios/ (one level under docs/)
+        # so '../reports/' resolves to docs/reports/ — correct as-is.
         rows.append(f"""
 <tr>
 <td><a href="../reports/martin_v4_{escape(s['signal_id'])}.html">{escape(s['signal_id'])}</a></td>

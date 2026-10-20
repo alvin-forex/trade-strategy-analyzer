@@ -274,19 +274,26 @@ def get_ea_style(ea: str) -> str:
     return f'background:{bg};color:{fg}'
 
 
-def get_signal_link(signal_id: str) -> str:
-    """Generate link to Signal report if exists."""
-    import os
+def get_signal_link(signal_id: str, reports_prefix: str) -> str:
+    """Generate link to Signal report if exists.
+
+    reports_prefix: relative URL path from the OUTPUT page's directory up to
+    docs/reports/ (e.g. '../../reports'), computed by generate_html() from the
+    actual output location. Depth depends on where the page is written
+    (docs/reviews/ -> '../reports', docs/reviews/monthly/ -> '../../reports',
+    docs/admin/reviews/monthly/ -> '../../../reports') so it must never be
+    hardcoded. Existence check always uses the canonical docs/reports/ dir.
+    """
     base_path = Path(__file__).parent.parent  # workspace root
     reports_dir = base_path / 'docs' / 'reports'
     # Check Signal_Deep_Analysis first
     deep_path = reports_dir / f'Signal_Deep_Analysis_{signal_id}.html'
     if deep_path.exists():
-        return f'<a href="../reports/Signal_Deep_Analysis_{signal_id}.html" class="signal-link">{signal_id}</a>'
+        return f'<a href="{reports_prefix}/Signal_Deep_Analysis_{signal_id}.html" class="signal-link">{signal_id}</a>'
     # Check martin_v4 report
     martin_path = reports_dir / f'martin_v4_{signal_id}.html'
     if martin_path.exists():
-        return f'<a href="../reports/martin_v4_{signal_id}.html" class="signal-link">{signal_id}</a>'
+        return f'<a href="{reports_prefix}/martin_v4_{signal_id}.html" class="signal-link">{signal_id}</a>'
     # No report exists, return plain text
     return signal_id
 
@@ -295,19 +302,15 @@ def generate_html(report: dict, output_path: Path) -> None:
     """Generate HTML report with TSA style."""
     meta, overall = report['meta'], report['overall']
     
-    # Calculate sidebar path depth based on output location
-    # reviews/monthly/*.html -> ../../sidebar.js
-    # reviews/weekly/*.html -> ../../sidebar.js
-    # reviews/daily/*.html -> ../../sidebar.js
-    # reviews/index.html -> ../sidebar.js
-    rel_path = output_path.relative_to(Path(__file__).parent.parent / 'docs')
-    path_parts = rel_path.parts
-    if len(path_parts) > 1:
-        # In subdirectory: need to go up two levels (e.g., monthly -> reviews -> docs)
-        sidebar_depth = '../../'
-    else:
-        # In reviews/ root: need to go up one level
-        sidebar_depth = '../'
+    # Calculate link prefixes from the ACTUAL output location (any depth):
+    #   docs/reviews/index.html            -> reports_prefix='../reports'      sidebar_depth='../'
+    #   docs/reviews/monthly/x.html        -> reports_prefix='../../reports'   sidebar_depth='../../'
+    #   docs/admin/reviews/monthly/x.html  -> reports_prefix='../../../reports' sidebar_depth='../../../'
+    import os
+    docs_root = Path(__file__).parent.parent / 'docs'
+    out_dir = Path(output_path).resolve().parent
+    reports_prefix = os.path.relpath((docs_root / 'reports').resolve(), start=out_dir).replace(os.sep, '/')
+    sidebar_depth = os.path.relpath(docs_root.resolve(), start=out_dir).replace(os.sep, '/') + '/'
     
     # Build HTML using string concatenation
     lines = []
@@ -411,7 +414,7 @@ def generate_html(report: dict, output_path: Path) -> None:
     for item in report['signal_comparison']:
         pnl_cls = 'positive' if item['total_pnl'] >= 0 else 'negative'
         pf_s = f"{item['profit_factor']:.2f}" if isinstance(item['profit_factor'], float) else str(item['profit_factor'])
-        lines.append(f'<tr><td>{get_signal_link(str(item["signal_id"]))}</td><td><span class="ea-badge" style="{get_ea_style(item["ea"]) }">{item["ea"]}</span></td><td>{item["count"]:,}</td><td>{item["win_rate"]:.1f}%</td><td class="{pnl_cls}">${item["total_pnl"]:,.2f}</td><td>{item["total_pips"]:,.1f}</td><td>{pf_s}</td><td>{item.get("avg_hold_hours",0):.1f}h</td></tr>')
+        lines.append(f'<tr><td>{get_signal_link(str(item["signal_id"]), reports_prefix)}</td><td><span class="ea-badge" style="{get_ea_style(item["ea"]) }">{item["ea"]}</span></td><td>{item["count"]:,}</td><td>{item["win_rate"]:.1f}%</td><td class="{pnl_cls}">${item["total_pnl"]:,.2f}</td><td>{item["total_pips"]:,.1f}</td><td>{pf_s}</td><td>{item.get("avg_hold_hours",0):.1f}h</td></tr>')
     lines.append('</tbody></table></div></div>')
     
     # CCY with accordion
@@ -441,13 +444,13 @@ def generate_html(report: dict, output_path: Path) -> None:
                         d_pf = f"{ds['profit_factor']:.2f}" if isinstance(ds.get('profit_factor'), float) else str(ds.get('profit_factor', '-'))
                         if idx == 0:
                             # First row: include Signal, EA with rowspan
-                            lines.append(f'<tr><td rowspan="{n_dirs}">{get_signal_link(str(s["signal_id"]))}</td><td rowspan="{n_dirs}"><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td><td>{ds.get("total_pips",0):,.1f}</td><td>{d_pf}</td><td>{ds.get("avg_hold_hours",0):.1f}h</td></tr>')
+                            lines.append(f'<tr><td rowspan="{n_dirs}">{get_signal_link(str(s["signal_id"]), reports_prefix)}</td><td rowspan="{n_dirs}"><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td><td>{ds.get("total_pips",0):,.1f}</td><td>{d_pf}</td><td>{ds.get("avg_hold_hours",0):.1f}h</td></tr>')
                         else:
                             # Subsequent rows: skip Signal and EA columns
                             lines.append(f'<tr><td><span class="sub-dir {d_cls}">{d_label}</span></td><td>{ds["count"]:,}</td><td>{ds["win_rate"]:.1f}%</td><td class="{d_pnl_cls}">${ds["total_pnl"]:,.2f}</td><td>{ds.get("total_pips",0):,.1f}</td><td>{d_pf}</td><td>{ds.get("avg_hold_hours",0):.1f}h</td></tr>')
                 else:
                     s_pf = f"{s['profit_factor']:.2f}" if isinstance(s.get('profit_factor'), float) else str(s.get('profit_factor', '-'))
-                    lines.append(f'<tr><td>{get_signal_link(str(s["signal_id"]))}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>-</td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td><td>{s.get("avg_hold_hours",0):.1f}h</td></tr>')
+                    lines.append(f'<tr><td>{get_signal_link(str(s["signal_id"]), reports_prefix)}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>-</td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td><td>{s.get("avg_hold_hours",0):.1f}h</td></tr>')
             lines.append('</tbody></table></td></tr>')
     lines.append('</tbody></table></div></div>')
     
@@ -476,10 +479,10 @@ def generate_html(report: dict, output_path: Path) -> None:
                     if i == 0:
                         # First row: CCY with rowspan
                         rowspan_attr = f' rowspan="{n_sigs}"' if n_sigs > 1 else ''
-                        lines.append(f'<tr><td{rowspan_attr}>{c["ccy"]}</td><td>{get_signal_link(str(s["signal_id"]))}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td><td>{s.get("avg_hold_hours",0):.1f}h</td></tr>')
+                        lines.append(f'<tr><td{rowspan_attr}>{c["ccy"]}</td><td>{get_signal_link(str(s["signal_id"]), reports_prefix)}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td><td>{s.get("avg_hold_hours",0):.1f}h</td></tr>')
                     else:
                         # Subsequent rows: no CCY cell (covered by rowspan)
-                        lines.append(f'<tr><td>{get_signal_link(str(s["signal_id"]))}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td><td>{s.get("avg_hold_hours",0):.1f}h</td></tr>')
+                        lines.append(f'<tr><td>{get_signal_link(str(s["signal_id"]), reports_prefix)}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td><td>{s.get("avg_hold_hours",0):.1f}h</td></tr>')
                 if not sig_rows:
                     ccy_pnl_cls = 'positive' if c['total_pnl'] >= 0 else 'negative'
                     ccy_pf = f"{c['profit_factor']:.2f}" if isinstance(c.get('profit_factor'), float) else str(c.get('profit_factor', '-'))
@@ -508,7 +511,7 @@ def generate_html(report: dict, output_path: Path) -> None:
                 ea_style = get_ea_style(ea)
                 s_pnl_cls = 'positive' if s['total_pnl'] >= 0 else 'negative'
                 s_pf = f"{s['profit_factor']:.2f}" if isinstance(s.get('profit_factor'), float) else str(s.get('profit_factor', '-'))
-                lines.append(f'<tr><td>{get_signal_link(str(s["signal_id"]))}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td><td>{s.get("avg_hold_hours",0):.1f}h</td></tr>')
+                lines.append(f'<tr><td>{get_signal_link(str(s["signal_id"]), reports_prefix)}</td><td><span class="ea-badge-sm" style="{ea_style}">{ea}</span></td><td>{s["count"]:,}</td><td>{s["win_rate"]:.1f}%</td><td class="{s_pnl_cls}">${s["total_pnl"]:,.2f}</td><td>{s.get("total_pips",0):,.1f}</td><td>{s_pf}</td><td>{s.get("avg_hold_hours",0):.1f}h</td></tr>')
             lines.append('</tbody></table></td></tr>')
     lines.append('</tbody></table></div></div>')
     

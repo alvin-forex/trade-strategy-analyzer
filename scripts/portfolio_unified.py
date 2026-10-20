@@ -381,7 +381,16 @@ def calculate_tpsl(stats: dict, capital: float, risk_pct: float, signal_id: str)
 
 # ── 8. HTML Generator ──────────────────────────────────────
 def generate_unified_html(pdef: dict, signal_analyses: list[dict], portfolio_sim: dict,
-                          correlations: list[dict], tpsl_list: list[dict]) -> str:
+                          correlations: list[dict], tpsl_list: list[dict],
+                          reports_prefix: str = "../reports") -> str:
+    """Build one portfolio page.
+
+    reports_prefix: relative URL path from the OUTPUT page's directory up to
+    docs/reports/. Depth depends on --output-dir (default docs/admin/portfolios
+    sits two levels under docs/ and needs '../../reports'; docs/portfolios
+    needs '../reports'), so it is computed in generate_one() from out_dir —
+    never hardcode it here (L21 dead-link resurrection guard).
+    """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     pid = pdef["id"]
     signals = pdef["signals"]
@@ -457,8 +466,8 @@ ul{margin-left:18px;margin-top:6px}li{margin:3px 0}
         s = sa["stats"]
         sid = sa["signal_id"]
         top_ccy_str = ", ".join(f"{c}" for c, _ in s["top_ccy"][:2])
-        deep_link = f'<a class="signal-link" href="../reports/Signal_Deep_Analysis_{sid}.html">{sid}</a>'
-        martin_link = f'<a class="signal-link" href="../reports/martin_v4_{sid}.html">🔍</a>'
+        deep_link = f'<a class="signal-link" href="{reports_prefix}/Signal_Deep_Analysis_{sid}.html">{sid}</a>'
+        martin_link = f'<a class="signal-link" href="{reports_prefix}/martin_v4_{sid}.html">🔍</a>'
         pnl_cls = "positive" if s["total_pnl"] >= 0 else "negative"
         dd_cls = "negative" if s["max_dd"] > 5000 else "warning" if s["max_dd"] > 1000 else ""
         h.append(f'<tr><td>{deep_link} {martin_link}</td><td><span class="ea-badge" style="background:#1f3a5f;color:#58a6ff">DW</span></td><td>{top_ccy_str}</td><td>{s["win_rate"]}%</td><td>{s["count"]:,}</td><td>{s["profit_factor"]}</td><td class="{pnl_cls}">${s["total_pnl"]:,.0f}</td><td class="{dd_cls}">${s["max_dd"]:,.0f}</td><td>{s["avg_hold_hours"]:.0f}h</td></tr>')
@@ -744,7 +753,13 @@ def generate_one(pdef, csv_dir, out_dir):
         tpsl_list.append(tpsl)
 
     # Generate HTML
-    html = generate_unified_html(pdef, signal_analyses, portfolio_sim, correlations, tpsl_list)
+    # Compute the reports link prefix from the ACTUAL output dir (any depth):
+    # default --output-dir is docs/admin/portfolios (two levels under docs/)
+    # -> '../../reports'; docs/portfolios would be '../reports'.
+    docs_reports = (Path(__file__).parent.parent / "docs" / "reports").resolve()
+    reports_prefix = os.path.relpath(docs_reports, start=Path(out_dir).resolve()).replace(os.sep, "/")
+    html = generate_unified_html(pdef, signal_analyses, portfolio_sim, correlations, tpsl_list,
+                                 reports_prefix=reports_prefix)
 
     # Write output
     out_path = out_dir / f"portfolio_{pdef['id']}.html"

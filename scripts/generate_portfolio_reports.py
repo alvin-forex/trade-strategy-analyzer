@@ -462,6 +462,8 @@ def generate_html_report(portfolio_id, config, signal_analyses, total_profit, to
 """
     
     for signal in signal_analyses:
+        # Depth contract: OUTPUT_DIR is docs/portfolios/ (one level under docs/)
+        # so '../reports/' resolves to docs/reports/ — correct as-is.
         direction_class = 'buy' if signal['primary_direction'] == 'buy' else 'sell'
         html += f"""                    <tr>
                         <td><a href="../reports/Signal_Deep_Analysis_{signal['signal_id']}.html" class="signal-link">{signal['signal_id']}</a></td>
