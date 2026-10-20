@@ -76,13 +76,18 @@ def get_dd_class(dd_value: float) -> str:
     else: return 'dd-r'
 
 
-def generate_html(all_results: List[Dict[str, Any]]) -> str:
+def generate_html(all_results: List[Dict[str, Any]], link_prefix: str = '../reports/', sidebar_prefix: str = '../') -> str:
     """Generate Signal Ranking HTML (v5).
 
     Aggregates per-Signal: average v5 score across all CCY pairs.
 
     Args:
         all_results: List of scoring result dicts from dde_v5_scorer.
+        link_prefix: Relative prefix for report links; must match the deploy
+            location: 'reports/' at docs/ root (GitHub Pages), '../../reports/'
+            under docs/admin/, '../reports/' for local output/ copies.
+        sidebar_prefix: Relative prefix for sidebar.css/sidebar.js ('' at docs/
+            root, '../../' under docs/admin/, '../' for local output/ copies).
 
     Returns:
         Complete HTML string.
@@ -180,8 +185,8 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
             clean_icon: str = '✅' if s['clean_pct'] >= 80 else ('⚠️' if s['clean_pct'] >= 50 else '🚫')
 
             # Check which report files actually exist before generating links
-            deep_link: str = f"../reports/index_{s['signal_id']}.html"
-            martin_link: str = f"../reports/martin_v4_{s['signal_id']}.html"
+            deep_link: str = f"{link_prefix}index_{s['signal_id']}.html"
+            martin_link: str = f"{link_prefix}martin_v4_{s['signal_id']}.html"
             _deep_exists: bool = any(
                 (p / f"index_{s['signal_id']}.html").exists()
                 for p in (OUTPUT_DIR, BASE_DIR / "reports", DOCS_DIR / "reports")
@@ -191,7 +196,13 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
                 for p in (OUTPUT_DIR, BASE_DIR / "reports", DOCS_DIR / "reports")
             )
 
-            row_links: str = f'<a href="https://signals.algoforest.com/signals/{s["signal_id"]}">{s["signal_id"]}</a>'
+            # L21 fix: prefer the in-site report (algoforest sends
+            # X-Frame-Options: DENY — its pages break inside iframes);
+            # fall back to opening the external signal page in a new tab.
+            if _deep_exists:
+                row_links: str = f'<a href="{link_prefix}index_{s["signal_id"]}.html">{s["signal_id"]}</a>'
+            else:
+                row_links: str = f'<a href="https://signals.algoforest.com/signals/{s["signal_id"]}" target="_blank" rel="noopener">{s["signal_id"]}</a>'
             if _martin_exists:
                 row_links += f' <a href="{martin_link}">📊</a>'
             if _deep_exists:
@@ -278,7 +289,7 @@ input[type=text]::placeholder{{color:#555}}
 label{{color:var(--text2);font-size:0.9em;margin-left:12px}}
 @media(max-width:768px){{body{{font-size:11px}}th,td{{padding:3px 5px}}}}
 </style>
-<link rel="stylesheet" href="../sidebar.css">
+<link rel="stylesheet" href="{sidebar_prefix}sidebar.css">
 <script>
 (function(){{
   const saved=localStorage.getItem('tsa-theme');
@@ -360,7 +371,7 @@ document.querySelectorAll('table[id^="tbl"]').forEach(function(table) {{
   }});
 }});
 </script>
-<script src="../sidebar.js"></script>
+<script src="{sidebar_prefix}sidebar.js"></script>
 </body></html>'''
 
     return html
@@ -380,29 +391,33 @@ def main() -> None:
         return
 
     # Generate HTML
-    html: str = generate_html(all_results)
-
-    # Write outputs
+    # Legacy local copy under output/ (repo-root ../reports/ still applies there)
+    html_local: str = generate_html(all_results)
     output_path: Path = OUTPUT_DIR / 'signal_ranking_dde_v5.html'
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(html)
+        f.write(html_local)
 
-    # Also write to docs/ for GitHub Pages
+    # GitHub Pages (docs/ root): site-relative links, L21-safe
+    html_docs: str = generate_html(all_results, link_prefix='reports/', sidebar_prefix='')
     DOCS_DIR.mkdir(exist_ok=True)
     docs_path: Path = DOCS_DIR / 'signal_ranking_dde_v5.html'
     with open(docs_path, 'w', encoding='utf-8') as f:
-        f.write(html)
+        f.write(html_docs)
 
-    # Also create signal_ranking.html (main alias)
+    # Also create signal_ranking.html (main alias, docs/ root too)
     docs_alias: Path = DOCS_DIR / 'signal_ranking.html'
     with open(docs_alias, 'w', encoding='utf-8') as f:
-        f.write(html)
+        f.write(html_docs)
 
-    # Also write to docs/admin/ for sidebar navigation (primary page)
+    # admin/ copy sits two levels deeper — needs its own prefixes.
+    # NOTE: if this page is password-protected via StatiCrypt, the encryption
+    # step must run AFTER this write; writing plaintext here replaces the
+    # encrypted page. Coordinate with the OpenClaw pipeline before regenerating.
+    html_admin: str = generate_html(all_results, link_prefix='../../reports/', sidebar_prefix='../../')
     admin_path: Path = DOCS_DIR / 'admin' / 'signal_ranking.html'
     admin_path.parent.mkdir(parents=True, exist_ok=True)
     with open(admin_path, 'w', encoding='utf-8') as f:
-        f.write(html)
+        f.write(html_admin)
 
     # Copy index_*.html deep-analysis reports to reports/ so relative links resolve
     import shutil
