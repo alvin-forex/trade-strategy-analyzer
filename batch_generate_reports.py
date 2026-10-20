@@ -66,13 +66,13 @@ with sync_playwright() as p:
     pg.locator("#analyzeBtn").click()
     for i in range(120):
         time.sleep(5)
-        if pg.evaluate("""() => document.getElementById("results").innerHTML.trim() !== """""):
+        if pg.evaluate("""() => document.getElementById("results").innerHTML.trim() !== ''"""):
             break
     time.sleep(3)
     r = pg.evaluate("""() => {{
         const s = document.querySelector("style").textContent;
         const r = document.getElementById("results");
-        return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1\\"><title>Trade Strategy Analysis Report</title><style>"+s+"</style></head><body style=\\"max-width:900px;margin:0 auto;padding:20px;font-family:sans-serif\\">"+r.innerHTML+"</body></html>";
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Trade Strategy Analysis Report</title><style>'+s+'</style></head><body style="max-width:900px;margin:0 auto;padding:20px;font-family:sans-serif">'+r.innerHTML+'</body></html>';
     }}""")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
