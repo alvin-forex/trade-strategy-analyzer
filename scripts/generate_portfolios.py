@@ -307,6 +307,9 @@ def generate_portfolio_html(pid, config, signals):
             direction = '<span style="color:#8b949e">◆ 雙向</span>'
 
         # Signal link
+        # Depth contract: page lands in docs/portfolios/ (one level under docs/)
+        # so '../reports/' correctly resolves to docs/reports/ — do NOT change
+        # to '../../reports/'. If OUTPUT_DIR moves deeper, recompute instead.
         if s["has_report"]:
             sig_link = f'<a href="../reports/Signal_Deep_Analysis_{s["signal_id"]}.html" class="signal-link">{s["signal_id"]}</a>'
         else:

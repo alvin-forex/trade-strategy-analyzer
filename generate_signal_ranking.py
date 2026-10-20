@@ -387,15 +387,20 @@ tr.top3{{background:rgba(255,215,0,0.03)}}
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html)
     
-    # Also write to docs/ for GitHub Pages
+    # Also write to docs/ for GitHub Pages.
+    # Link depth contract: '../reports/' only resolves for the local output/ copy
+    # at repo root (-> root reports/). Pages under docs/ sit next to docs/reports/,
+    # so their prefix must be 'reports/'. Rewrite the two report hrefs accordingly
+    # (the only occurrences of '../reports/' in the HTML are the report/martin links).
+    html_docs = html.replace('href="../reports/', 'href="reports/')
     docs_path = BASE_DIR / 'docs' / 'signal_ranking_dde_v4.html'
     with open(docs_path, 'w', encoding='utf-8') as f:
-        f.write(html)
+        f.write(html_docs)
     
     # Also create signal_ranking.html (alias)
     docs_alias = BASE_DIR / 'docs' / 'signal_ranking.html'
     with open(docs_alias, 'w', encoding='utf-8') as f:
-        f.write(html)
+        f.write(html_docs)
     
     print(f"\n✅ Generated: {output_path}")
     print(f"   Size: {len(html):,} bytes")

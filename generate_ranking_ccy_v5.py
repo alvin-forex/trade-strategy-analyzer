@@ -78,11 +78,17 @@ def fmt_pips(val: float) -> str:
         return f'{val:.1f}'
 
 
-def generate_html(all_results: List[Dict[str, Any]]) -> str:
+def generate_html(all_results: List[Dict[str, Any]], link_prefix: str = '../reports') -> str:
     """Generate the full ranking_ccy.html with v5 data + BUY/SELL grouping.
 
     Args:
         all_results: List of scoring result dicts (now includes 'type' field).
+        link_prefix: relative URL path from the OUTPUT page's directory up to
+            the martin v4 reports dir. Depth depends on the output location:
+            output/, reports/ (repo root copies) -> '../reports'
+            docs/admin/                          -> '../../reports'
+            Never hardcode '../reports/' inside the row builder — it breaks
+            when the same HTML is written to directories at different depths.
 
     Returns:
         Complete HTML string.
@@ -181,7 +187,7 @@ def generate_html(all_results: List[Dict[str, Any]]) -> str:
         martin_pct: str = f'{r["martin_pct"]:.0f}'
 
         # Signal链接：AlgoForest + 🔍 马丁报告 (V4)
-        martin_link: str = f"../reports/martin_v4_{r['signal_id']}.html"
+        martin_link: str = f"{link_prefix}/martin_v4_{r['signal_id']}.html"
         signal_cell: str = f'<td><a href="https://signals.algoforest.com/signals/{r["signal_id"]}">{r["signal_id"]}</a> <a href="{martin_link}" title="馬丁剖析 V4">🔍</a></td>'
 
         # Type 标签 (BUY/SELL)
@@ -467,18 +473,21 @@ def main() -> None:
         print("❌ No data available")
         return
 
-    html: str = generate_html(all_results)
+    # Repo-root copies (output/, reports/) keep the '../reports' prefix;
+    # the docs/admin/ copy sits one level deeper and needs '../../reports'.
+    html_root: str = generate_html(all_results, link_prefix='../reports')
+    html_admin: str = generate_html(all_results, link_prefix='../../reports')
 
     # Write to output/, reports/, and docs/
-    for out_dir in [OUTPUT_DIR, REPORTS_DIR, DOCS_DIR / 'admin']:
+    for out_dir, page in [(OUTPUT_DIR, html_root), (REPORTS_DIR, html_root), (DOCS_DIR / 'admin', html_admin)]:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / 'ccy_ranking.html'
         with open(out_path, 'w', encoding='utf-8') as f:
-            f.write(html)
+            f.write(page)
         print(f"✅ Written: {out_path}")
 
     print(f"   Total rows: {len(all_results)}")
-    print(f"   Size: {len(html):,} bytes")
+    print(f"   Size: {len(html_root):,} bytes")
 
 
 if __name__ == '__main__':
