@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# L22b pre-push gate (check-only): block plaintext of the 15 StatiCrypt core
+# pages from leaving this machine. Runs the same audit as CI
+# (tests/encryption_check.py) against HEAD — if any core page is plaintext,
+# the push is aborted before it ever reaches GitHub.
+#
+# Install (per clone; .git/hooks/ is not version-controlled):
+#   cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#
+# WHY CHECK-ONLY: at pre-push time the commits are already formed, so running
+# the encrypt script here would only dirty the working tree — the push would
+# still carry plaintext. Encryption must happen BEFORE commit (via
+# scripts/encrypt_admin_pages.sh); this hook is the last-line BLOCK, and the
+# CI gate (tests/encryption_check.py) is the backstop on main.
+set -u
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# Clones older than the L22 gate: don't block, just pass through.
+[ -f tests/encryption_check.py ] || exit 0
+
+python3 tests/encryption_check.py
