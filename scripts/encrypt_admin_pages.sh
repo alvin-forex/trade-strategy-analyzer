@@ -31,6 +31,11 @@ PAGES=(
   "docs/admin/volatility.html"
   "docs/index.html"
   "docs/signal_ranking.html"
+  # L22b (老闆裁決 2026-10-21「統一其他就好」): the 98-signal DDE v5 page joins
+  # the encrypted set. Gate list (tests/encryption_check.py) flips 14→15 only
+  # AFTER the encrypted copy of this page is committed — keeps CI green in
+  # between.
+  "docs/signal_ranking_dde_v5.html"
 )
 
 if [ ! -f "$PW_FILE" ]; then
