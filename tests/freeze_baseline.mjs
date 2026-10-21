@@ -5,8 +5,9 @@
  * 規則(白皮書裁定):
  *  - baseline 凍結必須先於一切引擎公式改動(L15 修復、danger 重構)
  *  - 快照 metadata 必須含 git_commit / engine_sha256 / frozen_at / thresholds
- *  - 現行門檻為百分制殘留(L15),此快照標記 pre-fix,Task D 修復後以
- *    受控流程(freeze --update + 人工審 diff 摘要)產生 post-fix baseline
+ *  - v1.3 快照標記 pre-fix;Task D 修復(方案 (b),2026-10-21 裁決修訂)後以
+ *    受控流程(重跑本腳本 + 人工審 diff 摘要)產生 post-fix baseline,
+ *    修復前版本保留於 baseline.pre-L15-fix.json 對照
  *
  * 用法:
  *   node tests/freeze_baseline.mjs                 # 用已凍結 inputs 重跑
@@ -37,9 +38,9 @@ const INPUTS_JSON = path.join(INPUTS_DIR, 'signals_input.json');
 const BASELINE_JSON = path.join(BASELINE_DIR, 'baseline.json');
 const DIST_JSON = path.join(BASELINE_DIR, 'rating_distribution.json');
 
-// 現行(未修復)門檻 — 與 martin_v4_engine.js computeRating 一致,凍結時點標記
+// 現行門檻表(方案 (b) 下不變 — 正規化後套用,與 martin_v4_engine.js computeRating 一致)
 const CURRENT_THRESHOLDS = { 'S+': 85, S: 70, A: 55, B: 40, C: 25, D: 15, E: 0 };
-const THRESHOLDS_STATE = 'pre-L15-fix (85/70/55/40/25/15, score cap 70 — known defect L15)';
+const THRESHOLDS_STATE = 'post-L15-fix plan-b (rating/danger on normalized Math.round(score*100/70); thresholds 85/70/55/40/25/15 unchanged; danger base 100-normalized; ruled 2026-10-21, supersedes v1.3 plan-a)';
 
 function sha256(buf) { return createHash('sha256').update(buf).digest('hex'); }
 
@@ -54,11 +55,10 @@ function csvPathFor(id) {
 
 function r2(v) { return Math.round(v * 100) / 100; }
 
-// ── 現行 danger 公式快照(與引擎 computeBlacklist 一致,含 (100-score) 缺陷) ──
+// ── danger 公式快照(與引擎 computeBlacklist 一致,L15 方案 (b):基準 (100−normalized)) ──
 function dangerCurrent(s) {
-    const score = eng.computeScore(s);
     const lossPart = s.total_pnl > 0 ? 0 : Math.abs(s.total_pnl) / 10;
-    return r2((100 - score) + lossPart);
+    return r2((100 - eng.normalizeScore(s)) + lossPart);
 }
 
 function snapshotSignal(id) {
@@ -173,13 +173,14 @@ function main() {
         engine_version: 'Martin Autopsy V4.1 (as in source header)',
         thresholds: CURRENT_THRESHOLDS,
         thresholds_state: THRESHOLDS_STATE,
+        rating_normalization: 'Math.round(score * 100 / 70) — plan (b), ruled 2026-10-21',
         input_ref: 'tests/inputs/signals_input.json',
         signals_frozen: okCount,
         signals_skipped_no_csv: skipCount,
         notes: [
-            'Step 0 快照 — 凍結於任何 L15/danger 修復之前。',
-            'danger_current 含已知 (100-score) 百分制殘留缺陷(L15 同源),按現行公式原樣凍結。',
-            'Task D 修復後必須以受控流程更新本檔案,並人工審閱 diff 摘要(白皮書 v1.3 §8.2)。',
+            'L15 修復後受控重凍(post-fix)— 白皮書方案 (b),2026-10-21 用戶裁決修訂(廢 v1.3 方案 (a))。',
+            'rating/danger 以 normalized = Math.round(score×100/70) 計算;門檻表 85/70/55/40/25/15 不變;danger 基準 (100−normalized)。',
+            'computeScore 原值不變,跨版本可比;修復前快照保留於 baseline.pre-L15-fix.json 供對照(人工審 diff 摘要,白皮書 v1.3 §8.2)。',
         ],
         signals: results,
     };

@@ -7,7 +7,8 @@
  * 覆蓋:
  *  [L1] 輸入完整性 — CSV sha256 對照 tests/inputs/signals_input.json(漂移 → 指引受控重凍)
  *  [L1] Golden diff — 當前引擎輸出 vs tests/baseline/baseline.json 全等
- *  [L1] 門檻一致性 — 每層 rating 與 baseline 門檻表對應區間一致
+ *  [L1] 門檻一致性 — 每層 rating 與 baseline 門檻表對應區間一致(方案 (b):先正規化)
+ *  [L1b] L15 方案(b)評級邊界 — S+ 可達性 + 六門檻有效原始分界 ±0.1 級距
  *  [L2] 性質 — score ∈ [0,70]、評級封閉集合、評級單調、滿分構造、blacklist 降序
  *
  * 執行:node --test tests/golden.test.mjs
@@ -38,6 +39,10 @@ const CLOSED_SET = ['S+', 'S', 'A', 'B', 'C', 'D', 'E'];
 const SCORE_CAP = 70; // L15:設計上限 30+20+15+5
 
 // 由門檻表推導評級(門檻驅動,Task D 更新 thresholds 後自動跟隨)
+// L15 方案 (b):先正規化 round(score×100/70) 再查門檻表(與引擎 normalizeScore 同式,
+// 引擎端由 [L1b] 邊界測試對鎖,兩式漂移即紅)
+function normScore(sc) { return Math.round(sc * 100 / 70); }
+
 function ratingFromScore(score, th) {
     const rows = Object.entries(th)
         .map(([r, t]) => ({ r, t }))
@@ -126,7 +131,7 @@ test('[L1] 門檻一致性:每層 score/rating 與 baseline 門檻表吻合', ()
     for (const [id, sig] of Object.entries(baseline.signals)) {
         if (sig.status === 'no_csv') continue;
         for (const [key, l] of Object.entries(sig.layers)) {
-            const expect = ratingFromScore(l.score, th);
+            const expect = ratingFromScore(normScore(l.score), th);
             if (expect !== l.rating) bad.push(`${id}/${key}: score ${l.score} → 門檻表應為 ${expect},記錄 ${l.rating}`);
         }
     }
@@ -162,12 +167,12 @@ test('[L2] 性質:評級單調(同門檻表下,分數越高評級不會更低)',
             assert.ok(rows[j].t > rows[i].t, `門檻表必須嚴格遞減:${rows[j].r}(${rows[j].t}) vs ${rows[i].r}(${rows[i].t})`);
         }
     }
-    // 實例單調:每層 rating == ratingFromScore(score)
+    // 實例單調:每層 rating == ratingFromScore(normScore(score))(方案 (b))
     const bad = [];
     for (const [id, sig] of Object.entries(baseline.signals)) {
         if (sig.status === 'no_csv') continue;
         for (const [key, l] of Object.entries(sig.layers)) {
-            if (ratingFromScore(l.score, th) !== l.rating) bad.push(`${id}/${key}`);
+            if (ratingFromScore(normScore(l.score), th) !== l.rating) bad.push(`${id}/${key}`);
         }
     }
     assert.equal(bad.length, 0, `單調性違反 ${bad.length} 層`);
@@ -212,4 +217,48 @@ test('[L2] 性質:L15 缺陷存在性標記(滿分不可達 S+,防「靜默修�
     const r = eng.computeRating(best);
     assert.ok(r !== 'S+', `pre-fix 狀態下 S+ 不可達,現得 ${r} — 若非預期請核查門檻`);
     assert.equal(baseline.rating_distribution?.['S+'] ?? 0, 0, 'pre-fix baseline 中 S+ 數應為 0');
+});
+
+// ─────────────────────────────────────────────────────────
+// [L1b] L15 修復(方案 (b))— 評級邊界 golden 測試
+// 白皮書 §8.2 Task D 修復配套:各門檻邊界 ±0.1 級距 + S+/S 可達性
+// 正規化 normalized = Math.round(score×100/70),門檻表 85/70/55/40/25/15 不變;
+// 有效原始分界:S+≥59.15 S≥48.65 A≥38.15 B≥27.65 C≥17.15 D≥10.15
+// (score 網格 0.1,取分界上首个網格值為入級樣本:59.2/48.8/38.2/27.7/17.2/10.2)
+// ─────────────────────────────────────────────────────────
+function mkStats(wr, odds, cnt, hold) {
+    return { symbol: 'TEST', direction: 'buy', layer_label: 'L1', lots: 0.01,
+             count: cnt, win_count: 0, loss_count: 0, wr, odds_pips: odds,
+             avg_hold: hold, total_pnl: 0, total_pips: 0 };
+}
+
+test('[L1b] L15 方案(b):S+ 可達性 — 滿分層應得 S+', () => {
+    const best = mkStats(100, 999, 10, 1);
+    assert.equal(eng.computeScore(best), SCORE_CAP);
+    assert.equal(eng.computeRating(best), 'S+', '修復後滿分層必須可達 S+(方案 (b) 核心驗收)');
+});
+
+test('[L1b] L15 方案(b):六門檻有效原始分界 ±0.1 級距', () => {
+    const cases = [
+        // [wr, odds, cnt, hold, 期望原始分, 期望評級, 說明]
+        [80,   0.91, 10, 1, 59.1, 'S',  'S+ 分界 59.15 界下樣本'],
+        [80,   0.92, 10, 1, 59.2, 'S+', 'S+ 分界 59.15 界上樣本'],
+        [42.5, 2.5,  10, 1, 48.5, 'A',  'S 分界 48.65 界下樣本'],
+        [44,   2.5,  10, 1, 48.8, 'S',  'S 分界 48.65 界上樣本'],
+        [45.5, 0.9,  10, 1, 38.1, 'B',  'A 分界 38.15 界下樣本'],
+        [46,   0.9,  10, 1, 38.2, 'A',  'A 分界 38.15 界上樣本'],
+        [33.5, 0.79, 3,  1, 27.6, 'C',  'B 分界 27.65 界下樣本'],
+        [33.5, 0.8,  3,  1, 27.7, 'B',  'B 分界 27.65 界上樣本'],
+        [10,   0.21, 3,  1, 17.1, 'D',  'C 分界 17.15 界下樣本'],
+        [10,   0.22, 3,  1, 17.2, 'C',  'C 分界 17.15 界上樣本'],
+        [8,    0.15, 1,  1, 10.1, 'E',  'D 分界 10.15 界下樣本'],
+        [8,    0.16, 1,  1, 10.2, 'D',  'D 分界 10.15 界上樣本'],
+    ];
+    for (const [wr, odds, cnt, hold, wantScore, wantRating, why] of cases) {
+        const s = mkStats(wr, odds, cnt, hold);
+        const sc = eng.computeScore(s);
+        assert.equal(sc, wantScore, `score 構造失敗(${why}):得 ${sc},預期 ${wantScore}`);
+        const rt = eng.computeRating(s);
+        assert.equal(rt, wantRating, `${why}:score ${sc} 應評 ${wantRating},實得 ${rt}`);
+    }
 });
