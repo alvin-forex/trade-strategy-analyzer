@@ -1,22 +1,29 @@
 #!/usr/bin/env bash
-# L22b pre-push gate (check-only): block plaintext of the 15 StatiCrypt core
-# pages from leaving this machine. Runs the same audit as CI
-# (tests/encryption_check.py) against HEAD — if any core page is plaintext,
-# the push is aborted before it ever reaches GitHub.
-#
-# Install (per clone; .git/hooks/ is not version-controlled):
-#   cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+# L22c pre-push gate v2 (check-only): audit EVERY commit about to be pushed —
+# all refs (main + side branches), all new commits per ref, not just HEAD.
+# v1 gap (HEAD-only) was reported by OpenClaw's live test on 2026-10-21 and is
+# closed by tests/push_audit.py.
 #
 # WHY CHECK-ONLY: at pre-push time the commits are already formed, so running
 # the encrypt script here would only dirty the working tree — the push would
 # still carry plaintext. Encryption must happen BEFORE commit (via
 # scripts/encrypt_admin_pages.sh); this hook is the last-line BLOCK, and the
 # CI gate (tests/encryption_check.py) is the backstop on main.
+#
+# Install (per clone; .git/hooks/ is not version-controlled):
+#   cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
 set -u
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-# Clones older than the L22 gate: don't block, just pass through.
-[ -f tests/encryption_check.py ] || exit 0
+if [ -f tests/push_audit.py ]; then
+  # v2: reads pre-push stdin lines itself; audits every pushed commit.
+  exec python3 tests/push_audit.py
+fi
 
-python3 tests/encryption_check.py
+if [ -f tests/encryption_check.py ]; then
+  # v1 fallback (old clone without push_audit.py): HEAD-only best effort.
+  exec python3 tests/encryption_check.py
+fi
+
+exit 0  # clone predates the L22 gate: don't block
