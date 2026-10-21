@@ -1,0 +1,54 @@
+name: sync-site
+
+# 方案 E（老闆裁定 2026-10-21）: main repo（private）＝單一真相源；
+# docs/（Pages 樹）自動鏡像到 public repo alvin-forex/tsa-site，由嗰邊免費發佈 Pages。
+# OpenClaw 每小時數據 commit 觸及 docs/ → 本 workflow 自動帶動 tsa-site 更新。
+#
+# 需要: Actions secret `TSA_SITE_TOKEN` ＝ fine-grained PAT，
+#       scope 只限 alvin-forex/tsa-site、Contents: Read and write。
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**', '.github/workflows/sync_site.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-site
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: "Checkout main repo (sparse: docs/ only)"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: docs
+
+      - name: Clone tsa-site
+        shell: bash
+        run: |
+          git clone --depth 1 \
+            "https://x-access-token:${{ secrets.TSA_SITE_TOKEN }}@github.com/alvin-forex/tsa-site.git" \
+            /tmp/site
+
+      - name: Mirror docs/ → tsa-site
+        shell: bash
+        run: |
+          rsync -a --delete --exclude='.git' "$GITHUB_WORKSPACE/docs/" /tmp/site/
+          cd /tmp/site
+          git config user.name  "tsa-sync-bot"
+          git config user.email "alvin-forex@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::notice::docs/ unchanged — nothing to sync"
+            exit 0
+          fi
+          git commit -m "sync: trade-strategy-analyzer@${GITHUB_SHA:0:7}"
+          git push
