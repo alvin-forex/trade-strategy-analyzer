@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """L22 StatiCrypt anti-resurrection gate.
 
-The 14 core pages were password-protected in 7ad97b7f (StatiCrypt AES-256,
-client-side). Generators (generate_signal_ranking_v5.py 等) write PLAINTEXT
-to some of these paths — if a regenerated page is committed unencrypted,
-its content is public again on Pages. This gate fails CI whenever any core
-page is not StatiCrypt-wrapped, forcing re-encryption via
+The 15 core pages are StatiCrypt-wrapped (AES-256, client-side): 14 pages in
+7ad97b7f, and the 98-signal docs/signal_ranking_dde_v5.html in d0e58013
+(L22b gate flip). Generators (generate_signal_ranking_v5.py 等) write
+PLAINTEXT to some of these paths — if a regenerated page is committed
+unencrypted, its content is public again on Pages. This gate fails CI
+whenever any core page is not StatiCrypt-wrapped, forcing re-encryption via
 scripts/encrypt_admin_pages.sh before the push counts as green.
 
 Reads blobs via `git show HEAD:<path>` so it works both in CI (full checkout)
@@ -30,6 +31,7 @@ CORE_PAGES = [
     "docs/admin/volatility.html",
     "docs/index.html",
     "docs/signal_ranking.html",
+    "docs/signal_ranking_dde_v5.html",
 ]
 
 
