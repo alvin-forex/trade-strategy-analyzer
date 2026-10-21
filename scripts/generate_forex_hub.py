@@ -160,6 +160,34 @@ def render(items: list[dict]) -> str:
     dates = sorted(grouped.keys(), reverse=True)
     latest_dt = items[0]["dt"].strftime("%Y-%m-%d %H:%M") if items else "N/A"
 
+    # L22 數據新鮮度（白皮書 v1.3 P1-fast 裁定 2026-10-20）：
+    # 「數據截至」時間戳＋過期升級警示＋「今日」標籤改基於系統日期（唔好 idx==0 硬標）
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    if items:
+        age_h = max(0.0, (now - items[0]["dt"]).total_seconds() / 3600.0)
+    else:
+        age_h = None
+    if age_h is None:
+        fresh_cls = "fresh"
+        fresh_badge = "🟢 數據截至 N/A（無任何報告）"
+    elif age_h <= 24:
+        fresh_cls = "fresh"
+        fresh_badge = f"🟢 數據截至 {latest_dt}"
+    elif age_h <= 24 * 7:
+        fresh_cls = "stale"
+        fresh_badge = f"⚠️ 數據截至 {latest_dt}（距今 {age_h:.0f} 小時，可能過期）"
+    else:
+        fresh_cls = "severe"
+        fresh_badge = (
+            f"🚨 數據嚴重過期：截至 {latest_dt}（距今 {age_h / 24:.0f} 天）——落單前請核實市況"
+        )
+    banner = (
+        f'<div class="banner {fresh_cls}">{fresh_badge}</div>'
+        if fresh_cls in ("stale", "severe")
+        else ""
+    )
+
     cards = []
     for idx, date in enumerate(dates):
         day_items = grouped[date]
@@ -182,7 +210,7 @@ def render(items: list[dict]) -> str:
             """)
         cards.append(f"""
         <details class="day"{open_attr}>
-          <summary><span>📋 {date}{'（今日）' if idx == 0 else ''}</span><span class="counts">🦀 {count_4h} | 📰 {count_daily}</span></summary>
+          <summary><span>📋 {date}{'（今日）' if date == today_str else ''}</span><span class="counts">🦀 {count_4h} | 📰 {count_daily}</span></summary>
           <div class="day-body">{''.join(rows)}</div>
         </details>
         """)
@@ -201,6 +229,8 @@ def render(items: list[dict]) -> str:
 .day{{background:#161b22;border:1px solid #21262d;border-radius:12px;margin-bottom:12px;overflow:hidden}} summary{{cursor:pointer;padding:14px 16px;font-weight:700;color:#e6edf3;display:flex;justify-content:space-between;align-items:center}} .counts{{color:#8b949e;font-size:12px;font-weight:500}} .day-body{{padding:0 12px 12px}}
 .report-card{{background:#0d1117;border:1px solid #21262d;border-radius:10px;margin:10px 0;padding:12px}} .card-head{{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}} .time{{font-family:monospace;color:#f0b429;font-weight:700}} .icon{{margin:0 4px}} .open-link{{font-size:12px;white-space:nowrap}} .summary{{margin-top:8px;color:#8b949e;font-size:13px;line-height:1.55}} .line{{margin-top:3px}}
 .badge{{font-size:10px;border-radius:999px;padding:2px 7px;margin-left:5px;vertical-align:middle}} .latest{{background:#f8514922;color:#f85149}} .type4h{{background:#3fb95022;color:#3fb950}} .typedaily{{background:#58a6ff22;color:#58a6ff}}
+.freshness{{display:inline-block;margin-top:10px;font-size:13px;padding:4px 10px;border-radius:999px}} .freshness.fresh{{background:#3fb95022;color:#3fb950}} .freshness.stale{{background:#f0b42922;color:#f0b429}} .freshness.severe{{background:#f8514922;color:#f85149}}
+.banner{{border-radius:12px;padding:12px 16px;margin-bottom:12px;font-weight:700}} .banner.stale{{background:#f0b42918;border:1px solid #f0b42955;color:#f0b429}} .banner.severe{{background:#f8514918;border:1px solid #f8514955;color:#f85149}}
 .footer{{text-align:center;color:#484f58;font-size:11px;margin:18px 0}}
 @media(max-width:768px){{body{{padding:64px 10px 12px}} .card-head{{display:block}} .open-link{{display:inline-block;margin-top:8px}}}}
 </style>
@@ -215,9 +245,11 @@ def render(items: list[dict]) -> str:
       <div class="stat">總報告 <b>{len(items)}</b></div>
       <div class="stat">4H 分析 <b>{sum(1 for i in items if i['type']=='4h')}</b></div>
       <div class="stat">每日報告 <b>{sum(1 for i in items if i['type']=='daily')}</b></div>
-      <div class="stat">最新更新 <b>{latest_dt}</b></div>
+      <div class="stat">數據截至 <b>{latest_dt}</b></div>
     </div>
+    <div class="freshness {fresh_cls}">{fresh_badge}</div>
   </section>
+  {banner}
   <nav class="tabs">
     <a class="tab" href="#4h">🦀 4H 市場分析</a>
     <a class="tab" href="#daily">📰 每日報告</a>
