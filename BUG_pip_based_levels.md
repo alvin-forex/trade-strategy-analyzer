@@ -4,6 +4,12 @@
 > 影響範圍：55/73 個信號（75%）
 > 嚴重程度：**HIGH**
 
+> ✅ **已結案（2026-10-22 補記錄）**：本 bug 已於發現同日修復——commit `c0c3f9f2`
+> （2026-05-25 19:35，Phase 0A）刪除 `compute_layer_net_profit()`，fallback 改為
+> lot-based（`compute_layer_from_lot_fallback()`，按 unique lot 推算層級）。
+> 防回歸測試：`tests/test_lot_based_levels.py`（lot 對照表驗證＋profit-based 禁用斷言）。
+> 本文檔保留作歷史記錄，下方「修復方案／防止再犯」各項均已落實。
+
 ## 問題描述
 
 `dde_v4_scorer.py` 第 28-32 行同第 72-86 行用 **淨利潤（Net Profit）** 去判斷交易層級：
