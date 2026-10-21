@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# L22 StatiCrypt anti-resurrection — re-encrypt the 14 core pages in place.
+# L22 StatiCrypt anti-resurrection — re-encrypt the 15 core pages in place.
 #
 # Why: generators (generate_signal_ranking_v5.py 等) write PLAINTEXT to some
 # of these paths. After any regeneration, run this script BEFORE commit+push;
 # CI runs tests/encryption_check.py and goes red on plaintext (anti-resurrection).
+# A pre-push hook (scripts/hooks/pre-push) also blocks plaintext from leaving
+# the machine — install it per clone (not version-controlled) with:
+#   cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
 #
 # Usage:
 #   bash scripts/encrypt_admin_pages.sh
 # Env:
 #   TSA_PW_FILE  password file (default /home/alvin/tsa_pw.txt) — NEVER commit
 #                the password itself; only the path is referenced here.
-# Requirements: npx (Node) — StatiCrypt CLI is fetched on demand.
+# Requirements: npx (Node) — StatiCrypt CLI is fetched on demand, and only
+#               when at least one page actually needs encryption.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,27 +35,11 @@ PAGES=(
   "docs/admin/volatility.html"
   "docs/index.html"
   "docs/signal_ranking.html"
-  # L22b (老闆裁決 2026-10-21「統一其他就好」): the 98-signal DDE v5 page joins
-  # the encrypted set. Gate list (tests/encryption_check.py) flips 14→15 only
-  # AFTER the encrypted copy of this page is committed — keeps CI green in
-  # between.
+  # L22b (老闆裁決 2026-10-21「統一其他就好」): the 98-signal DDE v5 page.
+  # Encrypted copy committed at d0e58013; CI gate (tests/encryption_check.py)
+  # flipped 14→15 alongside the --output→-d fix in this script.
   "docs/signal_ranking_dde_v5.html"
 )
-
-if [ ! -f "$PW_FILE" ]; then
-  echo "ERR: password file not found: $PW_FILE (set TSA_PW_FILE to override)" >&2
-  exit 1
-fi
-if ! command -v npx >/dev/null 2>&1; then
-  echo "ERR: npx not found — install Node.js first" >&2
-  exit 1
-fi
-
-PW="$(tr -d ' \r\n' < "$PW_FILE")"
-if [ -z "$PW" ]; then
-  echo "ERR: password file is empty: $PW_FILE" >&2
-  exit 1
-fi
 
 TMP_DIR="$REPO_ROOT/.staticrypt-tmp"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -59,43 +47,64 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 changed=0
 skipped=0
 failed=0
+todo=()
 
+# Pass 1 — classify (no password needed): missing / already encrypted / todo.
 for rel in "${PAGES[@]}"; do
   f="$REPO_ROOT/$rel"
   if [ ! -f "$f" ]; then
     echo "SKIP (missing)  $rel"
     skipped=$((skipped + 1))
-    continue
-  fi
-  # Idempotent: already-encrypted → leave untouched.
-  if head -c 4096 "$f" | grep -qi "staticrypt"; then
+  elif head -c 4096 "$f" | grep -qi "staticrypt"; then
     echo "OK   (already)  $rel"
     skipped=$((skipped + 1))
-    continue
+  else
+    todo+=("$rel")
   fi
-
-  rm -rf "$TMP_DIR"
-  mkdir -p "$TMP_DIR"
-
-  # Encrypt to a temp dir (output naming differs across staticrypt versions,
-  # so we locate whatever *.html was produced and verify the marker).
-  if ! (cd "$REPO_ROOT" && npx --yes staticrypt "$rel" -p "$PW" --output "$TMP_DIR" >/dev/null 2>&1); then
-    echo "FAIL (staticrypt)  $rel" >&2
-    failed=$((failed + 1))
-    continue
-  fi
-
-  produced="$(find "$TMP_DIR" -name '*.html' -type f | head -1)"
-  if [ -z "$produced" ] || ! grep -qi "staticrypt" "$produced"; then
-    echo "FAIL (no output)   $rel" >&2
-    failed=$((failed + 1))
-    continue
-  fi
-
-  mv "$produced" "$f"
-  echo "ENC $rel"
-  changed=$((changed + 1))
 done
+
+# Pass 2 — encrypt only what needs it. Password + npx are required lazily, so
+# a nothing-to-do run (e.g. all pages already locked) succeeds without a
+# password file; this keeps hook/cron/CI dry contexts safe.
+if [ "${#todo[@]}" -gt 0 ]; then
+  if [ ! -f "$PW_FILE" ]; then
+    echo "ERR: password file not found: $PW_FILE (set TSA_PW_FILE to override)" >&2
+    exit 1
+  fi
+  if ! command -v npx >/dev/null 2>&1; then
+    echo "ERR: npx not found — install Node.js first" >&2
+    exit 1
+  fi
+  PW="$(tr -d ' \r\n' < "$PW_FILE")"
+  if [ -z "$PW" ]; then
+    echo "ERR: password file is empty: $PW_FILE" >&2
+    exit 1
+  fi
+
+  for rel in "${todo[@]}"; do
+    rm -rf "$TMP_DIR"
+    mkdir -p "$TMP_DIR"
+    # staticrypt 3.x has NO --output flag (silently ignored → results land in
+    # ./encrypted/ and the find below reports nothing). The real flag is
+    # -d/--directory; the encrypted file keeps its input basename there.
+    if ! (cd "$REPO_ROOT" && npx --yes staticrypt "$rel" -p "$PW" -d "$TMP_DIR" >/dev/null 2>&1); then
+      echo "FAIL (staticrypt)  $rel" >&2
+      failed=$((failed + 1))
+      continue
+    fi
+
+    produced="$(find "$TMP_DIR" -name '*.html' -type f | head -1)"
+    if [ -z "$produced" ] || ! grep -qi "staticrypt" "$produced"; then
+      echo "FAIL (no output)   $rel" >&2
+      failed=$((failed + 1))
+      continue
+    fi
+
+    mv "$produced" "$REPO_ROOT/$rel"
+    echo "ENC $rel"
+    changed=$((changed + 1))
+  done
+fi
 
 echo "-----------------------------"
 echo "ENCRYPT_DONE changed=$changed skipped=$skipped failed=$failed"
