@@ -1074,7 +1074,13 @@ function calcStrategyScore(pos) {
 
   const score = (regression*0.30 + exitEff*0.25 + risk*0.20 + quality*0.15 + costScore*0.10) * 100;
   const grade = gradeOf(score);
-  return { score: Math.round(score*10)/10, grade, regression, exitEff, risk, quality, costScore };
+  // [L18] 低樣本暫緩定級 — 白皮書 v1.3 裁決(2026-10-22 核實實施):
+  //   np=0 除零 guard 已存在(上方 ddRatio 分支,np=0 → ddRatio=1.0,核實結論入冊);
+  //   |淨利| < $30 之倉位,exitEff(np/maxP)與 ddRatio(maxL/|np|)對微小金額變化極度敏感,
+  //   評級唔穩定 → 標記 low_sample;grade/score 照計(透明),但唔參與評級聚合。
+  //   口徑:|np|<30,四邊界 np=0/1/29/30 由 tests/test_l18_low_sample.mjs golden 鎖定。
+  const low_sample = Math.abs(np) < 30;
+  return { score: Math.round(score*10)/10, grade, low_sample, regression, exitEff, risk, quality, costScore };
 }
 
 function calcFinalScore(entry, strategy) {
@@ -1547,6 +1553,7 @@ async function analyze() {
       p._entryScore = entry;
       p._strategyScore = strategy;
       p._finalScore = final;
+      p._finalScore.low_sample = strategy.low_sample; // [L18] 低樣本旗傳播
     });
     prog.style.width='70%';
 
@@ -1645,6 +1652,7 @@ async function analyze() {
           p._entryScore = e2;
           p._strategyScore = s2;
           p._finalScore = calcFinalScore(e2.score, s2.score);
+          p._finalScore.low_sample = s2.low_sample; // [L18] 低樣本旗傳播
         });
         renderCompareTab(positions, positions2);
       } catch(e2) { console.warn('CSV2 compare failed:', e2); }
@@ -1871,27 +1879,33 @@ function renderEquityCurve(positions) {
 
 function renderScoreSection(positions) {
   // Grade distribution
-  const grades = {A:0, B:0, C:0, D:0};
-  positions.forEach(p => { grades[p._finalScore.grade]++; });
+  const grades = {A:0, B:0, C:0, D:0, '暫緩':0};
+  positions.forEach(p => {
+    // [L18] 低樣本(|淨利|<$30)倉位唔參與評級聚合
+    if (p._finalScore.low_sample) { grades['暫緩']++; return; }
+    grades[p._finalScore.grade]++;
+  });
 
   const donutData = [
     {label:'A ('+grades.A+')', value:grades.A, color:'#28a745'},
     {label:'B ('+grades.B+')', value:grades.B, color:'#ffc107'},
     {label:'C ('+grades.C+')', value:grades.C, color:'#fd7e14'},
-    {label:'D ('+grades.D+')', value:grades.D, color:'#dc3545'}
+    {label:'D ('+grades.D+')', value:grades.D, color:'#dc3545'},
+    {label:'暫緩 ('+grades['暫緩']+')', value:grades['暫緩'], color:'#6c757d'}
   ];
 
   // Entry vs Strategy distribution
   const entryGrades = {A:0, B:0, C:0, D:0};
   const stratGrades = {A:0, B:0, C:0, D:0};
   positions.forEach(p => {
+    if (p._finalScore.low_sample) return; // [L18] 低樣本唔參與評級聚合
     entryGrades[p._entryScore.grade]++;
     stratGrades[p._strategyScore.grade]++;
   });
 
   const entryInfo = infoToggle('entry-score', '<b>📊 Entry Score 入場評分</b><br>由三個維度組成：<b>方向（35%）</b>— 根據 L1 最大有利波幅（Max Pips）判斷方向正確程度，>20 pips 滿分。<br><b>時機（35%）</b>— 計算 max_pips / (max_pips + |max_loss_pips|)，反映入場後能否把握主要行情。L4+ 倉位有 1.2x 加成。<br><b>初始回撤（30%）</b>— 1 - min(|max_loss_pips|/200, 1.0)，入場後最大浮虧越小越高分。');
   const stratInfo = infoToggle('strat-score', '<b>📈 Strategy Score 策略評分</b><br>由五個維度組成：<b>回歸性（30%）</b>— L4+ 倉位若盈利滿分，否則視虧損程度扣分。<br><b>出場效率（25%）</b>— 盈利倉：實際盈利/最大浮盈；虧損倉：實際虧損/最大浮虧。<br><b>風險控制（20%）</b>— 層數分 + 回撤比率。<br><b>利潤質量（15%）</b>— 簡單二元：盈利 0.7 / 虧損 0.3。<br><b>成本效率（10%）</b>— 每小時持倉成本（手續費+swap）。');
-  const finalInfo = infoToggle('final-score', '<b>🎯 Final Score 最終評分</b><br>Final = Entry × 0.4 + Strategy × 0.6。<br>評級標準：<b>A ≥ 80</b>（可 Copy）、<b>B ≥ 60</b>（需評估）、<b>C ≥ 40</b>（需調整）、<b>D < 40</b>（不建議）。');
+  const finalInfo = infoToggle('final-score', '<b>🎯 Final Score 最終評分</b><br>Final = Entry × 0.4 + Strategy × 0.6。<br>評級標準：<b>A ≥ 80</b>（可 Copy）、<b>B ≥ 60</b>（需評估）、<b>C ≥ 40</b>（需調整）、<b>D < 40</b>（不建議）。<br><b>[L18] 低樣本暫緩</b>：|淨利| < $30 之倉位評級後面加 <b>*</b>（半透明）——淨利太細時出場效率同回撤比率對微小金額變化極度敏感，評級唔穩定，唔參與評級分佈聚合（白皮書 v1.3 裁決）。');
 
   let html = '<div class="chart-row">';
   html += '<div class="chart-box"><h3>綜合評級分佈' + finalInfo + '</h3>' + makeDonutSVG(donutData, 220) + '</div>';
@@ -1901,6 +1915,9 @@ function renderScoreSection(positions) {
     const c = gradeColor(g);
     html += `<tr><td><span class="${gradeClass(g)}" style="font-size:0.75em">${g}</span></td><td>${entryGrades[g]}</td><td>${stratGrades[g]}</td><td>${grades[g]}</td></tr>`;
   });
+  if (grades['暫緩'] > 0) { // [L18] 低樣本暫緩行
+    html += `<tr><td><span style="display:inline-block;padding:0 6px;border-radius:8px;background:#6c757d;color:#fff;font-size:0.75em" title="|淨利|<$30，評級唔穩定">暫緩*</span></td><td>—</td><td>—</td><td>${grades['暫緩']}</td></tr>`;
+  }
   html += '</table></div>';
   html += '</div>';
 
@@ -2203,7 +2220,7 @@ function renderPositionTable(positions) {
     html += `<td>${scoreCell(p._entryScore.score)}</td>`;
     html += `<td>${scoreCell(p._strategyScore.score)}</td>`;
     html += `<td>${scoreCell(p._finalScore.score)}</td>`;
-    html += `<td><span class="${gradeClass(p._finalScore.grade)}">${p._finalScore.grade}</span></td>`;
+    html += `<td><span class="${gradeClass(p._finalScore.grade)}"${p._finalScore.low_sample ? ' title="[L18] 低樣本暫緩：|淨利|<$30，評級唔穩定，唔參與評級聚合" style="opacity:0.65"' : ''}>${p._finalScore.grade}${p._finalScore.low_sample ? '*' : ''}</span></td>`;
     html += `<td>${fmt(p.holding_time_hours*60,0)}m</td>`;
     html += `<td style="font-size:0.8em">${fmtDate(p.open_time)}</td>`;
     html += `<td><span class="expand-btn" onclick="toggleSubRow(${i})">▼</span></td>`;
@@ -4938,6 +4955,7 @@ function renderRegimeComparisonSection() {
     p._entryScore = entry;
     p._strategyScore = strategy;
     p._finalScore = final;
+    p._finalScore.low_sample = strategy.low_sample; // [L18] 低樣本旗傳播
   });
 
   const label1 = window._csv1Label || 'CSV-A';
@@ -5494,7 +5512,7 @@ async function _autoSaveToAPI(positions, overall, layerStats, setParams) {
   positions.forEach(p => {
     if (p._finalScore) {
       const g = gradeOf(p._finalScore.score);
-      gradeDist[g]++;
+      if (!p._finalScore.low_sample) gradeDist[g]++; // [L18] 低樣本唔參與評級聚合
       sumEntry += p._entryScore ? p._entryScore.score : 0;
       sumStrategy += p._strategyScore ? p._strategyScore.score : 0;
       sumFinal += p._finalScore.score;
@@ -5602,7 +5620,7 @@ function _doSaveArchive(positions, isAuto) {
   positions.forEach(p => {
     if (p._finalScore) {
       const g = gradeOf(p._finalScore.score);
-      gradeDist[g]++;
+      if (!p._finalScore.low_sample) gradeDist[g]++; // [L18] 低樣本唔參與評級聚合
       sumEntry += p._entryScore.score;
       sumStrategy += p._strategyScore.score;
       sumFinal += p._finalScore.score;
