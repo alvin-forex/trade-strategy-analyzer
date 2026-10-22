@@ -47,6 +47,52 @@ tsa_backups/
 （第二磁碟／NFS／rclone 掛載點均可），腳本每份快照自動同步一份過去。
 雲端建議：rclone 掛 OneDrive／Google Drive 免費額度，或定時 `rclone copy $HOME/tsa_backups remote:tsa_backups`。
 
+### 現行 crontab 截錄（2026-10-22 項 2 盤點，2026-10-23 回填核對）
+
+```cron
+TSA_BACKUP_SECOND=/mnt/d/tsa_backups
+# 每日外匯報告 - 早盤報告
+# 每日外匯報告 - 晚盤報告
+
+# CCY 影片分析 - 每天檢查新影片（06:00）
+0 6 * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh video_check -- /home/alvin/.openclaw/workspace/scripts/check_new_videos.sh >> /tmp/openclaw/video_check.log 2>&1
+
+
+# Google Drive 圖片分析 - 每小時檢查有新圖先分析
+@reboot cd /home/alvin/.openclaw/workspace/trade_strategy_analyzer && /usr/bin/python3 /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/api_server.py >> /tmp/trade-analyzer-api.log 2>&1
+
+# 流程健康監察 - 每4小時（OCR之後10分鐘）
+10 */4 * * * /usr/bin/python3 /home/alvin/.openclaw/workspace/scripts/flow_health_check.py >> /tmp/openclaw/flow_health_check.log 2>&1
+
+@reboot sleep 30 && python3 /home/alvin/.openclaw/workspace/trade_strategy_analyzer/mt4_monitor/watchdog_daemon.py >> /tmp/watchdog_daemon.log 2>&1
+
+# CCY Power 每小時更新
+0 * * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh ccy_power -- /home/alvin/.openclaw/workspace/scripts/ccy_power_update_and_push.sh >> /tmp/openclaw/ccy_power.log 2>&1
+
+# Forex data 新鮮度檢查 - 每小時（取代 Finnhub heartbeat）
+0 * * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh freshness -- /usr/bin/python3 /home/alvin/.openclaw/workspace/scripts/forex_data_freshness.py >> /tmp/openclaw/forex_data_check.log 2>&1
+
+# TSA API watchdog — 每30分鐘確保 api_server 8787 存活（2026-08-31 丁蟹）
+*/30 * * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh tsa_api -- /home/alvin/.openclaw/workspace/scripts/ensure_tsa_api.sh >> /tmp/tsa_api_watchdog.log 2>&1
+
+# FF signals snapshot - 每日 01:05 / 05:05（0 agent tokens，CSV export 端點）
+5 1,5 * * 1-5 cd /home/alvin/.openclaw/data/ff-signals && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh ff_signals -- /home/alvin/.nvm/versions/node/v24.18.0/bin/node /home/alvin/.openclaw/data/ff-signals/ff-scraper.mjs >> /home/alvin/.openclaw/data/ff-signals/cron.log 2>&1
+
+# VPS backup architecture (2026-10-20)
+5 3 * * * bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh vps_pull -- /home/alvin/.openclaw/workspace/main/scripts/vps_pull_backup.sh >> /tmp/openclaw/vps_pull.log 2>&1
+35 3 * * * bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh vps_push -- /home/alvin/.openclaw/workspace/main/scripts/vps_push_backup.sh >> /tmp/openclaw/vps_push.log 2>&1
+
+# TSA SQLite 每日快照 — 03:10（03:05 mt5 pull 之後、03:35 vps push 之前；獨立於每小時 CCY push）
+10 3 * * * bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh db_snapshot -- /home/alvin/.openclaw/workspace/main/scripts/tsa_db_snapshot.sh >> /tmp/openclaw/tsa_db_snapshot.log 2>&1
+
+# TSA L16 備份（每日 04:00 HKT，RPO ≤ 24h；ZCODE 交辦 2026-10-22）
+0 4 * * * cd /home/alvin/.openclaw/workspace/trade_strategy_analyzer && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh backup_dbs -- bash scripts/backup_dbs.sh >> "$HOME/tsa_backups/backup.log" 2>&1
+* * * * * /home/alvin/.openclaw/workspace/scripts/alvins_bot_keepalive.sh
+```
+
+- 共 13 條 cron 條目：9 條已包 `watchdog_retry.sh`（標籤：backup_dbs／ccy_power／db_snapshot／ff_signals／freshness／tsa_api／video_check／vps_pull／vps_push）；2 條 @reboot 常駐（api_server.py／watchdog_daemon.py）裁定唔包（watchdog_retry 語義係一次性退避重試→安全停止，常駐 crash 後 5 連試無意義且 @reboot 冇下一輪會變孤兒；常駐監察由 watchdog_daemon 自己管）；另 2 條直接 cron（flow_health_check 每 4 小時／alvins_bot_keepalive 每分鐘）
+- 截錄與項 2 盤點 13 條有出入：項 2 盤點時「行 7/10 同時出現喺兩清單」有小矛盾——今次以本截錄（13 條實數）做最終核對
+
 ## 4. watchdog（指數退避，§4.4/§8.3 裁定）
 
 ```bash
@@ -103,8 +149,11 @@ python3 -c "import sqlite3;sqlite3.connect('~/tsa_backups/daily/<file>.db').exec
 - `~/tsa_backups/watchdog_state.json` 中 `status != "ok"` 嘅標籤
 - 昨日 `daily/` 有冇新快照（`ls daily/ | wc -l` 冇增長＝備份鏈斷，RPO 破功）
 
+> 2026-10-23 更新：晨報自檢已升級為 `tsa_selfcheck.py` 三段版（①備份自檢：alerts.log／watchdog_alerts.log／watchdog_state.json＋昨日 daily 快照檢查 ②數據新鮮度：CCY Power 時間戳 >24h 警告 ③第二位置監察：du/df＋兩位置最新 daily md5 對照）；晨報 automation 步驟 0 先跑 selfcheck，輸出嵌入晨報開頭並警告頂置。本段所列讀取項已由三段自檢覆蓋。
+
 ## 9. 演練記錄表
 
 | # | 日期 | 快照 | 驗證結果 | 耗時 | 執行者 |
 |---|------|------|----------|------|--------|
 | 1 | 2026-10-22 | 沙盒合成 DB（2 檔，日/週/月/事件四層） | integrity ok＋行數比對一致＋還原後 COUNT 一致 | <1min | ZCODE（腳本功能驗證） |
+| 2 | 2026-10-22 | VPS 真快照（20261022_070610，analysis_history.db＋ccy_power_observations.db 還原至沙盒臨時目錄） | integrity ok＋四表行數比對 ALL OK（analyses 92／versions 36／ccy_power_observations 142610／ccy_power_stats 0）＋目視抽樣正常 | 0.1s | OpenClaw（VPS 首輪真快照演練） |

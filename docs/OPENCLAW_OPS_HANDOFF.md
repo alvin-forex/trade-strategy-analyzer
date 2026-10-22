@@ -81,9 +81,11 @@
 
 | # | 項目 | 完成日期 | 驗收結果 | 備註 |
 |---|------|----------|----------|------|
-| 1 | cron 04:00 接線 | — | — | — |
-| 2 | watchdog 包裝 | — | — | — |
-| 3 | 雙存放第二位置 | — | — | — |
-| 4 | VPS 還原演練 | — | — | — |
-| 5 | template.bak 清理 | — | — | — |
-| 6 | 晨報自檢擴充 | — | — | — |
+| 1 | cron 04:00 接線 | 2026-10-22 | 06:45 crontab 接入＋手動驗證 OK；2026-10-23 04:00:01 首個自動 DAILY（ccy_power 142610 rows／analysis 128 rows）＋兩位置最新 daily md5 一致＋watchdog_state ok＝P0 完全閉環 | 三級輪替＋integrity 自動驗證；RPO ≤ 24h 達標 |
+| 2 | watchdog 包裝 | 2026-10-22 | cron 盤點 13 條：11 條一次性任務包 watchdog_retry（標籤制）／2 條 @reboot 常駐裁定唔包；成功/失敗路徑測試過；watchdog_state.json 各標籤 attempts/status 紀錄正常 | rc 記錄 bug 由 ZCODE L28 修復（merge be5f74c8），VPS pull 即生效 |
+| 3 | 雙存放第二位置 | 2026-10-22 | TSA_BACKUP_SECOND=/mnt/d/tsa_backups（D: 掛載點）；新快照雙寫；2026-10-23 兩位置最新 daily md5 一致；佔用 644M／磁碟可用 453G（6%） | 9p/drvfs 同實體機 caveat 已記錄，真異地（rclone）列 P2 等老闆；監察段併入項 6 第三段 |
+| 4 | VPS 還原演練 | 2026-10-22 | 070610 真快照還原沙盒：integrity ok＋四表行數比對 ALL OK（analyses 92／versions 36／ccy_power_observations 142610／ccy_power_stats 0）＋目視抽樣正常；沙盒還原 0.1s；RPO 實證 1.7h（≤24h 達標） | 紀錄入 RUNBOOK §9 演練記錄表 #2 |
+| 5 | template.bak 清理 | 2026-10-22 | 盤點 4 檔：刪 2（.z-ai-config.bak／bot.js.bak）；AngelGold EA .bak 保留；新發現 2 個 agent sqlite migration .bak 裁定不動；analysis_2026-04-19.jsonl 兩檔（原檔＋.bak）已按老闆裁定（唔要）刪除（2026-10-23，刪前 md5/行數存證見刪除回報） | 項 5 全案結清 |
+| 6 | 晨報自檢擴充 | 2026-10-23 | tsa_selfcheck.py 三段版（備份自檢／數據新鮮度／第二位置監察）＋晨報 automation 步驟 0 嵌入開頭＋警告頂置；人工失敗驗收（daily 改名→3 警告→復原→2 警告＋7 檔照舊＋md5 一致）完成 | 現存 2 觸頂標籤（freshness／video_check）持續頂置警告，另案排查 |
+
+> 六項全數完成（2026-10-23 核實收貨）——本交辦檔結案歸檔；檔案留 repo 做紀錄。後續跟進：watchdog 觸頂標籤排查（freshness／video_check）另案；P2 留後（rclone 真異地／mt4-ea 版本化／restore_drill.sh／tsa_selfcheck.py 入 repo）。
