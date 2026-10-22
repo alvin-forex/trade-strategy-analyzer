@@ -22,6 +22,13 @@
 # 狀態檔: $TSA_WATCHDOG_STATE（預設 $HOME/tsa_backups/watchdog_state.json）
 #         記錄每個命令最後一次嘅 attempts／last_error／last_ok，
 #         供晨報自檢同 cross-audit 讀取。
+#
+# 變更:
+#   L28 (2026-10-22): 修 rc 傳遞失真 —— rc=$? 原本放喺無 else 嘅
+#   if...fi 之後，捕捉到 if 命令自身嘅 0 而非被執行命令嘅真實
+#   退出碼（OpenClaw 項 2 核驗發現：bash -c 'exit 3' 記錄成
+#   exit=0）。改為直接執行命令後立即捕 rc，成功/失敗用 rc 判斷。
+#   新增 tests/test_watchdog_retry.sh 回歸測試（CI golden job 步驟）。
 # =============================================================================
 set -uo pipefail
 
@@ -52,7 +59,12 @@ start_ts="$(date '+%F %T')"
 while [ "$attempt" -lt "$MAX_ATTEMPTS" ]; do
   attempt=$((attempt + 1))
   echo "[watchdog] [$LABEL] 第 $attempt/$MAX_ATTEMPTS 次: $*"
-  if "$@"; then
+  # L28: 直接執行後立即捕 rc —— 唔好用 if "$@"; then ... fi; rc=$?,
+  # 因為無 else 嘅 if 命令喺條件失敗時自身回 0（POSIX 語義），
+  # 會令 rc 永遠記錄成 0、last_error 失去診斷價值。
+  "$@"
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
     echo "[watchdog] [$LABEL] OK（第 $attempt 次成功，耗時自 $start_ts）"
     python3 - "$STATE_FILE" "$LABEL" "$attempt" "ok" "" <<'PYEOF'
 import json, sys, datetime, pathlib
@@ -68,7 +80,6 @@ p.write_text(json.dumps(data, ensure_ascii=False, indent=1))
 PYEOF
     exit 0
   fi
-  rc=$?
   last_err="exit=$rc"
   echo "[watchdog] [$LABEL] 失敗 rc=$rc"
   if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
