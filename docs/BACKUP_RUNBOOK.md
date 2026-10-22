@@ -54,9 +54,6 @@ TSA_BACKUP_SECOND=/mnt/d/tsa_backups
 # 每日外匯報告 - 早盤報告
 # 每日外匯報告 - 晚盤報告
 
-# CCY 影片分析 - 每天檢查新影片（06:00）
-0 6 * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh video_check -- /home/alvin/.openclaw/workspace/scripts/check_new_videos.sh >> /tmp/openclaw/video_check.log 2>&1
-
 
 # Google Drive 圖片分析 - 每小時檢查有新圖先分析
 @reboot cd /home/alvin/.openclaw/workspace/trade_strategy_analyzer && /usr/bin/python3 /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/api_server.py >> /tmp/trade-analyzer-api.log 2>&1
@@ -90,8 +87,10 @@ TSA_BACKUP_SECOND=/mnt/d/tsa_backups
 * * * * * /home/alvin/.openclaw/workspace/scripts/alvins_bot_keepalive.sh
 ```
 
-- 共 13 條 cron 條目：9 條已包 `watchdog_retry.sh`（標籤：backup_dbs／ccy_power／db_snapshot／ff_signals／freshness／tsa_api／video_check／vps_pull／vps_push）；2 條 @reboot 常駐（api_server.py／watchdog_daemon.py）裁定唔包（watchdog_retry 語義係一次性退避重試→安全停止，常駐 crash 後 5 連試無意義且 @reboot 冇下一輪會變孤兒；常駐監察由 watchdog_daemon 自己管）；另 2 條直接 cron（flow_health_check 每 4 小時／alvins_bot_keepalive 每分鐘）
-- 截錄與項 2 盤點 13 條有出入：項 2 盤點時「行 7/10 同時出現喺兩清單」有小矛盾——今次以本截錄（13 條實數）做最終核對
+- 共 12 條：8 條包 `watchdog_retry.sh`（標籤：backup_dbs／ccy_power／db_snapshot／ff_signals／freshness／tsa_api／vps_pull／vps_push）；2 條 @reboot 常駐（api_server.py／watchdog_daemon.py）裁定唔包（watchdog_retry 語義係一次性退避重試→安全停止，常駐 crash 後 5 連試無意義且 @reboot 冇下一輪會變孤兒；常駐監察由 watchdog_daemon 自己管）；另 2 條直接 cron（flow_health_check 每 4 小時／alvins_bot_keepalive 每分鐘）
+- 截錄與項 2 盤點 13 條有出入：項 2 盤點時「行 7/10 同時出現喺兩清單」有小矛盾——今次以本截錄（12 條實數）做最終核對
+
+> 2026-10-23 項 7：刪除 video_check 條目（check_new_videos.sh 已不存在，老闆裁定）
 
 ## 4. watchdog（指數退避，§4.4/§8.3 裁定）
 
