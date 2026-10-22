@@ -20,6 +20,8 @@
 #   TSA_BACKUP_SECOND 第二存放根目錄（可選；例如另一磁碟／NFS 掛載點）
 #   TSA_FORCE_WEEKLY=1 / TSA_FORCE_MONTHLY=1   演練用：強制產生週/月快照
 #
+# L29（2026-10-23）：第二存放 weekly/monthly cp 失敗由「|| true 靜默」改為
+#   alert——同 daily/event 語義對齊；9p/drvfs 偶發寫入失敗唔再無聲缺失。
 # 排程建議（見 docs/BACKUP_RUNBOOK.md）:
 #   0 4 * * *  cd <repo> && bash scripts/backup_dbs.sh >> "$HOME/tsa_backups/cron.log" 2>&1
 # =============================================================================
@@ -150,7 +152,7 @@ for rel in "${DBS[@]}"; do
     snapshot_db "$src" "$wdest" || { alert "$rel 週備份失敗"; rc=1; }
     rotate "$WEEKLY_DIR" 4
     if [ -n "$SECOND_ROOT" ]; then
-      cp -f "$wdest" "$SECOND_ROOT/weekly/" 2>/dev/null || true
+      cp -f "$wdest" "$SECOND_ROOT/weekly/" 2>/dev/null || alert "第二存放寫入失敗: $wdest"
     fi
   fi
 
@@ -160,7 +162,7 @@ for rel in "${DBS[@]}"; do
     log "MONTHLY 快照: $rel"
     snapshot_db "$src" "$mdest" || { alert "$rel 月備份失敗"; rc=1; }
     if [ -n "$SECOND_ROOT" ]; then
-      cp -f "$mdest" "$SECOND_ROOT/monthly/" 2>/dev/null || true
+      cp -f "$mdest" "$SECOND_ROOT/monthly/" 2>/dev/null || alert "第二存放寫入失敗: $mdest"
     fi
   fi
 done
