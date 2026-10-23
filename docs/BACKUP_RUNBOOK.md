@@ -99,6 +99,8 @@ TSA_BACKUP_SECOND=/mnt/d/tsa_backups
 > 2026-10-23 項 7 phase 2 v2（雙 lane）：freshness script 改雙 lane — Lane A＝MT5 725B `gold_tick.csv`（90min）＋`forex_data.csv`（150min）；Lane B＝MT4 F1B `forex_data.csv`（180min 暫定，F1B 10-23 18:17 復活驗證中）。豁免週六/週日全日＋週一 08:00 前＋每日 05:00–07:59；逐檔獨立判定（任何一檔過期/缺失即 exit 1）。新增 cron 條目 `freshness_ccy`（每小時 :10），watchdog 標籤由 8 個增至 9 個、cron 由 12 條增至 13 條。
 >
 > 2026-10-23 項 7 phase 2 v2（db_snapshot 靜默失敗修復）：`tsa_db_snapshot.sh` 三件套 — ① 全部 `2>/dev/null` 改 `2>>"$LOG"`（實際 log 變數 `LOG="$DEST/snapshot.log"`）② 每個 db `.backup` 包 3 次重試（失敗 sleep 5，3 次全失敗才計 FAIL）③ 收尾 `exit "$FAIL"` 透傳 watchdog（integrity check／gzip 失敗一律計入 FAIL，失敗半成品 `.db`／`.db.gz` 即刪）。
+>
+> 2026-10-23 任務 E（script 入 repo，ZCODE 裁定 symlink 方案）：`forex_data_freshness.py`（v3 雙 lane）＋`tsa_db_snapshot.sh`（三件套修復版）已入 repo — canonical＝`scripts/forex_data_freshness.py`＋`scripts/tsa_db_snapshot.sh`；原 workspace 路徑（`/home/alvin/.openclaw/workspace/scripts/` 與 `main/scripts/`）改為 symlink 指向 repo 版，crontab 零改動、watchdog 標籤零改動。原檔備份為 `.pre_symlink`（保留）。日後改 script 一律改 repo 版＋commit。
 
 ## 4. watchdog（指數退避，§4.4/§8.3 裁定）
 
