@@ -285,9 +285,21 @@ function computeLayerStats(trades) {
 // ═══════════════════════════════════════════════════════
 // Rating
 // ═══════════════════════════════════════════════════════
+// L15 修復 — 白皮書方案 (b)(2026-10-21 用戶裁決修訂,廢 v1.3 方案 (a)):
+//   score 設計上限 70(30+20+15+5),評級與 danger 改用正規化百分制:
+//     normalized = Math.round(score × 100 / 70)  → 門檻表 85/70/55/40/25/15 不變
+//     danger 基準 = (100 − normalized)            → 取代殘留 (100 − raw score)
+//   computeScore 原值不變,保持跨版本可比。
+//   有效原始分界(0.1 分制網格):S+≥59.2 S≥48.8 A≥38.2 B≥27.7 C≥17.2 D≥10.2
+//   (連續分界 59.15/48.65/38.15/27.65/17.15/10.15;0.35 暗區已入冊白皮書 v1.4)
+//   由 tests/golden.test.mjs [L1b] 邊界測試鎖定,改動即紅。
+
+function normalizeScore(s) {
+    return Math.round(computeScore(s) * 100 / 70);
+}
 
 function computeRating(s) {
-    const sc = computeScore(s);
+    const sc = normalizeScore(s);
     if (sc >= 85) return 'S+'; if (sc >= 70) return 'S'; if (sc >= 55) return 'A';
     if (sc >= 40) return 'B'; if (sc >= 25) return 'C'; if (sc >= 15) return 'D'; return 'E';
 }
@@ -326,7 +338,7 @@ function computeBlacklist(layerStats) {
     for (const [key, s] of Object.entries(layerStats)) {
         const r = computeRating(s);
         if (['D', 'E'].includes(r) && s.count >= 2) {
-            const danger = (100 - computeScore(s)) + Math.abs(s.total_pnl > 0 ? 0 : Math.abs(s.total_pnl) / 10);
+            const danger = (100 - normalizeScore(s)) + Math.abs(s.total_pnl > 0 ? 0 : Math.abs(s.total_pnl) / 10);
             bl.push({ key, symbol: s.symbol, direction: s.direction, layer: s.layer_label, lots: s.lots, rating: r, score: computeScore(s), danger_score: r2(danger), wr: s.wr, count: s.count, total_pnl: s.total_pnl, reason: getDangerReason(s) });
         }
     }
@@ -468,7 +480,7 @@ function fmtLotCompare(actualLot, setConfigs, layerIdx) {
 
 // Export
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { parseCSV, filterByDateRange, computeLayerStats, computeRating, computeScore, computeSummary, computeBlacklist, buildCCYDirectionSummary };
+    module.exports = { parseCSV, filterByDateRange, computeLayerStats, computeRating, computeScore, normalizeScore, computeSummary, computeBlacklist, buildCCYDirectionSummary };
 }
 
 </script>
