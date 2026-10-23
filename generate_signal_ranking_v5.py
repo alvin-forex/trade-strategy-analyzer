@@ -377,6 +377,27 @@ document.querySelectorAll('table[id^="tbl"]').forEach(function(table) {{
     return html
 
 
+def reencrypt_core_pages() -> None:
+    """任務 G（老闆裁定 2026-10-23）：generator 寫入後即時復活加密，防明文再被覆寫/commit。
+
+    加密邏輯單一真相源 = scripts/encrypt_admin_pages.sh：
+      - pw file 缺失 → script exit 1（報錯停低），唔會靜默寫明文
+      - 無嘢要加密 → script exit 0（dry-safe）
+    呢度 check returncode：加密失敗即停，唔准帶病生成（老闆驗收第 4 點）。"""
+    import subprocess, sys
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parents[0]
+    script = repo_root / 'scripts' / 'encrypt_admin_pages.sh'
+    if not script.exists():
+        raise SystemExit(f'[task-G] encrypt script not found: {script} — 停低，唔准出明文頁')
+    r = subprocess.run(['bash', str(script)], capture_output=True, text=True, cwd=str(repo_root))
+    sys.stdout.write(r.stdout or '')
+    if r.returncode != 0:
+        sys.stderr.write(r.stderr or '')
+        raise SystemExit('[task-G] encrypt_admin_pages.sh failed — '
+                         'CORE_PAGES 明文唔准帶病輸出（可能 pw file 缺失），停低')
+
+
 def main() -> None:
     """Main entry point: run v5 scoring and generate ranking HTML."""
     print("=" * 60)
@@ -433,8 +454,13 @@ def main() -> None:
     if copied:
         print(f"   Copied {copied} index_*.html reports → reports/")
 
+    # 任務 G：寫入完成後即時復活加密（所有明文寫入都喺上面發生）。
+    # 注意：原本放在 print(len(html)) 之後，但該行有既有 NameError bug（html 未定義），
+    # 加密呼叫永遠行唔到 → 移到 crash 位之前。NameError 本身回報 ZCODE。
+    reencrypt_core_pages()
+
     print(f"\n✅ Generated: {output_path}")
-    print(f"   Size: {len(html):,} bytes")
+    print(f"   Size: {len(html_docs):,} bytes")
 
 
 if __name__ == '__main__':
