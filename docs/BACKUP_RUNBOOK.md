@@ -67,7 +67,11 @@ TSA_BACKUP_SECOND=/mnt/d/tsa_backups
 0 * * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh ccy_power -- /home/alvin/.openclaw/workspace/scripts/ccy_power_update_and_push.sh >> /tmp/openclaw/ccy_power.log 2>&1
 
 # Forex data 新鮮度檢查 - 每小時（取代 Finnhub heartbeat）
+# Lane A（freshness）：MT5 725B 自家 EA — gold_tick.csv（90min）＋forex_data.csv（150min）
 0 * * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh freshness -- /usr/bin/python3 /home/alvin/.openclaw/workspace/scripts/forex_data_freshness.py >> /tmp/openclaw/forex_data_check.log 2>&1
+
+# Lane B（freshness_ccy）：MT4 F1B 第三方 CCY Power — forex_data.csv（180min 暫定，F1B 復活驗證中）
+10 * * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh freshness_ccy -- /usr/bin/python3 /home/alvin/.openclaw/workspace/scripts/forex_data_freshness.py --lane ccy >> /tmp/openclaw/forex_data_check_ccy.log 2>&1
 
 # TSA API watchdog — 每30分鐘確保 api_server 8787 存活（2026-08-31 丁蟹）
 */30 * * * * cd /home/alvin/.openclaw/workspace/scripts && bash /home/alvin/.openclaw/workspace/trade_strategy_analyzer/scripts/watchdog_retry.sh tsa_api -- /home/alvin/.openclaw/workspace/scripts/ensure_tsa_api.sh >> /tmp/tsa_api_watchdog.log 2>&1
@@ -87,10 +91,14 @@ TSA_BACKUP_SECOND=/mnt/d/tsa_backups
 * * * * * /home/alvin/.openclaw/workspace/scripts/alvins_bot_keepalive.sh
 ```
 
-- 共 12 條：8 條包 `watchdog_retry.sh`（標籤：backup_dbs／ccy_power／db_snapshot／ff_signals／freshness／tsa_api／vps_pull／vps_push）；2 條 @reboot 常駐（api_server.py／watchdog_daemon.py）裁定唔包（watchdog_retry 語義係一次性退避重試→安全停止，常駐 crash 後 5 連試無意義且 @reboot 冇下一輪會變孤兒；常駐監察由 watchdog_daemon 自己管）；另 2 條直接 cron（flow_health_check 每 4 小時／alvins_bot_keepalive 每分鐘）
-- 截錄與項 2 盤點 13 條有出入：項 2 盤點時「行 7/10 同時出現喺兩清單」有小矛盾——今次以本截錄（12 條實數）做最終核對
+- 共 13 條：9 條包 `watchdog_retry.sh`（標籤：backup_dbs／ccy_power／db_snapshot／ff_signals／freshness／freshness_ccy／tsa_api／vps_pull／vps_push）；2 條 @reboot 常駐（api_server.py／watchdog_daemon.py）裁定唔包（watchdog_retry 語義係一次性退避重試→安全停止，常駐 crash 後 5 連試無意義且 @reboot 冇下一輪會變孤兒；常駐監察由 watchdog_daemon 自己管）；另 2 條直接 cron（flow_health_check 每 4 小時／alvins_bot_keepalive 每分鐘）
+- 截錄與項 2 盤點 13 條有出入：項 2 盤點時「行 7/10 同時出現喺兩清單」有小矛盾——今次以本截錄做最終核對
 
 > 2026-10-23 項 7：刪除 video_check 條目（check_new_videos.sh 已不存在，老闆裁定）
+>
+> 2026-10-23 項 7 phase 2 v2（雙 lane）：freshness script 改雙 lane — Lane A＝MT5 725B `gold_tick.csv`（90min）＋`forex_data.csv`（150min）；Lane B＝MT4 F1B `forex_data.csv`（180min 暫定，F1B 10-23 18:17 復活驗證中）。豁免週六/週日全日＋週一 08:00 前＋每日 05:00–07:59；逐檔獨立判定（任何一檔過期/缺失即 exit 1）。新增 cron 條目 `freshness_ccy`（每小時 :10），watchdog 標籤由 8 個增至 9 個、cron 由 12 條增至 13 條。
+>
+> 2026-10-23 項 7 phase 2 v2（db_snapshot 靜默失敗修復）：`tsa_db_snapshot.sh` 三件套 — ① 全部 `2>/dev/null` 改 `2>>"$LOG"`（實際 log 變數 `LOG="$DEST/snapshot.log"`）② 每個 db `.backup` 包 3 次重試（失敗 sleep 5，3 次全失敗才計 FAIL）③ 收尾 `exit "$FAIL"` 透傳 watchdog（integrity check／gzip 失敗一律計入 FAIL，失敗半成品 `.db`／`.db.gz` 即刪）。
 
 ## 4. watchdog（指數退避，§4.4/§8.3 裁定）
 
