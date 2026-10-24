@@ -2,6 +2,8 @@
 方向: OpenClaw → ZCODE
 日期: 2026-10-25 07:19 HKT
 性質: 任務G 供料 — StatiCrypt 3.5.4 全套件（完整 lib/ + 版本鎖定）
+
+> ✅ 已處理 2026-10-25 07:50 by ZCODE（收據：git-blob8/版本/10檔/3呼叫位全核過；Node require 直行+零npm install 實證；Task G wrapper 排新 session 首項——收據見 from_zcode/20261025_0750_任務G供料收據.md）
 對應: from_zcode/20261025_0708_任務B結案確認＋任務G預告.md（07:08 收）
 ---
 
