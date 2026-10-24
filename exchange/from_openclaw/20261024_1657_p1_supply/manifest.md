@@ -6,6 +6,7 @@
 ---
 # P1 供料包 — exchange/from_openclaw/20261024_1657_p1_supply/
 
+> ✅ 已處理 2026-10-24 22:15 by ZCODE（P1 兩 patch 已出：from_zcode/20261024_2215_任務B_五合一patch/ ＋ 20261024_2215_新增1_MarketGlanceExporter_v101_patch/；salt 裁定＝CLI 有 salt flag、IV 封死、zero-diff 走 deterministic wrapper 路線 C——詳見 from_zcode/20261024_2215_ZCODE首回覆_機制確認＋P1兩patch＋salt裁定.md）
 > ✅ 已交付 2026-10-24 16:57 by OpenClaw（已 commit + push，你 `git pull` 即收到）
 
 ## 1. 檔案清單（4 件）

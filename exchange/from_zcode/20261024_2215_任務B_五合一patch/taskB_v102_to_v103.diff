@@ -1,0 +1,404 @@
+--- ForexDataExporter_v102_orig.mq4	2026-10-24 14:07:50.702496336 +0000
++++ ForexDataExporter_v103.mq4	2026-10-24 14:08:48.202850290 +0000
+@@ -2,23 +2,34 @@
+ //|                                            ForexDataExporter.mq4 |
+ //|                                    OpenClaw Forex Report V2 EA    |
+ //+------------------------------------------------------------------+
++//| v1.03 - 2026-10-24 - ZCODE Task B 五合一修復                      |
++//|  FIX-1 ResolveSym(): 精確名 → alias → normalize(尾點/.r/.raw/.m)  |
++//|       → broker 全表枚舉比對；US500 alias 到 SP500 (F1B=SP500.r)   |
++//|  FIX-2 枚舉 gate: OnInit ResolutionPass 一次過 resolve 並快取；   |
++//|       missing 停低唔准填（Print MISSING + 匯出統計，唔准靜默）     |
++//|  FIX-3 GetDigits() 改 MarketInfo(MODE_DIGITS) 為主                 |
++//|       （修 XAUUSD. 落 5 位小數 bug；SP500.r 精度跟 broker）        |
++//|  FIX-4 totalSymbols 動態 ArraySize(Symbols)（唔再硬編碼 30）       |
++//|  FIX-5 審計 Print: RESOLVED/MISSING 逐條 + 匯出完成統計行          |
++//|  不變承諾: CSV 33 欄 schema / 檔名 forex_data.csv / 每 60 分鐘     |
++//|  排程 / symbol 欄照寫 canonical want 名 — 下游零改動              |
+ //| v1.02 - 2026-05-27 23:35 HKT - All English, UTF-8 encoding        |
+-//| Scans 28 pairs + XAUUSD across D1/H4/H1 timeframes                |
++//| Scans 28 pairs + XAUUSD + US500 across D1/H4/H1 timeframes        |
+ //| Exports STC, CCY POWER, River, BB, EMA, ATR, RSI, MACD to CSV    |
+ //| Output: MQL4/Files/forex_data.csv                                 |
+ //+------------------------------------------------------------------+
+ #property copyright "OpenClaw AI"
+ #property link      "https://openclaw.ai"
+-#property version   "1.02"
++#property version   "1.03"
+ #property strict
+-#property description "v1.02 - 2026-05-27 23:35 HKT - All English UTF-8"
++#property description "v1.03 - 2026-10-24 - Task B: symbol resolution + missing gate"
+ 
+ // === Input Parameters ===
+ input int    ExportIntervalMinutes = 60;      // Export interval (minutes)
+ input string CSV_Filename = "forex_data.csv"; // CSV filename
+ input bool   DebugMode = false;               // Print debug info
+ 
+-// === Symbol List ===
++// === Symbol List (canonical names — resolution to broker names is automatic) ===
+ string Symbols[] = {
+     "AUDUSD", "AUDCAD", "AUDCHF", "AUDJPY", "AUDNZD",
+     "CADCHF", "CADJPY",
+@@ -30,26 +41,121 @@
+     "XAUUSD", "US500"
+ };
+ 
++// === Alias table: canonical want -> broker-side base name (before normalize) ===
++#define ALIAS_N 1
++string ALIAS_FROM[ALIAS_N] = { "US500" };   // F1B broker 實名 SP500.r
++string ALIAS_TO[ALIAS_N]   = { "SP500" };
++
+ // === Timeframes ===
+ int Timeframes[] = { PERIOD_D1, PERIOD_H4, PERIOD_H1 };
+ string TF_Names[] = { "D1", "H4", "H1" };
+ 
+ // === Global Variables ===
+ datetime lastExportTime = 0;
+-int totalSymbols = 30;
++int totalSymbols = 0;
++string resolvedSymbols[];      // want-indexed cache; "" = unresolvable
++int    missingSymbols = 0;
++string missingList = "";
++
++//+------------------------------------------------------------------+
++string NormalizeSym(string s)
++{
++    // strip trailing dots: "XAUUSD." -> "XAUUSD"
++    while(StringLen(s) > 0 &&
++          StringGetCharacter(s, StringLen(s) - 1) == '.')
++        s = StringSubstr(s, 0, StringLen(s) - 1);
++    // strip common broker suffixes: "SP500.r" -> "SP500"
++    string suffixes[3] = {".RAW", ".R", ".M"};
++    for(int k = 0; k < 3; k++)
++    {
++        int pos = StringFind(s, suffixes[k]);
++        if(pos > 0)
++            s = StringSubstr(s, 0, pos);
++    }
++    return s;
++}
++
++//+------------------------------------------------------------------+
++//| FIX-1: exact name -> alias -> normalized enumeration match       |
++//+------------------------------------------------------------------+
++string ResolveSym(const string want)
++{
++    // 1) exact broker name already exists
++    if(MarketInfo(want, MODE_POINT) > 0)
++        return want;
++
++    // 2) alias mapping (e.g. US500 -> SP500)
++    string w = want;
++    for(int a = 0; a < ALIAS_N; a++)
++    {
++        if(StringCompare(want, ALIAS_FROM[a], false) == 0)
++        {
++            w = ALIAS_TO[a];
++            break;
++        }
++    }
++    if(w != want && MarketInfo(w, MODE_POINT) > 0)
++        return w;
++
++    // 3) normalized enumeration match over the full broker symbol table
++    string wu = NormalizeSym(w);
++    StringToUpper(wu);
++    int total = SymbolsTotal(false);
++    for(int i = 0; i < total; i++)
++    {
++        string s  = SymbolName(i, false);
++        string su = s;
++        StringToUpper(su);
++        su = NormalizeSym(su);
++        if(su == wu && MarketInfo(s, MODE_POINT) > 0)
++            return s;
++    }
++    return "";
++}
++
++//+------------------------------------------------------------------+
++//| FIX-2: one-shot resolution pass at init; missing = stop, no fill |
++//+------------------------------------------------------------------+
++void ResolutionPass()
++{
++    ArrayResize(resolvedSymbols, totalSymbols);
++    missingSymbols = 0;
++    missingList = "";
++    for(int s = 0; s < totalSymbols; s++)
++    {
++        resolvedSymbols[s] = ResolveSym(Symbols[s]);
++        if(resolvedSymbols[s] == "")
++        {
++            missingSymbols++;
++            missingList = missingList + Symbols[s] + " ";
++            Print("MISSING: want=", Symbols[s],
++                  " no broker match after alias+normalize (rows will be skipped, NOT filled)");
++        }
++        else
++        {
++            Print("RESOLVED: want=", Symbols[s], " -> ", resolvedSymbols[s]);
++        }
++    }
++}
+ 
+ //+------------------------------------------------------------------+
+ int OnInit()
+ {
+-    Print("=== ForexDataExporter v1.02 Start ===");
++    Print("=== ForexDataExporter v1.03 Start ===");
++
++    totalSymbols = ArraySize(Symbols);          // FIX-4
+     Print("Symbols: ", totalSymbols);
+     Print("Timeframes: D1, H4, H1");
+     Print("Interval: ", ExportIntervalMinutes, " min");
+     Print("CSV: ", CSV_Filename);
+     Print("=====================================");
+-    
++
++    ResolutionPass();                            // FIX-2
++    if(missingSymbols > 0)
++        Print("MISSING SYMBOLS: ", missingList);
++
+     ExportAllData();
+-    
++
+     return(INIT_SUCCEEDED);
+ }
+ 
+@@ -75,13 +181,13 @@
+ {
+     string filePath = CSV_Filename;
+     int handle = FileOpen(filePath, FILE_WRITE | FILE_CSV | FILE_ANSI, ',');
+-    
++
+     if(handle == INVALID_HANDLE)
+     {
+         Print("ERROR: Cannot open file: ", filePath, " Error: ", GetLastError());
+         return;
+     }
+-    
++
+     // CSV Header
+     FileWrite(handle,
+         "timestamp", "symbol", "timeframe",
+@@ -98,85 +204,95 @@
+         "rsi14",
+         "macd_line", "macd_signal", "macd_hist"
+     );
+-    
++
+     datetime exportTime = TimeCurrent();
+     string timeStr = TimeToString(exportTime, TIME_DATE|TIME_MINUTES);
+     int successCount = 0;
+     int failCount = 0;
+-    
++
+     for(int s = 0; s < totalSymbols; s++)
+     {
+-        string sym = Symbols[s];
+-        
++        string sym  = Symbols[s];        // canonical name (goes into CSV untouched)
++        string rsym = resolvedSymbols[s];// broker-resolved name (all indicator calls)
++
++        // FIX-2 gate: unresolvable symbol -> skip loudly, never fill
++        if(rsym == "")
++        {
++            if(DebugMode)
++                Print("SKIP (unresolved): ", sym, " ", "all TFs");
++            failCount += 3;
++            continue;
++        }
++
+         for(int t = 0; t < 3; t++)
+         {
+             int tf = Timeframes[t];
+             string tfName = TF_Names[t];
+-            
+-            int bars = iBars(sym, tf);
++
++            int bars = iBars(rsym, tf);
+             if(bars < 200)
+             {
+                 if(DebugMode)
+-                    Print("WARN: ", sym, " ", tfName, " bars=", bars, " (skipped)");
++                    Print("WARN: ", sym, " (", rsym, ") ", tfName, " bars=", bars, " (skipped)");
+                 failCount++;
+                 continue;
+             }
+-            
++
+             // OHLCV
+-            double openVal  = iOpen(sym, tf, 0);
+-            double highVal  = iHigh(sym, tf, 0);
+-            double lowVal   = iLow(sym, tf, 0);
+-            double closeVal = iClose(sym, tf, 0);
+-            long   volVal   = iVolume(sym, tf, 0);
+-            
++            double openVal  = iOpen(rsym, tf, 0);
++            double highVal  = iHigh(rsym, tf, 0);
++            double lowVal   = iLow(rsym, tf, 0);
++            double closeVal = iClose(rsym, tf, 0);
++            long   volVal   = iVolume(rsym, tf, 0);
++
+             // STC (Stochastic 5,3,3)
+-            double stcMain   = iStochastic(sym, tf, 5, 3, 3, MODE_SMA, 0, MODE_MAIN, 0);
+-            double stcSignal = iStochastic(sym, tf, 5, 3, 3, MODE_SMA, 0, MODE_SIGNAL, 0);
+-            
++            double stcMain   = iStochastic(rsym, tf, 5, 3, 3, MODE_SMA, 0, MODE_MAIN, 0);
++            double stcSignal = iStochastic(rsym, tf, 5, 3, 3, MODE_SMA, 0, MODE_SIGNAL, 0);
++
+             // CCY Power Indicator v1.00
+-            double ccyBuySignal  = iCustom(sym, tf, "CCY Power Indicator v1.00", 0, 0);
+-            double ccySellSignal = iCustom(sym, tf, "CCY Power Indicator v1.00", 1, 0);
+-            double ccyBasePower  = iCustom(sym, tf, "CCY Power Indicator v1.00", 2, 0);
+-            double ccyQuotePower = iCustom(sym, tf, "CCY Power Indicator v1.00", 3, 0);
+-            double ccyMarketAvg  = iCustom(sym, tf, "CCY Power Indicator v1.00", 4, 0);
+-            
++            double ccyBuySignal  = iCustom(rsym, tf, "CCY Power Indicator v1.00", 0, 0);
++            double ccySellSignal = iCustom(rsym, tf, "CCY Power Indicator v1.00", 1, 0);
++            double ccyBasePower  = iCustom(rsym, tf, "CCY Power Indicator v1.00", 2, 0);
++            double ccyQuotePower = iCustom(rsym, tf, "CCY Power Indicator v1.00", 3, 0);
++            double ccyMarketAvg  = iCustom(rsym, tf, "CCY Power Indicator v1.00", 4, 0);
++
+             // River v1.00
+-            double riverUpper     = iCustom(sym, tf, "River v1.00", 0, 0);
+-            double riverMiddle    = iCustom(sym, tf, "River v1.00", 1, 0);
+-            double riverLower     = iCustom(sym, tf, "River v1.00", 2, 0);
+-            double riverUpperBlue = iCustom(sym, tf, "River v1.00", 3, 0);
+-            double riverLowerBlue = iCustom(sym, tf, "River v1.00", 4, 0);
+-            double riverArrowUp   = iCustom(sym, tf, "River v1.00", 5, 0);
+-            double riverArrowDn   = iCustom(sym, tf, "River v1.00", 6, 0);
+-            
++            double riverUpper     = iCustom(rsym, tf, "River v1.00", 0, 0);
++            double riverMiddle    = iCustom(rsym, tf, "River v1.00", 1, 0);
++            double riverLower     = iCustom(rsym, tf, "River v1.00", 2, 0);
++            double riverUpperBlue = iCustom(rsym, tf, "River v1.00", 3, 0);
++            double riverLowerBlue = iCustom(rsym, tf, "River v1.00", 4, 0);
++            double riverArrowUp   = iCustom(rsym, tf, "River v1.00", 5, 0);
++            double riverArrowDn   = iCustom(rsym, tf, "River v1.00", 6, 0);
++
+             // Bollinger Bands (20, 2)
+-            double bbUpper  = iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_UPPER, 0);
+-            double bbMiddle = iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_MAIN, 0);
+-            double bbLower  = iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_LOWER, 0);
+-            
++            double bbUpper  = iBands(rsym, tf, 20, 2, 0, PRICE_CLOSE, MODE_UPPER, 0);
++            double bbMiddle = iBands(rsym, tf, 20, 2, 0, PRICE_CLOSE, MODE_MAIN, 0);
++            double bbLower  = iBands(rsym, tf, 20, 2, 0, PRICE_CLOSE, MODE_LOWER, 0);
++
+             // EMA 20/50/200
+-            double ema20  = iMA(sym, tf, 20, 0, MODE_EMA, PRICE_CLOSE, 0);
+-            double ema50  = iMA(sym, tf, 50, 0, MODE_EMA, PRICE_CLOSE, 0);
+-            double ema200 = iMA(sym, tf, 200, 0, MODE_EMA, PRICE_CLOSE, 0);
+-            
++            double ema20  = iMA(rsym, tf, 20, 0, MODE_EMA, PRICE_CLOSE, 0);
++            double ema50  = iMA(rsym, tf, 50, 0, MODE_EMA, PRICE_CLOSE, 0);
++            double ema200 = iMA(rsym, tf, 200, 0, MODE_EMA, PRICE_CLOSE, 0);
++
+             // ATR (14)
+-            double atr14 = iATR(sym, tf, 14, 0);
+-            
++            double atr14 = iATR(rsym, tf, 14, 0);
++
+             // RSI (14)
+-            double rsi14 = iRSI(sym, tf, 14, PRICE_CLOSE, 0);
+-            
++            double rsi14 = iRSI(rsym, tf, 14, PRICE_CLOSE, 0);
++
+             // MACD (12, 26, 9)
+-            double macdLine   = iMACD(sym, tf, 12, 26, 9, PRICE_CLOSE, MODE_MAIN, 0);
+-            double macdSignal = iMACD(sym, tf, 12, 26, 9, PRICE_CLOSE, MODE_SIGNAL, 0);
++            double macdLine   = iMACD(rsym, tf, 12, 26, 9, PRICE_CLOSE, MODE_MAIN, 0);
++            double macdSignal = iMACD(rsym, tf, 12, 26, 9, PRICE_CLOSE, MODE_SIGNAL, 0);
+             double macdHist   = macdLine - macdSignal;
+-            
++
+             // Write row
+             FileWrite(handle,
+                 timeStr, sym, tfName,
+-                DoubleToStr(openVal, GetDigits(sym)),
+-                DoubleToStr(highVal, GetDigits(sym)),
+-                DoubleToStr(lowVal, GetDigits(sym)),
+-                DoubleToStr(closeVal, GetDigits(sym)),
++                DoubleToStr(openVal, GetDigits(rsym)),
++                DoubleToStr(highVal, GetDigits(rsym)),
++                DoubleToStr(lowVal, GetDigits(rsym)),
++                DoubleToStr(closeVal, GetDigits(rsym)),
+                 IntegerToString(volVal),
+                 DoubleToStr(stcMain, 2),
+                 DoubleToStr(stcSignal, 2),
+@@ -185,45 +301,53 @@
+                 DoubleToStr(ccyBasePower, 4),
+                 DoubleToStr(ccyQuotePower, 4),
+                 DoubleToStr(ccyMarketAvg, 4),
+-                DoubleToStr(riverUpper, GetDigits(sym)),
+-                DoubleToStr(riverMiddle, GetDigits(sym)),
+-                DoubleToStr(riverLower, GetDigits(sym)),
+-                DoubleToStr(riverUpperBlue, GetDigits(sym)),
+-                DoubleToStr(riverLowerBlue, GetDigits(sym)),
+-                DoubleToStr(riverArrowUp, GetDigits(sym)),
+-                DoubleToStr(riverArrowDn, GetDigits(sym)),
+-                DoubleToStr(bbUpper, GetDigits(sym)),
+-                DoubleToStr(bbMiddle, GetDigits(sym)),
+-                DoubleToStr(bbLower, GetDigits(sym)),
+-                DoubleToStr(ema20, GetDigits(sym)),
+-                DoubleToStr(ema50, GetDigits(sym)),
+-                DoubleToStr(ema200, GetDigits(sym)),
+-                DoubleToStr(atr14, GetDigits(sym)),
++                DoubleToStr(riverUpper, GetDigits(rsym)),
++                DoubleToStr(riverMiddle, GetDigits(rsym)),
++                DoubleToStr(riverLower, GetDigits(rsym)),
++                DoubleToStr(riverUpperBlue, GetDigits(rsym)),
++                DoubleToStr(riverLowerBlue, GetDigits(rsym)),
++                DoubleToStr(riverArrowUp, GetDigits(rsym)),
++                DoubleToStr(riverArrowDn, GetDigits(rsym)),
++                DoubleToStr(bbUpper, GetDigits(rsym)),
++                DoubleToStr(bbMiddle, GetDigits(rsym)),
++                DoubleToStr(bbLower, GetDigits(rsym)),
++                DoubleToStr(ema20, GetDigits(rsym)),
++                DoubleToStr(ema50, GetDigits(rsym)),
++                DoubleToStr(ema200, GetDigits(rsym)),
++                DoubleToStr(atr14, GetDigits(rsym)),
+                 DoubleToStr(rsi14, 2),
+-                DoubleToStr(macdLine, GetDigits(sym)),
+-                DoubleToStr(macdSignal, GetDigits(sym)),
+-                DoubleToStr(macdHist, GetDigits(sym))
++                DoubleToStr(macdLine, GetDigits(rsym)),
++                DoubleToStr(macdSignal, GetDigits(rsym)),
++                DoubleToStr(macdHist, GetDigits(rsym))
+             );
+-            
++
+             successCount++;
+-            
++
+             if(DebugMode)
+                 Print("OK: ", sym, " ", tfName);
+         }
+     }
+-    
++
+     FileClose(handle);
+-    
++
+     Print("=== Export Complete ===");
+     Print("Time: ", timeStr);
+     Print("Success: ", successCount, " rows");
+     Print("Failed: ", failCount, " rows");
++    Print("Resolved: ", (totalSymbols - missingSymbols), "/", totalSymbols,
++          ", Missing: ", missingSymbols);        // FIX-5 audit line
++    if(missingSymbols > 0)
++        Print("MISSING SYMBOLS: ", missingList); // FIX-5 grep anchor
+     Print("File: ", filePath);
+ }
+ 
+ //+------------------------------------------------------------------+
++//| FIX-3: broker digits first; hardcoded fallbacks kept for safety  |
++//+------------------------------------------------------------------+
+ int GetDigits(string symbol)
+ {
++    int d = (int)MarketInfo(symbol, MODE_DIGITS);
++    if(d > 0) return d;
+     if(symbol == "XAUUSD") return 2;
+     if(StringFind(symbol, "JPY") >= 0) return 3;
+     return 5;
