@@ -1,0 +1,73 @@
+--- MarketGlanceExporter_v100_orig.mq5	2026-10-24 14:10:53.351613010 +0000
++++ MarketGlanceExporter_v101.mq5	2026-10-24 14:11:30.272841368 +0000
+@@ -1,6 +1,13 @@
+ //+------------------------------------------------------------------+
+ //| MarketGlanceExporter.mq5 — Market Glance 7 項 MT5 本地源 exporter |
+ //| 任務 A 步驟 2（ZCODE 出品 2026-10-23）                            |
++//| v1.01 - 2026-10-24 - ZCODE 新增#1 patch：                        |
++//|   P1-1 InpSymbols 支援「|」多候選鏈（逐個試，首中即用）：          |
++//|        對應老闆 2026-10-24 枚舉（DXYZ/CL-OIL/UKOUSD/USOUSD/       |
++//|        NAS100.r/vix.r 確認存在）；Brent 候選 UKOUSD→USOUSD→       |
++//|        CL-OIL；SP500 候選 SP500.r→US500                           |
++//|   P1-2 候選全滅先寫 missing（規則不變：唔准靜默跳過）              |
++//|   ※ 7 項最終映射仍以 mg_diagnose.csv 審核＋老闆確認為準（gate 不變）|
+ //|                                                                  |
+ //| 老闆規則：                                                        |
+ //|  - 每 5 分鐘寫 MQL5/Files/market_glance.csv                       |
+@@ -15,10 +22,10 @@
+ //|   4. 首啟動即寫一次快照，之後每 5 分鐘覆寫                          |
+ //+------------------------------------------------------------------+
+ #property copyright "ZCODE for TSA — task A step 2"
+-#property version   "1.00"
++#property version   "1.01"
+ #property strict
+ 
+-input string InpSymbols     = "SP500.r;DJ30.r;NAS100.r;DXYZ;vix.r;UKOUSD;HK50.r";
++input string InpSymbols     = "SP500.r|US500;DJ30.r;NAS100.r;DXYZ;vix.r;UKOUSD|USOUSD|CL-OIL;HK50.r";
+ input string InpNames       = "S&P 500;Dow;Nasdaq;DXY;VIX;Brent;HK50";
+ input int    InpIntervalSec = 300;              // 5 分鐘
+ input string InpFile        = "market_glance.csv";
+@@ -47,6 +54,28 @@
+    return "";
+ }
+ 
++//--- P1-1: 多候選鏈解析："A|B|C" 逐個試，首中即用；全滅回 ""
++string ResolveFirst(const string candidates)
++{
++   string parts[];
++   int n = StringSplit(candidates, '|', parts);
++   if(n <= 0)
++      return "";
++   for(int i = 0; i < n; i++)
++   {
++      string one = parts[i];
++      // 清空格
++      StringTrimLeft(one);
++      StringTrimRight(one);
++      if(StringLen(one) == 0)
++         continue;
++      string hit = ResolveSym(one);
++      if(hit != "")
++         return hit;
++   }
++   return "";
++}
++
+ string NormalizeSym(string s)
+ {
+    // strip 尾點（例如 "XAUUSD." → "XAUUSD"）
+@@ -85,12 +114,12 @@
+    for(int i = 0; i < n; i++)
+    {
+       string nm  = (i < m && StringLen(names[i]) > 0) ? names[i] : syms[i];
+-      string sym = ResolveSym(syms[i]);
++      string sym = ResolveFirst(syms[i]);   // P1-1: 多候選鏈
+       string ts  = TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS);
+ 
+       if(sym == "")
+       {
+-         // 老闆規則：找唔到寫 missing 行，唔准靜默跳過
++         // 老闆規則：找唔到寫 missing 行，唔准靜默跳過（P1-2 候選全滅先 missing）
+          missing++;
+          FileWrite(fh, ts, syms[i], nm, "", "", "", "", "", "", "missing");
+          continue;
