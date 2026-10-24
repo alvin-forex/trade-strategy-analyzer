@@ -1,0 +1,78 @@
+--- ForexDataExporter_v103_patched.mq4	2026-10-24 14:47:33.924409629 +0000
++++ ForexDataExporter_v104.mq4	2026-10-24 14:48:09.491553073 +0000
+@@ -2,6 +2,10 @@
+ //|                                            ForexDataExporter.mq4 |
+ //|                                    OpenClaw Forex Report V2 EA    |
+ //+------------------------------------------------------------------+
++//| v1.04 - 2026-10-24 - US500 修復：ResolveSym 改 name-first         |
++//|       隱藏 symbol（SP500.r 唔喺 Market Watch）MarketInfo 返 0，    |
++//|       v1.03 枚舉 gate 誤拒 → 改為名面優先＋fallback，             |
++//|       數據面交 bars gate（bars==0 報 MISSING DATA 提示 Show All）  |
+ //| v1.03 - 2026-10-24 - ZCODE Task B 五合一修復                      |
+ //|  FIX-1 ResolveSym(): 精確名 → alias → normalize(尾點/.r/.raw/.m)  |
+ //|       → broker 全表枚舉比對；US500 alias 到 SP500 (F1B=SP500.r)   |
+@@ -20,9 +24,9 @@
+ //+------------------------------------------------------------------+
+ #property copyright "OpenClaw AI"
+ #property link      "https://openclaw.ai"
+-#property version   "1.03"
++#property version   "1.04"
+ #property strict
+-#property description "v1.03 - 2026-10-24 - Task B: symbol resolution + missing gate"
++#property description "v1.04 - 2026-10-24 - Task B: name-first resolution for hidden symbols"
+ 
+ // === Input Parameters ===
+ input int    ExportIntervalMinutes = 60;      // Export interval (minutes)
+@@ -98,8 +102,12 @@
+         return w;
+ 
+     // 3) normalized enumeration match over the full broker symbol table
++    //    v1.04: NAME match first — MarketInfo 返 0 嘅隱藏 symbol（唔喺
++    //    Market Watch）唔可以即刻拒收，記做 fallback；有 live data 嘅
++    //    命中優先返。數據有冇交由 ExportAllData 嘅 bars gate 判（v1.04）
+     string wu = NormalizeSym(w);
+     StringToUpper(wu);
++    string fallback = "";
+     int total = SymbolsTotal(false);
+     for(int i = 0; i < total; i++)
+     {
+@@ -107,10 +115,15 @@
+         string su = s;
+         StringToUpper(su);
+         su = NormalizeSym(su);
+-        if(su == wu && MarketInfo(s, MODE_POINT) > 0)
+-            return s;
++        if(su == wu)
++        {
++            if(MarketInfo(s, MODE_POINT) > 0)
++                return s;          // live-data hit，最優
++            if(fallback == "")
++                fallback = s;      // name hit 但隱藏 — 留住做 fallback
++        }
+     }
+-    return "";
++    return fallback;
+ }
+ 
+ //+------------------------------------------------------------------+
+@@ -141,7 +154,7 @@
+ //+------------------------------------------------------------------+
+ int OnInit()
+ {
+-    Print("=== ForexDataExporter v1.03 Start ===");
++    Print("=== ForexDataExporter v1.04 Start ===");
+ 
+     totalSymbols = ArraySize(Symbols);          // FIX-4
+     Print("Symbols: ", totalSymbols);
+@@ -232,7 +245,10 @@
+             int bars = iBars(rsym, tf);
+             if(bars < 200)
+             {
+-                if(DebugMode)
++                if(bars == 0)
++                    Print("MISSING DATA: ", sym, " (", rsym, ") ", tfName,
++                          " bars=0 — symbol hidden or no history (手動 fallback: Market Watch 右鍵 -> Show All 再重掛)");
++                else if(DebugMode)
+                     Print("WARN: ", sym, " (", rsym, ") ", tfName, " bars=", bars, " (skipped)");
+                 failCount++;
+                 continue;

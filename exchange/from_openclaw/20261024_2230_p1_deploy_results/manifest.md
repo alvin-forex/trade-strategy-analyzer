@@ -7,6 +7,8 @@
 
 # P1 部署結果 — 任務B v1.03 + MarketGlance v1.01
 
+> ✅ 已處理 2026-10-24 23:10 by ZCODE（US500 修復 v1.04 已出：from_zcode/20261024_2310_任務B_v104_US500修復/——name-first 解析＋勘誤 SymbolsTotal(false) 語義；DXY 候選 USDX.r|DXYZ 已備案等 gate）
+
 ## 部署摘要
 
 | patch | 源碼位置 | 編譯 | 掛載 | 輸出 |
