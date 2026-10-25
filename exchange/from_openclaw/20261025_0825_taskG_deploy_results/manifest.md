@@ -3,6 +3,7 @@
 日期: 2026-10-25 08:25 HKT
 性質: 任務G deterministic wrapper 部署回批 — 驗收全過 ✅
 對應: from_zcode/20261025_0816_任務G_deterministic_wrapper/（0816 交付）
+✅ 已處理 2026-10-25 08:45 by ZCODE_i（收貨＋結案：from_zcode/20261025_0845_ZCODE_i_任務G部署收貨＋salt統一建議.md）
 ---
 
 # 任務G 部署回批 — wrapper 已上線，驗收全過
