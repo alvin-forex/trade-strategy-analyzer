@@ -1,0 +1,201 @@
+--- AngelGold_v4.mq5.bak_20261026_0120	2026-10-01 11:48:23.000000000 +0800
++++ AngelGold_v4.mq5	2026-10-26 01:38:36.361499900 +0800
+@@ -21,7 +21,7 @@
+ //|  Panel: pink minimalist dashboard (ShowPanel)                    |
+ //+------------------------------------------------------------------+
+ #property copyright "Alvin"
+-#property version   "4.16"
++#property version   "4.17"
+ #property strict
+ #include <Trade\Trade.mqh>
+ #define COL_WHITE        C'255,255,255'
+@@ -100,7 +100,7 @@
+    g_hRSI = iRSI(_Symbol, SigTF(), RSI_Period, PRICE_CLOSE);
+    g_hATR = iATR(_Symbol, SigTF(), ATR_Period);
+    bool ok = IndReady();
+-   Print("v4.16 InitHandles: SMA=",g_hSMA," RSI=",g_hRSI," ATR=",g_hATR, ok?" [OK]":" [FAIL]");
++   Print("v4.17 InitHandles: SMA=",g_hSMA," RSI=",g_hRSI," ATR=",g_hATR, ok?" [OK]":" [FAIL]");
+    return ok;
+ }
+ datetime g_lastPanelDraw = 0;
+@@ -173,9 +173,9 @@
+    WriteAlive();
+    InitHandles();
+    EnsureSubIndicators();
+-   EventSetTimer(3);   // v4.16: timer keeps retrying handles AND subwindows until all ready
++   EventSetTimer(3);   // v4.17: timer keeps retrying handles AND subwindows until all ready
+    if(ApplyPinkTheme) ApplyPinkChartTheme();
+-   Print("=== AngelGold v4.16 core started ===");
++   Print("=== AngelGold v4.17 core started ===");
+    if(StrategyMode==FVG_M15)
+       Print("Mode=FVG_M15 (v4.08) | SL=", DoubleToString(FVG_SL_ATR,1), "xATR TP=", DoubleToString(FVG_TP_ATR,1), "xATR TL=", FVG_TimeLimitBars, "bars");
+    double effLot = EffectiveLot();
+@@ -190,7 +190,7 @@
+ {
+    if(!IndReady()) { InitHandles(); }
+    EnsureSubIndicators();
+-   if(IndReady() && g_rsiAdded && g_atrAdded) { EventKillTimer(); Print("v4.16 all indicators ready"); }
++   if(IndReady() && SubInd_Ready()) { EventKillTimer(); Print("v4.17 all indicators ready"); }
+ }
+ datetime g_lastAlive = 0;
+ void WriteAlive()
+@@ -819,25 +819,105 @@
+ }
+ 
+ //+------------------------------------------------------------------+
+-// v4.09b: add RSI/ATR subwindow indicators + text labels
+-bool g_rsiAdded=false, g_atrAdded=false;
+-void EnsureSubIndicators()
++// ── v4.17 子窗指標冪等管理 ────────────────────────────────────────────────
++// v4.17 根因：process 級旗標 reinit 歸零，chart 舊指標仍在（.chr 固化），
++// CHART_WINDOWS_TOTAL append 每次 reinit +2 子窗，OnDeinit hardcoded 名刪唔中。
++// v4.17：以 chart 實態為準（掃描為真），先清重複、count==0 先加；OnDeinit 用
++// 同一掃描邏輯全清。留邊份無實質差異（同參數），先到先 keep。
++
++bool SubInd_IsRSI(const string nm)
+ {
+-   if(!ShowIndicators) return;
+-   // v4.12: append to NEW subwindows (old code wrote to fixed index 1/2 which
+-   // silently fails when those subwindows already hold other indicators)
+-   if(!IndReady()) return;   // no handles -> no subwindow spam
+-   if(!g_rsiAdded && g_hRSI!=INVALID_HANDLE)
++   if(StringFind(nm, "RSI") == 0) return true;
++   if(StringFind(nm, "Relative Strength Index") == 0) return true;
++   return false;
++}
++bool SubInd_IsATR(const string nm)
++{
++   if(StringFind(nm, "ATR") == 0) return true;
++   if(StringFind(nm, "Average True Range") == 0) return true;
++   return false;
++}
++
++// 掃全 chart 子窗（w=1..wins-1），回報 RSI/ATR 各幾多份
++void SubInd_Count(int &rsiCount, int &atrCount)
++{
++   rsiCount = 0; atrCount = 0;
++   int wins = (int)ChartGetInteger(0, CHART_WINDOWS_TOTAL);
++   for(int w = 1; w < wins; w++)
+    {
+-      int sub=(int)ChartGetInteger(0, CHART_WINDOWS_TOTAL);
+-      if(sub>0 && ChartIndicatorAdd(0, sub, g_hRSI)) g_rsiAdded=true;
++      int total = ChartIndicatorsTotal(0, w);
++      for(int k = 0; k < total; k++)
++      {
++         string nm = ChartIndicatorName(0, w, k);
++         if(SubInd_IsRSI(nm)) rsiCount++;
++         if(SubInd_IsATR(nm)) atrCount++;
++      }
+    }
+-   if(!g_atrAdded && g_hATR!=INVALID_HANDLE)
+-   {
+-      int sub=(int)ChartGetInteger(0, CHART_WINDOWS_TOTAL);
+-      if(sub>0 && ChartIndicatorAdd(0, sub, g_hATR)) g_atrAdded=true;
++}
++
++// 清重複（removeAll=false，每種留一份）或全清（removeAll=true，OnDeinit 用）
++// 由高窗刪起：刪空窗會令窗數收縮、index 移位——外層迴圈每次重新讀窗數就安全。
++// guard 32：實際子窗唔會超過呢個數，純防死循環（delete 失敗時照收工唔癱）。
++int SubInd_RemoveExcess(bool removeAll)
++{
++   int removed = 0;
++   int rsiKept = 0, atrKept = 0;
++   for(int guard = 0; guard < 32; guard++)
++   {
++      int wins = (int)ChartGetInteger(0, CHART_WINDOWS_TOTAL);
++      if(wins <= 1) break;                       // 淨返主圖，收工
++      bool deletedThisRound = false;
++      for(int w = wins - 1; w >= 1; w--)         // 由高窗刪起
++      {
++         int total = ChartIndicatorsTotal(0, w);
++         for(int k = total - 1; k >= 0; k--)     // 子窗內由尾刪起
++         {
++            string nm = ChartIndicatorName(0, w, k);
++            bool isRSI = SubInd_IsRSI(nm), isATR = SubInd_IsATR(nm);
++            if(!isRSI && !isATR) continue;
++            bool keep = !removeAll &&
++                        ((isRSI && rsiKept == 0) || (isATR && atrKept == 0));
++            if(keep)
++            {
++               if(isRSI) rsiKept = 1; else atrKept = 1;
++               continue;
++            }
++            if(ChartIndicatorDelete(0, w, nm))
++            {
++               removed++;
++               deletedThisRound = true;
++            }
++         }
++      }
++      if(!deletedThisRound) break;               // 冇刪走任何嘢 → 收工
+    }
+-   if(g_rsiAdded && !g_atrAdded) { /* next tick will retry ATR into another new subwindow */ }
++   return removed;
++}
++
++// v4.17：chart 上 RSI 同 ATR 各至少一份（取代 v4.17 process 級旗標判斷）
++bool SubInd_Ready()
++{
++   int r = 0, a = 0;
++   SubInd_Count(r, a);
++   return (r > 0 && a > 0);
++}
++
++// v4.17：以 chart 實態為準，唔再靠 process 級旗標
++void EnsureSubIndicators()
++{
++   if(!ShowIndicators) return;
++   if(!IndReady()) return;
++
++   // 1) 先清重複（reinit 後 chart 上可能留存舊份——.chr 已固化，EA 重載唔會清）
++   SubInd_RemoveExcess(false);
++
++   // 2) 清完再數：count==0 先加（append 新子窗；RSI 加完 ATR 另開一窗）
++   int rsiCount = 0, atrCount = 0;
++   SubInd_Count(rsiCount, atrCount);
++   if(rsiCount == 0 && g_hRSI != INVALID_HANDLE)
++      ChartIndicatorAdd(0, (int)ChartGetInteger(0, CHART_WINDOWS_TOTAL), g_hRSI);
++   if(atrCount == 0 && g_hATR != INVALID_HANDLE)
++      ChartIndicatorAdd(0, (int)ChartGetInteger(0, CHART_WINDOWS_TOTAL), g_hATR);
+ }
+ // v4.09b: text labels on SMA line / FVG boxes / arrows
+ void LabelObj(string nm, datetime t, double price, string txt, color clr, int anchor=ANCHOR_LEFT_UPPER)
+@@ -887,7 +967,7 @@
+    ObjRect(P+"hdr2", X+140, Y+18, W-140, 38, COL_HEADER2); // light end
+    ObjRect(P+"hdr3", X, Y+18, 140, 38, COL_HEADER);        // seamless base
+    ObjDot(P+"dot",  X+18, Y+28, COL_GREEN_BORDER, 9);       // status dot
+-   ObjText(P+"title", X+34, Y+16, "AngelGold v4.16", 11, COL_WHITE, "Arial");
++   ObjText(P+"title", X+34, Y+16, "AngelGold v4.17", 11, COL_WHITE, "Arial");
+    ObjText(P+"mode",  X+W-10, Y+20, EnableTrading ? "LIVE" : "SHADOW", 8, COL_HEADER2, "Arial Bold", true);
+ 
+    Y += 64;
+@@ -916,7 +996,7 @@
+    ObjText(P+"posT", X+128, Y+8, StringFormat("Pos: %d", PositionsMine()), 9, COL_TEXT, "Arial Bold");
+ 
+    Y += 40;
+-   // ============ 4. indicator cards (v4.16: live refresh) ============
++   // ============ 4. indicator cards (v4.17: live refresh) ============
+    ComputeIndicators();
+    ObjText(P+"indLbl", X, Y, "INDICATORS · M"+IntegerToString(SignalTF_Minutes), 7, COL_TITLE);
+    Y += 14;
+@@ -1095,13 +1175,14 @@
+    if(g_hRSI!=INVALID_HANDLE) IndicatorRelease(g_hRSI);
+    if(g_hATR!=INVALID_HANDLE) IndicatorRelease(g_hATR);
+    ObjectsDeleteAll(0, "AGI_");
+-   for(int w=(int)ChartGetInteger(0,CHART_WINDOWS_TOTAL)-1; w>=1; w--)
+-   {
+-      ChartIndicatorDelete(0, w, "RSI(14)");
+-      ChartIndicatorDelete(0, w, "ATR(14)");
+-   }
++   // v4.17: 只有「EA 真係被移除／圖表關閉」才全清。TF 切換(3)、改參數(5)、
++   // recompile(2)、換帳號(6) 等 reinit 一律保留子窗——保留後新一輪 OnInit 的
++   // chart 實態掃描會自然收斂到每種一份；若喺 reinit 時刪走，新 TF 上
++   // ChartIndicatorAdd 會失敗（實測 err 4114），子窗歸零。
++   if(reason == REASON_REMOVE || reason == REASON_CHARTCLOSE)
++      SubInd_RemoveExcess(true);
+ 
+    ObjectsDeleteAll(0, "AG5_");
+-   Print("=== AngelGold v4.16 stopped (", reason, ") ===");
++   Print("=== AngelGold v4.17 stopped (", reason, ") ===");
+ }
+ //+------------------------------------------------------------------+
