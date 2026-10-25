@@ -1,0 +1,69 @@
+--- bgr_v100.py	2026-10-25 15:55:28.634091182 +0000
++++ bgr_v200.py	2026-10-25 15:55:48.106192895 +0000
+@@ -1,5 +1,10 @@
+ #!/usr/bin/env python3
+-"""Batch generate deep analysis reports for multiple signals."""
++"""Batch generate deep analysis reports for multiple signals.
++
++Task H v2.00 (ZCODE 2026-10-26): unified official head CSS + back link for all
++generated pages (real + placeholder). Tool page index.html <style> is the single
++source of truth for placeholder CSS; real pages keep runtime extraction.
++"""
+ import time, os, sys, subprocess
+ 
+ BASE = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer"
+@@ -27,15 +32,23 @@
+ # Check if CSV has actual trades (more than just header + deposit)
+ with open(CSV_PATH, "r") as f:
+     lines = f.readlines()
++
++# Task H v2.00: 統一 head CSS＋返回連結——tool 頁 CSS 係唯一真相源
++with open(f"{{BASE}}/index.html", "r") as f:
++    html = f.read()
++_css_s = html.find("<style>")
++_css_e = html.find("</style>", _css_s)
++TOOL_CSS = html[_css_s+7:_css_e] if _css_s >= 0 and _css_e > _css_s else ""
++
+ if len(lines) < 3:
+     print(f"SKIP: {{SIGNAL_ID}} - only {{len(lines)}} lines (no trades)")
+-    # Create a minimal placeholder report
++    # Create a placeholder report（Task H：官方 head＋CSS＋返回連結；原文句子保留）
+     html_content = f"""<!DOCTYPE html>
+-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+-<title>Signal {{SIGNAL_ID}}</title></head>
+-<body style="max-width:900px;margin:0 auto;padding:20px;font-family:sans-serif">
+-<h2>Signal {{SIGNAL_ID}}</h2>
+-<p>No trading data available (deposit only, no trades executed).</p>
++<html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Signal {{SIGNAL_ID}} — Trade Strategy Analysis Report</title><style>
++{{TOOL_CSS}}
++</style></head><body style="max-width:900px;margin:0 auto;padding:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif">
++<p style="margin-bottom:16px"><a href="../index.html" style="color:#0f3460;text-decoration:none;font-weight:600">← 返回主頁</a></p>
++<div class="card"><h2>Signal {{SIGNAL_ID}}</h2><p>No trading data available (deposit only, no trades executed).</p></div>
+ </body></html>"""
+     os.makedirs(os.path.dirname(OUT), exist_ok=True)
+     with open(OUT, "w") as f:
+@@ -43,9 +56,6 @@
+     print(f"PLACEHOLDER: {{OUT}}")
+     exit(0)
+ 
+-with open(f"{{BASE}}/index.html", "r") as f:
+-    html = f.read()
+-
+ with sync_playwright() as p:
+     br = p.chromium.launch(headless=True)
+     pg = br.new_page()
+@@ -69,11 +79,13 @@
+         if pg.evaluate("""() => document.getElementById("results").innerHTML.trim() !== ''"""):
+             break
+     time.sleep(3)
++    # Task H v2.00: lang＋signal title＋官方 body font＋返回連結
+     r = pg.evaluate("""() => {{
+         const s = document.querySelector("style").textContent;
+         const r = document.getElementById("results");
+-        return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Trade Strategy Analysis Report</title><style>'+s+'</style></head><body style="max-width:900px;margin:0 auto;padding:20px;font-family:sans-serif">'+r.innerHTML+'</body></html>';
++        return '<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>__TITLE__</title><style>'+s+'</style></head><body style="max-width:900px;margin:0 auto;padding:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif"><p style="margin-bottom:16px"><a href="../index.html" style="color:#0f3460;text-decoration:none;font-weight:600">← 返回主頁</a></p>'+r.innerHTML+'</body></html>';
+     }}""")
++    r = r.replace("__TITLE__", f"Signal {{SIGNAL_ID}} — Trade Strategy Analysis Report", 1)
+     os.makedirs(os.path.dirname(OUT), exist_ok=True)
+     with open(OUT, "w") as f:
+         f.write(r)

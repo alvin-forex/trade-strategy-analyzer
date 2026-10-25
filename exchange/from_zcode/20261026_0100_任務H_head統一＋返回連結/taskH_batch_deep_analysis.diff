@@ -1,0 +1,71 @@
+--- hda_v100.py	2026-10-25 15:55:28.633091177 +0000
++++ hda_v200.py	2026-10-25 15:55:28.646091243 +0000
+@@ -1,5 +1,10 @@
+ #!/usr/bin/env python3
+-"""Batch generate deep analysis reports using Playwright."""
++"""Batch generate deep analysis reports using Playwright.
++
++Task H v2.00 (ZCODE 2026-10-26): unified official head CSS + back link for all
++generated pages (real + placeholder). Tool page index.html <style> is the single
++source of truth for placeholder CSS; real pages keep runtime extraction.
++"""
+ import time, os, sys
+ 
+ def generate_one(signal_id, base):
+@@ -12,23 +17,27 @@
+     # Check if CSV has enough data
+     with open(csv_path, 'r') as f:
+         lines = f.readlines()
++
++    # Task H v2.00: 統一 head CSS＋返回連結——tool 頁 CSS 係唯一真相源（與真頁同一份）
++    with open(f"{base}/index.html", 'r') as f:
++        template_html = f.read()
++    _css_s = template_html.find('<style>')
++    _css_e = template_html.find('</style>', _css_s)
++    tool_css = template_html[_css_s+7:_css_e] if _css_s >= 0 and _css_e > _css_s else ''
++
+     if len(lines) < 3:
+-        # Create placeholder
++        # Create placeholder（Task H：官方 head＋CSS＋返回連結；原文句子保留）
+         html = f"""<!DOCTYPE html>
+-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+-<title>Signal {signal_id}</title></head>
+-<body style="max-width:900px;margin:0 auto;padding:20px;font-family:sans-serif">
+-<h2>Signal {signal_id}</h2>
+-<p>No trading data available (deposit only, no trades executed).</p>
++<html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Signal {signal_id} — Trade Strategy Analysis Report</title><style>
++{tool_css}
++</style></head><body style="max-width:900px;margin:0 auto;padding:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif">
++<p style="margin-bottom:16px"><a href="../index.html" style="color:#0f3460;text-decoration:none;font-weight:600">← 返回主頁</a></p>
++<div class="card"><h2>Signal {signal_id}</h2><p>No trading data available (deposit only, no trades executed).</p></div>
+ </body></html>"""
+         os.makedirs(os.path.dirname(out_path), exist_ok=True)
+         with open(out_path, 'w') as f:
+             f.write(html)
+-        return ("placeholder", f"Only {len(lines)} lines")
+-
+-    # Read the index.html template
+-    with open(f"{base}/index.html", 'r') as f:
+-        template_html = f.read()
++        return ("placeholder", f"Only {len(lines)} lines (official head + back link)")
+ 
+     from playwright.sync_api import sync_playwright
+ 
+@@ -74,14 +83,15 @@
+ 
+         time.sleep(3)
+ 
+-        # Extract results HTML
++        # Extract results HTML（Task H v2.00：lang＋signal title＋官方 body font＋返回連結）
+         result_html = pg.evaluate("""
+             () => {
+                 const s = document.querySelector('style').textContent;
+                 const r = document.getElementById('results');
+-                return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Trade Strategy Analysis Report</title><style>' + s + '</style></head><body style="max-width:900px;margin:0 auto;padding:20px;font-family:sans-serif">' + r.innerHTML + '</body></html>';
++                return '<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>__TITLE__</title><style>' + s + '</style></head><body style="max-width:900px;margin:0 auto;padding:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif"><p style="margin-bottom:16px"><a href="../index.html" style="color:#0f3460;text-decoration:none;font-weight:600">← 返回主頁</a></p>' + r.innerHTML + '</body></html>';
+             }
+         """)
++        result_html = result_html.replace("__TITLE__", f"Signal {signal_id} — Trade Strategy Analysis Report", 1)
+ 
+         os.makedirs(os.path.dirname(out_path), exist_ok=True)
+         with open(out_path, 'w') as f:
