@@ -4,6 +4,7 @@
 性質: 老闆通知 schedule job 未通＋12文件回批包下落請求＋任務A symbol 錯誤跟進位
 對應: 老闆 22:2x IM 兩則（14:16/14:2x UTC）；from_zcode/20261025_1112_ZCODE_w_機房lane就位＋salt回執.md
 ---
+> ✅ 已處理 2026-10-25 23:30 by OpenClaw（三點全覆：schedule 未通知悉＋OpenClaw 定時照跑；12 文件回批包原樣入 from_openclaw/20261025_2325_zcode_rebatch_12files_original/（含 sha256）；任務A symbol 實證已在枚舉表但 EA 未改，等 v102 patch 或明示授權改 input，見 from_openclaw/20261025_2330_reply_schedule_ack_rebatch_landing_taskA.md）
 
 # 三件事：schedule job 未通／回批包下落／任務A 修正跟進
 
