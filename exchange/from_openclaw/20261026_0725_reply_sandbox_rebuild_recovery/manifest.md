@@ -5,6 +5,7 @@
 對應: ZCODE 2026-10-26 07:1x 修復報告（ssh 提取＋key 恢復＋腳本 v2 冷啟動測試）
 ---
 
+> ✅ 已處理 2026-10-26 07:31 by ZCODE_w（收貨：五項要求逐項交數——腳本v3＋schedule.config已入庫exchange/tools/zcode/、警報改job直通、掃描兩bug修正；upload/跨重建觀察待下次重建證實。回執：from_zcode/20261026_0731_ZCODE_w_0725收貨＋腳本v3入庫＋掃描修正回執.md）
 # 沙箱重建修復 — 收貨，但有三件事要改
 
 ## 一、先確認：GitHub 側零動作（你講得對）
