@@ -1,0 +1,55 @@
+   FileClose(h);
+   return true;
+}
+int Dg2(string sym){ return (int)SymbolInfoInteger(sym, SYMBOL_DIGITS); }
+
+void WriteSnapshotRow()
+{
+   int h = FileOpen("forex_data.csv", FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI, ',');
+   if(h == INVALID_HANDLE) { Print("FileOpen forex_data.csv failed ", GetLastError()); return; }
+   FileSeek(h, 0, SEEK_END);
+   if(FileTell(h) == 0) {
+      FileWrite(h, "timestamp","symbol","timeframe","open","high","low","close","volume",
+                "ccy_1_name","ccy_1_power","ccy_2_name","ccy_2_power","ccy_3_name","ccy_3_power",
+                "ccy_4_name","ccy_4_power","ccy_5_name","ccy_5_power","ccy_6_name","ccy_6_power",
+                "ccy_7_name","ccy_7_power","ccy_8_name","ccy_8_power","ccy_9_name","ccy_9_power",
+                "bb_upper","bb_middle","bb_lower","ema20","ema50","ema200",
+                "atr14","rsi14","macd_line","macd_signal","macd_hist","swing_high","swing_low");
+   }
+   for(int i = 0; i < 3; i++) WriteTFRow(h, i);
+   FileClose(h);
+}
+
+void WriteTFRow(int h, int i)
+{
+   double o = iOpen(g_sym, g_tfs[i], 1), hi = iHigh(g_sym, g_tfs[i], 1),
+          lo = iLow(g_sym, g_tfs[i], 1),  c  = iClose(g_sym, g_tfs[i], 1);
+   long v = (long)iVolume(g_sym, g_tfs[i], 1);
+   double buf[1];
+   double rsi = 0, bbU = 0, bbM = 0, bbL = 0, e20 = 0, e50 = 0, e200 = 0, atr = 0, mc = 0, ms = 0;
+   if(CopyBuffer(g_hRsi[i],    0, 1, 1, buf) == 1) rsi  = buf[0];
+   if(CopyBuffer(g_hBands[i],  1, 1, 1, buf) == 1) bbU  = buf[0];
+   if(CopyBuffer(g_hBands[i],  0, 1, 1, buf) == 1) bbM  = buf[0];
+   if(CopyBuffer(g_hBands[i],  2, 1, 1, buf) == 1) bbL  = buf[0];
+   if(CopyBuffer(g_hEma20[i],  0, 1, 1, buf) == 1) e20  = buf[0];
+   if(CopyBuffer(g_hEma50[i],  0, 1, 1, buf) == 1) e50  = buf[0];
+   if(CopyBuffer(g_hEma200[i], 0, 1, 1, buf) == 1) e200 = buf[0];
+   if(CopyBuffer(g_hAtr[i],    0, 1, 1, buf) == 1) atr  = buf[0];
+   if(CopyBuffer(g_hMacd[i],   0, 1, 1, buf) == 1) mc   = buf[0];
+   if(CopyBuffer(g_hMacd[i],   1, 1, 1, buf) == 1) ms   = buf[0];
+   int hiIdx = iHighest(g_sym, g_tfs[i], MODE_HIGH, 500, 1);
+   int loIdx = iLowest(g_sym, g_tfs[i], MODE_LOW, 500, 1);
+   double swH = (hiIdx >= 0) ? iHigh(g_sym, g_tfs[i], hiIdx) : 0;
+   double swL = (loIdx >= 0) ? iLow(g_sym, g_tfs[i], loIdx) : 0;
+   datetime bt = iTime(g_sym, g_tfs[i], 1);
+   string tfName = (g_tfs[i] == PERIOD_D1) ? "D1" : (g_tfs[i] == PERIOD_H4) ? "H4" : "H1";
+   FileWrite(h, TimeToString(bt, TIME_DATE|TIME_MINUTES), g_sym, tfName,
+             DoubleToString(o, Dg()), DoubleToString(hi, Dg()),
+             DoubleToString(lo, Dg()), DoubleToString(c, Dg()), (long)v,
+             "","","","","","","","","","","","","","","","","","",
+             DoubleToString(bbU, Dg()), DoubleToString(bbM, Dg()), DoubleToString(bbL, Dg()),
+             DoubleToString(e20, Dg()), DoubleToString(e50, Dg()), DoubleToString(e200, Dg()),
+             DoubleToString(atr, Dg()), DoubleToString(rsi, 2),
+             DoubleToString(mc, 2), DoubleToString(ms, 2), DoubleToString(mc - ms, 2),
+             DoubleToString(swH, Dg()), DoubleToString(swL, Dg()));
+}

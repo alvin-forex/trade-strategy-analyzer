@@ -1,0 +1,218 @@
+14a15
+> import time as _time
+20,23c21,105
+< DEFAULT_CSV = (
+<     "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/"
+<     "A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/forex_data.csv"
+< )
+---
+> # ── 數據源選擇（任務 C，老闆裁定：F1B 優先，A06E 只作 stale fallback）──
+> F1B_CSV_GLOB   = ('/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/'
+>                   'Terminal/F1BBCAA*/MQL4/Files/forex_data.csv')
+> A06E_CSV_GLOB  = ('/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/'
+>                   'Terminal/A06E6395*/MQL4/Files/forex_data.csv')
+> F1B_CCY_GLOB   = ('/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/'
+>                   'Terminal/F1BBCAA*/MQL4/Files/ccy_power_reader.csv')
+> A06E_CCY_GLOB  = ('/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/'
+>                   'Terminal/A06E6395*/MQL4/Files/ccy_power_reader.csv')
+> SOURCE_STALE_MIN = 180
+> 
+> DEFAULT_CSV = None  # 任務 C：由 select_main_csv() 動態決定
+> 
+> # ── Market Glance MT5 本地源（任務 A phase 2b，老闆裁定嚴禁外部數據源）──
+> MARKET_GLANCE_GLOB = ('/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/'
+>                       'Terminal/725B*/MQL5/Files/market_glance.csv')
+> MARKET_GLANCE_STALE_MIN = 15
+> MG_ITEMS = ['S&P 500', 'Dow', 'Nasdaq', 'DXY', 'VIX', 'Brent', 'HK50']
+> 
+> 
+> def _pick_source(glob_p1, glob_p3, label):
+>     """P1 fresh→P2 stale（照用＋標示）→P3 fallback（標已停產）→全無則 SystemExit。
+>     返回 (path, status, mtime_str)。每步打印實際選中來源。"""
+>     import glob as _glob, os as _os, sys as _sys, time as _time2
+>     hits = sorted(_glob.glob(glob_p1))
+>     if hits:
+>         p = hits[0]
+>         age = (_time2.time() - _os.path.getmtime(p)) / 60.0
+>         ts = _time2.strftime('%m-%d %H:%M', _time2.localtime(_os.path.getmtime(p)))
+>         if age <= SOURCE_STALE_MIN:
+>             print(f'[source] {label} P1 fresh: {p} (mtime {ts}, {age:.0f}min)')
+>             return p, 'fresh', ts
+>         print(f'[source] {label} P2 STALE: {p} (mtime {ts}, {age:.0f}min > {SOURCE_STALE_MIN}min)')
+>         return p, f'STALE（最後更新 {ts}）', ts
+>     fb = sorted(_glob.glob(glob_p3))
+>     if fb:
+>         p = fb[0]
+>         ts = _time2.strftime('%m-%d %H:%M', _time2.localtime(_os.path.getmtime(p)))
+>         print(f'[source] {label} P3 fallback（已停產）: {p} (mtime {ts})')
+>         return p, f'STALE（A06E 已停產，最後更新 {ts}）', ts
+>     raise SystemExit(f'[source] {label} 全部源不可用（P1/P3 都冇檔）——唔生成「看起來正常」嘅報告')
+> 
+> 
+> def select_main_csv():
+>     return _pick_source(F1B_CSV_GLOB, A06E_CSV_GLOB, '主CSV')
+> 
+> 
+> def select_ccy_source():
+>     return _pick_source(F1B_CCY_GLOB, A06E_CCY_GLOB, 'CCY-Power')
+> 
+> 
+> def fetch_market_glance_mt5():
+>     """讀 MT5 (725B) MarketGlanceExporter 產出嘅 market_glance.csv。
+> 
+>     覆寫規則（老闆裁定）：
+>       - 檔案 mtime > 15 分鐘 → 每項標 STALE（最後更新 HH:MM）
+>       - status=missing → 標「缺數」，唔准填其他來源
+>       - change_pct 空 → 標「—」，唔准自己計
+>     返回：list[dict]，key = name/price/change_pct/source/note"""
+>     import glob as _glob, os as _os
+>     hits = sorted(_glob.glob(MARKET_GLANCE_GLOB))
+>     rows = {it: {'name': it, 'price': None, 'change_pct': None,
+>                  'source': 'MT5 725B', 'note': '缺數（market_glance.csv 不存在）'}
+>             for it in MG_ITEMS}
+>     if not hits:
+>         return list(rows.values())
+> 
+>     path = hits[0]
+>     age_min = (_time.time() - _os.path.getmtime(path)) / 60.0
+>     stale_tag = f'STALE（最後更新 {datetime.fromtimestamp(_os.path.getmtime(path)).strftime("%H:%M")}）' \
+>         if age_min > MARKET_GLANCE_STALE_MIN else ''
+>     with open(path, newline='', encoding='utf-8', errors='replace') as f:
+>         for row in csv.DictReader(f):
+>             nm = (row.get('name') or '').strip()
+>             if nm in rows:
+>                 status = (row.get('status') or '').strip()
+>                 price = (row.get('last') or row.get('bid') or '').strip()
+>                 chg = (row.get('change_pct') or '').strip()
+>                 note = stale_tag or ('缺數' if status == 'missing' else 'fresh')
+>                 rows[nm].update({
+>                     'price': float(price) if price not in ('', 'missing') else None,
+>                     'change_pct': float(chg) if chg else None,
+>                     'note': note if status != 'missing' else '缺數',
+>                 })
+>     return list(rows.values())
+101,133d182
+< def fetch_market_glance_yahoo():
+<     """Fetch real-time market data from Yahoo Finance."""
+<     symbols = {
+<         '^GSPC': ('標普500', '{:,.2f}'),
+<         '^DJI': ('道瓊', '{:,.2f}'),
+<         '^IXIC': ('納指', '{:,.2f}'),
+<         'DX-Y.NYB': ('DXY', '{:.2f}'),
+<         '^VIX': ('VIX', '{:.2f}'),
+<         'BZ=F': ('Brent原油', '$' + '{:.2f}'),
+<         '^HSI': ('HK50', '{:,.2f}'),
+<     }
+<     items = []
+<     try:
+<         import yfinance as yf
+<         for sym, (name, fmt) in symbols.items():
+<             try:
+<                 ticker = yf.Ticker(sym)
+<                 info = ticker.info
+<                 price = info.get('regularMarketPrice') or info.get('currentPrice')
+<                 prev_close = info.get('regularMarketPreviousClose') or info.get('previousClose')
+<                 if price and prev_close:
+<                     change_pct = ((price - prev_close) / prev_close) * 100
+<                     direction = 'up' if change_pct > 0 else 'down'
+<                     value = fmt.format(price) if not fmt.startswith('$') else '${:.2f}'.format(price)
+<                     items.append((name, {'value': value, 'change': f'{change_pct:+.2f}%', 'direction': direction}))
+<                 else:
+<                     items.append((name, {'value': '—', 'change': '無數據', 'direction': 'neutral'}))
+<             except:
+<                 items.append((name, {'value': '—', 'change': 'error', 'direction': 'neutral'}))
+<     except ImportError:
+<         items.append(('Yahoo Finance', {'value': '未安裝', 'change': '', 'direction': 'neutral'}))
+<     return items
+< 
+135c184
+<     """Build Market Glance with Yahoo Finance data + XAU from MT4."""
+---
+>     """Build Market Glance with MT5 local data + XAU from MT4 (任務 A phase 2b)."""
+138,140c187,204
+<     # Fetch Yahoo Finance data first
+<     yahoo_items = fetch_market_glance_yahoo()
+<     items.extend(yahoo_items)
+---
+>     # Fetch MT5 Market Glance first（老闆裁定：嚴禁外部數據源，缺數照實報）
+>     mt5_items = fetch_market_glance_mt5()
+>     for it in mt5_items:
+>         name = it['name']
+>         price = it['price']
+>         chg = it['change_pct']
+>         note = it['note']
+>         if price is None:
+>             value, change, direction = '—', note, 'neutral'
+>         else:
+>             value = f'{price:,.2f}'
+>             if chg is not None:
+>                 change = f'{chg:+.2f}%'
+>                 direction = 'up' if chg > 0 else 'down'
+>             else:
+>                 change = note
+>                 direction = 'neutral'
+>         items.append((name, {'value': value, 'change': change, 'direction': direction}))
+625d688
+< def _removed_old_market_glance(): pass  # removed, using Yahoo Finance version
+968c1031,1047
+< def generate_report(data, tf_map, output_path):
+---
+> def render_source_block(entries):
+>     """entries: list[(項目, terminal, 檔案, 檔內timestamp, 狀態)] → HTML 區塊。
+>     唔准改現有版面結構，只喺報告 header 後 append 呢個區塊。"""
+>     if not entries:
+>         return ''
+>     rows = ''.join(
+>         f'<tr><td>{i}</td><td>{t}</td><td style="font-family:monospace;font-size:11px">{p}</td>'
+>         f'<td>{ts}</td><td style="color:{"#d9534f" if "STALE" in st or "缺" in st else "#5cb85c"}">{st}</td></tr>'
+>         for i, t, p, ts, st in entries)
+>     return ('<div style="margin:8px 0;padding:8px;border:1px solid #ddd;border-radius:4px;'
+>             'font-size:12px"><b>數據來源</b>（老闆裁定：MT4/MT5 本地源，嚴禁外部數據源）'
+>             '<table style="border-collapse:collapse;width:100%;margin-top:6px">'
+>             '<tr style="text-align:left"><th>項目</th><th>terminal</th><th>檔案</th>'
+>             '<th>檔內 timestamp</th><th>狀態</th></tr>' + rows + '</table></div>')
+> 
+> 
+> def generate_report(data, tf_map, output_path, source_entries=None):
+1025a1105,1106
+> {render_source_block(source_entries)}
+> 
+1059c1140
+<     parser.add_argument("--input", default=DEFAULT_CSV, help="Path to forex_data.csv")
+---
+>     parser.add_argument("--input", default=None, help="Path to forex_data.csv（唔填就自動揀源）")
+1062a1144,1149
+>     # 任務 C：動態揀源（F1B fresh → F1B STALE → A06E fallback → 全無報錯）
+>     if not args.input:
+>         args.input, src_main_status, src_main_ts = select_main_csv()
+>     else:
+>         src_main_status, src_main_ts = '指定(--input)', ''
+> 
+1075,1079c1162,1164
+<     READER_CSV = (
+<         "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/"
+<         "A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/ccy_power_reader.csv"
+<     )
+<     tf_map = load_ccy_power_tf(READER_CSV)
+---
+>     # 任務 C：CCY 源都係動態揀（F1B → A06E fallback）
+>     reader_path, reader_status, reader_ts = select_ccy_source()
+>     tf_map = load_ccy_power_tf(reader_path)
+1082c1167
+<         print(f"ℹ️ CCY Power loaded from ccy_power_reader.csv: {counts}", file=sys.stderr)
+---
+>         print(f"ℹ️ CCY Power loaded from {reader_path}: {counts}", file=sys.stderr)
+1097a1183,1191
+>     # 任務 C：組數據來源區塊（報告 header 顯示）
+>     main_label = 'F1B (MT4)' if 'F1BBCAA' in args.input else ('A06E (MT4)' if 'A06E' in args.input else '指定(--input)')
+>     ccy_label = 'F1B (MT4)' if 'F1BBCAA' in reader_path else ('A06E (MT4)' if 'A06E' in reader_path else reader_path)
+>     src_entries = [
+>         ('主 CSV', main_label, args.input, src_main_ts, src_main_status),
+>         ('CCY-Power', ccy_label, reader_path, reader_ts, reader_status),
+>         ('Market Glance', 'MT5 725B', 'market_glance.csv (MT5 725B)', '', 'MT5 725B 本地源'),
+>     ]
+> 
+1099c1193
+<     result = generate_report(data, tf_map, output_path)
+---
+>     result = generate_report(data, tf_map, output_path, source_entries=src_entries)
