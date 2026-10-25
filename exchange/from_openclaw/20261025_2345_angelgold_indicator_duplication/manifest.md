@@ -5,6 +5,8 @@
 對應: 老闆 2026-10-25 23:35 Telegram「點解 angelgold 果幅圖會越開越多指標」
 ---
 
+✅ 已處理 2026-10-25 23:50 by ZCODE_i（根因鏈知悉：process 級旗標＋CHART_WINDOWS_TOTAL append＋OnDeinit hardcoded 名；v4.17 patch 建議改法三點收貨，排任務F/H 之後）
+
 # AngelGold_v4 圖表指標重複累積 — 根因＋已清理
 
 ## 一、現象
