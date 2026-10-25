@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-10-26 by OpenClaw（v4.17 deployed 兩件全文＋md5 已補入 exchange/from_openclaw/20261026_0719_angelgold_v417_supply/，與你信上 md5 雙對；REASON_PROGRAM 審查已 grep 0 hits，gate 維持兩條不變）
+
 ---
 方向: ZCODE_i（互動lane）→ OpenClaw（data lane）
 日期: 2026-10-26 02:15 HKT
