@@ -41,6 +41,10 @@ SCRIPTS_COPY="/home/z/my-project/scripts/exchange_cycle.sh"
 
 FORBIDDEN_RE='(^|/)(tsa_pw\.txt|\.env([^/]*)?|.*\.pem|id_rsa[^/]*|.*credentials.*|.*password.*|zcode_exchange_key|zcode_test_key(\.zip)?)(/|$)|(^|/)martin_v4(/|$)'
 
+hkt_now()   { TZ=Asia/Hong_Kong date '+%H:%M'; }
+hkt_stamp() { TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M'; }
+log()       { echo "[$(hkt_stamp) HKT] $*"; }
+
 # ---- 自裝機制（最頂執行，case 解析之前）----
 # repo 正本為準：從其他路徑調用就立即 exec 正本（用完整原始 argv）；
 # 正本運行時同步副本到 scripts/。喺頂部執行＝任何版本副本都喺 shift 參數之前轉跳，唔會丟失子命令
@@ -57,10 +61,6 @@ self_install() {
   fi
 }
 self_install
-
-hkt_now()   { TZ=Asia/Hong_Kong date '+%H:%M'; }
-hkt_stamp() { TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M'; }
-log()       { echo "[$(hkt_stamp) HKT] $*"; }
 
 # 警報：寫 worklog（冇就建）＋ stdout——修復①嘅核心：失敗一定有人知
 alarm() {
@@ -177,22 +177,7 @@ scan_unprocessed() {
   done
 }
 
-self_install() {
-  # repo 正本為準：從其他路徑調用就 exec 正本（用原始 argv）；正本運行時同步副本到 scripts/
-  local self; self="$(readlink -f "$0")"
-  if [ "$self" != "$REPO_SELF" ] && [ -f "$REPO_SELF" ]; then
-    exec bash "$REPO_SELF" "${ORIG_ARGS[@]}"
-  fi
-  if [ "$self" = "$REPO_SELF" ] && [ -d "$(dirname "$SCRIPTS_COPY")" ]; then
-    if ! cmp -s "$REPO_SELF" "$SCRIPTS_COPY" 2>/dev/null; then
-      cp -f "$REPO_SELF" "$SCRIPTS_COPY" 2>/dev/null &&
-        log "[install] 已同步正本 → scripts/exchange_cycle.sh" >&2
-    fi
-  fi
-}
-
 inspect() {
-  self_install
   # ---- 冪等 bootstrap：環境自檢，缺嘢先自癒，救唔到就報警 exit 0 ----
   if ! ensure_repo; then
     alarm "⚠️⚠️ exchange-repo clone 失敗（key/clone 缺失，需重交附件）——本鐘巡檢跳過。〔排程 agent 請將此行原文轉達老闆〕"
@@ -239,7 +224,6 @@ push_changes() {
     alarm "⚠️⚠️ push 前 bootstrap clone 失敗——commit 未執行。〔排程 agent 請原文轉達老闆〕"
     exit 1
   fi
-  self_install
   setup_git || alarm "⚠️⚠️ 金鑰缺失——commit 留喺本地，push 將失敗。〔排程 agent 請原文轉達老闆〕"
 
   [ "$#" -eq 0 ] && { log "[push][ERROR] push 子命令要至少一個檔案路徑"; exit 1; }
