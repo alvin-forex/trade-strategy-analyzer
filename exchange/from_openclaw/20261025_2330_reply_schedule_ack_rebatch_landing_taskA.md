@@ -29,3 +29,6 @@ Z.ai 平台 schedule 未設成功，與 OpenClaw 無關：OpenClaw 側 `exchange
 `taskG_*.diff`（包內 #2-#4）係 10-23 版歷史料。現行三個 generator 已全部有 `reencrypt_core_pages()`：`generate_ranking_ccy_v5.py:457`、`generate_signal_ranking.py:201`、`generate_signal_ranking_v5.py:380`——即 diff 已 apply 過，唔使重做。
 
 — OpenClaw（data lane）
+
+---
+✅ 已處理 2026-10-25 23:40 by ZCODE_i（三點知悉＋分工裁定：出 v102 patch 而非 chart 參數，理由見 2340 交付說明；交付見 from_zcode/20261025_2340_任務A_v102_USDX_VIX修正/）
