@@ -1,0 +1,106 @@
+--- gs_v106.mq5	2026-10-25 15:48:02.950721767 +0000
++++ gs_v107.mq5	2026-10-25 15:48:40.483914889 +0000
+@@ -1,5 +1,17 @@
+ //+------------------------------------------------------------------+
+-//| GoldSupporter.mq5  v1.00                                       |
++//| GoldSupporter.mq5  v1.07                                       |
++//| v1.07 - 2026-10-25 - ZCODE 任務F patch（ccy 欄根因修復）：        |
++//|   F-1 forex_data.csv ccy_1..9 name/power 18 欄一直寫空串——根因：  |
++//|        WriteTFRow 從未接 CurrencyPower_v3 buffer。修復：OnInit    |
++//|        每 TF 開 iCustom handle，寫行時 CopyBuffer k=0..8          |
++//|        （B0..B8 = XAU,USD,EUR,JPY,GBP,AUD,CAD,CHF,NZD power，     |
++//|        名序照 CP v3 CCY[9]；B9=Diff 唔喺 schema，唔寫）            |
++//|   F-2 攞唔到 buffer（handle INVALID／CopyBuffer 失敗）→ 寫空＋    |
++//|        Print 警告，唔靜默（老闆規則）                              |
++//|   F-3 OnDeinit 補 IndicatorRelease(g_hCp)（handle 衞生）           |
++//|   ※ iCustom 名="CurrencyPower_v3"（MQL5/Indicators 根目錄檔名）   |
++//|   ※ CP v3 buffer 計算週期以其內部 PairTF 為準（唔跟 chart TF）——   |
++//|      D1/H4/H1 三行 ccy 值可能相同，屬指標設計，驗收時留意          |
+ //| 用途：由 MT5 導出 XAUUSD 真報價數據畀 WSL 分析用                  |
+ //| 輸出（MQL5/Files/）：                                             |
+ //|   gold_tick.csv   - 每分鐘 tick（server_time,bid,ask）            |
+@@ -10,13 +22,15 @@
+ //| 掛法：放入任何一張圖都得（EA 自動搵金價 symbol），開 Algo Trading |
+ //+------------------------------------------------------------------+
+ #property copyright "Alvin"
+-#property version   "1.00"
++#property version   "1.07"
+ 
+ string g_sym;
+ datetime g_lastH1 = 0;
+ 
+ ENUM_TIMEFRAMES g_tfs[3] = {PERIOD_D1, PERIOD_H4, PERIOD_H1};
+ int g_hRsi[3], g_hBands[3], g_hEma20[3], g_hEma50[3], g_hEma200[3], g_hAtr[3], g_hMacd[3];
++int g_hCp[3];                 // F-1: CurrencyPower_v3 handles（D1/H4/H1）
++string CP_CCY[9] = {"XAU","USD","EUR","JPY","GBP","AUD","CAD","CHF","NZD"};  // F-1: 名序照 CP v3 CCY[9]
+ 
+ int Dg() { return (int)SymbolInfoInteger(g_sym, SYMBOL_DIGITS); }
+ 
+@@ -67,13 +81,18 @@
+       g_hEma200[i] = iMA(g_sym, g_tfs[i], 200, 0, MODE_EMA, PRICE_CLOSE);
+       g_hAtr[i]    = iATR(g_sym, g_tfs[i], 14);
+       g_hMacd[i]   = iMACD(g_sym, g_tfs[i], 12, 26, 9, PRICE_CLOSE);
++      // F-1: CurrencyPower_v3（9 貨幣 power B0-B8；B9 Diff 唔寫）
++      g_hCp[i]     = iCustom(g_sym, g_tfs[i], "CurrencyPower_v3");
++      if(g_hCp[i] == INVALID_HANDLE)
++         Print("GoldSupporter v1.07: CP v3 handle fail @", g_tfs[i],
++               " — 檢查 MQL5/Indicators/CurrencyPower_v3.mq5 存在＋已編譯（ccy 欄將寫空）");
+    }
+    g_lastH1 = iTime(g_sym, PERIOD_H1, 0);
+    EventSetTimer(60);
+    WriteAll();
+    SaveSelfTemplate();
+    WriteGsAlive();
+-   Print("GoldSupporter v1.06 started, symbol=", g_sym);
++   Print("GoldSupporter v1.07 started, symbol=", g_sym);
+    return INIT_SUCCEEDED;
+ }
+ 
+@@ -121,7 +140,13 @@
+    Print("PlanExecutor template apply failed: ", GetLastError());
+ }
+ 
+-void OnDeinit(const int reason) { EventKillTimer(); }
++void OnDeinit(const int reason)
++{
++   EventKillTimer();
++   // F-3: CP handle 衞生釋放
++   for(int i = 0; i < 3; i++)
++      if(g_hCp[i] != INVALID_HANDLE) { IndicatorRelease(g_hCp[i]); g_hCp[i] = INVALID_HANDLE; }
++}
+ 
+ void OnTimer()
+ {
+@@ -252,10 +277,31 @@
+    double swL = (loIdx >= 0) ? iLow(g_sym, g_tfs[i], loIdx) : 0;
+    datetime bt = iTime(g_sym, g_tfs[i], 1);
+    string tfName = (g_tfs[i] == PERIOD_D1) ? "D1" : (g_tfs[i] == PERIOD_H4) ? "H4" : "H1";
++   // F-1: ccy_1..9 由 CP v3 buffer 攞（B0..B8），shift 1 同其他欄一致
++   string cpN[9]; double cpP[9];
++   bool cpOk = false;
++   if(g_hCp[i] != INVALID_HANDLE) {
++      cpOk = true;
++      double b[1];
++      for(int k = 0; k < 9; k++) {
++         cpN[k] = CP_CCY[k];
++         if(CopyBuffer(g_hCp[i], k, 1, 1, b) == 1) cpP[k] = b[0];
++         else { cpOk = false; break; }
++      }
++   }
++   if(!cpOk) {
++      for(int k = 0; k < 9; k++) { cpN[k] = ""; cpP[k] = 0; }
++      Print("GoldSupporter v1.07: CP v3 buffer miss @", g_sym, " ", tfName,
++            " (handle=", g_hCp[i], ") — ccy 欄寫空，唔靜默");
++   }
+    FileWrite(h, TimeToString(bt, TIME_DATE|TIME_MINUTES), g_sym, tfName,
+              DoubleToString(o, Dg()), DoubleToString(hi, Dg()),
+              DoubleToString(lo, Dg()), DoubleToString(c, Dg()), (long)v,
+-             "","","","","","","","","","","","","","","","","","",
++             cpN[0],DoubleToString(cpP[0],1), cpN[1],DoubleToString(cpP[1],1),
++             cpN[2],DoubleToString(cpP[2],1), cpN[3],DoubleToString(cpP[3],1),
++             cpN[4],DoubleToString(cpP[4],1), cpN[5],DoubleToString(cpP[5],1),
++             cpN[6],DoubleToString(cpP[6],1), cpN[7],DoubleToString(cpP[7],1),
++             cpN[8],DoubleToString(cpP[8],1),
+              DoubleToString(bbU, Dg()), DoubleToString(bbM, Dg()), DoubleToString(bbL, Dg()),
+              DoubleToString(e20, Dg()), DoubleToString(e50, Dg()), DoubleToString(e200, Dg()),
+              DoubleToString(atr, Dg()), DoubleToString(rsi, 2),
