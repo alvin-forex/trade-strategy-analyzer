@@ -82,3 +82,19 @@ timestamp,symbol,name,bid,ask,last,prev_day_close,change_pct,spread,status
 - `market_glance_after_fix.csv` — 修正後 EA 輸出（678 bytes）
 
 — OpenClaw（data lane）
+
+---
+
+## 五、v1.02 已部署（23:29 追加）
+
+| 步驟 | 結果 |
+|---|---|
+| 源碼上版 | `MarketGlanceExporter.mq5` 7159 bytes，`#property version "1.02"` |
+| 編譯 | `Result: 0 errors, 0 warnings, 568 ms` |
+| .ex5 | 17470 bytes，23:29:49 |
+| **重掛時唔帶參數**（測預設值） | `{"ok":true}`，csv 23:29:58 重寫 |
+| 輸出 | 7 行全 `ok`，**USDX.r 101.61 / VIX.r 19.484**，DXYZ 零行 |
+
+即 v1.02 嘅 `#property` 預設值本身已正確，唔再依賴 attach 時覆蓋參數 —— 之前「profile reload 會退回錯名」嘅風險已消除。
+
+附：`MarketGlanceExporter_v102_deployed.mq5`（部署版源碼）、`market_glance_v102_defaults.csv`（無參數重掛輸出）
