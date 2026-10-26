@@ -1,0 +1,45 @@
+# v3.2 獨立驗證證據 2026-10-26 09:21 HKT
+
+## 1. bash -n
+PASS (exit 0)
+
+## 2. STAMP_RE 實值
+42:STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*進行中).*by[[:space:]]+(OpenClaw|ZCODE)'   # v3.2 收窄：全檔行首錨點＋必須有真實蓋章者（by OpenClaw/ZCODE*），防行首引用協議原文假陽性；深位章（2330_reply 第34行 by ZCODE_i）實測仍命中
+
+## 3. 真章命中（含深位第34行 by ZCODE_i）
+2330_reply 深位章: 1
+0825 信（ZCODE_w 09:00 新章）: 1
+0855 信: 1
+
+## 4. 假陽性負向測試（協議原文／佔位符行首）
+總命中（應為1，只中真章）: 1
+純佔位符檔命中（應為0）: 0
+
+## 5. push 段 rebase 加固
+  log "[push] commit 完成: $(git -C "$REPO" log -1 --format='%h %s')"
+
+  # v3.2 push 前同步：遠端可能有新 commit（OpenClaw watcher :19／CCY :00），
+  # 先 fetch＋rebase 避免非 ff 被拒。rebase 失敗→abort 還原→警報，commit 留本地，永不 force。
+  if git -C "$REPO" fetch origin "$BRANCH" >/dev/null 2>&1; then
+    if ! git -C "$REPO" rebase "origin/$BRANCH" >/dev/null 2>&1; then
+      git -C "$REPO" rebase --abort >/dev/null 2>&1
+      alarm "⚠️⚠️ push 前 rebase 失敗（遠端分叉自動合併唔過／工作區唔乾淨）——commit 已留喺本地，唔會 force。〔排程 agent 請原文轉達老闆〕"
+      exit 1
+    fi
+  fi
+
+  if git -C "$REPO" push origin "HEAD:$BRANCH" >/dev/null 2>&1; then
+
+## 6. 全 from_zcode/ 信件蓋章分佈（本鐘巡檢）
+2  20261024_2215_ZCODE首回覆_機制確認＋P1兩patch＋salt裁定.md
+1  20261025_0708_任務B結案確認＋任務G預告.md
+1  20261025_0750_任務G供料收據.md
+1  20261025_0814_ZCODE新session接管＋key往返測試.md
+1  20261025_0820_ZCODE_i_雙session協調_任務G已交付.md
+1  20261025_0845_ZCODE_i_任務G部署收貨＋salt統一建議.md
+2  20261025_1112_ZCODE_w_機房lane就位＋salt回執.md
+1  20261025_2230_ZCODE_i_schedule未通＋回批包下落＋任務A跟進.md
+1  20261026_0731_ZCODE_w_0725收貨＋腳本v3入庫＋掃描修正回執.md
+1  20261026_0855_ZCODE_w_2330_mg收貨回執.md
+1  20261026_0856_ZCODE_w_0719補料收貨回執.md
+0  20261026_0900_ZCODE_w_0825收貨＋v32落地回執.md
