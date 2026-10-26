@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3 — exchange 信箱巡檢＋精準 push（ZCODE_w 機房 lane）
+# exchange_cycle.sh v3.2 — exchange 信箱巡檢＋精準 push（ZCODE_w 機房 lane）
 #   ★ 此腳本正本住喺 repo：exchange/tools/zcode/exchange_cycle.sh（v3 起）
 #     scripts/ 下嗰份只係安裝副本；運行時自動 exec repo 正本，永遠用最新版
+#
+# v3.2 重點（回應 OpenClaw 0825 信＋08:56 push 撞板實測）：
+#   1. STAMP_RE 收窄：要求 by＋(OpenClaw|ZCODE)，防信件內文行首引用協議原文假陽性
+#   2. push 前自動 fetch＋rebase：遠端有新 commit（watcher :19／CCY :00）時自動
+#      合併，唔再因非 ff 被拒（2026-10-26 08:56 實際發生，警報一次）
 #
 # v3 重點（回應 OpenClaw 0725 信修正）：
 #   1. 信件判定修正：只掃「信件入口」（from_openclaw/*/manifest.md ＋頂層 loose .md），
@@ -34,7 +39,7 @@ REMOTE_SSH="git@github.com:alvin-forex/trade-strategy-analyzer.git"
 REMOTE_HTTPS="https://github.com/alvin-forex/trade-strategy-analyzer.git"
 BRANCH="main"
 SCAN_DIR="exchange/from_openclaw"
-STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*進行中)'   # 全檔掃描＋行首錠點：附件引用唔會誤中，深位章（如 2330_reply 第 34 行）都掃到
+STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*進行中).*by[[:space:]]+(OpenClaw|ZCODE)'   # v3.2 收窄：全檔行首錨點＋必須有真實蓋章者（by OpenClaw/ZCODE*），防行首引用協議原文假陽性；深位章（2330_reply 第34行 by ZCODE_i）實測仍命中
 WORKLOG="/home/z/my-project/worklog.md"
 REPO_SELF="${REPO}/exchange/tools/zcode/exchange_cycle.sh"
 SCRIPTS_COPY="/home/z/my-project/scripts/exchange_cycle.sh"
@@ -249,6 +254,16 @@ push_changes() {
   case "$msg" in exchange:*) ;; *) msg="exchange: $msg" ;; esac
   git -C "$REPO" commit -m "$msg" >/dev/null || { log "[push][ERROR] commit 失敗"; exit 1; }
   log "[push] commit 完成: $(git -C "$REPO" log -1 --format='%h %s')"
+
+  # v3.2 push 前同步：遠端可能有新 commit（OpenClaw watcher :19／CCY :00），
+  # 先 fetch＋rebase 避免非 ff 被拒。rebase 失敗→abort 還原→警報，commit 留本地，永不 force。
+  if git -C "$REPO" fetch origin "$BRANCH" >/dev/null 2>&1; then
+    if ! git -C "$REPO" rebase "origin/$BRANCH" >/dev/null 2>&1; then
+      git -C "$REPO" rebase --abort >/dev/null 2>&1
+      alarm "⚠️⚠️ push 前 rebase 失敗（遠端分叉自動合併唔過／工作區唔乾淨）——commit 已留喺本地，唔會 force。〔排程 agent 請原文轉達老闆〕"
+      exit 1
+    fi
+  fi
 
   if git -C "$REPO" push origin "HEAD:$BRANCH" >/dev/null 2>&1; then
     log "[push] push origin $BRANCH 成功 ✅"
