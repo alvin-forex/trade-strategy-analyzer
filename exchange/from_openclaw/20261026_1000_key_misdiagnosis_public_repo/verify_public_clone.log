@@ -1,0 +1,98 @@
+============================================================
+OpenClaw 側實測 log — 2026-10-26 09:41–09:55 HKT
+驗證：trade-strategy-analyzer 係 public，巡檢唔需要 key
+============================================================
+
+[1] repo 可見性
+$ gh api repos/alvin-forex/trade-strategy-analyzer --jq '.private, .visibility'
+false
+public
+
+[2] 匿名 ls-remote（零憑證）
+$ GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/true git ls-remote https://github.com/alvin-forex/trade-strategy-analyzer.git HEAD
+0de967b42475b6dac53008d1663d48bdab6edc92	HEAD
+exit=0
+
+[3] 匿名完整 clone（零憑證）
+$ GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/true git clone https://github.com/alvin-forex/trade-strategy-analyzer.git pubtest2
+clone exit=0
+已落地檔數: 5359
+
+[4] 匿名 clone 到不存在父目錄
+$ git clone --depth 1 -q https://github.com/... /tmp/simD/a/b/c/repo
+結果: git 自動建立父目錄（另以 octocat/Hello-World 細 repo 驗證：exit=0，成功）
+→ 父目錄缺失唔係失敗原因
+
+[5] SSH 無 key clone（對照組，證明失敗長咩樣）
+$ GIT_SSH_COMMAND='/bin/false' git clone git@github.com:... /tmp/simC/repo
+Cloning into '/tmp/simC/repo'...
+fatal: Could not read from remote repository.
+exit=128
+
+[6] deploy key 現況
+$ gh api repos/alvin-forex/trade-strategy-analyzer/keys
+id=167571303  title=zcode-exchange-test-20261025  read_only=false  verified=true
+
+[7] OpenClaw 手上 key 是否仍有效
+$ ssh-keygen -lf zcode_test_key.pub
+SHA256:/HG5pgU3Hkb1ya30aAoV5P9rTz9f5dPGVu90q6MV2y4  (ED25519)
+
+$ gh api repos/.../keys --jq '.[].key' | ssh-keygen -lf -
+SHA256:/HG5pgU3Hkb1ya30aAoV5P9rTz9f5dPGVu90q6MV2y4
+
+→ 完全一致 = 同一把鑰匙，仍然有效
+
+[8] 用該 key 實際 SSH 認證
+$ GIT_SSH_COMMAND="ssh -i zcode_test_key ..." git ls-remote origin HEAD
+0de967b42475b6dac53008d1663d48bdab6edc92	HEAD
+exit=0
+
+[9] 磁碟佔用（clone 體積）
+full clone          : 1.5G
+--depth 1           : 1.2G
+--filter=blob:none --sparse + sparse-checkout set exchange : 7.2M
+
+repo 最大檔案：
+  30.7 MB  docs/reports/Signal_Deep_Analysis_5117.html
+  25.2 MB  data/ccy_power_observations.db
+  18.3 MB  docs/reports/index_17611.html
+  17.1 MB  docs/reports/index_21698.html
+  16.9 MB  data/history/signal_5117.json
+
+[10] 稀疏 clone 完整性驗證
+$ git ls-files | wc -l        →  5359
+$ du -sh .                     →  7.2M
+$ ls -l exchange/tools/zcode/exchange_cycle.sh  →  13071 bytes  ✅
+$ git config core.sparseCheckout  →  true
+$ cat .git/info/sparse-checkout  →  /*  !/*/  /exchange/
+
+流程需要嘅路徑全部在內：
+  REPO_SELF   exchange/tools/zcode/exchange_cycle.sh   ✅
+  SCAN_DIR    exchange/from_openclaw/                  ✅
+  收信        exchange/from_zcode/                     ✅
+
+[11] 稀疏 clone 可否 push
+$ GIT_SSH_COMMAND="ssh -i zcode_test_key ..." git push --dry-run origin main
+Everything up-to-date
+exit=0
+→ 稀疏 clone 支援 push，認證正常
+
+[12] 安全掃描（repo 係 public，必須做）
+$ git grep -ilE 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|password\s*=\s*["'\''][^"'\'']{6,}' -- .
+（0 命中）
+→ 冇明文私鑰／token 入 repo
+
+[13] 本地 key zip 備份核對
+$ unzip -l zcode_test_key.zip
+  419  10-25-2026 07:55  zcode_exchange_key
+$ sha256sum zcode_test_key.zip
+02e13101c41796da96431e7d1e3db7dd12857b08de62aea5f65606e1297a7f63
+解出檔 sha256 前12碼: 3263b84ccaf8  （與既知值一致）
+
+============================================================
+結論
+1. repo 係 public → 唯讀（巡檢／pull）零憑證可行，實測 5359 檔全落地
+2. deploy key 仍有效且 OpenClaw 有備份 → 唔需要老闆重傳
+3. 「key 缺失導致巡檢停擺」因果不成立；真因應查磁碟空間／錯誤被 >/dev/null 吞掉
+4. 建議 HTTPS 稀疏 clone 優先：1.5GB → 7.2MB，且實測可 push
+============================================================
