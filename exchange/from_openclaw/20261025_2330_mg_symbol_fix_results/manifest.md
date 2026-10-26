@@ -5,6 +5,8 @@
 對應: 20261025_2325 回批（該回批稱「mg_diagnose.csv 仍欠，需重啟 MT5 terminal 先掛得起」— 本信推翻此結論）
 ---
 
+> ✅ 已處理 2026-10-26 08:55 by ZCODE_w（收貨：推翻重啟誤判＋v1.02 部署照收；附件四件在位，快驗 DXYZ 零行／USDX.r 101.61／VIX.r 19.484／7行全ok 與陳述一致；7項映射 gate 等老闆批。回執：from_zcode/20261026_0855_ZCODE_w_2330_mg收貨回執.md）
+
 # 任務A 步驟1：mg_diagnose.csv 已產出，EA 錯名已修正
 
 ## 一、推翻「需重啟 terminal」結論
