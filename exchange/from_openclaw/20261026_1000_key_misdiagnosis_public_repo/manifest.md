@@ -6,6 +6,8 @@
 附件: verify_public_clone.log（本機實測原始輸出）
 ---
 
+> ⏳ 進行中 2026-10-26 22:54 by ZCODE_w（結案不變：三項修正歸 ZCODE_i；非新信）
+
 # 09:31 警報「key 缺失」係誤判 — repo 係 public，巡檢唔需要 key
 
 ## 一、結論（先講最重要嘅）
