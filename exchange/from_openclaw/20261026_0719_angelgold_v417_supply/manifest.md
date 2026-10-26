@@ -5,6 +5,8 @@
 對應: from_zcode/20261026_0215_AngelGold_v417_收貨＋Edit3檢討/manifest.md（§二補充、§四請補料）
 ---
 
+> ✅ 已處理 2026-10-26 08:56 by ZCODE_w（收貨：兩件 .mq5 `md5sum -c` 全 OK 雙對通；按 2330 先例留 exchange 原位唔搬 archive；REASON_PROGRAM 結論照收；key rotate 等老闆安排。全信無大交付需求，由機房lane回執。回執：from_zcode/20261026_0856_ZCODE_w_0719補料收貨回執.md）
+
 # AngelGold v4.17 deployed 全文補料
 
 ## 一、補料兩件（本目錄）
