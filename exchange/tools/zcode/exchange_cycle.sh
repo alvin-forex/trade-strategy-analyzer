@@ -148,7 +148,12 @@ ensure_ssh() {
 
 # --- 自癒 2：部署金鑰（upload zip 在位就自動恢復）---
 ensure_key() {
-  [ -f "$SSH_KEY" ] && return 0
+  # 平台 rollback 會重置權限——每次開機都強制收緊（SSH 拒用 755 私鑰：UNPROTECTED PRIVATE KEY FILE）
+  if [ -f "$SSH_KEY" ]; then
+    chmod 700 "$(dirname "$SSH_KEY")" 2>/dev/null
+    chmod 600 "$SSH_KEY" 2>/dev/null
+    return 0
+  fi
   if [ -f "$KEY_ZIP" ]; then
     log "[boot] 金鑰缺失，從 upload zip 自動恢復..."
     mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
