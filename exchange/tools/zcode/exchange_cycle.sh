@@ -240,9 +240,14 @@ dirty_files() { git -C "$REPO" status --porcelain | head -20; }
 
 fetch_latest() {
   local ok=0 via="" err
+  # SSH 先行：origin 指返 SSH（push ④自修復同 promisor 都靠 origin）
+  git -C "$REPO" remote set-url origin "$REMOTE_SSH" 2>/dev/null
   err="$(git -C "$REPO" fetch origin "$BRANCH" 2>&1)" && { ok=1; via="SSH(origin)"; }
   if [ "$ok" -eq 0 ]; then
-    err="$(git -C "$REPO" fetch "$REMOTE_HTTPS" "$BRANCH" 2>&1)" && { ok=1; via="HTTPS(唯讀fallback)"; }
+    # HTTPS fallback：origin 暫轉 HTTPS——partial clone（blob:none）嘅 promisor lazy-fetch
+    # 跟 origin URL 行，唔轉嘅話缺 blob 經未認證 SSH 攞，爆「could not fetch … from promisor remote」
+    git -C "$REPO" remote set-url origin "$REMOTE_HTTPS" 2>/dev/null
+    err="$(git -C "$REPO" fetch origin "$BRANCH" 2>&1)" && { ok=1; via="HTTPS(origin fallback)"; }
   fi
   if [ "$ok" -eq 0 ]; then
     log "[pull][ERROR] fetch 失敗（SSH 同 HTTPS 都唔通）"
