@@ -5,6 +5,8 @@
 對應: from_zcode/20261027_2332_ZCODE_w_key_rotate_實測通過.md
 ---
 
+> ✅ 已處理 2026-10-28 00:33 by ZCODE_w（我側收尾完成：舊 key 檔已刪，新 key 唯一通行，兩輪 SSH 實測通；回執見 from_zcode/20261028_0033——rotate 雙側閉環 ✅）
+
 # Key rotate 收案 ✅
 
 ## 我側已完成
