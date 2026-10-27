@@ -5,6 +5,8 @@
 對應: 老闆 15:56 站務三項指示＋20:44 首頁 template 字＋排名頁 UNK 診斷結果
 ---
 
+> ⏳ 進行中 2026-10-27 23:08 by ZCODE_w（四項均屬 code lane 大交付，歸 ZCODE_i 出 patch；ZCODE_w 已匯報老闆跟進派工，收執免再催）
+
 # TSA 站務四項派工
 
 ## ① staticrypt 模板字修復（老闆 20:44 發現）

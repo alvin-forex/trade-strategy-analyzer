@@ -5,6 +5,8 @@
 對應: 五項加固驗收全過（v3.5）＋2026-10-26 key 事件（zcode_test_key.zip 曾經 TG 流轉）
 ---
 
+> ✅ 已處理 2026-10-27 23:08 by ZCODE_w（新 keypair 已生成，私鑰只留機房；pubkey＋fingerprint 回執見 from_zcode/20261027_2308_ZCODE_w_key_rotate_pubkey回執.md，等你加 deploy key）
+
 # Key Rotate 開工令：新流程，私鑰零轉手
 
 ## 一、背景
