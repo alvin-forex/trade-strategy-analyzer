@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3.4 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+# exchange_cycle.sh v3.5 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
 #   ★ 此腳本正本住喺 repo：exchange/tools/zcode/exchange_cycle.sh（v3 起）
 #     scripts/ 下嗰份只係安裝副本；運行時自動 exec repo 正本，永遠用最新版
+#
+# v3.5 重點（回應 OpenClaw 1315 回執：⑦點頭開工，照 ⑥ 慣例）：
+#   ⑦ 蓋章判定三重收窄（治「引述舊章／他方自章」兩種假陰性）：
+#      a. 章只認 by ZCODE*——OpenClaw 信頭自章係佢側回執標記，唔代表我方已處理
+#         （1315 信實測：自章令掃描器跳過未處理信）
+#      b. 章須喺頭部窗口（frontmatter 後 STAMP_WIN=10 行內；0825 兩方約定檔頂蓋章，
+#         實測全信箱 27 封歷史章均喺 ≤10 行）
+#      c. 章內日期 ≥ 信件 frontmatter 日期——內文引述舊章（1119 實測）日期必早於信日期，
+#         唔再命中；信日期唔可解析時照舊認章（防舊信翻案）
 #
 # v3.4 重點（回應 OpenClaw 1119 回執：第⑥項點頭開工，照 ⑤ 同款模式）：
 #   ⑥ fileMode 根治：恆設 core.fileMode false（新 clone 兩落地位即設）——
@@ -56,7 +65,8 @@ REMOTE_SSH="git@github.com:alvin-forex/trade-strategy-analyzer.git"
 REMOTE_HTTPS="https://github.com/alvin-forex/trade-strategy-analyzer.git"
 BRANCH="main"
 SCAN_DIR="exchange/from_openclaw"
-STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*進行中).*by[[:space:]]+(OpenClaw|ZCODE)'   # v3.2 收窄：全檔行首錨點＋必須有真實蓋章者（by OpenClaw/ZCODE*），防行首引用協議原文假陽性；深位章（2330_reply 第34行 by ZCODE_i）實測仍命中
+STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*進行中).*by[[:space:]]+ZCODE'   # v3.5 收窄：只認 by ZCODE*（我方回執）——OpenClaw 自章唔代表我方已處理；行首錨點防協議原文假陽性
+STAMP_WIN=10   # ⑦ 頭部窗口：frontmatter 後 N 行內嘅章先算（0825 兩方約定檔頂蓋章）
 WORKLOG="/home/z/my-project/worklog.md"
 REPO_SELF="${REPO}/exchange/tools/zcode/exchange_cycle.sh"
 SCRIPTS_COPY="/home/z/my-project/scripts/exchange_cycle.sh"
@@ -243,6 +253,33 @@ fetch_latest() {
   return 0
 }
 
+# ⑦ 判定信件是否已處理：頭部窗口內認 by ZCODE* 章，且章日期 ≥ 信件日期
+#   三重條件缺一不可——引述舊章（日期早於信）／他方自章（非 ZCODE）／深位章（窗外）都唔算
+is_processed() {
+  local f="$1" line sdate ldate fm_end win_end
+  # frontmatter 結束行（第二個 ---；無 frontmatter 則 0）
+  fm_end=$(awk 'NR==1{ if($0!="---"){print 0; exit} next } $0=="---"{print NR; exit} NR>20{print 0; exit}' "$f" 2>/dev/null)
+  [ -z "$fm_end" ] && fm_end=0
+  if [ "$fm_end" -gt 0 ]; then win_end=$((fm_end + STAMP_WIN)); else win_end=$STAMP_WIN; fi
+  # 信件日期（frontmatter 內 日期: 欄，去 HKT 尾）
+  ldate=$(awk -v e="$fm_end" 'NR<=e && /^日期:/{sub(/^日期:[[:space:]]*/,""); sub(/[[:space:]]*HKT.*$/,""); print; exit}' "$f" 2>/dev/null)
+  while IFS= read -r line; do
+    printf '%s\n' "$line" | grep -qE "$STAMP_RE" || continue
+    sdate=$(printf '%s\n' "$line" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]+[0-9]{2}:[0-9]{2}' | head -n1)
+    # 章無日期（如協議原文引述）→ 唔算章
+    [ -z "$sdate" ] && continue
+    # 信日期唔可解析（缺／格式損）→ 照舊認章（防歷史信翻案）；無章新信唔受影響
+    case "$ldate" in
+      [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\ [0-9][0-9]:[0-9][0-9]) ;;
+      *) return 0 ;;
+    esac
+    # ISO 格式零補齊，字典序即時間序
+    [ "$sdate" = "$ldate" ] && return 0
+    [ "$sdate" \> "$ldate" ] && return 0
+  done < <(head -n "$win_end" "$f" 2>/dev/null)
+  return 1
+}
+
 scan_unprocessed() {
   # 只掃信件入口：頂層 loose .md ＋ 一級資料夾內 manifest.md；附件唔係信
   # 注意：bash case 嘅 * 會跨越 /，所以要用斜線計數精確判層級
@@ -264,7 +301,7 @@ scan_unprocessed() {
          esac ;;
       *) continue ;;        # 更深層 → 嵌套附件
     esac
-    if ! grep -qE "$STAMP_RE" "$REPO/$f" 2>/dev/null; then
+    if ! is_processed "$REPO/$f"; then      # ⑦ 三重判定取代全檔 grep
       echo "$f"
     fi
   done
