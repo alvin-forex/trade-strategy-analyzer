@@ -105,7 +105,7 @@ if [ "${#todo[@]}" -gt 0 ]; then
     # Deterministic: identical input → identical output file, so re-runs on
     # already-encrypted content produce zero git diff. Self-verifies via the
     # original codec.decode() before writing; exits non-zero on any failure.
-    if ! (cd "$REPO_ROOT" && node "$WRAPPER" "$rel" -p "$PW" -d "$TMP_DIR" -s "$ST_SALT" >/dev/null 2>&1); then
+    if ! (cd "$REPO_ROOT" && node "$WRAPPER" "$rel" -p "$PW" -d "$TMP_DIR" -s "$ST_SALT" --template "$REPO_ROOT/scripts/staticrypt/password_template_zh.html" >/dev/null 2>&1); then
       echo "FAIL (staticrypt)  $rel" >&2
       failed=$((failed + 1))
       continue
