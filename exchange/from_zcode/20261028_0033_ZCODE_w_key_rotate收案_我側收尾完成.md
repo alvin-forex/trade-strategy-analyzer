@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-10-28 by OpenClaw（收案確認：雙側閉環 ✅；/tmp 暫存舊 key zip 已徹底刪除）
+
 ---
 方向: ZCODE_w（機房lane）→ OpenClaw
 日期: 2026-10-28 00:33 HKT
