@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3.2 — exchange 信箱巡檢＋精準 push（ZCODE_w 機房 lane）
+# exchange_cycle.sh v3.3 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
 #   ★ 此腳本正本住喺 repo：exchange/tools/zcode/exchange_cycle.sh（v3 起）
 #     scripts/ 下嗰份只係安裝副本；運行時自動 exec repo 正本，永遠用最新版
+#
+# v3.3 重點（回應 OpenClaw 2340 派工＋0015 增補五項加固，老闆 10-27 指示即刻處理）：
+#   ① 診斷可見：步驟失敗→diag_dump 落 stderr（df -h／失敗指令 stderr 原文節錄，
+#      頭尾截斷防爆炸）；巡查報告加磁碟使用率一行
+#   ② 稀疏重建：repo 蒸發後改 sparse clone（--depth 1 --filter=blob:none＋cone
+#      淨拉 exchange/），SSH→HTTPS 兩路，帶耗時計時；稀疏唔過先 fallback 完整
+#   ③ inspect 真・唯讀：config 改「值唔同先寫」（穩態零寫入）；巡查前後 git
+#      status 自檢，inspect 路徑零工作區 side-effect
+#   ④ push origin 自修復：origin=https 而 key 在位→自動 set-url SSH 先推；
+#      key 唔在位→如實報「無 key」留本地，唔再誤報「憑證/遠端分叉」
+#   ⑤ quotePath 根治：恆設 core.quotePath false（新 clone 即設）＋掃描改
+#      git ls-files -z 零轉義——中文目錄名信件唔再漏掃
 #
 # v3.2 重點（回應 OpenClaw 0825 信＋08:56 push 撞板實測）：
 #   1. STAMP_RE 收窄：要求 by＋(OpenClaw|ZCODE)，防信件內文行首引用協議原文假陽性
@@ -18,7 +30,7 @@
 #   4. 警報分層（回應修正2）：stdout 警報（排程 job 原文轉達老闆＝唔靠 git
 #      嘅通道）→ worklog（第三層記錄）。判定準則：push 全壞都送得出去先算警報
 #   冪等 bootstrap 不變：ssh 缺→提取 deb；key 缺但 upload zip 在位→自動恢復；
-#   repo 缺→clone（SSH 優先，HTTPS 唯讀 fallback）
+#   repo 缺→稀疏 clone（SSH 優先，HTTPS 唯讀 fallback；都唔過→完整 clone）
 #
 # 用法:
 #   bash .../exchange_cycle.sh          巡檢（退出碼: 0=無新信/已報警, 10=有新信, 1=錯誤）
@@ -49,6 +61,27 @@ FORBIDDEN_RE='(^|/)(tsa_pw\.txt|\.env([^/]*)?|.*\.pem|id_rsa[^/]*|.*credentials.
 hkt_now()   { TZ=Asia/Hong_Kong date '+%H:%M'; }
 hkt_stamp() { TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M'; }
 log()       { echo "[$(hkt_stamp) HKT] $*"; }
+
+# ---- ① 診斷段：一律落 stderr（stdout 保留畀巡查報告解析）----
+dline() { echo "[diag] $*" >&2; }
+# df -h（根目錄＋repo 掛載點）＋失敗指令 stderr 原文節錄（>12 行→頭6＋尾3，截斷防爆炸）
+diag_dump() {
+  dline "---- df -h（/ 及 repo 掛載點） ----"
+  df -h / "$REPO" 2>&1 | sed 's/^/[diag] /' >&2
+  if [ -n "${1:-}" ]; then
+    dline "---- 失敗指令 stderr 原文節錄 ----"
+    local n; n="$(printf '%s\n' "$1" | wc -l)"
+    if [ "$n" -gt 12 ]; then
+      printf '%s\n' "$1" | head -6 | sed 's/^/[diag] /' >&2
+      dline "...（中間省略 $((n-9)) 行）..."
+      printf '%s\n' "$1" | tail -3 | sed 's/^/[diag] /' >&2
+    else
+      printf '%s\n' "$1" | sed 's/^/[diag] /' >&2
+    fi
+  fi
+}
+# 磁碟使用率一行（巡查報告用，stdout）
+disk_line() { df -h / "$REPO" 2>/dev/null | awk 'NR>1{printf "%s %s  ", $6, $5}'; }
 
 # ---- 自裝機制（最頂執行，case 解析之前）----
 # repo 正本為準：從其他路徑調用就立即 exec 正本（用完整原始 argv）；
@@ -112,10 +145,16 @@ ensure_key() {
   [ -f "$SSH_KEY" ]
 }
 
+# ③⑤ config 只喺「現值≠目標值」先寫——穩態 inspect 連 .git/config 都零寫入
+gcfg() {
+  local cur; cur="$(git -C "$REPO" config --get "$1" 2>/dev/null || true)"
+  [ "$cur" = "$2" ] || git -C "$REPO" config "$1" "$2" >/dev/null 2>&1
+}
 setup_git() {
-  git -C "$REPO" config user.name  "ZCODE"                    >/dev/null 2>&1
-  git -C "$REPO" config user.email "zcode@tsa-exchange.local" >/dev/null 2>&1
-  git -C "$REPO" config core.autocrlf false                   >/dev/null 2>&1
+  gcfg user.name  "ZCODE"
+  gcfg user.email "zcode@tsa-exchange.local"
+  gcfg core.autocrlf false
+  gcfg core.quotePath false   # ⑤ 中文路徑掃描根治（ls-files -z 之外嘅雙保險）
   local sshbin; sshbin="$(ensure_ssh)" || return 1
   if ensure_key; then
     export GIT_SSH_COMMAND="$sshbin -i $SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
@@ -126,28 +165,67 @@ setup_git() {
 
 ensure_repo() {
   [ -d "$REPO/.git" ] && return 0
-  log "[boot] repo 唔存在，clone 中..."
-  if setup_git && git clone "$REMOTE_SSH" "$REPO" >/dev/null 2>&1; then
-    log "[boot] SSH clone 完成"
-    return 0
-  fi
-  if git clone "$REMOTE_HTTPS" "$REPO" >/dev/null 2>&1; then
-    log "[boot] HTTPS clone 完成（唯讀 bootstrap）"
-    return 0
-  fi
+  log "[boot] repo 唔存在，②稀疏重建中（淨拉 exchange/ 子樹）..."
+  local t0 t1 err url mode
+  t0="$(date +%s)"
+  # ---- ② 稀疏 clone：部分 clone＋cone 模式淨 checkout exchange/（快、滿帶寬）----
+  for mode in SSH HTTPS; do
+    if [ "$mode" = "SSH" ]; then
+      setup_git >/dev/null 2>&1 || { dline "SSH 憑證唔齊，跳過 SSH 稀疏路"; continue; }
+      url="$REMOTE_SSH"
+    else
+      url="$REMOTE_HTTPS"
+    fi
+    err="$(git clone --depth 1 --filter=blob:none --no-checkout "$url" "$REPO" 2>&1)" || {
+      dline "稀疏 clone 失敗（$mode）: $(printf '%s\n' "$err" | head -2)"
+      rm -rf "$REPO" 2>/dev/null
+      continue
+    }
+    if git -C "$REPO" sparse-checkout init --cone >/dev/null 2>&1 \
+       && git -C "$REPO" sparse-checkout set exchange >/dev/null 2>&1 \
+       && git -C "$REPO" checkout "$BRANCH" >/dev/null 2>&1; then
+      t1=$(( $(date +%s) - t0 ))
+      log "[boot] ②稀疏 clone 完成（$mode，淨 exchange/ 子樹，耗時 ${t1}s）: $(git -C "$REPO" log -1 --format='%h %s' 2>/dev/null)"
+      git -C "$REPO" config core.quotePath false >/dev/null 2>&1   # ⑤ 新 clone 即設
+      return 0
+    fi
+    dline "sparse-checkout 設定失敗（$mode），轉 fallback"
+    rm -rf "$REPO" 2>/dev/null
+  done
+  # ---- fallback：完整 clone（稀疏路全唔過先行；舊 git 無 partial-clone 能力時用）----
+  log "[boot] 稀疏路唔過，fallback 完整 clone..."
+  for mode in SSH HTTPS; do
+    if [ "$mode" = "SSH" ]; then
+      setup_git >/dev/null 2>&1 || continue
+      url="$REMOTE_SSH"
+    else
+      url="$REMOTE_HTTPS"
+    fi
+    err="$(git clone --depth 1 "$url" "$REPO" 2>&1)" && {
+      log "[boot] 完整 clone 完成（$mode，耗時 $(( $(date +%s) - t0 ))s）"
+      git -C "$REPO" config core.quotePath false >/dev/null 2>&1
+      return 0
+    }
+    dline "完整 clone 失敗（$mode）: $(printf '%s\n' "$err" | head -2)"
+    rm -rf "$REPO" 2>/dev/null
+  done
+  diag_dump ""   # ① 全路失敗：df -h 落 stderr
   return 1
 }
 
 dirty_files() { git -C "$REPO" status --porcelain | head -20; }
 
 fetch_latest() {
-  local ok=0 via=""
-  if git -C "$REPO" fetch origin "$BRANCH" >/dev/null 2>&1; then
-    ok=1; via="SSH(origin)"
-  elif git -C "$REPO" fetch "$REMOTE_HTTPS" "$BRANCH" >/dev/null 2>&1; then
-    ok=1; via="HTTPS(唯讀fallback)"
+  local ok=0 via="" err
+  err="$(git -C "$REPO" fetch origin "$BRANCH" 2>&1)" && { ok=1; via="SSH(origin)"; }
+  if [ "$ok" -eq 0 ]; then
+    err="$(git -C "$REPO" fetch "$REMOTE_HTTPS" "$BRANCH" 2>&1)" && { ok=1; via="HTTPS(唯讀fallback)"; }
   fi
-  [ "$ok" -eq 0 ] && { log "[pull][ERROR] fetch 失敗（SSH 同 HTTPS 都唔通）"; return 1; }
+  if [ "$ok" -eq 0 ]; then
+    log "[pull][ERROR] fetch 失敗（SSH 同 HTTPS 都唔通）"
+    diag_dump "$err"   # ① df -h＋stderr 原文節錄
+    return 1
+  fi
   if git -C "$REPO" merge --ff-only FETCH_HEAD >/dev/null 2>&1; then
     log "[pull] 已更新（via $via）: $(git -C "$REPO" log -1 --format='%h %s')"
   else
@@ -161,7 +239,9 @@ scan_unprocessed() {
   # 只掃信件入口：頂層 loose .md ＋ 一級資料夾內 manifest.md；附件唔係信
   # 注意：bash case 嘅 * 會跨越 /，所以要用斜線計數精確判層級
   local f rel slashes
-  git -C "$REPO" ls-files "$SCAN_DIR" | while read -r f; do
+  # ⑤ ls-files -z：路徑以 NUL 分隔零轉義——中文／特殊字元目錄名唔會被 quotePath
+  #   轉成八進制引號串，case 匹配唔再靜默漏掃（config false 之外嘅根治）
+  git -C "$REPO" ls-files -z "$SCAN_DIR" | while IFS= read -r -d '' f; do
     case "$f" in
       *.md) ;;
       *) continue ;;
@@ -196,6 +276,10 @@ inspect() {
   local dirty; dirty="$(dirty_files)"
   [ -n "$dirty" ] && { log "[warn] 工作區唔乾淨:"; echo "$dirty" | sed 's/^/    /'; }
 
+  # ③ 真・唯讀自檢：巡查唔准有工作區 side-effect（前後 git status 對比）
+  local st_before st_after
+  st_before="$(git -C "$REPO" status --porcelain 2>/dev/null)"
+
   if ! fetch_latest; then
     alarm "⚠️⚠️ git fetch/merge 失敗——〔排程 agent 請將此行原文轉達老闆〕；下鐘自動重試"
     echo "$(hkt_now) 巡查失敗已報警（fetch），HEAD=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo 未知)"
@@ -209,7 +293,11 @@ inspect() {
   unprocessed="$(scan_unprocessed)"
   [ -n "$unprocessed" ] && n="$(printf '%s\n' "$unprocessed" | wc -l | tr -d ' ')"
 
+  st_after="$(git -C "$REPO" status --porcelain 2>/dev/null)"
+  [ "$st_before" != "$st_after" ] && dline "③⚠ inspect 期間工作區出現變化（應零寫入）: ${st_after:0:200}"
+
   echo "=================================================="
+  echo "磁碟: $(disk_line)"   # ① df -h 節錄（/ 及 repo 掛載點）
   if [ "$n" -eq 0 ]; then
     echo "$(hkt_now) 巡查完成，無新信，HEAD=$head_short"
     echo "=================================================="
@@ -229,7 +317,20 @@ push_changes() {
     alarm "⚠️⚠️ push 前 bootstrap clone 失敗——commit 未執行。〔排程 agent 請原文轉達老闆〕"
     exit 1
   fi
-  setup_git || alarm "⚠️⚠️ 金鑰缺失——commit 留喺本地，push 將失敗。〔排程 agent 請原文轉達老闆〕"
+  # ---- ④ origin URL 自修復：https 而 key 在位→自動 set-url SSH 先至推；
+  #      無 key→唔好再誤報「憑證/遠端分叉」，如實報「無 key」留本地 ----
+  local cur_url no_key=0
+  cur_url="$(git -C "$REPO" remote get-url origin 2>/dev/null || echo "?")"
+  if [ "$cur_url" != "$REMOTE_SSH" ]; then
+    if ensure_key; then
+      git -C "$REPO" remote set-url origin "$REMOTE_SSH" 2>/dev/null \
+        && log "[push] ④origin URL 自修復: $cur_url → SSH（key 在位）"
+    else
+      no_key=1
+    fi
+  fi
+  setup_git || no_key=1
+  [ "$no_key" -eq 1 ] && alarm "⚠️⚠️ push：部署金鑰唔在位（無 key）——commit 照做留本地，唔會推；唔再誤報憑證/分叉。請恢復 ~/.ssh/zcode_exchange_key 或 upload zip 後下鐘自動續推。〔排程 agent 請原文轉達老闆〕"
 
   [ "$#" -eq 0 ] && { log "[push][ERROR] push 子命令要至少一個檔案路徑"; exit 1; }
   case "$msg" in *$'\n'*) log "[push][ERROR] commit 訊息唔可以有換行"; exit 1 ;; esac
@@ -255,8 +356,12 @@ push_changes() {
   git -C "$REPO" commit -m "$msg" >/dev/null || { log "[push][ERROR] commit 失敗"; exit 1; }
   log "[push] commit 完成: $(git -C "$REPO" log -1 --format='%h %s')"
 
-  # v3.2 push 前同步：遠端可能有新 commit（OpenClaw watcher :19／CCY :00），
-  # 先 fetch＋rebase 避免非 ff 被拒。rebase 失敗→abort 還原→警報，commit 留本地，永不 force。
+  # v3.2 push 前同步：遠端可能有新 commit（OpenClaw watcher :19／CCY :00）時自動
+  # 合併，唔再因非 ff 被拒。rebase 失敗→abort 還原→警報，commit 留本地，永不 force。
+  if [ "$no_key" -eq 1 ]; then
+    log "[push] 無 key——跳過 rebase/push，commit 已留喺本地 main（④如實報告）"
+    exit 1
+  fi
   if git -C "$REPO" fetch origin "$BRANCH" >/dev/null 2>&1; then
     if ! git -C "$REPO" rebase "origin/$BRANCH" >/dev/null 2>&1; then
       git -C "$REPO" rebase --abort >/dev/null 2>&1
@@ -265,15 +370,18 @@ push_changes() {
     fi
   fi
 
-  if git -C "$REPO" push origin "HEAD:$BRANCH" >/dev/null 2>&1; then
+  local perr
+  perr="$(git -C "$REPO" push origin "HEAD:$BRANCH" 2>&1)" && {
     log "[push] push origin $BRANCH 成功 ✅"
-  else
-    alarm "⚠️⚠️ push 失敗（憑證/遠端分叉）——commit 已留喺本地 main，唔會 force。〔排程 agent 請原文轉達老闆〕"
+  } || {
+    log "[push][ERROR] push origin $BRANCH 失敗"
+    diag_dump "$perr"   # ① df -h＋push stderr 原文節錄（憑證/分叉/網絡一眼可辨）
+    alarm "⚠️⚠️ push 失敗（詳見 stderr 診斷段原文節錄）——commit 已留喺本地 main，唔會 force。〔排程 agent 請原文轉達老闆〕"
     exit 1
-  fi
+  }
 }
 
-usage() { sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
 case "${1:-}" in
   ""|inspect) inspect ;;
