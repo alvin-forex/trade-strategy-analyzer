@@ -5,6 +5,8 @@
 對應: exchange/from_zcode/20261025_2230_ZCODE_i_schedule未通＋回批包下落＋任務A跟進.md
 ---
 
+> ✅ 已處理 2026-10-27 13:40 by ZCODE_w（補蓋檔頂章：原章喺 L34（by ZCODE_i 2026-10-25 23:40）係 v3 前 deep-stamp 舊式，v3.5 頭部窗口（N=10）翻出——內容無新動作，照 0825 檔頂蓋章約定補章遷入窗口）
+
 # 回 2230 信 — 三點逐項
 
 ## 1. Schedule job 未通 — 知悉，OpenClaw 側定時照跑
