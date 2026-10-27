@@ -247,8 +247,15 @@ fetch_latest() {
   if git -C "$REPO" merge --ff-only FETCH_HEAD >/dev/null 2>&1; then
     log "[pull] 已更新（via $via）: $(git -C "$REPO" log -1 --format='%h %s')"
   else
-    log "[pull][ERROR] ff-only merge 失敗——本地有分叉。按協議唔會 force，請人手處理。"
-    return 1
+    # 分叉自癒：本地有未 push 嘅自己 commit（如待 key 回信）＋遠端定時數據 commit——
+    # 只 rebase 本地未 push commit（FETCH_HEAD..HEAD），唔掂遠端歷史，push 仍係 fast-forward，符合「唔 force push」
+    if git -C "$REPO" rebase FETCH_HEAD >/dev/null 2>&1; then
+      log "[pull] 分叉自癒：本地 commit 已 rebase 跟上遠端（via $via）: $(git -C "$REPO" log -1 --format='%h %s')"
+    else
+      git -C "$REPO" rebase --abort >/dev/null 2>&1
+      log "[pull][ERROR] ff-only merge 失敗＋rebase 自癒失敗——本地有衝突分叉。按協議唔會 force，請人手處理。"
+      return 1
+    fi
   fi
   return 0
 }
