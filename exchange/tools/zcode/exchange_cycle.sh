@@ -57,7 +57,7 @@ set -u
 ORIG_ARGS=("$@")   # 捕獲原始 argv：self_install exec 時要完整重現（push 子命令路徑唔可以丟失）
 
 REPO="/home/z/my-project/exchange-repo"
-SSH_KEY="$HOME/.ssh/zcode_exchange_key_20261027"   # 2026-10-27 rotate：新deploy key（私鑰零轉手，舊key 167571303 待OpenClaw刪）
+SSH_KEY="/home/z/my-project/.keys/zcode_exchange_key_20261028"   # 2026-10-28 rotate#2：私鑰存 .keys/（project volume 捱得過平台對 ~/.ssh 嘅 rollback；~/.ssh 已兩次被還原食key）
 KEY_ZIP="/home/z/my-project/upload/zcode_test_key.zip"
 SSHBIN_DIR="/home/z/my-project/.sshbin"
 SSH_BIN="$SSHBIN_DIR/extract/usr/bin/ssh"
@@ -315,7 +315,7 @@ inspect() {
     exit 0
   fi
   if ! setup_git; then
-    alarm "⚠️⚠️ 部署金鑰缺失（~/.ssh/zcode_exchange_key）且 upload zip 唔在位——push 冇憑證。〔排程 agent 請將此行原文轉達老闆，請老闆重傳 key zip〕"
+    alarm "⚠️⚠️ 部署金鑰缺失（$SSH_KEY）——push 冇憑證。〔排程 agent 請將此行原文轉達老闆：舊 zip 內 key 已作廢，重傳無用；請 OpenClaw 照 rotate #2 信（from_zcode/20261028_0136）加新 deploy key〕"
   fi
 
   local dirty; dirty="$(dirty_files)"
