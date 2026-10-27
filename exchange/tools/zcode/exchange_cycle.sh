@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3.3 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+# exchange_cycle.sh v3.4 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
 #   ★ 此腳本正本住喺 repo：exchange/tools/zcode/exchange_cycle.sh（v3 起）
 #     scripts/ 下嗰份只係安裝副本；運行時自動 exec repo 正本，永遠用最新版
+#
+# v3.4 重點（回應 OpenClaw 1119 回執：第⑥項點頭開工，照 ⑤ 同款模式）：
+#   ⑥ fileMode 根治：恆設 core.fileMode false（新 clone 兩落地位即設）——
+#      防「repo 存活跨回滾／外部 chmod」造成嘅全檔假 M mode 噪音
+#      （2026-10-27 10:31 實際發生一次，171 檔假 M 阻 ff 合併；gcfg 值唔同先寫，穩態零寫入）
 #
 # v3.3 重點（回應 OpenClaw 2340 派工＋0015 增補五項加固，老闆 10-27 指示即刻處理）：
 #   ① 診斷可見：步驟失敗→diag_dump 落 stderr（df -h／失敗指令 stderr 原文節錄，
@@ -155,6 +160,7 @@ setup_git() {
   gcfg user.email "zcode@tsa-exchange.local"
   gcfg core.autocrlf false
   gcfg core.quotePath false   # ⑤ 中文路徑掃描根治（ls-files -z 之外嘅雙保險）
+  gcfg core.fileMode false    # ⑥ mode 噪音根治（值唔同先寫，穩態零寫入）
   local sshbin; sshbin="$(ensure_ssh)" || return 1
   if ensure_key; then
     export GIT_SSH_COMMAND="$sshbin -i $SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
@@ -187,6 +193,7 @@ ensure_repo() {
       t1=$(( $(date +%s) - t0 ))
       log "[boot] ②稀疏 clone 完成（$mode，淨 exchange/ 子樹，耗時 ${t1}s）: $(git -C "$REPO" log -1 --format='%h %s' 2>/dev/null)"
       git -C "$REPO" config core.quotePath false >/dev/null 2>&1   # ⑤ 新 clone 即設
+      git -C "$REPO" config core.fileMode false >/dev/null 2>&1    # ⑥ 新 clone 即設
       return 0
     fi
     dline "sparse-checkout 設定失敗（$mode），轉 fallback"
@@ -204,6 +211,7 @@ ensure_repo() {
     err="$(git clone --depth 1 "$url" "$REPO" 2>&1)" && {
       log "[boot] 完整 clone 完成（$mode，耗時 $(( $(date +%s) - t0 ))s）"
       git -C "$REPO" config core.quotePath false >/dev/null 2>&1
+      git -C "$REPO" config core.fileMode false >/dev/null 2>&1    # ⑥ 新 clone 即設
       return 0
     }
     dline "完整 clone 失敗（$mode）: $(printf '%s\n' "$err" | head -2)"

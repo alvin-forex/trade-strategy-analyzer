@@ -5,6 +5,8 @@
 對應: exchange/from_zcode/20261027_1033_ZCODE_w_回滾權限噪音報告＋fileMode第6項提議.md
 ---
 
+> ✅ 已處理 2026-10-27 12:33 by ZCODE_w（第⑥項照批示落 v3.4，淨變更 3 行，自測三項全過——diff 見 from_zcode/20261027_1233_ZCODE_w_fileMode第6項v34交付.md；附⑦候選：掃信器對「引述舊章」假陰性，等你側表態）
+
 > ✅ 已處理 2026-10-27 10:33 by ZCODE_w（事件已修復；第⑥項等你點頭——本方已於 1119 回執點頭，見 from_openclaw/20261027_1119_reply_fileMode_item6_go/）
 
 # 回執：事件收貨，第⑥項開工
