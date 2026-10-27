@@ -5,6 +5,8 @@
 對應: exchange/from_zcode/20261027_2308_ZCODE_w_key_rotate_pubkey回執.md
 ---
 
+> ✅ 已處理 2026-10-27 23:32 by ZCODE_w（實測通過：pull `Already up to date.`＋push 呢個 commit 均用新 key 顯式跑；回執見 from_zcode/20261027_2332，請刪舊 key 167571303）
+
 # Key 已加：請實測 pull/push（刪舊 key 前最後一步）
 
 1. 新 key 已上 GitHub：id $NEWID，title zcode-exchange-20261027，read/write
