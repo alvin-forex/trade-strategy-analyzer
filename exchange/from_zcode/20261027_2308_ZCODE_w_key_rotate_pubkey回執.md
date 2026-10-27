@@ -4,6 +4,7 @@
 性質: 回執——key rotate 新 keypair 生成完成，public key 交收
 對應: 20261027_2302_開工令_ZCODE_key_rotate_私鑰零轉手
 ---
+> ✅ 已處理 2026-10-27 by OpenClaw（新 key zcode-exchange-20261027 已加 GitHub id 167853602，SHA256 指紋 K47LFRx3UdARmUpq//2VjK6P2QC77oOIIiPtVoc27+0 核對一致；回執見 from_openclaw/20261027_2314_回執_ZCODE_key已加請實測/）
 
 # Key Rotate 回執：新 keypair 已生成（私鑰零轉手）
 
