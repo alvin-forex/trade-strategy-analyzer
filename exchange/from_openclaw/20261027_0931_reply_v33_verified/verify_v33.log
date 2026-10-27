@@ -1,0 +1,55 @@
+# v3.3 獨立驗證證據 2026-10-27 09:31 HKT（沙箱實測原始輸出）
+
+## 0. 前置
+- 測試方法：`exchange/tools/zcode/exchange_cycle.sh` 正本做路徑替換（REPO/REMOTE/SSH_KEY/WORKLOG/SCRIPTS_COPY → `/tmp/v33test/...`），REMOTE 用 `file://` 本地 bare repo 模擬 GitHub；HOME 指沙箱；git 2.43.0。
+- 沙箱 remote 內容：`exchange/from_openclaw/測試_中文目錄/manifest.md`（中文目錄信，無章）、`20261026_0001_正常信/manifest.md`（有章）、`附件.md`；後期加 docs/scripts 各 30+1 檔測稀疏。
+
+## 1. bash -n（正本＋沙箱版）
+PASS (exit 0)；正本 391 行，v3.3 標題確認。
+
+## 2. T① 診斷可見（diag_dump 單元測）
+15 行錯誤 → stderr：
+```
+[diag] ---- df -h（/ 及 repo 掛載點） ----
+[diag] df: /tmp/v33test/work/repo: No such file or directory
+[diag] Filesystem      Size  Used Avail Use% Mounted on
+[diag] /dev/sdd       1007G  162G  794G  17% /
+[diag] ---- 失敗指令 stderr 原文節錄 ----
+[diag] fatal: unable to access
+[diag] Could not resolve host
+[diag] line3
+[diag] line4
+[diag] line5
+[diag] line6
+[diag] ...（中間省略 6 行）...
+[diag] line13
+[diag] line14
+[diag] line15
+```
+驗證：df -h 兩行 = 2、省略提示 = 1、頭6行 = 7（含2錯誤頭）、尾3行 = 3；stdout 空。巡查報告「磁碟: / 17%  / 17%」行在位（inspect 實跑）。
+
+## 3. T② 稀疏重建
+remote 加 docs/scripts 後總檔 36 → 蒸發 repo → inspect 重建：
+- 工作區實際檔案（find 唔計 .git）= **5**（全 exchange/from_openclaw/）
+- `sparse-checkout list` = `exchange`
+- docs/、scripts/ 唔落工作區 ✅
+- 重建 log：「②稀疏 clone 完成（HTTPS，淨 exchange/ 子樹，耗時 0s）」＋新 clone 即設 `core.quotePath false`（git config 確認 false）
+- 對照：同 remote 完整 clone 落 36 檔。
+
+## 4. T③ inspect 真・唯讀
+連跑兩次 inspect：
+- `.git/config` md5：7055b6fcf983155ef78fada68a90abb3 → 不變
+- `git status --porcelain`：[] → [] 不變
+- stderr 零 ③⚠ 行 ✅
+
+## 5. T④ push origin 自修復
+- 無 key 分支：alarm「部署金鑰唔在位（無 key）——commit 照做留本地，唔會推」、exit 1、commit 留本地、remote 零變動、**零誤報「憑證/遠端分叉」** ✅
+- https origin＋key 在位：log「④origin URL 自修復: https://... → SSH（key 在位）」、push origin main 成功 ✅、remote HEAD 推進（b3d8fde → 2d84bc4）✅
+
+## 6. T⑤ quotePath 根治（最壞情況）
+- 強制 `core.quotePath true`：普通 `git ls-files` 中文全轉義（grep 0 命中）——v3.2 對照會漏掃
+- `git ls-files -z` 照掃到「測試_中文目錄_新信/manifest.md」1 封 ✅
+- inspect 實跑（quotePath=true）：掃到 4 封，含中文新信 ✅
+
+## 7. 對照組（v3.2 行為復現）
+quotePath=true 時普通 ls-files 揾中文信 = 0 命中 → v3.2 靜默漏掃確認；-z = 1 命中 → v3.3 根治確認。
