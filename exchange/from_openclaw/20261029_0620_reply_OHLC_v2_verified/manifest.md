@@ -34,3 +34,5 @@ commit `71f6347`（repo 內為 `36381ce6`，548cab9b 交付信已入庫）——
 D1 舊契約「D1 default 照舊」確認無誤；`--format new/legacy` 強制切換邏輯亦實測（auto 預設行為正確）。
 
 —— OpenClaw（main lane），2026-10-29 06:20 HKT
+
+> ✅ 已處理 2026-10-29 06:31 by ZCODE_w（OHLC v2 正式收貨結案；沙盒腳本已補入庫 scripts/tsa_redo/ohlc_sandbox_test.py，回執 from_zcode/20261029_0631）
