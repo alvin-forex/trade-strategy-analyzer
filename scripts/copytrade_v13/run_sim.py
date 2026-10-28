@@ -16,7 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from schema import init_db          # noqa: E402
 from ingest import ingest, signal_csvs   # noqa: E402
-from matrix import run_matrix, write_rows, LAYER_POLICIES, N_GATE  # noqa: E402
+from matrix import run_matrix, write_rows, LAYER_POLICIES, N_GATE, _load_cycles  # noqa: E402
+from copy_timing import (simulate_timing_all, summarize_timing,  # noqa: E402
+                         load_m5_json)
 
 SIM_COLS = ["signal_id", "symbol", "layer_policy", "copy_method", "account_type",
             "cost_scenario", "cycles_n", "trades_filled", "trades_missed",
@@ -32,13 +34,8 @@ DL = os.path.join(REPO, "docs", "downloads")
 
 
 def layer_freq_matrix(conn, signals):
-    """§11.3 層數勝率×頻率矩陣（cycle 級，原始美元）。"""
+    """§11.3 層數勝率×頻率矩陣（cycle 級，原始美元）＋單層回報（③先計單層回報）。"""
     out = []
-    for sid in signals:
-        for row in conn.execute(
-                "SELECT symbol, cycle_id, direction, layers_n, pnl_total, close_time "
-                "FROM cycles WHERE signal_id=?", (sid,)):
-            pass  # cycles 逐層計——用 layers 表重聚合
     by = defaultdict(lambda: {"wins": 0, "n": 0, "pnl": 0.0})
     for row in conn.execute(
             "SELECT c.signal_id, c.symbol, c.layers_n, c.pnl_total FROM cycles c "
@@ -53,7 +50,8 @@ def layer_freq_matrix(conn, signals):
     for (sid, sym, pol), v in sorted(by.items()):
         out.append({"signal_id": sid, "symbol": sym, "layer_policy": pol,
                     "cycles": v["n"], "win_rate": round(v["wins"] / v["n"], 4) if v["n"] else 0,
-                    "pnl_usd": round(v["pnl"], 2)})
+                    "pnl_usd": round(v["pnl"], 2),
+                    "pnl_per_cycle": round(v["pnl"] / v["n"], 2) if v["n"] else 0})
     return out
 
 
@@ -64,6 +62,12 @@ def main():
     ap.add_argument("--out", default=os.path.join(REPO, "data", "copytrade.db"))
     ap.add_argument("--report-dir", default=os.path.join(REPO, "data", "copytrade"))
     ap.add_argument("--db-reset", action="store_true")
+    ap.add_argument("--timing", action="store_true",
+                    help="D2 Copy 時機掃描（v1.2 merge）：wait 網格 FILLED/MISSED（需 M5 JSON＋L0）")
+    ap.add_argument("--timing-only", action="store_true",
+                    help="只跑 timing 掃描出第五產出（唔入庫唔重跑矩陣——M5 導出後單獨重跑用）")
+    ap.add_argument("--m5-dir", default=os.path.join(REPO, "docs", "data"),
+                    help="M5 JSON 目錄（export_hst.py v2 --tf 5 出嘅 {PAIR}_M5.json）")
     args = ap.parse_args()
 
     signals = None
@@ -83,6 +87,17 @@ def main():
     os.makedirs(args.report_dir, exist_ok=True)
     conn = sqlite3.connect(args.out)
     init_db(conn)
+
+    if args.timing_only:
+        # D2 增量場景：M5 導出後只重跑 timing 掃描（DB 已入庫，唔重複 ingest／矩陣）
+        sids = [s.strip() for s in (args.signals or "").split(",") if s.strip()] \
+            if not args.all else None
+        if sids is None:
+            sids = sorted({os.path.basename(p).split("-")[-1].replace(".csv", "")
+                           for p in signal_csvs(DL, None)})
+        _run_timing(conn, sids, args)
+        conn.close()
+        return
 
     n_tr, n_cy, n_ly = ingest(conn, paths)  # 機房無 L0 specs → 未跑兩式交叉驗證
     print(f"✅ 入庫：trades {n_tr}／cycles {n_cy}／layers {n_ly}")
@@ -131,7 +146,58 @@ def main():
     gated = sum(1 for r in rows if r["outcome_note"] == "樣本不足")
     print(f"✅ 四份產出 → {args.report_dir}")
     print(f"   blocked（需 L0）{blocked}｜樣本不足（N<{N_GATE}）{gated}｜可排名 {len(rank)}")
+
+    if args.timing:
+        _run_timing(conn, sids, args)
     conn.close()
+
+
+def _run_timing(conn, sids, args):
+    """D2 第五份產出：Copy 時機掃描（v1.2 merge）——--timing／--timing-only 共用。"""
+    m5_dir = args.m5_dir
+    cache = {}
+
+    def m5_loader(sym):
+        if sym in cache:
+            return cache[sym]
+        p = os.path.join(m5_dir, f"{sym}_M5.json")
+        bars = load_m5_json(p) if os.path.exists(p) else None
+        cache[sym] = bars
+        return bars
+
+    # L0 唯一權威（§6.2）：有 symbols 表先行權威鏈；無 → specs=None 每行 BLOCKED（零估算）
+    specs = None
+    if conn.execute("SELECT COUNT(*) FROM symbols").fetchone()[0] > 0:
+        specs = {r[0]: {"pip_size": r[1], "tick_size": r[2], "tick_value": r[3],
+                        "contract_size": r[4], "quote_currency": r[5],
+                        "margin_initial": r[6], "fx_at_export": None}
+                 for r in conn.execute(
+                     "SELECT symbol, pip_size, tick_size, tick_value, contract_size, "
+                     "quote_currency, margin_initial FROM symbols")}
+        # fx_at_export 缺——非 USD 報價將 raise MissingFx→BLOCKED（鐵律 2，正確行為）
+
+    per_sid, all_rows = {}, []
+    for sid in sids:
+        rows_sid = simulate_timing_all(_load_cycles(conn, sid), specs=specs,
+                                       fx_table=None, m5_loader=m5_loader)
+        per_sid[sid] = rows_sid
+        all_rows.extend(rows_sid)
+    with open(os.path.join(args.report_dir, "copy_timing_scan.csv"), "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["signal_id", "symbol", "sim_type",
+                                          "wait_pips", "cycles", "filled", "missed",
+                                          "blocked", "fill_rate", "total_pnl_usd",
+                                          "avg_pnl_usd", "win_rate", "avg_pips"])
+        w.writeheader()
+        for sid in sids:
+            for s in summarize_timing(per_sid[sid]):
+                s["signal_id"] = sid
+                w.writerow({k: s.get(k) for k in w.fieldnames})
+    n_f = sum(1 for r in all_rows if r.get("outcome") == "FILLED")
+    n_m = sum(1 for r in all_rows if r.get("outcome") == "MISSED")
+    n_b = sum(1 for r in all_rows if r.get("outcome") in ("BLOCKED", "NO_M5_DATA"))
+    print("✅ 第五份產出 copy_timing_scan.csv（D2 v1.2 merge）")
+    print(f"   timing 行 {len(all_rows)}｜FILLED {n_f}｜MISSED {n_m}｜"
+          f"blocked/no-M5 {n_b}（L0＋M5 導出後重跑即解鎖）")
 
 
 if __name__ == "__main__":
