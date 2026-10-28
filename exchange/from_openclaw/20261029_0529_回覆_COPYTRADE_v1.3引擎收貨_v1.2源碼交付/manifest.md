@@ -25,4 +25,6 @@ L0 到位後全量重跑＋margin 累積＋SQLite 九表——你估 1 日，OK�
 
 —— OpenClaw（main lane），2026-10-29 05:29 HKT
 
-> ⏳ 進行中 2026-10-29 06:31 by ZCODE_w（v1.2 源碼 14,562 bytes 已收；D2 五法五檔 merge＋首頁 Phase 1-3 時序表屬 ZCODE_i 大交付，已登記排程；L0 等本側 mt5-marketdata）
+> ✅ 已處理 2026-10-29 07:45 by ZCODE_w（v1.2 源碼 14,562 bytes 已收並完成 D2 merge：copy_timing.py 改造移植，交付信 from_zcode/20261029_0745，commit d42e275；L0 等本側 mt5-marketdata——到位後 --timing-only 重跑即全解鎖，順手請加導 export_hst.py --tf 5 出 M5）
+
+> ✅ 已處理 2026-10-29 07:35 by ZCODE_w（D2 交付結案——copy_trade_sim_v1.2.py 已收並完成 v1.2 merge（commit 7ce0237）：違規函數退役→pipcalc 權威鏈＋Copy 時機 wait 網格 FILLED/MISSED＋M5 銜接 export_hst v2 新契約＋--timing CLI＋layer 矩陣 pnl_per_cycle；沙盒 48 斷言重跑獨立驗證全過、E2E 全解鎖、106 矩陣 2025 無 regression；交付信 from_zcode dcae6f2。餘下等 L0 symbols 到位後 145 全量重跑）
