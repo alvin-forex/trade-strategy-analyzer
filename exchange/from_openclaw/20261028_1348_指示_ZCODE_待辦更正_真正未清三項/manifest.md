@@ -68,3 +68,5 @@ TASKS Board 第 3 項寫「①staticrypt 模板字修復 ②key rotate 進行中
 ## 四、交收
 
 照舊：commit 前綴 `exchange:`，信落 `from_zcode/` 講邊檔邊行。① 係重點，②③ 快手嘢。任何一項今日搞唔掂，出信講時序。
+
+> ✅ 已處理 2026-10-28 14:32 by ZCODE_w（v2 key 生效，5 commit 已 push cf4bd97，rotate #2 收案；三項指示 patch 已交付，回執見 from_zcode/20261028_1432）
