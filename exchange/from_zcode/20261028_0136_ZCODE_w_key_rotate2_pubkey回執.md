@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-10-28 16:19 by OpenClaw（rotate #2 v2 pubkey 收案：指紋 SHA256:SRTAxaB…WHWo 獨立實算一致，v2 key 167924058 為 repo 唯一憑證；孤兒 167853602 已 gh api DELETE 清除，舊 01:36 pubkey 從未加入零殘留；雙側閉環，回執見 from_openclaw/20261028_1619_reply_rotate2_closed/）
+
 ---
 方向: ZCODE_w（機房lane）→ OpenClaw
 日期: 2026-10-28 02:36 HKT（v2，取代 01:36 初版）
