@@ -2,8 +2,22 @@
 """
 MT4 .hst History Exporter — converts MT4 .hst files to JSON for web frontend.
 
+v2 (2026-10-29): multi-timeframe + intraday support
+  - TF labels: 1->M1, 5->M5, 15->M15, 30->M30, 60->H1, 240->H4, 1440->D1 ...
+  - Intraday TFs output the new contract: {updated, count, timeframe, source,
+    bars:[{timestamp, open, high, low, close, volume, spread}]} where timestamp
+    is an ISO datetime ("2026-10-29T14:15") in MT4 server time.
+  - D1 keeps the legacy contract ({symbol, timeframe, start, end, count,
+    bars:[{d,o,h,l,c,v}], indicators?}) so existing report pages keep working.
+  - --format new|legacy|auto overrides (default auto = intraday new / D1 legacy).
+  - --limit N keeps only the most recent N bars (controls M15 file size).
+  - spread is read from the v401 record (offset 48, int32); 0 if absent.
+  - manifest.json: legacy keys unchanged; intraday runs append tf-level entries.
+
 Usage:
-    python export_hst.py [--src DIR] [--out DIR] [--pairs EURUSD,XAUUSD,...] [--tf 1440]
+    python export_hst.py [--src DIR] [--out DIR] [--pairs EURUSD,XAUUSD,...]
+                         [--tf 1440] [--limit N] [--format auto|new|legacy]
+                         [--indicators] [--compact]
 
 Defaults:
     --src   Auto-detect MT4 history directory (VantageInternational-Live 11)
@@ -15,9 +29,22 @@ Defaults:
 import struct, datetime, json, os, sys, argparse, glob
 
 # MT4 .hst v401 record: 60 bytes
-# time(4) + padding(4) + open(8) + high(8) + low(8) + close(8) + vol(8) + extra(12)
+# time(4) + padding(4) + open(8) + high(8) + low(8) + close(8) + vol(8)
+# + spread(4) + trailing(8)
 RECORD_SIZE = 60
 HEADER_SIZE = 148
+SPREAD_OFFSET = 48
+
+# Timeframe (minutes) -> label
+TF_LABELS = {
+    1: 'M1', 5: 'M5', 15: 'M15', 30: 'M30', 60: 'H1',
+    240: 'H4', 1440: 'D1', 10080: 'W1', 43200: 'MN1',
+}
+
+
+def tf_label(minutes):
+    """Map timeframe minutes to a label (60->H1, 15->M15, 1440->D1)."""
+    return TF_LABELS.get(minutes, f'M{minutes}')
 
 
 def find_mt4_history():
@@ -40,8 +67,13 @@ def find_mt4_history():
     return None
 
 
-def read_hst(filepath):
-    """Read MT4 .hst v401 file, return list of OHLC bars."""
+def read_hst(filepath, intraday=False):
+    """Read MT4 .hst v401 file, return list of OHLC bars.
+
+    intraday=False (D1 legacy): bars carry 'd' = date string 'YYYY-MM-DD'.
+    intraday=True: bars carry 'timestamp' = ISO datetime 'YYYY-MM-DDTHH:MM'
+                   plus 'spread' from the v401 record.
+    """
     bars = []
     file_size = os.path.getsize(filepath)
     n_bars = (file_size - HEADER_SIZE) // RECORD_SIZE
@@ -65,6 +97,7 @@ def read_hst(filepath):
             low_val = struct.unpack('<d', record[24:32])[0]
             close_val = struct.unpack('<d', record[32:40])[0]
             vol = struct.unpack('<q', record[40:48])[0]
+            spread = struct.unpack('<i', record[SPREAD_OFFSET:SPREAD_OFFSET + 4])[0]
 
             # Sanity check: skip zero-price bars
             if open_val == 0 and close_val == 0:
@@ -72,24 +105,36 @@ def read_hst(filepath):
 
             dt = datetime.datetime.fromtimestamp(time_val)
 
-            bars.append({
-                'd': dt.strftime('%Y-%m-%d'),
-                'o': round(open_val, 8),
-                'h': round(high_val, 8),
-                'l': round(low_val, 8),
-                'c': round(close_val, 8),
-                'v': vol
-            })
+            if intraday:
+                bars.append({
+                    'timestamp': dt.strftime('%Y-%m-%dT%H:%M'),
+                    'open': round(open_val, 8),
+                    'high': round(high_val, 8),
+                    'low': round(low_val, 8),
+                    'close': round(close_val, 8),
+                    'volume': vol,
+                    'spread': max(spread, 0)
+                })
+            else:
+                bars.append({
+                    'd': dt.strftime('%Y-%m-%d'),
+                    'o': round(open_val, 8),
+                    'h': round(high_val, 8),
+                    'l': round(low_val, 8),
+                    'c': round(close_val, 8),
+                    'v': vol
+                })
 
     return bars
 
 
 def detect_pair_from_filename(filename):
     """Extract pair name from .hst filename."""
-    # Examples: EURUSD1440.hst, XAUUSD.1440.hst, XAUAUD.1440.hst
+    # Examples: EURUSD1440.hst, XAUUSD.1440.hst, EURUSD15.hst, EURUSD.60.hst
     name = filename.replace('.hst', '')
-    # Remove timeframe suffix (1, 60, 240, 1440)
-    for tf in ['1440', '240', '60', '1']:
+    # Remove timeframe suffix (43200, 10080, 1440, 240, 60, 30, 15, 5, 1)
+    # Longest first so '15' doesn't strip from '1440' etc.
+    for tf in ['43200', '10080', '1440', '240', '60', '30', '15', '5', '1']:
         if name.endswith('.' + tf):
             return name[:-len(tf)-1]  # remove .TF
         if name.endswith(tf):
@@ -108,8 +153,19 @@ def get_all_pairs(hist_dir, timeframe=1440):
 
         # Check if it matches the timeframe
         # Format: PAIR{TF}.hst or PAIR.{TF}.hst
-        if not (f.endswith(tf_str + '.hst') or f.endswith('.' + tf_str + '.hst')):
+        # Match on the dot-suffix first; for bare suffix require a non-digit
+        # boundary so EURUSD15.hst doesn't also match tf=1 or tf=5.
+        bare = f.endswith(tf_str + '.hst') and not f.endswith(tf_str + tf_str + '.hst')
+        dotted = f.endswith('.' + tf_str + '.hst')
+        if not (bare or dotted):
             continue
+        # Guard: PAIR{TF}.hst bare match must not be the tail of a longer tf
+        # (e.g. tf=5 matching 'EURUSD15.hst').
+        if bare:
+            stem = f[:-len('.hst')]
+            prefix = stem[:-len(tf_str)]
+            if prefix and prefix[-1].isdigit():
+                continue
 
         pair = detect_pair_from_filename(f)
         filepath = os.path.join(hist_dir, f)
@@ -125,15 +181,39 @@ def get_all_pairs(hist_dir, timeframe=1440):
     return pairs
 
 
-def export_pair(filepath, pair_name, timeframe=1440):
-    """Export a single pair to JSON."""
-    bars = read_hst(filepath)
+def export_pair(filepath, pair_name, timeframe=1440, fmt='auto', limit=None,
+                src_dir=''):
+    """Export a single pair to JSON payload dict."""
+    intraday = (timeframe != 1440)
+    fmt = fmt or 'auto'
+    if fmt == 'legacy':
+        intraday = False
+    elif fmt == 'new':
+        intraday = True
+
+    bars = read_hst(filepath, intraday=intraday)
     if not bars:
         return None
 
+    if limit and limit > 0 and len(bars) > limit:
+        bars = bars[-limit:]
+
+    label = tf_label(timeframe)
+
+    if intraday:
+        return {
+            'updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'symbol': pair_name,
+            'timeframe': label,
+            'source': src_dir,
+            'start': bars[0]['timestamp'],
+            'end': bars[-1]['timestamp'],
+            'count': len(bars),
+            'bars': bars
+        }
     return {
         'symbol': pair_name,
-        'timeframe': 'D1' if timeframe == 1440 else f'M{timeframe}',
+        'timeframe': 'D1' if timeframe == 1440 else label,
         'start': bars[0]['d'],
         'end': bars[-1]['d'],
         'count': len(bars),
@@ -259,8 +339,14 @@ def main():
     parser.add_argument('--src', help='MT4 history directory (auto-detect if omitted)')
     parser.add_argument('--out', default='../docs/data/', help='Output directory')
     parser.add_argument('--pairs', help='Comma-separated pairs (default: all)')
-    parser.add_argument('--tf', type=int, default=1440, help='Timeframe (default: 1440=D1)')
-    parser.add_argument('--indicators', action='store_true', help='Include technical indicators')
+    parser.add_argument('--tf', type=int, default=1440,
+                        help='Timeframe minutes: 1,5,15,30,60,240,1440 (default: 1440=D1)')
+    parser.add_argument('--limit', type=int, default=None,
+                        help='Keep only the most recent N bars (recommended for M15/M30)')
+    parser.add_argument('--format', choices=['auto', 'new', 'legacy'], default='auto',
+                        help='JSON contract: auto=intraday new/D1 legacy (default), '
+                             'new={timestamp,open,...}, legacy={d,o,h,l,c,v}')
+    parser.add_argument('--indicators', action='store_true', help='Include technical indicators (D1 legacy only)')
     parser.add_argument('--compact', action='store_true', help='Compact JSON (no indentation)')
     args = parser.parse_args()
 
@@ -290,6 +376,8 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     # Export
+    label = tf_label(args.tf)
+    intraday = (args.tf != 1440)
     exported = 0
     skipped = 0
     manifest = []
@@ -300,21 +388,21 @@ def main():
 
         print(f"  📊 {pair}: {info['bars']} bars ... ", end='', flush=True)
 
-        data = export_pair(info['path'], pair, args.tf)
+        data = export_pair(info['path'], pair, args.tf, fmt=args.format,
+                           limit=args.limit, src_dir=hist_dir)
         if not data:
             print("❌ (no data)")
             skipped += 1
             continue
 
-        # Add indicators if requested
-        if args.indicators:
+        # Add indicators if requested (legacy D1 contract only)
+        if args.indicators and not intraday and args.format != 'new':
             indicators = calculate_technical_indicators(data)
             if indicators:
                 data['indicators'] = indicators
 
         # Write JSON
-        tf_label = 'D1' if args.tf == 1440 else f'M{args.tf}'
-        out_file = os.path.join(out_dir, f"{pair}_{tf_label}.json")
+        out_file = os.path.join(out_dir, f"{pair}_{label}.json")
 
         with open(out_file, 'w') as f:
             if args.compact:
@@ -324,29 +412,38 @@ def main():
 
         manifest.append({
             'symbol': pair,
-            'tf': tf_label,
+            'tf': label,
             'start': data['start'],
             'end': data['end'],
             'bars': data['count'],
-            'file': f"{pair}_{tf_label}.json"
+            'file': f"{pair}_{label}.json"
         })
 
         print(f"✅ {data['start']} → {data['end']} ({data['count']} bars)")
         exported += 1
 
-    # Write manifest
-    manifest_file = os.path.join(out_dir, 'manifest.json')
-    with open(manifest_file, 'w') as f:
-        json.dump({
-            'generated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'source': hist_dir,
-            'timeframe': 'D1' if args.tf == 1440 else f'M{args.tf}',
-            'pairs': manifest,
-            'total_pairs': len(manifest),
-            'total_bars': sum(m['bars'] for m in manifest)
-        }, f, indent=1)
+    # Write manifest (per-TF file so runs of different TFs don't clobber
+    # each other; legacy D1 manifest name kept for backwards compatibility)
+    if intraday:
+        manifest_file = os.path.join(out_dir, f'manifest_{label}.json')
+    else:
+        manifest_file = os.path.join(out_dir, 'manifest.json')
 
-    print(f"\n✅ Exported {exported} pairs, skipped {skipped}")
+    manifest_payload = {
+        'generated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'source': hist_dir,
+        'timeframe': label,
+        'pairs': manifest,
+        'total_pairs': len(manifest),
+        'total_bars': sum(m['bars'] for m in manifest)
+    }
+    if args.limit:
+        manifest_payload['limit'] = args.limit
+
+    with open(manifest_file, 'w') as f:
+        json.dump(manifest_payload, f, indent=1)
+
+    print(f"\n✅ Exported {exported} pairs, skipped {skipped} (TF={label}, format={args.format})")
     print(f"📁 Output: {out_dir}")
     print(f"📋 Manifest: {manifest_file}")
 
