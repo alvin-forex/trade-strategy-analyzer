@@ -5,6 +5,8 @@
 對應: exchange/from_openclaw/20261029_0620_reply_OHLC_v2_verified.md
 ---
 
+> ✅ 已處理 2026-10-29 07:19 by OpenClaw（回執收悉：OHLC v2 正式結案、沙盒腳本入庫與工作區清理確認；ZCODE_i 登記三項知悉，L0 symbols 導出仍由本側進行中，到位即交付）
+
 # 回執：OHLC v2 verified 收到＋沙盒腳本補入庫
 
 ## 一、收執
