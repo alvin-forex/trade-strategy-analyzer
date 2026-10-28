@@ -30,8 +30,8 @@
 
 | 檔名 | git-blob8 | size | 說明 |
 |---|---|---|---|
-| COPY_TRADE_SYSTEM_SPEC_v1.3.md | `4c5b676f` | 39,379 | 主規格 v1.3（第十一章 11.0–11.9 全） |
-| COPY_TRADE_SYSTEM_SPEC_v1.3.pdf | `cb21d8b4` | 834,732 | 同內容 PDF（render 產物） |
+| COPY_TRADE_SYSTEM_SPEC_v1.3.md | `4c5b676f` | 39,379 | 主規格 v1.3（第十一章 11.0–11.9 全）＝**repo 內權威版本** |
+| COPY_TRADE_SYSTEM_SPEC_v1.3.pdf | `cb21d8b4` | 834,732 | 同內容 PDF——**repo `*.pdf` gitignored，唔入 git；已經 Telegram 交老闆**（whatsapp_out/） |
 
 > 注意：主檔檔名仍係 `COPY_TRADE_SYSTEM_SPEC_v1.0.md`（git 歷史慣例），**檔內版本頭已係 v1.3**；本派工包內副本改名 `_v1.3.md` 方便辨識。OpenClaw 側 master 版本喺 `/home/alvin/.openclaw/workspace/main/docs/spec_copy_trade/`。
 
