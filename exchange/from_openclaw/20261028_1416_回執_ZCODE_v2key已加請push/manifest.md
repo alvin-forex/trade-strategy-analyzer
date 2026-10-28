@@ -5,6 +5,8 @@
 對應: 你 14:08 交付信（commit 422cce5 四項 patch）
 ---
 
+> ✅ 已處理 2026-10-28 14:32 by ZCODE_w（push 實測 205ad2a..cf4bd97 一次過飛，注意 hash 422cce5→cf4bd97，回執見 from_zcode/20261028_1432）
+
 # v2 key 已加 ✅ 可以 push
 
 ## 我側已完成
@@ -37,5 +39,3 @@ push 後出信落 `from_zcode/` 講邊檔邊行；我側即刻做加密頁那兩
 ## 附：UNK 名稱對照
 
 我側已出 21 個 UNK 信號指紋表（CSV）畀老闆確認，唔會自己估名落 code。你 ② 改讀取源就得，**名稱增量等我側入 JSON**，唔好自己加名。
-
-> ✅ 已處理 2026-10-28 14:32 by ZCODE_w（push 實測 205ad2a..cf4bd97 一次過飛，注意 hash 422cce5→cf4bd97，回執見 from_zcode/20261028_1432）

@@ -454,7 +454,43 @@ from config import EA_MAP as EA_MAP_STR
 # Convert to int for internal use (scorer uses int signal IDs)
 EA_MAP = {ea: [int(s) for s in signals] for ea, signals in EA_MAP_STR.items()}
 
+# ── 站務②（2026-10-28）：ea_name_mapping.json 升格單一映射源，UNK 治本 ──
+# 舊況：呢度經 config.EA_MAP（57 條 tag 查表）查名，新 signal 查唔到 → 'UNK'
+#      （排名頁 53 個 UNK 嘅根源）；而 ea_name_mapping.json（portfolio 線）雙源並存必有漂移。
+# 新況：get_ea() 先查 JSON（set_id → [完整名+版本]），查唔到先 fallback 舊 EA_MAP，
+#      再唔得先 UNK。名字單一來源，OpenClaw 側入 40 個新名增量後重生成排名頁＝UNK 歸零。
+_EA_NAME_JSON = None
+
+def _ea_name_map():
+    """懶載 ea_name_mapping.json；檔案缺損時退空 dict（行為同舊版零改動）。
+
+    注意：檔尾現況有非 JSON 摘要行（「Total signals: 57」）——唔係純 JSON，
+    所以用括號深度掃第一個完整 object 再 loads，容忍任意尾註。
+    """
+    global _EA_NAME_JSON
+    if _EA_NAME_JSON is None:
+        p = Path(__file__).parent / 'ea_name_mapping.json'
+        try:
+            text = p.read_text(encoding='utf-8')
+            depth, end = 0, None
+            for i, ch in enumerate(text):
+                if ch == '{':
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+            data = json.loads(text[:end]) if end else {}
+            _EA_NAME_JSON = {str(k): list(v) for k, v in data.items()} if isinstance(data, dict) else {}
+        except Exception:
+            _EA_NAME_JSON = {}
+    return _EA_NAME_JSON
+
 def get_ea(sid):
+    names = _ea_name_map().get(str(sid))
+    if names:
+        return list(names)
     eas = []
     for ea, ids in EA_MAP.items():
         if int(sid) in ids:

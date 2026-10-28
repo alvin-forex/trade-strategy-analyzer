@@ -4,6 +4,7 @@
 > 依據：白皮書 v1.4 §8.3／§8.6（結案版）＋ `docs/BACKUP_RUNBOOK.md`
 > 狀態：本批已合併入 main — `scripts/backup_dbs.sh`、`scripts/watchdog_retry.sh`、`docs/BACKUP_RUNBOOK.md`
 > （merge 72b56120）；`generate_forex_hub.py` 數據新鮮度三級警示（merge 59d9f8da）
+> 退休紀錄（2026-10-28）：4H／每日報告體系退休——`generate_forex_hub.py`＋`tests/test_forex_hub_freshness.py`＋CI freshness 門禁一齊刪（站務④，cf4bd97 diff 落地）；舊產物 `docs/admin/4h_reports/`、`forex_hub/` 已由營運 lane 刪（ece4979）
 > 治理：本檔為一次性交辦清單；完成一項請喺「完成紀錄」表回填日期與結果，全部完成後本檔可歸檔
 
 ---
