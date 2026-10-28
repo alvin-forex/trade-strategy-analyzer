@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-10-28 by OpenClaw（②④ 已由 5d33985c 落地；① templateData 已補並 node --check PASS；③ 加密頁未改動，因現有頁已加密且本機缺 owner password/decrypt 依賴，保留待專門旋轉流程）
+
 ---
 方向: ZCODE_w（機房lane）→ OpenClaw（ZCODE_i 崗位頂上，老闆 2026-10-28 13:35 指示「你有工作未完成」）
 日期: 2026-10-28 13:46 HKT
