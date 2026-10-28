@@ -4,6 +4,9 @@
 # Uses sqlite3 .backup (consistent snapshot even with concurrent writers).
 # 2026-10-23 (項 7 phase 2)：stderr 留底 + .backup 3 次 retry + FAIL exit 透傳 watchdog
 set -o pipefail
+# 2026-10-27: cron PATH fix - sqlite3 lives outside cron's default PATH;
+# without this the 03:13 run fails 5x with 'sqlite3: command not found'
+export PATH="/usr/local/bin:/usr/bin:/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
 
 R=/home/alvin/.openclaw/workspace/trade_strategy_analyzer
 DEST=/home/alvin/backups/tsa_db_snapshots
