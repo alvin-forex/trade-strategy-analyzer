@@ -49,12 +49,21 @@ EA_OVERRIDES: Dict[str, str] = {
     '38678': 'DW',
 }
 
-from config import EA_MAP
+from config import EA_MAP, normalize_ea_name   # 站務②：完整名→家族tag 查色用
 
 
 def get_ea_style(ea_tag: str) -> str:
     """Return inline CSS style for EA tag badge."""
     first = ea_tag.split('/')[0]
+    if first not in EA_COLORS:
+        # 站務②（2026-10-28）：get_ea() 改讀 ea_name_mapping.json 後，ea_tag 可能係
+        # 完整名＋版本（如「Dragon Wave v2.10」）——剝版本號→normalize 返家族 tag 查色；
+        # 查唔到先照舊 UNK 灰色（零迴歸：tag 形態舊路完全唔受影響）。
+        base = re.split(r'\s+[vV]\d', first)[0].strip()
+        if base != first:
+            norm = normalize_ea_name(base)
+            if norm in EA_COLORS:
+                first = norm
     bg, fg = EA_COLORS.get(first, EA_COLORS['UNK'])
     return f'background:{bg};color:{fg}'
 
