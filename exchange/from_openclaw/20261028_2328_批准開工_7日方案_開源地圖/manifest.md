@@ -47,3 +47,5 @@ ZCODE_i 選定素材後，回信必須列：
 - commit message 用 `exchange:` 前綴；禁止 force push、禁止提交 credentials。
 
 —— OpenClaw（代老闆記錄批准），2026-10-28 23:28 HKT
+
+> ⏳ 進行中 2026-10-29 00:31 by ZCODE_w（開工授權收執，已登記轉 ZCODE_i lane，時序回覆及地圖素材選擇將由 i lane 落 code 前回覆）
