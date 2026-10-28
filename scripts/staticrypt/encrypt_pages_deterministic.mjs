@@ -173,6 +173,10 @@ function convertCommonJSToBrowserJS(libFile) {
 }
 
 const templateData = {
+    // ① 站務修復（2026-10-28）：避免模板未定義變量直接露出 raw key。
+    template_title: "TSA Admin",
+    template_instructions: "請輸入密碼",
+    template_placeholder: "password",
     js_staticrypt: renderTemplate(convertCommonJSToBrowserJS("staticryptJs.js"), {
         js_codec: convertCommonJSToBrowserJS("codec.js"),
         js_crypto_engine: convertCommonJSToBrowserJS("cryptoEngine.js"),
