@@ -201,6 +201,9 @@ h1{font-size:26px;line-height:1.3;margin:0 0 6px;font-weight:700;letter-spacing:
 .c{min-width:0;overflow-wrap:anywhere;padding-right:10px}
 .c p{margin:0}
 .t{font-size:15px;font-weight:600;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;padding-right:2px}
+/* 16:40 量測回批 (1)：390px 長任務名（中英＋全角＋混合）scrollWidth 329>326 差 3px——
+   照 OpenClaw 建議 .c-task .t 改 break-all；任何字元間可斷，min-content 更碎，A5 字數不受影響 */
+.c-task .t{overflow-wrap:break-word;word-break:break-all}
 .concl{font-size:14px;line-height:1.6;color:var(--t1);overflow-wrap:anywhere}
 .chip{display:inline-block;font-size:12px;color:var(--t2);background:var(--l2);
  border:1px solid var(--line);border-radius:6px;padding:1px 7px;white-space:normal}
