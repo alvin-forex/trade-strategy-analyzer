@@ -176,11 +176,12 @@ def _run_timing(conn, sids, args):
     if conn.execute("SELECT COUNT(*) FROM symbols").fetchone()[0] > 0:
         specs = {r[0]: {"pip_size": r[1], "tick_size": r[2], "tick_value": r[3],
                         "contract_size": r[4], "quote_currency": r[5],
-                        "margin_initial": r[6], "fx_at_export": None}
+                        "margin_initial": r[6], "fx_at_export": r[7]}
                  for r in conn.execute(
                      "SELECT symbol, pip_size, tick_size, tick_value, contract_size, "
-                     "quote_currency, margin_initial FROM symbols")}
-        # fx_at_export 缺——非 USD 報價將 raise MissingFx→BLOCKED（鐵律 2，正確行為）
+                     "quote_currency, margin_initial, fx_at_export FROM symbols")}
+        # fx_at_export 由 load_l0.py 注入（ExportSymbolsL0.mq5 導出當日匯率）；
+        # 缺——非 USD 報價將 raise MissingFx→BLOCKED（鐵律 2，正確行為）
 
     per_sid, all_rows = {}, []
     for sid in sids:

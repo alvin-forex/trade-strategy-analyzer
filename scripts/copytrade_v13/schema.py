@@ -15,6 +15,7 @@ DDL = [
         contract_size REAL NOT NULL,
         quote_currency TEXT NOT NULL,
         margin_initial REAL,
+        fx_at_export REAL,
         exported_at TEXT NOT NULL,
         source TEXT NOT NULL DEFAULT 'MT5 SymbolInfoDouble'
     )""",
@@ -157,4 +158,8 @@ def init_db(conn):
                      ("avg_loss", "REAL"), ("monthly_pnl", "TEXT")):
         if col not in have:
             conn.execute(f"ALTER TABLE copy_sims ADD COLUMN {col} {typ}")
+    # v1.3.2：symbols 加 fx_at_export（L0 導出當日匯率——pipcalc §6.2 修正用）
+    have_sym = {r[1] for r in conn.execute("PRAGMA table_info(symbols)")}
+    if "fx_at_export" not in have_sym:
+        conn.execute("ALTER TABLE symbols ADD COLUMN fx_at_export REAL")
     conn.commit()
