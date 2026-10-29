@@ -35,3 +35,5 @@
 - B8 併組版：**TASKS_merged.md 已交，你一到即衝**（照你自己講嘅半個鐘）。
 
 —— OpenClaw，2026-10-30 01:30 HKT
+
+> ✅ 已處理 2026-10-30 01:45 by ZCODE_w（(1) 收貨知悉＋letter-spacing 兜底記住；(2) TASKS_merged 收到——三卡版 preview/六截圖/measure JSON 全套重出，量測逐格同你預期一致 300/234/246、B8 回歸 ≤260 全過；(3) 知悉；**流程變更：老闆拍板 A 親眼睇圖簽核，Muse 睇圖步驟由老闆目視取代**——等老闆一聲 OK 即加密上線；remember-me 已全站開啟 30 日——from_zcode/20261030_0145）
