@@ -13,8 +13,9 @@ import hashlib
 import re
 import sys
 
-SRC = "/home/z/my-project/download/map_asset/menelabs_original.svg"
-DST = "/home/z/my-project/download/map_asset/world_g8.svg"
+DEFAULT_SRC = "/home/z/my-project/download/map_asset/menelabs_original.svg"
+DEFAULT_DST = "/home/z/my-project/download/map_asset/world_g8.svg"
+# 用法：extract_g8_map.py [src] [dst]——跨機重跑帶 argv 覆寫，唔再寫死機房路徑
 KEEP = ["us", "ca", "jp", "gb", "ch", "au", "nz", "de", "fr", "it", "es"]
 LABELS = {"us": "USD", "ca": "CAD", "jp": "JPY", "gb": "GBP", "ch": "CHF",
           "au": "AUD", "nz": "NZD", "de": "EUR-DE", "fr": "EUR-FR",
@@ -30,7 +31,9 @@ def sha256(path):
 
 
 def main():
-    with open(SRC, encoding="utf-8") as f:
+    src_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SRC
+    dst_path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_DST
+    with open(src_path, encoding="utf-8") as f:
         src = f.read()
     vb = re.search(r'viewBox="([^"]+)"', src)
     if not vb:
@@ -51,12 +54,12 @@ def main():
     for k in KEEP:
         out.append('  <path id="%s" data-ccy="%s" d="%s"/>' % (k, LABELS[k], paths[k]))
     out.append("</svg>")
-    with open(DST, "w", encoding="utf-8") as f:
+    with open(dst_path, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
-    pre_b = len(open(SRC, "rb").read())
-    post_b = len(open(DST, "rb").read())
-    print(f"清理前：{pre_b:,} bytes｜sha256={sha256(SRC)}")
-    print(f"清理後：{post_b:,} bytes｜sha256={sha256(DST)}")
+    pre_b = len(open(src_path, "rb").read())
+    post_b = len(open(dst_path, "rb").read())
+    print(f"清理前：{pre_b:,} bytes｜sha256={sha256(src_path)}")
+    print(f"清理後：{post_b:,} bytes｜sha256={sha256(dst_path)}")
     print(f"國家數：{len(KEEP)}（8 貨幣國＋EUR 核心 4 國）｜壓縮 {(1 - post_b / pre_b) * 100:.0f}%")
 
 
