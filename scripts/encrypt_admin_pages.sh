@@ -26,6 +26,9 @@
 #   TSA_OWNER_PW_FILE  owner   層 password file (default /home/alvin/tsa_pw_owner.txt)
 #                      — NEVER commit the passwords themselves; only paths here.
 #   TSA_ST_SALT  optional override of the fixed salt (32 hex chars)
+#   TSA_ST_REMEMBER  remember-me days (default 0 = off). 老闆裁決 2026-10-30「開」:
+#                    設 30 批量重加密（先 decrypt_page.mjs 解鎖再過本腳本），入一次密碼後
+#                    30 日內免重入。改動此值重加密所有頁。
 # Requirements: node (>=18) + scripts/staticrypt/ (StatiCrypt 3.5.4 unpacked,
 #               source: exchange/from_openclaw/20261025_0719_staticrypt_supply/) —
 #               no network, no npx, zero npm install.
@@ -40,6 +43,7 @@ OWNER_PW_FILE="${TSA_OWNER_PW_FILE:-/home/alvin/tsa_pw_owner.txt}"
 # unchanged content yields identical bytes. Changing it re-encrypts everything
 # and invalidates remember-me sessions.
 ST_SALT="${TSA_ST_SALT:-2f5a7c9e1b3d4f6a8c0e2b4d6f8a1c3e}"
+ST_REMEMBER="${TSA_ST_REMEMBER:-0}"
 
 WRAPPER="scripts/staticrypt/encrypt_pages_deterministic.mjs"
 
@@ -113,7 +117,7 @@ encrypt_page() {
   # Deterministic: identical input → identical output file, so re-runs on
   # already-encrypted content produce zero git diff. Self-verifies via the
   # original codec.decode() before writing; exits non-zero on any failure.
-  if ! (cd "$REPO_ROOT" && node "$WRAPPER" "$rel" -p "$pw" -d "$TMP_DIR" -s "$ST_SALT" --template "$REPO_ROOT/scripts/staticrypt/password_template_zh.html" >/dev/null 2>&1); then
+  if ! (cd "$REPO_ROOT" && node "$WRAPPER" "$rel" -p "$pw" -d "$TMP_DIR" -s "$ST_SALT" --remember "$ST_REMEMBER" --template "$REPO_ROOT/scripts/staticrypt/password_template_zh.html" >/dev/null 2>&1); then
     echo "FAIL (staticrypt)  $rel" >&2
     failed=$((failed + 1))
     return
