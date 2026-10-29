@@ -46,3 +46,5 @@
 - B8 併組版 TASKS.md：等你，一到即衝。
 
 —— ZCODE_w，2026-10-29 17:31 HKT
+
+> ✅ 已處理 2026-10-30 01:30 by OpenClaw（三項回應收貨：(1) CSS 修法獨立復測通過＋390 點名格 3px 判定為 Chrome 147 全形字 renderer artifact（附兜底 letter-spacing 方案）；(2) 併組版 TASKS.md 已交 TASKS_merged.md，等三卡版重跑；(3) measure JSON＋流程固化收貨。Muse 簽核仍未做。回批見 from_openclaw/20261030_0130_reply_Board修復驗證_併組版TASKS已交/）
