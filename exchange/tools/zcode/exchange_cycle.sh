@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3.5 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+# exchange_cycle.sh v3.6 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
 #   ★ 此腳本正本住喺 repo：exchange/tools/zcode/exchange_cycle.sh（v3 起）
 #     scripts/ 下嗰份只係安裝副本；運行時自動 exec repo 正本，永遠用最新版
 #
+# v3.6 重點（2026-10-29 修復：Task 90 實錘假陰性 regression）：
+#   ⑦b 頭部窗口廢除：v3.5 要求章喺 frontmatter 後 STAMP_WIN=10 行內，但實際蓋章
+#      慣例係檔尾（08:53 實測：10 封已處理信嘅章全部喺 28-105 行→全部誤報新信）。
+#      改返全檔掃描；⑦a（只認 by ZCODE*）＋⑦c（章日期 ≥ 信日期）兩重收窄已足夠
+#      防假陽性（他方自章／內文引述舊章都唔命中），窗口淨係製造假陰性。
 # v3.5 重點（回應 OpenClaw 1315 回執：⑦點頭開工，照 ⑥ 慣例）：
 #   ⑦ 蓋章判定三重收窄（治「引述舊章／他方自章」兩種假陰性）：
 #      a. 章只認 by ZCODE*——OpenClaw 信頭自章係佢側回執標記，唔代表我方已處理
@@ -66,7 +71,7 @@ REMOTE_HTTPS="https://github.com/alvin-forex/trade-strategy-analyzer.git"
 BRANCH="main"
 SCAN_DIR="exchange/from_openclaw"
 STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*進行中).*by[[:space:]]+ZCODE'   # v3.5 收窄：只認 by ZCODE*（我方回執）——OpenClaw 自章唔代表我方已處理；行首錨點防協議原文假陽性
-STAMP_WIN=10   # ⑦ 頭部窗口：frontmatter 後 N 行內嘅章先算（0825 兩方約定檔頂蓋章）
+# ⑦b STAMP_WIN 頭部窗口已於 v3.6 廢除——實際蓋章慣例係檔尾，窗口令已處理信假陰性（10 封實證）
 WORKLOG="/home/z/my-project/worklog.md"
 REPO_SELF="${REPO}/exchange/tools/zcode/exchange_cycle.sh"
 SCRIPTS_COPY="/home/z/my-project/scripts/exchange_cycle.sh"
@@ -270,14 +275,13 @@ fetch_latest() {
   return 0
 }
 
-# ⑦ 判定信件是否已處理：頭部窗口內認 by ZCODE* 章，且章日期 ≥ 信件日期
-#   三重條件缺一不可——引述舊章（日期早於信）／他方自章（非 ZCODE）／深位章（窗外）都唔算
+# ⑦ 判定信件是否已處理（v3.6 兩重條件）：全檔掃描認 by ZCODE* 章，且章日期 ≥ 信件日期
+#   ——引述舊章（日期早於信）／他方自章（非 ZCODE）都唔算；檔尾深位章照認（假陰性修復）
 is_processed() {
-  local f="$1" line sdate ldate fm_end win_end
+  local f="$1" line sdate ldate fm_end
   # frontmatter 結束行（第二個 ---；無 frontmatter 則 0）
   fm_end=$(awk 'NR==1{ if($0!="---"){print 0; exit} next } $0=="---"{print NR; exit} NR>20{print 0; exit}' "$f" 2>/dev/null)
   [ -z "$fm_end" ] && fm_end=0
-  if [ "$fm_end" -gt 0 ]; then win_end=$((fm_end + STAMP_WIN)); else win_end=$STAMP_WIN; fi
   # 信件日期（frontmatter 內 日期: 欄，去 HKT 尾）
   ldate=$(awk -v e="$fm_end" 'NR<=e && /^日期:/{sub(/^日期:[[:space:]]*/,""); sub(/[[:space:]]*HKT.*$/,""); print; exit}' "$f" 2>/dev/null)
   while IFS= read -r line; do
@@ -293,7 +297,7 @@ is_processed() {
     # ISO 格式零補齊，字典序即時間序
     [ "$sdate" = "$ldate" ] && return 0
     [ "$sdate" \> "$ldate" ] && return 0
-  done < <(head -n "$win_end" "$f" 2>/dev/null)
+  done < "$f"   # v3.6：全檔掃描（⑦b 窗口廢除）——⑦a+⑦c 已防假陽性
   return 1
 }
 
