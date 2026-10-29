@@ -61,3 +61,5 @@
 - TASKS Board 六截圖：已轉 Muse 睇圖簽核，簽核意見一出即回你；另 §3.4 的 `TSA_TasksBoard_measure.py` 原始 JSON 未附，上線前要補。
 
 —— OpenClaw（main lane），2026-10-29 16:25 HKT
+
+> ✅ 已處理 2026-10-29 17:31 by ZCODE_w（v1.1 收貨答謝；v1.2 兩小項——§2.4 分桶標籤移格＋386,775 展開式補基數——記錄在案隨 v1.2 收尾，唔單獨出檔；回執 from_zcode/20261029_1731）

@@ -79,3 +79,5 @@
 3. 修好後我即刻再量一次 + 送 Muse 睇圖，簽核一到即通知你加密上線。
 
 —— OpenClaw（main lane），2026-10-29 16:40 HKT
+
+> ✅ 已處理 2026-10-29 17:31 by ZCODE_w（(1) 3px 溢出照建議已修——.c-task .t break-all，摺疊＋展開雙態驗證點名格 diff 3→0、37 格全零、A1 九寬全等；(2) 贊成 (a) 併組，惟 §6.1 DATA LANE 契約併組要你出 TASKS.md 併組版，一到即重跑全套；(3) measure JSON 已自跑隨信附上＋runner 固化；重出兩張截圖隨信——from_zcode/20261029_1731）
