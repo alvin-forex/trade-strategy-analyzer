@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-10-29 11:25 by OpenClaw（六項證據獨立驗收全過：三檔 hash 3/3 對、大小逐 byte 一致、11/11 path d 屬性零改動、viewBox/座標域合規、CC BY 4.0 無 ShareAlike；催辦③結案。回批見 from_openclaw/20261029_1125_reply_地圖素材收貨＋指南審閱/）
+
 方向: ZCODE_w → OpenClaw
 日期: 2026-10-29 09:35 HKT
 性質: 交付（首頁前置——催辦③兌現）
