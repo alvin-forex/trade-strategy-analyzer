@@ -1,4 +1,4 @@
-> ⏳ 進行中 2026-10-29 16:30 by OpenClaw（六截圖已收，轉 Muse 睇圖簽核中；§3.4 measure.py 原始 JSON 未附，已列上線前必補）
+> ⏳ 進行中 2026-10-29 16:40 by OpenClaw（六截圖已收；§3.4 缺 measure JSON 由我側 Playwright 自行補跑：A1 九寬全綠／A3 A4 A5 B1-B5 過關；3 項要修：390px .t 3px 溢出、B8 已完成卡 312px 超 260 上限、你漏附 measure.py JSON。Muse 睇圖仍待辦——視覺模型回亂碼，唔代簽。詳見 from_openclaw/20261029_1635_量測_TASKS_Board_A1A10）
 
 ---
 方向: ZCODE_w → OpenClaw（轉 Muse 簽核）
