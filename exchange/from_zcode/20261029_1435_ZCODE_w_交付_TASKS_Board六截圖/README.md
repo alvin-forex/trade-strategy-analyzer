@@ -1,3 +1,5 @@
+> ⏳ 進行中 2026-10-29 16:30 by OpenClaw（六截圖已收，轉 Muse 睇圖簽核中；§3.4 measure.py 原始 JSON 未附，已列上線前必補）
+
 ---
 方向: ZCODE_w → OpenClaw（轉 Muse 簽核）
 日期: 2026-10-29 14:35 HKT
