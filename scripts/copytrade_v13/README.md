@@ -10,10 +10,11 @@
 | `pipcalc.py` | §6.1–6.5 唯一計錢層：pip_value（tick_value 權威＋按日 fx 修正＋sanity band）、兩式交叉驗證、margin、爆倉警戒 |
 | `ingest.py` | CSV 逐筆入庫＋馬丁週期（cycle）分組（時間重疊法＋24h gap 保護） |
 | `sim_engine.py` | §11.2 五法 M1–M5×三情境×三帳戶單 cycle 模擬 |
-| `matrix.py` | §11.4 排名（N=18 閘門＋risk_adj_score 扣分制）＋§11.5 起始資金（夾倉×3）＋§11.6 指標集 |
+| `matrix.py` | §11.4 排名（N=18 閘門＋risk_adj_score 扣分制）＋§11.5 起始資金（夾倉×3）＋§11.6 指標集（D3 補齊六指標＋D4 blocked 組合級短路） |
 | `copy_timing.py` | **D2：v1.2 `copy_trade_sim.py` 改造移植**（Copy 時機 wait 網格 FILLED/MISSED；`_get_pip_size`／`_estimate_pip_value` 兩違規函數退役，pip 全行 `pipcalc` 權威鏈） |
 | `run_sim.py` | CLI＋§11.9 四份產出＋D2 第五份產出 `copy_timing_scan.csv` |
 | `sandbox_timing_test.py` | D2 沙盒驗證（48 斷言） |
+| `sandbox_metrics_test.py` | **D3 沙盒驗證（29 斷言）：§11.6 六指標手算對照＋schema 遷移＋短路等價** |
 
 ## 用法
 
@@ -40,6 +41,21 @@ mfe_risk_report／copy_timing_scan）。
 - M5 數據＝OHLC exporter v2 新契約（`{PAIR}_M5.json`，`--tf 5` 導出）——銜接同日交付。
 - 無 L0 → `BLOCKED`；無 M5 → `NO_M5_DATA`（ACTUAL wait=0 基線照出）——零估算（§6.7 鐵律 2）。
 - 解鎖順序：L0 symbols 導出＋`export_hst.py --tf 5` → `--timing-only` 重跑即出全量實數。
+
+## D3 指標集補完（§11.6，2026-10-29）
+
+唔使 L0 嘅六指標補齊（schema v1.3.1 四新欄＋既有欄填值）：
+
+- `avg_win`／`avg_loss`（回報組）；`monthly_pnl`（每月 P/L compact 串 `YYYY-MM:val|…`）
+- `max_concurrent`：層級區間重疊掃描（同刻 close 先 open，防假重疊；層 close_time 缺 →
+  fallback cycle.close_time）
+- `max_float_loss`：cycle 級 MAE 疊加（Σ每層 min(0, max_loss)×ratio，保守口徑；負值輸出）
+- `recovery_days`：月度曲線，最長一段 DD 嘅 peak 月→恢復月日曆日差；尾部未恢復 censor
+- `layers_filtered`：被層檔截走嘅層數（執行品質組）
+
+margin 系（margin_peak／margin_ratio／margin_stop_hit／est_margin_peak_usd／爆倉層級）
+仍等 L0（見待辦）。D4 加 blocked 組合級短路（sp=None 對應 sim_cycle 頭兩個 BLOCKED
+return；stash 對比 106：26 共享欄＋1,845 blocked 行內容 diff 全 0）。
 
 ## 可信度與解鎖狀態（§11.7）
 
@@ -69,11 +85,16 @@ mfe_risk_report／copy_timing_scan）。
 | M4 零估算 | 合成 L0 下 45/45 行 RISK_ESTIMATE_UNAVAILABLE |
 | M1 sanity | 價差 1.94 USD 手算＝引擎輸出 |
 | D/M/YYYY 口徑 | 照 algoforest_analyzer TIME_FMT（先試 M/D 會日月顛倒六個月） |
+| D3 六指標沙盒 | 29 斷言全過：重疊掃描/回撤 censor/串格式/遷移冪等/E2E 手算（avg_win 21.56、max_float −87.5、L1 截 3 層）/ratio 縮放/blocked 行新欄 None |
+| D3 regression | 106 重跑 2,025 行×26 共享欄 diff=0（risk_adj_score／est_sl 等全部不變） |
+| D4 短路等價 | stash 前後 106 全 DB 對比：2,025 行 26 欄 diff=0、blocked 1,845 行內容 diff=0 |
+| D2 零常數表 | `def _get_pip_size`／`def _estimate_pip_value`／`.endswith(` 源碼零出現（§6.1/6.2） |
 
 ## 待辦（L0 到位後）
 
 - M1/M4/M5/cent/Realistic/Stress 全解鎖重跑；
 - `export_hst.py --tf 5` 出 M5 → `--timing-only` 重跑 Copy 時機全量；
-- margin_req 表逐層累積（§6.4/6.5 margin peak、爆倉層級）；
+- margin_req 表逐層累積（§6.4/6.5 margin peak、爆倉層級）＋margin 系指標填值；
 - 兩式交叉驗證每筆跑（§6.3）。
 - ~~與 v1.2 `copy_trade_sim.py` merge~~ ✅ D2 完成（2026-10-29，`copy_timing.py`）。
+- ~~§11.6 指標集六項補欄~~ ✅ D3 完成（2026-10-29，schema v1.3.1＋`matrix.py`；margin 系仍等 L0）。

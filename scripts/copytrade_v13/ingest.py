@@ -108,27 +108,34 @@ def _mk_cycle(sid, sym, typ, members):
     }
 
 
+def _qc_flag(t, verify_fn):
+    """兩式交叉驗證 qc_flag（§6.3）——except 收口同原版（MISSING_SPEC）。"""
+    if not verify_fn:
+        return None
+    try:
+        return verify_fn(t)[1]
+    except Exception:
+        return "MISSING_SPEC"
+
+
 def ingest(conn: sqlite3.Connection, paths, verify_fn=None):
-    """CSV→trades/cycles/layers 三表入庫；verify_fn 做兩式交叉驗證（§6.3，有 specs 先跑）。"""
+    """CSV→trades/cycles/layers 三表入庫；verify_fn 做兩式交叉驗證（§6.3，有 specs 先跑）。
+
+    D4 性能：trades／layers 改 executemany 批次（26 萬筆全量逐句 INSERT 係瓶頸）。
+    """
     n_tr = n_cy = n_ly = 0
-    for p in paths:
+    for pi, p in enumerate(paths, 1):
         trades = load_signal_csv(p)
         cycles = group_cycles(trades)
-        for t in trades:
-            qc = None
-            if verify_fn:
-                try:
-                    _, qc = verify_fn(t)
-                except Exception:
-                    qc = "MISSING_SPEC"
-            conn.execute(
-                "INSERT INTO trades(signal_id,symbol,typ,lots,open_time,close_time,open_price,"
-                "close_price,net_pips,net_profit,max_profit,max_loss,magic,comment,source_file,"
-                "source_row,qc_flag) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (t["signal_id"], t["symbol"], t["typ"], t["lots"], t["open_time"], t["close_time"],
-                 t["open_price"], t["close_price"], t["net_pips"], t["net_profit"], t["max_profit"],
-                 t["max_loss"], t["magic"], t["comment"], t["source_file"], t["source_row"], qc))
-            n_tr += 1
+        conn.executemany(
+            "INSERT INTO trades(signal_id,symbol,typ,lots,open_time,close_time,open_price,"
+            "close_price,net_pips,net_profit,max_profit,max_loss,magic,comment,source_file,"
+            "source_row,qc_flag) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            [(t["signal_id"], t["symbol"], t["typ"], t["lots"], t["open_time"], t["close_time"],
+              t["open_price"], t["close_price"], t["net_pips"], t["net_profit"], t["max_profit"],
+              t["max_loss"], t["magic"], t["comment"], t["source_file"], t["source_row"],
+              _qc_flag(t, verify_fn)) for t in trades])
+        n_tr += len(trades)
         for c in cycles:
             cur = conn.execute(
                 "INSERT INTO cycles(signal_id,symbol,direction,open_time,close_time,layers_n,"
@@ -136,14 +143,15 @@ def ingest(conn: sqlite3.Connection, paths, verify_fn=None):
                 (c["signal_id"], c["symbol"], c["direction"], c["open_time"], c["close_time"],
                  c["layers_n"], c["lots_total"], c["pnl_total"], c["data_grade"]))
             cid = cur.lastrowid
-            for L in c["layers"]:
-                conn.execute(
-                    "INSERT INTO layers(cycle_id,layer_no,lots,open_time,open_price,pnl,lots_cum)"
-                    " VALUES(?,?,?,?,?,?,?)",
-                    (cid, L["layer_no"], L["lots"], L["open_time"], L["open_price"],
-                     L["net_profit"], L["lots_cum"]))
-                n_ly += 1
+            conn.executemany(
+                "INSERT INTO layers(cycle_id,layer_no,lots,open_time,open_price,pnl,lots_cum)"
+                " VALUES(?,?,?,?,?,?,?)",
+                [(cid, L["layer_no"], L["lots"], L["open_time"], L["open_price"],
+                  L["net_profit"], L["lots_cum"]) for L in c["layers"]])
+            n_ly += len(c["layers"])
             n_cy += 1
+        if pi % 20 == 0 or pi == len(paths):
+            print(f"   …ingest {pi}/{len(paths)} 份（累計 {n_tr:,} 筆）", flush=True)
     conn.commit()
     return n_tr, n_cy, n_ly
 
