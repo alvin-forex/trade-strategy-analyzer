@@ -22,8 +22,10 @@ from copy_timing import (simulate_timing_all, summarize_timing,  # noqa: E402
 
 SIM_COLS = ["signal_id", "symbol", "layer_policy", "copy_method", "account_type",
             "cost_scenario", "cycles_n", "trades_filled", "trades_missed",
+            "layers_filtered",
             "gross_pnl", "net_pnl", "win_rate", "profit_factor", "expectancy",
-            "monthly_growth", "max_dd", "max_dd_pct", "margin_peak", "margin_ratio",
+            "avg_win", "avg_loss", "monthly_growth", "monthly_pnl",
+            "max_dd", "max_dd_pct", "margin_peak", "margin_ratio",
             "max_concurrent", "max_layer", "max_float_loss", "margin_stop_hit",
             "breach_layer_no", "stable_month_ratio", "worst_month", "max_consec_losses",
             "recovery_days", "concentration", "est_sl_cost_usd", "est_margin_peak_usd",
@@ -144,8 +146,12 @@ def main():
 
     blocked = sum(1 for r in rows if r["outcome_note"] and r["outcome_note"].startswith("BLOCKED"))
     gated = sum(1 for r in rows if r["outcome_note"] == "樣本不足")
+    conc = max((r.get("max_concurrent") or 0) for r in rows) if rows else 0
+    rec = [r["recovery_days"] for r in rows if r.get("recovery_days") is not None]
     print(f"✅ 四份產出 → {args.report_dir}")
     print(f"   blocked（需 L0）{blocked}｜樣本不足（N<{N_GATE}）{gated}｜可排名 {len(rank)}")
+    print(f"   D3 補欄：最大同時持倉 peak {conc}｜recovery_days 有值行 "
+          f"{len(rec)}/{len(rows)}（最長 {max(rec) if rec else '—'} 日）")
 
     if args.timing:
         _run_timing(conn, sids, args)

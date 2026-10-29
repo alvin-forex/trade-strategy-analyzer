@@ -83,12 +83,16 @@ DDL = [
         cycles_n INTEGER NOT NULL,
         trades_filled INTEGER NOT NULL,
         trades_missed INTEGER NOT NULL,
+        layers_filtered INTEGER,  -- §11.6 執行品質：被層檔截走嘅層數
         gross_pnl REAL NOT NULL,
         net_pnl REAL NOT NULL,
         win_rate REAL NOT NULL,
         profit_factor REAL,
         expectancy REAL,
+        avg_win REAL,            -- §11.6 回報組：平均盈利單
+        avg_loss REAL,           -- §11.6 回報組：平均虧損單（負值）
         monthly_growth REAL,
+        monthly_pnl TEXT,        -- §11.6 回報組：每月 P/L（"YYYY-MM:val|..."）
         max_dd REAL,
         max_dd_pct REAL,
         margin_peak REAL,
@@ -144,7 +148,13 @@ DDL = [
 
 
 def init_db(conn):
-    """建九張表（冪等）。"""
+    """建九張表（冪等）＋ copy_sims v1.3.1 四欄遷移（D3 補完：§11.6 avg_win/avg_loss/layers_filtered/monthly_pnl）。"""
     for ddl in DDL:
         conn.execute(ddl)
+    # 既有 DB 遷移：CREATE TABLE IF NOT EXISTS 唔會加欄——pragma 檢查後 ALTER（冪等）
+    have = {r[1] for r in conn.execute("PRAGMA table_info(copy_sims)")}
+    for col, typ in (("layers_filtered", "INTEGER"), ("avg_win", "REAL"),
+                     ("avg_loss", "REAL"), ("monthly_pnl", "TEXT")):
+        if col not in have:
+            conn.execute(f"ALTER TABLE copy_sims ADD COLUMN {col} {typ}")
     conn.commit()
