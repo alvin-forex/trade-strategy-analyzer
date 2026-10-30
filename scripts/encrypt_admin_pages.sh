@@ -37,6 +37,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PW_FILE="${TSA_PW_FILE:-/home/alvin/tsa_pw.txt}"
 OWNER_PW_FILE="${TSA_OWNER_PW_FILE:-/home/alvin/tsa_pw_owner.txt}"
+# Phase 1 1.4（TSA 新首頁 v1.1）：密碼頁模板可用 env 換——
+#   TSA_ST_TEMPLATE=scripts/staticrypt/password_template_dark.html （深色 tokens 版，新首頁用）
+# 預設 zh 白底版唔變（其他 14 頁照舊）。
+ST_TEMPLATE="${TSA_ST_TEMPLATE:-scripts/staticrypt/password_template_zh.html}"
 
 # 任務G deterministic salt — 32 hex, NOT a secret (embedded in each page's
 # staticrypt_config, same as StatiCrypt CLI does). Fixed so that re-encrypting
@@ -117,7 +121,7 @@ encrypt_page() {
   # Deterministic: identical input → identical output file, so re-runs on
   # already-encrypted content produce zero git diff. Self-verifies via the
   # original codec.decode() before writing; exits non-zero on any failure.
-  if ! (cd "$REPO_ROOT" && node "$WRAPPER" "$rel" -p "$pw" -d "$TMP_DIR" -s "$ST_SALT" --remember "$ST_REMEMBER" --template "$REPO_ROOT/scripts/staticrypt/password_template_zh.html" >/dev/null 2>&1); then
+  if ! (cd "$REPO_ROOT" && node "$WRAPPER" "$rel" -p "$pw" -d "$TMP_DIR" -s "$ST_SALT" --remember "$ST_REMEMBER" --template "$REPO_ROOT/$ST_TEMPLATE" >/dev/null 2>&1); then
     echo "FAIL (staticrypt)  $rel" >&2
     failed=$((failed + 1))
     return
