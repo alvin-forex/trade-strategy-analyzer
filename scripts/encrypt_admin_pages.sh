@@ -26,9 +26,10 @@
 #   TSA_OWNER_PW_FILE  owner   層 password file (default /home/alvin/tsa_pw_owner.txt)
 #                      — NEVER commit the passwords themselves; only paths here.
 #   TSA_ST_SALT  optional override of the fixed salt (32 hex chars)
-#   TSA_ST_REMEMBER  remember-me days (default 0 = off). 老闆裁決 2026-10-30「開」:
-#                    設 30 批量重加密（先 decrypt_page.mjs 解鎖再過本腳本），入一次密碼後
-#                    30 日內免重入。改動此值重加密所有頁。
+#   TSA_ST_REMEMBER  remember-me days. 老闆裁決 2026-10-30「開」→ 預設改 **30**
+#                    （2026-10-30 12:5x ZCODE_w 定案：每日 05:30 重生成 4 頁
+#                    false/0 回歸嘅根因＝生成器行本腳本時漏傳 env；預設直接
+#                    對齊老闆裁決，OpenClaw 排程側零改動。傳 0 可顯式關閉。）
 # Requirements: node (>=18) + scripts/staticrypt/ (StatiCrypt 3.5.4 unpacked,
 #               source: exchange/from_openclaw/20261025_0719_staticrypt_supply/) —
 #               no network, no npx, zero npm install.
@@ -47,7 +48,7 @@ ST_TEMPLATE="${TSA_ST_TEMPLATE:-scripts/staticrypt/password_template_zh.html}"
 # unchanged content yields identical bytes. Changing it re-encrypts everything
 # and invalidates remember-me sessions.
 ST_SALT="${TSA_ST_SALT:-2f5a7c9e1b3d4f6a8c0e2b4d6f8a1c3e}"
-ST_REMEMBER="${TSA_ST_REMEMBER:-0}"
+ST_REMEMBER="${TSA_ST_REMEMBER:-30}"
 
 WRAPPER="scripts/staticrypt/encrypt_pages_deterministic.mjs"
 
