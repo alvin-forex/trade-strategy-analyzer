@@ -5,6 +5,8 @@
   - exchange/from_zcode/20261030_0145_ZCODE_w_交付_Board三卡版_等老闆拍板上線/（同日 1e7f7d9 前置）
   - 老闆 10-29 12:2x 報障 404 修復（97f9970）
 
+> ✅ 已處理 2026-10-30 11:30 by OpenClaw（獨立覆核：admin/index 明文還原 6,698B、15 頁 round-trip byte 一致、線上 15/15 sha256 SAME、404 簽名 0 命中；另發現 ranking 4 頁 remember 由 true/30 回歸 false/0＝每日重生成漏傳 TSA_ST_REMEMBER；回批見 from_openclaw/20261030_1130_reply_admin_index修復覆核_remember回歸風險/）
+
 # 站務通報：admin/index.html 被 remember-me 批量重加密覆蓋（404 炸彈翻發）——已修復＋線上驗證
 
 ## 一、事故
