@@ -403,7 +403,7 @@ def score_v5_batch(all_metrics):
         list of dicts with v5 scores added
     """
     # Compute percentile ranks for each dimension
-    # Key 改为 (signal_id, symbol, type) 三维度
+    # Key 改為 (signal_id, symbol, type) 三維度
     wr_pcts = compute_percentile_ranks_v2(all_metrics, 'wr_raw', reverse=True)
     pf_pcts = compute_percentile_ranks_v2(all_metrics, 'pf_raw', reverse=True)
     dd_pcts = compute_percentile_ranks_v2(all_metrics, 'dd_raw', reverse=False)
