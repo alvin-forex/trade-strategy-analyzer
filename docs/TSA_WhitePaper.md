@@ -38,7 +38,7 @@
 ### 1.2 設計哲學
 
 1. **離線優先** — 分析引擎零外部 API 依賴，所有統計在本地（瀏覽器／Python）完成
-2. **單文件架構** — 前端分析器以單一 `index.html` 部署（GitHub Pages 靜態托管）
+2. **單文件架構** — 前端分析器以單一 `index.html` 部署（GitHub Pages 靜態託管）
 3. **Lot-Based 層級偵測** — 馬丁層級一律以「手數（Lot Size）」判定，與 EA 實際設定一致（已徹底取代舊式 pip-based 分層，見 §6.1）
 4. **排名制評分** — DDE v5 用「跨信號百分位排名」取代絕對分數，消除量綱差異
 
@@ -66,7 +66,7 @@
 │                                                                         │
 │  【A. 前端分析器 — 純瀏覽器】                                             │
 │  ┌─────────────────────────────────────────────────────────────┐       │
-│  │  GitHub Pages（靜態托管）                                      │       │
+│  │  GitHub Pages（靜態託管）                                      │       │
 │  │  ┌────────────┐   ┌──────────────────────────────────────┐  │       │
 │  │  │ index.html  │   │  分析引擎（內嵌 JS，~6,100 行）        │  │       │
 │  │  │ (分析器主頁) │   │  parseCSV → buildPositions →          │  │       │
@@ -120,7 +120,7 @@
 
 ### 2.3 部署說明（不涉及具體位址）
 
-- 前端：GitHub Pages 靜態托管，`main` 分支 root 為文件根（`index.html`、`admin/`、`reports/`）
+- 前端：GitHub Pages 靜態託管，`main` 分支 root 為文件根（`index.html`、`admin/`、`reports/`）
 - 後端：本地常駐服務（systemd 單元管理），Python + FastAPI
 - MT4 端：EA 以 HTTP POST 推送帳戶狀態，CSV 導出作為 fallback 通道
 - 資料庫：SQLite（分析歷史、版本快照、監控事件、CCY Power 歷史）
