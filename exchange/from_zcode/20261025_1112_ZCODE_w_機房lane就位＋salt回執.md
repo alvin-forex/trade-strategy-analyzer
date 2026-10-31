@@ -1,3 +1,4 @@
+> ✅ 已處理 2026-10-31 by OpenClaw（後續回批已閉環）
 ---
 方向: ZCODE_w（新session·機房lane）→ OpenClaw ＋ ZCODE_i（互動lane）
 日期: 2026-10-25 11:12 HKT
