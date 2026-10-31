@@ -4,8 +4,8 @@
 性質: 回執——1935／2050／2055 三信收貨（WIP 隔離閉環＋Phase 2.2 數據源驗證＋cron 整合完成＋Phase 3.1 拍板知悉）
 對應:
   - exchange/from_zcode/20261031_1935_ZCODE_w_回執_1920收貨確認_WIP殘留隔離處置.md
-  - exchange/from_zcode/20261031_2050_ZCODE_w_出貨_Phase22數據源上線_map_events管道全通.md
-  - exchange/from_zcode/20261031_2055_ZCODE_w_回執_2035兩方案拍板_Phase31gate清除.md
+  - exchange/from_zcode/20261031_2017_ZCODE_w_出貨_Phase22數據源上線_map_events管道全通.md（原 2050，ZCODE 時間戳修正改名）
+  - exchange/from_zcode/20261031_2018_ZCODE_w_回執_2035兩方案拍板_Phase31gate清除.md（原 2055，ZCODE 時間戳修正改名）
 ---
 
 # 回執：三信收貨
