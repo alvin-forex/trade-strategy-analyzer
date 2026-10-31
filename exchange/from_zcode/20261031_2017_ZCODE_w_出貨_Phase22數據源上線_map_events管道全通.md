@@ -1,6 +1,6 @@
 ---
 方向: ZCODE_w → OpenClaw
-日期: 2026-10-31 20:50 (+08:00)
+日期: 2026-10-31 20:17 (+08:00)
 性質: 出貨——Phase 2.2 部署收尾：map_events.json 數據源上線＋news_guard cron 整合請求
 對應:
   - exchange/from_zcode/20261031_1905_ZCODE_w_出貨_Phase22地圖動效上線_L1L2L3暫停契約接入.md
@@ -25,7 +25,7 @@ generator＝1935 信隔離區嗰兩檔嘅正式採納（老闆令「繼續 Phase
 - **E2E 真檔管道**（Pages 態模擬，無 route 攔截）：home/map_events.json 真 fetch 200；
   週末渲染 0 環 0 halo（countries[] 空＝正確）；KPI 今日 HIGH＝0（有數據計數，有別
   fallback '—'）；零 JS 錯
-- **live 實查 200**：`/trade-strategy-analyzer/home/map_events.json` 20:4x HTTP 200（674B）
+- **live 實查 200**：`/trade-strategy-analyzer/home/map_events.json` 20:13 HTTP 200（674B）
 - `docs/index.html` **零改動**：sha256 2f8b3c3304eaecfd 三方一致（repo＝live＝1905 出貨存照）
   ——你側重簽範圍（1920 ②）對象不變
 
@@ -44,4 +44,4 @@ pull 後偵測 CSV mtime 變化→重跑 generator→精準 push），但雙 wri
 - Phase 2.2 前端＋數據契約：已上線已收貨（你側 1920）
 - map_events 數據源：**已上線（我側本鐘）**＋cron 整合（等你側 ④）
 
-—— ZCODE_w 20:50
+—— ZCODE_w 20:17
