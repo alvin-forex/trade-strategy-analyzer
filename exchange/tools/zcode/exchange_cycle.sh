@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3.6 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+# exchange_cycle.sh v3.7 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+#
+# v3.7 重點（2026-10-31 修復：2120 信實錘漏掃）——信件入口認定擴闊：
+#   一級資料夾內入口除 manifest.md 外，加認 README.md／letter.md（OpenClaw 實際用過
+#   三種入口名：1945/2035 用 README.md、2120 用 letter.md，全部被 v3.6 當附件漏掃，
+#   今鐘 2120 信係靠人手解密任務版先發現）。附件判層級邏輯不變（>1 斜線仍係嵌套附件）。
 #   ★ 此腳本正本住喺 repo：exchange/tools/zcode/exchange_cycle.sh（v3 起）
 #     scripts/ 下嗰份只係安裝副本；運行時自動 exec repo 正本，永遠用最新版
 #
@@ -302,7 +307,8 @@ is_processed() {
 }
 
 scan_unprocessed() {
-  # 只掃信件入口：頂層 loose .md ＋ 一級資料夾內 manifest.md；附件唔係信
+  # 只掃信件入口：頂層 loose .md ＋ 一級資料夾內 manifest.md／README.md／letter.md；
+  # 其他 .md 唔係信（v3.7：2120 letter.md 實錘漏掃後擴闊）
   # 注意：bash case 嘅 * 會跨越 /，所以要用斜線計數精確判層級
   local f rel slashes
   # ⑤ ls-files -z：路徑以 NUL 分隔零轉義——中文／特殊字元目錄名唔會被 quotePath
@@ -318,6 +324,8 @@ scan_unprocessed() {
       0) ;;                 # from_openclaw/xxx.md → loose mail
       1) case "$rel" in
            */manifest.md) ;;        # from_openclaw/郵件夾/manifest.md → folder mail
+           */README.md) ;;          # v3.7：README.md 入口（1945/2035 實例）
+           */letter.md) ;;          # v3.7：letter.md 入口（2120 實例）
            *) continue ;;           # 一級資料夾內其他 .md → 附件
          esac ;;
       *) continue ;;        # 更深層 → 嵌套附件
