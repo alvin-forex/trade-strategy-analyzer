@@ -136,6 +136,18 @@ encrypt_page() {
     return
   fi
 
+  # v3.7 後置閘（回應 OpenClaw 1130 信第二節建議，2026-10-31 落地）：
+  # 加密輸出嘅 staticryptConfig 實值必須等於本次 --remember——唔等＝env 漏傳／
+  # 靜默降級（10-30 05:30 tsa-ranking-daily 4 頁 true/30→false/0 事故同類），即 FAIL
+  local want_en="false" want_days="0"
+  [ "$ST_REMEMBER" -gt 0 ] && { want_en="true"; want_days="$ST_REMEMBER"; }
+  if ! grep -q "\"isRememberEnabled\":${want_en}" "$produced" \
+     || ! grep -q "\"rememberDurationInDays\":${want_days}" "$produced"; then
+    echo "FAIL (remember cfg want $want_en/$want_days)  $rel" >&2
+    failed=$((failed + 1))
+    return
+  fi
+
   mv "$produced" "$REPO_ROOT/$rel"
   echo "ENC ($tier)  $rel"
   changed=$((changed + 1))
