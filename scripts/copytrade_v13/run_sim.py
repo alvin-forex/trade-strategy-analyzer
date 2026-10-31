@@ -15,7 +15,26 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from schema import init_db          # noqa: E402
-from ingest import ingest, signal_csvs   # noqa: E402
+from ingest import ingest, signal_csvs
+
+def build_fx_table(conn):
+    # 2026-11-01 D2 unlock: prices_daily majors close -> {(sym,date): quote->USD rate}
+    q = conn.execute('''SELECT symbol, date, price FROM prices_daily''')
+    daily = {}
+    for sym, d, px in q:
+        daily[(sym, d)] = px
+    fx = {}
+    base_map = {'EUR':'EURUSD','GBP':'GBPUSD','AUD':'AUDUSD','NZD':'NZDUSD','CAD':'USDCAD','CHF':'USDCHF','JPY':'USDJPY'}
+    inv_ccy = ('CAD','CHF','JPY')
+    for sym, qc in conn.execute("SELECT symbol, quote_currency FROM symbols WHERE quote_currency != 'USD'"):
+        base = base_map.get(qc)
+        if not base: continue
+        inv = qc in inv_ccy
+        for (psym, d), px in daily.items():
+            if psym == base:
+                fx[(sym, d)] = (1.0/px) if inv else px
+    return fx
+   # noqa: E402
 from matrix import run_matrix, write_rows, LAYER_POLICIES, N_GATE, _load_cycles  # noqa: E402
 from copy_timing import (simulate_timing_all, summarize_timing,  # noqa: E402
                          load_m5_json)
@@ -105,7 +124,7 @@ def main():
     print(f"✅ 入庫：trades {n_tr}／cycles {n_cy}／layers {n_ly}")
 
     sids = sorted({os.path.basename(p).split("-")[-1].replace(".csv", "") for p in paths})
-    rows = run_matrix(conn, sids, specs=None, fx_table=None)  # L0 到位後解鎖 M1/M4/cent
+    rows = run_matrix(conn, sids, specs=None, fx_table=build_fx_table(conn))  # L0 到位後解鎖 M1/M4/cent
     write_rows(conn, rows)
     print(f"✅ copy_sims {len(rows)} 行（六維矩陣）")
 
@@ -186,7 +205,7 @@ def _run_timing(conn, sids, args):
     per_sid, all_rows = {}, []
     for sid in sids:
         rows_sid = simulate_timing_all(_load_cycles(conn, sid), specs=specs,
-                                       fx_table=None, m5_loader=m5_loader)
+                                       fx_table=build_fx_table(conn), m5_loader=m5_loader)
         per_sid[sid] = rows_sid
         all_rows.extend(rows_sid)
     with open(os.path.join(args.report_dir, "copy_timing_scan.csv"), "w", newline="") as f:
