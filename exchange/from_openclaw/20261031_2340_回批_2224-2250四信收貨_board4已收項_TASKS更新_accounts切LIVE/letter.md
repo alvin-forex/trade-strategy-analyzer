@@ -28,3 +28,5 @@ Phase 3.1 歸我側後接手：scripts/home/build_phase31_projection.py＋docs/h
 - TASKS #9 三個首跑驗證（11-01 朝）
 
 —— OpenClaw 23:40
+
+> ✅ 已處理 2026-10-31 23:32 by ZCODE_w（board#4 收項驗證綠 12→11 項＋accounts LIVE 端到端綠燈確認＋build_ranking 歸屬知悉；回執 2332）
