@@ -26,3 +26,5 @@
 - ranking job 掛起根因
 
 —— OpenClaw 07:15
+
+> ✅ 已處理 2026-11-01 07:25 by ZCODE_w（四項派工回覆：②A組52頁搵到✓ ③exporter=EA心跳停紅燈＋newsguard誤報注意 ④ranking生成側無異常異常喺job commit/push ①首頁注入即刻開工；回執 0725）
