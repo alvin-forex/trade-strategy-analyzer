@@ -194,22 +194,27 @@ h1{font-size:26px;line-height:1.3;margin:0 0 6px;font-weight:700;letter-spacing:
 .row{display:grid;grid-template-columns:26px minmax(0,205px) minmax(0,1fr) 82px;
  gap:12px;padding:10px 0;border-bottom:1px solid rgba(42,54,80,.75);align-items:start}
 .row:last-child{border-bottom:0;padding-bottom:2px}
-.row-hd{font-size:12px;color:var(--neutral);padding:0 0 6px;border-bottom:1px solid var(--line);
- letter-spacing:.4px}
+/* 1945 notes②：表頭 meta neutral(#8B95A5)≈5.5:1 偏淺→t2(#A8B4C4)≈8.7:1；
+   「偏密」→padding 6→8px＋letter-spacing .4→.5px */
+.row-hd{font-size:12px;color:var(--t2);padding:0 0 8px;border-bottom:1px solid var(--line);
+ letter-spacing:.5px}
 .row-hd .c{font-size:12px}
 .row-2{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
 .c{min-width:0;overflow-wrap:anywhere;padding-right:10px}
 .c p{margin:0}
 .t{font-size:15px;font-weight:600;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;padding-right:2px}
 /* 16:40 量測回批 (1)：390px 長任務名（中英＋全角＋混合）scrollWidth 329>326 差 3px——
-   照 OpenClaw 建議 .c-task .t 改 break-all；任何字元間可斷，min-content 更碎，A5 字數不受影響 */
+   曾照 OpenClaw 建議用 break-all；1945 notes① 實測副作用＝英文單字「Copilot」被斷
+   「Co／pilot」。改 anywhere：min-content 計算同樣可斷（防溢出等效、3px 問題不回頭），
+   但只喺必要時先斷——英文單字完整、CJK 照常斷 */
 /* 10-31 上線同步：OpenClaw 0130 建議 (2) letter-spacing:-.2px（Chrome 全形「＋」cluster
    3px artifact 兜底）——preview 軌 1355 出貨已實測歸零，生成器跟上防重生成走回頭 */
-.c-task .t{overflow-wrap:break-word;word-break:break-all;letter-spacing:-.2px}
+.c-task .t{overflow-wrap:anywhere;word-break:normal;letter-spacing:-.2px}
 .concl{font-size:14px;line-height:1.6;color:var(--t1);overflow-wrap:anywhere}
 .chip{display:inline-block;font-size:12px;color:var(--t2);background:var(--l2);
  border:1px solid var(--line);border-radius:6px;padding:1px 7px;white-space:normal}
-.c-idx{font-size:12px;color:var(--neutral);font-variant-numeric:tabular-nums;padding-top:3px}
+/* 1945 notes② 同批：序號同表頭同級 12px 灰字——neutral→t2 保持一致 */
+.c-idx{font-size:12px;color:var(--t2);font-variant-numeric:tabular-nums;padding-top:3px}
 .ev{font-size:13px;color:var(--t2)}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
  background:var(--l2);border:1px solid var(--line);border-radius:4px;padding:0 3px;
@@ -235,7 +240,8 @@ details.fd[open]>summary::after{content:"－"}
 details.card--done[open] .fold-hint::after{content:" ▴"}
 details.card--done[open] .rows{margin-top:14px}
 details.card--done .rows{margin-top:0}
-.foot{text-align:center;color:var(--t3);font-size:12px;margin-top:24px;line-height:1.7}
+/* 1945 notes③：footer 12px t3(#7A8698)≈4.95:1 偏細偏淺→13px t2≈8.7:1 */
+.foot{text-align:center;color:var(--t2);font-size:13px;margin-top:24px;line-height:1.7}
 
 @media (min-width:768px) and (max-width:1199px){
  .row:not(.row-2){grid-template-columns:24px minmax(0,180px) minmax(0,1fr) 76px;gap:10px}
@@ -260,7 +266,7 @@ details.card--done .rows{margin-top:0}
  details.fd>summary{padding:6px 20px 6px 0}
  .c-idx{display:none}
  .c-state::before,.c-ev::before,.c-eta::before{content:attr(data-l);display:block;
-  font-size:12px;color:var(--neutral);letter-spacing:.5px;margin-bottom:2px}
+  font-size:12px;color:var(--t2);letter-spacing:.5px;margin-bottom:2px}
  .c-state{padding-left:10px;border-left:2px solid var(--line2)}
  .c-task::before{display:none}
  .t{font-size:15px}
