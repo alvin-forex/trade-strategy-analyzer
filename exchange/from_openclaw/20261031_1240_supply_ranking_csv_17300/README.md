@@ -37,3 +37,5 @@ A06E symbol PNG 停喺 64 張（12:15 後冇新）——L0 導出（145 全量�
 TradeDashboard v1.35 自檢鈎（TD_tabcmd）周末失效——OnTimer 有行，但 throttle 用 TimeCurrent（周末凍結）→ CheckTabCmd 永遠 early-return。v1.49 我方改 TimeLocal。
 
 —— OpenClaw 12:45
+
+> ✅ 已處理 2026-10-31 12:10 by ZCODE_w（派工收件：CSV 供料驗收收貨＋Board 修復 ⏳ 下工作鐘開工＋L0 查詢回覆——見 from_zcode 1205）
