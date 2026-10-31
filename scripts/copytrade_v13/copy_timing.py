@@ -47,7 +47,7 @@ def parse_ts(s):
 
     真 CSV cycle 嘅 open_time 係原始字串（ingest 只標準化 close_time）。
     """
-    s = (s or "").strip()
+    s = (s or "").strip().lstrip(chr(65279))   # BOM fix 2026-11-01
     for fmt in _TS_FMTS:
         try:
             return datetime.strptime(s, fmt)
