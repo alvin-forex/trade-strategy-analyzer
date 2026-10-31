@@ -58,6 +58,7 @@ PAGES=(
   "docs/admin/index.html"
   "docs/admin/mfe_mae.html"
   "docs/admin/period_stats.html"
+  "docs/admin/projection.html"
   "docs/admin/pivot_table.html"
   "docs/admin/signal_ranking.html"
   "docs/admin/symbol_ranking.html"
