@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 3.1 投影 · 六欄</title>
+<style>
+:root{--bg:#0f1620;--card:#16202e;--t1:#e8eef5;--t2:#a8b4c4;--t3:#7a8698;--line:#22303f;--amber:#c98a00;--red:#dc3545;--green:#28a745}
+body{background:var(--bg);color:var(--t1);font-family:'Helvetica Neue','PingFang TC','Noto Sans CJK TC',sans-serif;margin:0;padding:24px 16px}
+.wrap{max-width:1100px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}
+.meta{color:var(--t2);font-size:12.5px;line-height:1.6;margin-bottom:14px}
+.badge{display:inline-block;padding:2px 10px;border-radius:6px;font-size:12px;margin-left:8px;vertical-align:middle}
+.badge.na{background:#3a3f46;color:var(--t2)}
+.lamp{display:inline-block;width:9px;height:9px;border-radius:50%;background:#666;margin-right:6px;vertical-align:middle}
+.lamp.off{background:#555f6b}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border-radius:10px;overflow:hidden}
+th{position:sticky;top:0;background:#1c2937;color:var(--t2);text-align:left;padding:8px 10px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid #1b2634;white-space:nowrap}
+tr:hover td{background:#1a2735}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.red{color:var(--red);font-weight:700}
+.grn{color:var(--green)}
+.amb{color:var(--amber)}
+.r0{opacity:.92}.bar{height:3px;background:#2b3a4c;border-radius:2px;margin-top:3px}.bar>i{display:block;height:3px;border-radius:2px;background:linear-gradient(90deg,#2e6da4,#4a9eda)}
+.foot{color:var(--t3);font-size:12px;margin-top:18px;text-align:center}
+#err{color:var(--red);padding:20px}
+@media(max-width:640px){body{padding:12px 6px}td,th{padding:6px 6px;font-size:12px}}
+</style></head><body><div class="wrap">
+<h1>📊 Phase 3.1 投影 · 六欄<span class="badge na"><span class="lamp off"></span>MT5 帳戶 N/A</span></h1>
+<div class="meta" id="meta">載入中…</div>
+<div id="err"></div>
+<table><thead><tr>
+<th>#</th><th>信號</th><th>商品</th><th>總分 dde_score</th><th>樣本 trades</th><th>勝率%</th><th>PF</th><th>爆倉 red_card</th><th>當月增長</th><th>月份</th>
+</tr></thead><tbody id="tb"></tbody></table>
+<div class="foot" id="foot"></div>
+</div>
+<script>
+fetch('../home/projection.json').then(r=>r.json()).then(d=>{
+  document.getElementById('meta').textContent =
+    '生成 '+d.generated_at+' ｜排序：當月增長 ↓ ｜'+d.rows.length+' 行（dde_scores × decision_ranking）';
+  document.getElementById('foot').textContent =
+    '來源：'+d.source+' ｜ '+d.accounts.note;
+  const maxg = Math.max(...d.rows.map(r=>r.month_growth||0),1);
+  const tb = document.getElementById('tb');
+  tb.innerHTML = d.rows.map((r,i)=>{
+    const mg = r.month_growth===null?'—':(r.month_growth>0?'+':'')+r.month_growth.toFixed(0);
+    const mgc = r.month_growth===null?'':(r.month_growth>0?'grn':'red');
+    const bar = r.month_growth>0?'<div class="bar"><i style="width:'+(100*r.month_growth/maxg).toFixed(0)+'%"></i></div>':'';
+    return '<tr class="r'+(r.red_card?1:0)+'">'
+      +'<td class="num" style="color:var(--t3)">'+(i+1)+'</td>'
+      +'<td><b>'+r.signal+'</b></td><td>'+r.symbol+'</td>'
+      +'<td class="num">'+(r.dde_score===null?'—':r.dde_score.toFixed(1))+'</td>'
+      +'<td class="num">'+r.trades+'</td>'
+      +'<td class="num">'+(r.win_rate===null?'—':r.win_rate.toFixed(1))+'</td>'
+      +'<td class="num '+(r.pf>=1.5?'grn':(r.pf>=1?'amb':'red'))+'">'+(r.pf===null?'—':r.pf.toFixed(2))+'</td>'
+      +'<td>'+(r.red_card?'<span class="red">🔴 '+r.red_reasons.length+' 因</span>':'<span class="grn">—</span>')+'</td>'
+      +'<td class="num '+mgc+'">'+mg+bar+'</td>'
+      +'<td style="color:var(--t3)">'+(r.month_key||'—')+'</td></tr>';
+  }).join('');
+}).catch(e=>{document.getElementById('err').textContent='載入失敗：'+e});
+</script></body></html>
