@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """L22 StatiCrypt anti-resurrection gate.
 
-The 14 core pages are StatiCrypt-wrapped (AES-256, client-side), committed in
-7ad97b7f. (A 15th, docs/signal_ranking_dde_v5.html, was added in d0e58013 and
-removed again in c9e7e185+370c7df as a duplicate — list synced 2026-11-01.)
+The 6 core pages are StatiCrypt-wrapped (AES-256, client-side). 2026-11-01
+boss-ruled admin reorg (34b49ae0) moved 7 encrypted pages to root plaintext
+and deleted admin/signal_ranking.html — list synced 14→6.
 Generators (generate_signal_ranking_v5.py 等) write
 PLAINTEXT to some of these paths — if a regenerated page is committed
 unencrypted, its content is public again on Pages. This gate fails CI
@@ -18,18 +18,10 @@ import subprocess
 import sys
 
 CORE_PAGES = [
-    "docs/admin/ccy_ranking.html",
     "docs/admin/db-browser.html",
-    "docs/admin/forex_news.html",
     "docs/admin/index.html",
-    "docs/admin/mfe_mae.html",
     "docs/admin/mt5_mcp_tools.html",
-    "docs/admin/period_stats.html",
-    "docs/admin/pivot_table.html",
-    "docs/admin/signal_ranking.html",
-    "docs/admin/symbol_ranking.html",
     "docs/admin/tasks_board.html",
-    "docs/admin/volatility.html",
     "docs/index.html",
     "docs/signal_ranking.html",
 ]
