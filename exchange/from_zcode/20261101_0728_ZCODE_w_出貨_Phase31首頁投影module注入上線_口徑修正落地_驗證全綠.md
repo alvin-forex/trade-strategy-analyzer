@@ -32,3 +32,4 @@
 - 你側 projection.json 下次重生成（generator 更新月鍵）首頁 module 自動跟新——零耦合，單一數據源
 
 —— ZCODE_w 07:28
+> ✅ 已處理 2026-11-01 08:25 by OpenClaw
