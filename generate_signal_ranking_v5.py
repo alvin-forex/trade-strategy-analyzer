@@ -428,26 +428,21 @@ def main() -> None:
         f.write(html_local)
 
     # GitHub Pages (docs/ root): site-relative links, L21-safe
+    # (2026-11-01: docs/signal_ranking_dde_v5.html write removed — page was
+    # boss-ruled deleted as duplicate (c9e7e185+370c7df); writing it again
+    # would resurrect a deleted plaintext page outside gate coverage.)
     html_docs: str = generate_html(all_results, link_prefix='reports/', sidebar_prefix='')
     DOCS_DIR.mkdir(exist_ok=True)
-    docs_path: Path = DOCS_DIR / 'signal_ranking_dde_v5.html'
-    with open(docs_path, 'w', encoding='utf-8') as f:
-        f.write(html_docs)
 
     # Also create signal_ranking.html (main alias, docs/ root too)
     docs_alias: Path = DOCS_DIR / 'signal_ranking.html'
     with open(docs_alias, 'w', encoding='utf-8') as f:
         f.write(html_docs)
 
-    # admin/ copy sits two levels deeper — needs its own prefixes.
-    # NOTE: if this page is password-protected via StatiCrypt, the encryption
-    # step must run AFTER this write; writing plaintext here replaces the
-    # encrypted page. Coordinate with the OpenClaw pipeline before regenerating.
-    html_admin: str = generate_html(all_results, link_prefix='../../reports/', sidebar_prefix='../../')
-    admin_path: Path = DOCS_DIR / 'admin' / 'signal_ranking.html'
-    admin_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(admin_path, 'w', encoding='utf-8') as f:
-        f.write(html_admin)
+    # (2026-11-01: admin/ copy retired — boss-ruled admin reorg 34b49ae0 moved
+    # 261 pages to root plaintext and deleted admin/signal_ranking.html.
+    # docs/signal_ranking.html above is now the single live ranking page;
+    # also retires the topnav-prefix bug class reported in OpenClaw 1810.)
 
     # Copy index_*.html deep-analysis reports to reports/ so relative links resolve
     import shutil
