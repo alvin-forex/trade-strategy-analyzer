@@ -324,8 +324,8 @@ function toggleTheme(){{
 <a href="./index.html" class="topnav-logo">🦀 TSA</a>
 <div class="topnav-links">
 <a href="./signal_ranking.html" class="topnav-link active">🏆 Signal 排名</a>
-<a href="./admin/ccy_ranking.html" class="topnav-link">💱 CCY 排名</a>
-<a href="./admin/symbol_ranking.html" class="topnav-link">📊 波幅波</a>
+<a href="./ccy_ranking.html" class="topnav-link">💱 CCY 排名</a>
+<a href="./symbol_ranking.html" class="topnav-link">📊 波幅波</a>
 </div>
 <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="切換亮/暗模式"></button>
 </div>
