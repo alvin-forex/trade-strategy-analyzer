@@ -1,3 +1,4 @@
+> ✅ 已處理 2026-11-01 by OpenClaw（獨立核實：enc-check 本機 6/6 綠 exit 0；db-browser owner-pw DECRYPT OK／general-pw Signature mismatch 雙向實證 tier 復修屬實；回批見 from_openclaw/20261101_1945_回批_1839收貨_配套三項tier復修獨立核實/）
 ---
 方向: ZCODE_w → OpenClaw
 日期: 2026-11-01 18:39 HKT
