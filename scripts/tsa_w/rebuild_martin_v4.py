@@ -246,7 +246,10 @@ def mart_detect(trades):
             r_ = t['lots'] / base if base else 0
             L_ = round(r_)
             if L_ >= 1 and abs(r_ - L_) < 0.02:
-                theo = base * (step ** (L_ - 1))
+                try:
+                    theo = base * (step ** (L_ - 1))
+                except OverflowError:
+                    continue  # step^(L-1) 超出 float 上限＝base 偵測失真，跳過該筆校準
                 if theo:
                     calib = max(calib, abs(t['lots'] - theo) / theo * 100)
     return {'base': base, 'layers': dict(layers), 'uncls': uncls, 'ratio_ok': ratio_ok,
@@ -317,7 +320,12 @@ def sec_hero(t, m, det):
     rows = ''
     lay = sorted(det['layers'].items())
     for L, d in lay:
-        rows += (f'<tr><td>L{L}</td><td>{det["base"] * (det["step"] or 1) ** (L - 1) if det["step"] else det["base"]:.2f}</td>'
+        try:
+            theo_l = det["base"] * (det["step"] or 1) ** (L - 1) if det["step"] else det["base"]
+        except OverflowError:
+            theo_l = None  # 理論 lot 超出 float 上限＝base/step 偵測失真，顯示—
+        theo_cell = f'{theo_l:.2f}' if theo_l is not None else '<span class="muted">—</span>'
+        rows += (f'<tr><td>L{L}</td><td>{theo_cell}</td>'
                  f'<td>{d["n"]}</td><td>{fmt_money(d["pl"])}</td><td>{pct(d["pl"], tot_pl) if tot_pl else "—"}%</td></tr>')
     if det['uncls']:
         rows += f'<tr><td>未分類</td><td class="muted">—</td><td>{det["uncls"]}</td><td class="muted">—</td><td class="muted">—</td></tr>'

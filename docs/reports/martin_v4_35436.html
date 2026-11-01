@@ -1,937 +1,198 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-Hant" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Martin v4 · Signal 35436 · TSA</title>
 <link rel="stylesheet" href="../sidebar.css">
-<title>🔄 馬丁剖析法 V4 — Signal 35436</title>
 <style>
-:root{--font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px}
-[data-theme="dark"]{--bg:#0a0e17;--card:#111520;--hover:#1a1f2e;--text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;--brd:#1e2433;--th:#111520;--zebra:#151b28}
-[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--hover:#eef2f7;--text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107;--brd:#ddd;--th:#eef2f7;--zebra:#f0f4fa}
+:root{--bg:#0a0e17;--card:#111520;--card2:#1a1f2e;--zebra:#151b28;--brd:#1e2433;--th:#111520;
+--text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;
+--radius:12px}
+[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--card2:#eef2f7;--zebra:#f0f4fa;--brd:#ddd;--th:#eef2f7;
+--text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:var(--font);background:var(--bg);color:var(--text);padding:12px;max-width:1400px;margin:0 auto}
-h1{font-size:1.3em;color:var(--pri);margin-bottom:4px}
-h2{font-size:1.05em;color:var(--pri);margin:16px 0 8px}
-a{color:var(--acc);text-decoration:none;font-weight:bold}
-.theme-btn{width:36px;height:36px;border:1px solid var(--brd);border-radius:50%;background:var(--card);color:var(--text);font-size:18px;cursor:pointer;flex-shrink:0}
-/* Stats bar */
-.stats-bar{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap}
-.stats-bar .v{font-size:1.3em;font-weight:bold;color:var(--pri)}.stats-bar .l{font-size:0.75em;color:var(--text2)}
-/* Date controls */
-.date-controls{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:12px 16px;margin-bottom:12px}
-.quick-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.quick-btns button{padding:5px 12px;border:1px solid var(--brd);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.85em}
-.quick-btns button.active{background:var(--pri);color:#000;border-color:var(--pri);font-weight:bold}
-.quick-btns button:hover{border-color:var(--pri)}
-.date-inputs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.date-inputs label{color:var(--text2);font-size:0.85em}
-.date-inputs input[type="date"]{background:var(--bg);border:1px solid var(--brd);color:var(--text);padding:5px 8px;border-radius:6px;font-size:0.9em}
-.date-inputs button{padding:5px 10px;border:1px solid var(--brd);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.8em}
-.range-container{position:relative;height:40px;margin:4px 0}
-.range-track{position:absolute;top:18px;left:0;right:0;height:4px;background:var(--brd);border-radius:2px}
-.range-fill{position:absolute;top:18px;height:4px;background:var(--pri);border-radius:2px}
-.range-handle{position:absolute;top:10px;width:20px;height:20px;background:var(--pri);border-radius:50%;cursor:grab;z-index:2;touch-action:none}
-.range-handle:active{cursor:grabbing}
-.range-labels{display:flex;justify-content:space-between;font-size:0.75em;color:var(--text2);margin-top:24px}
-/* Sections */
-.sec{background:var(--card);border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;overflow:hidden}
-.sec-h{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:0.95em}
-.sec-h:hover{background:var(--hover)}
-.sec-h .arrow{transition:transform 0.2s;font-size:0.8em;color:var(--text2)}
-.sec-h.open .arrow{transform:rotate(90deg)}
-.sec-b{display:none;padding:10px 14px;border-top:1px solid var(--brd)}
-.sec-b.open{display:block}
-/* Info tooltip */
-.info{display:inline-block;margin-left:6px;width:16px;height:16px;border-radius:50%;background:var(--acc);color:#fff;font-size:10px;text-align:center;line-height:16px;cursor:help;position:relative}
-.info .tip{display:none;position:absolute;left:20px;top:-10px;z-index:100;background:var(--card);border:1px solid var(--brd);border-radius:6px;padding:10px;width:280px;font-size:0.85em;font-weight:normal;text-align:left;color:var(--text);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
-.info:hover .tip,.info:focus .tip{display:block}
-/* Tables */
-table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:0.85em}
-th{background:var(--th);padding:5px 7px;text-align:left;border-bottom:2px solid var(--pri);color:var(--pri);font-size:0.8em;white-space:nowrap;cursor:pointer;user-select:none}
-th:hover{background:var(--hover)}
-td{padding:4px 7px;border-bottom:1px solid var(--brd);font-size:0.85em}
-tr:hover{background:var(--card)}
-.row-a{background:rgba(76,175,80,0.08)}.row-d{background:rgba(255,87,34,0.08)}
-/* Expand trades */
-.trades-toggle{color:var(--acc);cursor:pointer;font-size:0.8em;margin:4px 0;padding:3px 8px;border:1px solid var(--brd);border-radius:4px;display:inline-block;background:var(--bg)}
-.trades-toggle:hover{border-color:var(--acc)}
-.trades-panel{display:none;margin:6px 0;max-height:400px;overflow-y:auto}
-.trades-panel.open{display:block}
-.trades-panel table{font-size:0.78em}
-.trades-panel th{font-size:0.75em}
-/* Rating */
-.r-sp{color:#FFD700;font-weight:bold}.r-s{color:#FFA500;font-weight:bold}.r-a{color:var(--grn);font-weight:bold}.r-b{color:var(--acc);font-weight:bold}.r-c{color:var(--yel)}.r-d{color:var(--red)}.r-e{color:#999}
-.pnl-pos{color:var(--grn);font-weight:bold}.pnl-neg{color:var(--red);font-weight:bold}
-/* Charts */
-.chart-row{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}
-.chart-box{flex:1;min-width:300px;background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:8px}
-.chart-box h4{font-size:0.85em;color:var(--acc);margin-bottom:4px}
-.chart-box canvas{width:100%;height:180px}
-/* Blacklist / Recovery */
-.blk{background:var(--card);border:1px solid var(--red);border-radius:8px;padding:10px 14px;margin-bottom:6px}
-.rec{background:var(--card);border:1px solid var(--yel);border-radius:8px;padding:10px 14px;margin-bottom:6px}
-/* Global bar */
-.global-bar{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 14px;margin-bottom:12px;overflow-x:auto}
-.global-bar svg{width:100%;height:auto}
-/* Period Stats */
-.period-stats{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;overflow-x:auto}
-.period-stats table{width:100%;border-collapse:collapse;font-size:0.85em}
-.period-stats th{background:var(--th);padding:8px 10px;text-align:center;border:1px solid var(--brd);color:var(--pri);font-size:0.8em;white-space:nowrap}
-.period-stats td{padding:7px 10px;text-align:center;border:1px solid var(--brd);white-space:nowrap}
-.period-stats tbody tr:nth-child(even){background:var(--zebra)}
-.period-stats tbody tr:hover{background:var(--bg)}
-.period-stats .p-period{font-weight:bold;color:var(--acc)}
-.period-stats .p-pos{color:var(--grn);font-weight:bold}
-.period-stats .p-neg{color:var(--red);font-weight:bold}
-.period-stats .p-wr-good{color:var(--grn)}
-.period-stats .p-wr-bad{color:var(--red)}
-.period-stats tfoot td{font-weight:bold;border:1px solid var(--brd);background:var(--th)}
-/* Responsive */
-@media(max-width:768px){body{padding:8px;font-size:13px}.quick-btns button{padding:4px 8px;font-size:0.8em}.date-inputs{flex-direction:column;align-items:flex-start}.chart-row{flex-direction:column}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
+a{color:var(--acc);text-decoration:none}
+.layout{max-width:1200px;margin:0 auto;padding:16px;display:grid;grid-template-columns:168px 1fr;gap:20px}
+main{min-width:0}
+.toc{position:sticky;top:16px;align-self:start;background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:14px 12px;font-size:.85em}
+.toc h3{color:var(--pri);font-size:.95em;margin-bottom:8px}
+.toc a{display:block;padding:5px 6px;border-radius:6px;color:var(--text2)}
+.toc a:hover{background:var(--card2);color:var(--text)}
+header.top{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+header.top h1{font-size:1.2em;color:#fff}
+header.top .sub{color:var(--text2);font-size:.85em}
+#themeToggle{background:var(--card2);border:1px solid var(--brd);color:var(--text);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1em}
+section{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;overflow-x:auto}
+section table{min-width:max-content}
+@media(max-width:520px){.sel-bar select{max-width:44vw}}
+section>h2{color:var(--pri);font-size:1.15em;margin-bottom:4px}
+section>.legend{color:var(--text2);font-size:.8em;margin-bottom:12px}
+.banner{background:rgba(255,193,7,.12);border:1px solid var(--yel);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;color:var(--yel);font-size:.88em}
+.hero-grid{display:grid;grid-template-columns:2fr 3fr;gap:16px}
+.hero-left .badge{display:inline-block;border:2px solid var(--grn);color:var(--grn);border-radius:10px;padding:8px 18px;font-weight:800;font-size:1.25em;background:rgba(76,175,80,.08)}
+.hero-left .badge.martin{border-color:var(--pri);color:var(--pri);background:rgba(255,215,0,.08);box-shadow:0 0 18px rgba(255,215,0,.15)}
+.hero-left .badge.none{border-color:#8B95A5;color:#8B95A5;background:rgba(139,149,165,.08)}
+.hero-left .meta{color:var(--text2);font-size:.85em;margin-top:10px}
+.hero-left .meta b{color:var(--text)}
+.six{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.six .cell{background:var(--card2);border:1px solid var(--brd);border-radius:10px;padding:10px 12px}
+.six .k{color:var(--text2);font-size:.75em}
+.six .v{font-size:1.18em;font-weight:700;margin-top:2px}
+.v.pos{color:var(--grn)}.v.neg{color:var(--red)}
+.narrow{margin-top:14px;background:var(--card2);border:1px solid var(--brd);border-radius:10px;padding:8px 14px;display:flex;gap:18px;flex-wrap:wrap;font-size:.82em;color:var(--text2)}
+.narrow b{color:var(--text)}
+.pills{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.pill{background:var(--card2);border:1px solid var(--brd);border-radius:999px;padding:8px 14px;text-align:center}
+.pill .k{color:var(--text2);font-size:.72em}
+.pill .v{font-weight:700;font-size:1.02em}
+table{width:100%;border-collapse:collapse;font-size:.88em}
+th{background:var(--th);color:var(--text2);font-weight:600;padding:7px 9px;text-align:right;border-bottom:1px solid var(--brd);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:6px 9px;border-bottom:1px solid var(--brd);text-align:right;white-space:nowrap}
+tbody tr:nth-child(even){background:var(--zebra)}
+.pos{color:var(--grn)}.neg{color:var(--red)}.muted{color:var(--text2)}
+.dim{opacity:.45}
+.buysell th:nth-child(2),.buysell td:nth-child(2){border-left:3px solid var(--grn)}
+.buysell th:last-child,.buysell td:last-child{border-left:3px solid var(--red)}
+.buy-h,.sell-h{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.buy-h{background:var(--grn)}.sell-h{background:var(--red)}
+.bar-cell{background:linear-gradient(90deg,rgba(100,181,246,.55),rgba(100,181,246,.15));border-radius:3px;min-height:12px}
+.heat{display:grid;gap:2px;font-size:.72em}
+.heat .lab{color:var(--text2);display:flex;align-items:center;justify-content:flex-end;padding-right:4px}
+.heat .c{border-radius:3px;min-height:22px;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.heat .c.na{background:var(--card2);color:var(--text2)}
+.hm-wrap{overflow-x:auto}
+details{border:1px solid var(--brd);border-radius:10px;padding:10px 14px;margin-top:12px;background:var(--card2)}
+details>summary{cursor:pointer;color:var(--acc);font-weight:600}
+select,input[type=range]{accent-color:var(--acc)}
+.sel-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.sel-bar label{color:var(--text2);font-size:.85em}
+.sel-bar select{background:var(--card2);color:var(--text);border:1px solid var(--brd);border-radius:8px;padding:6px 10px;font-size:.95em}
+.slider-row{display:flex;gap:12px;align-items:center;margin:10px 0 4px;flex-wrap:wrap}
+.slider-row input[type=range]{flex:1;min-width:200px}
+.slider-val{font-weight:700;color:var(--pri);min-width:64px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.svgbox{background:var(--card2);border:1px solid var(--brd);border-radius:10px;padding:10px;overflow-x:auto}
+.svgbox svg{display:block;margin:0 auto}
+.svgbox .cap{color:var(--text2);font-size:.78em;text-align:center;margin-top:4px}
+.gline{stroke:#666;stroke-dasharray:4 4;stroke-width:1}
+.footnote{color:var(--text2);font-size:.8em;margin-top:8px}
+.guide{display:grid;grid-template-columns:1fr 1fr;gap:4px 22px;font-size:.85em}
+.guide dt{color:var(--pri);font-weight:600}
+.guide dd{color:var(--text2);margin-bottom:6px}
+@media(max-width:860px){.layout{grid-template-columns:1fr}.toc{position:static;display:flex;flex-wrap:wrap;gap:2px}
+.toc a{padding:4px 10px;background:var(--card2);border-radius:999px}
+.hero-grid{grid-template-columns:1fr}.six{grid-template-columns:repeat(2,1fr)}.pills{grid-template-columns:repeat(2,1fr)}
+.two{grid-template-columns:1fr}.guide{grid-template-columns:1fr}
+.hm-wrap{max-height:280px}}
 </style>
 </head>
 <body>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-<h1>🔄 馬丁剖析法 V4</h1>
-<button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="切換主題">☀️</button>
+<div class="layout">
+<nav class="toc"><h3>目錄</h3>
+<a href="#s1">① 整倉總覽</a><a href="#s2">② 馬丁偵測</a><a href="#s3">③ 商品分析器</a>
+<a href="#s4">④ 商品方向總表</a><a href="#s5">⑤ 月度樞紐</a><a href="#s6">⑥ MAE/MFE 散點</a>
+<a href="#s7">⑦ 時間維度＋明細</a><a href="#s8">⑧ 使用說明</a></nav>
+<main>
+<header class="top"><div><h1>Martin v4 分析 · Signal 35436</h1>
+<div class="sub">照老闆 Excel v8.5 八區動線重建（Template B）· CSV fetch 架構保留＋全數據預渲染底</div></div>
+<button id="themeToggle" onclick="toggleTheme()">☀️</button></header>
+<div class="banner">⚠ 樣本頁：清洗後 694 筆（CSV 原始 695 行）；CSV 33 欄補齊前，部分指標按降級軍規處理（pips 主 $ 輔）。生成於 2026-11-02 05:40 HKT。</div>
+<section id="s1"><h2>① 整倉總覽</h2><div class="legend">10 秒結論：賺唔賺、係唔係馬丁。圖例：P&amp;L／勝率按平倉淨值（含 commission+swap）。</div>
+<div class="hero-grid"><div class="hero-left"><span class="badge martin">偵測到馬丁 ×2.0</span><div class="meta"><b>694</b> 筆交易　·　數據範圍 <b>2026-03-24 → 2026-06-12</b>（按平倉時間）</div></div>
+<div class="six"><div class="cell"><div class="k">總 P&L</div><div class="v pos">$580.65</div></div><div class="cell"><div class="k">勝率</div><div class="v ">73.6%<span class="muted">（511/694）</span></div></div><div class="cell"><div class="k">Profit Factor</div><div class="v ">1.09</div></div><div class="cell"><div class="k">盈虧比</div><div class="v ">0.39</div></div><div class="cell"><div class="k">MaxDD $</div><div class="v neg">-$3,386.02</div></div><div class="cell"><div class="k">最大 lot</div><div class="v ">0.32</div></div></div></div>
+<div class="narrow"><div>MAE pips 平均 <b>120.2</b>·中位 <b>14.4</b>·P90 <b>364.2</b>（$20.57）</div><div>MFE pips 平均 <b>58.2</b>·中位 <b>9.6</b>·P90 <b>208.3</b>（$11.32）</div></div><details><summary>分層摘要（6 層）</summary><table><thead><tr><th>層</th><th>理論 lot</th><th>筆數</th><th>P&amp;L</th><th>佔 P&amp;L%</th></tr></thead><tbody><tr><td>L1</td><td>0.01</td><td>495</td><td>-$284.77</td><td>-49.0%</td></tr><tr><td>L2</td><td>0.02</td><td>135</td><td>$402.14</td><td>69.3%</td></tr><tr><td>L4</td><td>0.08</td><td>41</td><td>-$433.13</td><td>-74.6%</td></tr><tr><td>L8</td><td>1.28</td><td>17</td><td>$91.53</td><td>15.8%</td></tr><tr><td>L16</td><td>327.68</td><td>5</td><td>$100.56</td><td>17.3%</td></tr><tr><td>L32</td><td>21474836.48</td><td>1</td><td>$704.32</td><td>121.3%</td></tr></tbody></table></details></section>
+<section id="s2"><h2>② 馬丁偵測</h2><div class="legend">判定方法：白皮書 v3.1 §4.3——校準用「出現≥2次嘅最小 lot」做基準。基準 lot 0.01（出現≥2次最小 lot），倍數 ×2</div>
+<div class="pills">
+<div class="pill"><div class="k">基準 lot</div><div class="v">0.01</div></div>
+<div class="pill"><div class="k">偵測倍數</div><div class="v">×2</div></div>
+<div class="pill"><div class="k">歸層比例</div><div class="v">100.0%</div></div>
+<div class="pill"><div class="k">校準層差</div><div class="v">100.0%</div></div>
 </div>
-<div class="sub" id="headerSub">Signal 35436 (DW) · 載入中...</div>
-
-<!-- Date Range -->
-<div class="date-controls" id="dateControls">
-<div style="color:var(--text2);font-size:0.85em;margin-bottom:6px">
-📅 時間範圍
-<span class="info">i<span class="tip">選擇時間範圍後，所有分析會即時重新計算。<br><br><b>快速按鈕</b>：選擇預設時段<br><b>自訂日期</b>：手動輸入 From/To<br><b>拖拉 Bar</b>：拖動手柄選擇範圍</span></span>
+<table><thead><tr><th>層</th><th>實際 lot</th><th>筆數</th><th>分佈</th><th>P&amp;L</th></tr></thead><tbody><tr><td>L1</td><td>0.01</td><td>495</td><td><div class="bar-cell" style="width:100%"></div></td><td>-$284.77</td></tr><tr><td>L2</td><td>0.02</td><td>135</td><td><div class="bar-cell" style="width:27%"></div></td><td>$402.14</td></tr><tr><td>L4</td><td>0.04</td><td>41</td><td><div class="bar-cell" style="width:8%"></div></td><td>-$433.13</td></tr><tr><td>L8</td><td>0.08</td><td>17</td><td><div class="bar-cell" style="width:4%"></div></td><td>$91.53</td></tr><tr><td>L16</td><td>0.16</td><td>5</td><td><div class="bar-cell" style="width:4%"></div></td><td>$100.56</td></tr><tr><td>L32</td><td>0.32</td><td>1</td><td><div class="bar-cell" style="width:4%"></div></td><td>$704.32</td></tr></tbody></table>
+<details><summary>判定方法（六步）</summary><div class="footnote">① 剔除 balance／未平倉列 → ② 統計實際 lot 分佈 → ③ 基準 lot＝出現≥2次嘅最小 lot → ④ 每筆按 lot/基準 倍數歸層（容差 2%）→ ⑤ 相鄰層比值眾數＝偵測倍數 → ⑥ 最大層≥2 即判馬丁；未分類列於表尾。</div></details></section>
+<section id="s3"><h2>③ 商品分析器</h2><div class="legend">單商品手術台：預設總 P&amp;L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。</div>
+<div class="sel-bar"><label>商品</label><select id="sym-select"><option value="XAUUSD">XAUUSD</option><option value="EURUSD">EURUSD</option><option value="AUDCAD">AUDCAD</option></select>
+<label>入場門檻</label><div class="slider-row" style="margin:0;flex:1"><input type="range" id="th-slider" min="0" max="60" step="1" value="20"><span class="slider-val" id="th-out">20 pips</span></div></div>
+<div id="an-note" class="footnote"></div>
+<div class="two"><div><h3 style="color:var(--acc);font-size:.95em;margin-bottom:6px">指標 × BUY/SELL（<span id="an-name"></span>）</h3><div id="an-table"></div></div>
+<div><h3 style="color:var(--acc);font-size:.95em;margin-bottom:6px">止賺止蝕參考（層×方向）</h3><div id="an-box"></div></div></div>
+<h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">61 級入場效益曲線</h3>
+<div class="slider-row"><span class="muted" style="font-size:.82em">可避開虧損 <b id="th-avoid" style="color:var(--red)">—</b>　可捕捉盈利 <b id="th-catch" style="color:var(--grn)">—</b>（門檻命中佔比）</span></div>
+<div class="svgbox" id="an-curve"></div>
+<div class="footnote">綠線＝可捕捉盈利%（MFE≥門檻佔比）；無虧損單時避開虧損% 不出線。門檻與商品選擇寫入 URL hash，可分享。</div></section>
+<section id="s4"><h2>④ 商品方向總表</h2><div class="legend">全場商品×方向成績表，按勝率排序；L5+ 深層馬丁暴露喺深層馬丁帳戶先會有數（本訊號見 ② 區）。</div>
+<table><thead><tr><th>商品</th><th>方向</th><th>筆數</th><th>勝率</th><th>P&amp;L</th><th>avg MAE $</th><th>avg MFE $</th><th>avg MAE p</th><th>avg MFE p</th><th>max lot</th><th>L5+ 筆數</th></tr></thead>
+<tbody><tr><td>EURUSD</td><td><span class="buy-h"></span>BUY</td><td>93</td><td>79.6%</td><td class="pos">$54.54</td><td>2.32</td><td>1.20</td><td>14.5</td><td>6.8</td><td>0.08</td><td class="muted">—</td></tr><tr><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>96</td><td>78.1%</td><td class="pos">$49.64</td><td>2.01</td><td>0.94</td><td>17.5</td><td>7.2</td><td>0.08</td><td class="muted">—</td></tr><tr><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>120</td><td>75.8%</td><td class="pos">$55.26</td><td>2.31</td><td>1.24</td><td>19.8</td><td>7.1</td><td>0.16</td><td class="muted">—</td></tr><tr><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>118</td><td>71.2%</td><td class="pos">$1,539.01</td><td>53.56</td><td>31.03</td><td>303.8</td><td>138.6</td><td>0.32</td><td class="muted">—</td></tr><tr><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>147</td><td>70.7%</td><td class="neg">-$1,212.52</td><td>45.73</td><td>24.03</td><td>269.2</td><td>142.1</td><td>0.08</td><td class="muted">—</td></tr><tr><td>EURUSD</td><td><span class="sell-h"></span>SELL</td><td>120</td><td>69.2%</td><td class="pos">$94.72</td><td>4.54</td><td>2.60</td><td>21.5</td><td>8.0</td><td>0.16</td><td class="muted">—</td></tr></tbody></table>
+<div class="footnote">零交易子集唔出行（軍規 A④）。</div></section>
+<section id="s5"><h2>⑤ 月度樞紐</h2><div class="legend">年×月 P&amp;L 熱力表（按平倉月）＋全年合計。圖例：綠贏紅蝕，深淺按該表 max|值| 歸一化；「·」＝未覆蓋（冇數≠$0）。</div>
+<div class="heat" style="grid-template-columns:64px repeat(13,1fr)"><div class="lab"></div><div class="lab" style="justify-content:center">1</div><div class="lab" style="justify-content:center">2</div><div class="lab" style="justify-content:center">3</div><div class="lab" style="justify-content:center">4</div><div class="lab" style="justify-content:center">5</div><div class="lab" style="justify-content:center">6</div><div class="lab" style="justify-content:center">7</div><div class="lab" style="justify-content:center">8</div><div class="lab" style="justify-content:center">9</div><div class="lab" style="justify-content:center">10</div><div class="lab" style="justify-content:center">11</div><div class="lab" style="justify-content:center">12</div><div class="lab" style="justify-content:center">全年</div><div class="lab">2026</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c" style="background:rgba(76,175,80,0.27)" title="2026-03: $654.48">0.7k</div><div class="c" style="background:rgba(76,175,80,0.46)" title="2026-04: $1,294.13">1.3k</div><div class="c" style="background:rgba(76,175,80,0.40)" title="2026-05: $1,114.71">1.1k</div><div class="c" style="background:rgba(255,87,34,0.80)" title="2026-06: -$2,482.67">-2.5k</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c" style="background:rgba(76,175,80,0.25)">$580.65</div></div></section>
+<section id="s6"><h2>⑥ MAE/MFE 散點</h2><div class="legend">入場質素四象限：MFE=入場後最大有利、MAE=最大不利（pips，由入場價起算）。y=x 線上＝好單。</div>
+<div class="two"><div class="svgbox"><b style="color:var(--acc)">BUY</b><svg viewBox="0 0 300 230" width="100%" height="230"><rect x="40" y="10" width="250" height="190" fill="#0d1120" stroke="#222"/><line x1="40" y1="10" x2="40" y2="200" stroke="#1c2333"/><text x="40" y="214" fill="#777" font-size="9" text-anchor="middle">0</text><line x1="102" y1="10" x2="102" y2="200" stroke="#1c2333"/><text x="102" y="214" fill="#777" font-size="9" text-anchor="middle">559</text><line x1="165" y1="10" x2="165" y2="200" stroke="#1c2333"/><text x="165" y="214" fill="#777" font-size="9" text-anchor="middle">1118</text><line x1="227" y1="10" x2="227" y2="200" stroke="#1c2333"/><text x="227" y="214" fill="#777" font-size="9" text-anchor="middle">1677</text><line x1="290" y1="10" x2="290" y2="200" stroke="#1c2333"/><text x="290" y="214" fill="#777" font-size="9" text-anchor="middle">2236</text><line x1="40" y1="200" x2="290" y2="200" stroke="#1c2333"/><text x="35" y="203" fill="#777" font-size="9" text-anchor="end">0</text><line x1="40" y1="153" x2="290" y2="153" stroke="#1c2333"/><text x="35" y="156" fill="#777" font-size="9" text-anchor="end">138</text><line x1="40" y1="105" x2="290" y2="105" stroke="#1c2333"/><text x="35" y="108" fill="#777" font-size="9" text-anchor="end">276</text><line x1="40" y1="58" x2="290" y2="58" stroke="#1c2333"/><text x="35" y="61" fill="#777" font-size="9" text-anchor="end">414</text><line x1="40" y1="10" x2="290" y2="10" stroke="#1c2333"/><text x="35" y="13" fill="#777" font-size="9" text-anchor="end">552</text><line x1="40" y1="200" x2="290" y2="-568.5655737704918" class="gline"/><circle cx="40.0" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="196.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="195.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="81.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="169.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="163.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="59.2" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="196.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="182.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="195.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="192.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="192.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="192.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="169.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="192.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="64.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="196.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="127.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.6" cy="199.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="193.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="110.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="103.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.6" cy="197.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.8" cy="74.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="24.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="196.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.8" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="45.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="99.2" cy="109.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="160.5" cy="76.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="116.9" cy="128.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.4" cy="199.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.0" cy="196.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.6" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.3" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="199.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.0" cy="198.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="198.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="107.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="94.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="57.2" cy="159.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="165.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="69.2" cy="177.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="78.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="142.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.2" cy="183.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="116.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="197.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="198.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.8" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="142.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.4" cy="129.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="123.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.4" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.4" cy="199.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.9" cy="197.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.4" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.7" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="77.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="79.1" cy="163.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="24.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="196.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.1" cy="187.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="196.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="194.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="187.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.5" cy="138.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="97.4" cy="184.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="78.4" cy="153.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="108.3" cy="124.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="80.9" cy="160.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="108.7" cy="125.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="73.6" cy="121.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="134.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="53.3" cy="195.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="110.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.0" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.0" cy="198.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="85.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.6" cy="110.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="52.5" cy="112.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.6" cy="196.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.5" cy="148.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="178.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="61.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="155.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="59.2" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.1" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="49.7" cy="185.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="199.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="197.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.8" cy="198.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.1" cy="194.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.7" cy="153.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="56.6" cy="169.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="66.4" cy="199.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="79.1" cy="179.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="92.7" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="65.2" cy="140.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="114.2" cy="140.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.3" cy="64.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="107.3" cy="147.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="198.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="54.5" cy="180.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="199.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="60.6" cy="187.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="54.7" cy="137.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="74.9" cy="172.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.5" cy="77.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="85.7" cy="120.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="196.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.5" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.5" cy="196.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.2" cy="198.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="46.5" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="63.0" cy="193.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="63.1" cy="191.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="57.9" cy="171.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="66.0" cy="193.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="56.4" cy="156.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="194.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="194.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="197.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="194.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.4" cy="104.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="82.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="194.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.2" cy="73.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="57.2" cy="141.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.6" cy="196.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="194.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="193.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="177.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="196.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="197.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="196.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="199.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="197.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.5" cy="93.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="58.6" cy="129.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.2" cy="194.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="198.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.6" cy="199.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.0" cy="200.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="195.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="125.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.3" cy="165.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="196.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.8" cy="198.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.8" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.1" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="58.6" cy="195.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.3" cy="136.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.0" cy="199.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="195.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.4" cy="199.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="45.0" cy="199.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.6" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="194.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.6" cy="196.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.6" cy="198.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="44.0" cy="198.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="45.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.4" cy="194.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.3" cy="199.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="125.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="190.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.9" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="48.2" cy="199.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="45.6" cy="38.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.0" cy="199.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="137.3" cy="139.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="202.0" cy="198.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.0" cy="199.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="197.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="199.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.4" cy="198.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.7" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="56.5" cy="128.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="80.2" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="59.3" cy="133.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="80.1" cy="197.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="67.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="69.4" cy="174.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="193.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="46.5" cy="199.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.1" cy="197.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.7" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="179.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="130.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="197.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.8" cy="197.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.4" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="197.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="195.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="180.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="168.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="55.0" cy="171.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.9" cy="154.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.6" cy="148.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="79.6" cy="180.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="197.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="158.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="194.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="167.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="193.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="93.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="80.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="64.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.8" cy="199.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="197.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.6" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="52.5" cy="156.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="90.9" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.4" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.6" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.8" cy="200.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="193.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.7" cy="110.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="55.1" cy="145.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="84.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="101.9" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="72.5" cy="168.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="96.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.2" cy="199.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="184.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="159.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="62.6" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.1" cy="196.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.4" cy="199.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="194.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="196.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="156.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="60.1" cy="195.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.6" cy="199.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="169.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.4" cy="165.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.8" cy="152.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="74.2" cy="160.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.5" cy="199.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="195.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="199.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.8" cy="187.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.5" cy="160.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.4" cy="177.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.6" cy="193.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.7" cy="199.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="48.9" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="50.9" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="44.3" cy="194.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="47.8" cy="198.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="49.9" cy="198.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.7" cy="199.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.0" cy="192.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.6" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="50.5" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="39.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="109.8" cy="157.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="184.7" cy="197.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="211.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="48.2" cy="199.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="187.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="50.6" cy="199.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="52.1" cy="199.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.4" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="46.1" cy="198.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.1" cy="194.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="49.6" cy="196.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="114.9" cy="133.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="161.9" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.9" cy="197.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.5" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="194.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="194.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.9" cy="198.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="81.3" cy="164.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="88.1" cy="150.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="86.2" cy="144.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="120.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="120.2" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="161.0" cy="138.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="183.3" cy="148.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="223.1" cy="185.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="233.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="250.8" cy="178.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="271.5" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.3" cy="196.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.4" cy="199.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.6" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.0" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.0" cy="198.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="124.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="62.4" cy="124.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><text x="165.0" y="226" fill="#777" font-size="10" text-anchor="middle">MAE（pips）</text><text x="12" y="105.0" fill="#777" font-size="10" transform="rotate(-90 12 105.0)">MFE（pips）</text></svg><div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 46.7%；綠點贏紅點蝕</div></div><div class="svgbox"><b style="color:var(--acc)">SELL</b><svg viewBox="0 0 300 230" width="100%" height="230"><rect x="40" y="10" width="250" height="190" fill="#0d1120" stroke="#222"/><line x1="40" y1="10" x2="40" y2="200" stroke="#1c2333"/><text x="40" y="214" fill="#777" font-size="9" text-anchor="middle">0</text><line x1="102" y1="10" x2="102" y2="200" stroke="#1c2333"/><text x="102" y="214" fill="#777" font-size="9" text-anchor="middle">441</text><line x1="165" y1="10" x2="165" y2="200" stroke="#1c2333"/><text x="165" y="214" fill="#777" font-size="9" text-anchor="middle">882</text><line x1="227" y1="10" x2="227" y2="200" stroke="#1c2333"/><text x="227" y="214" fill="#777" font-size="9" text-anchor="middle">1323</text><line x1="290" y1="10" x2="290" y2="200" stroke="#1c2333"/><text x="290" y="214" fill="#777" font-size="9" text-anchor="middle">1764</text><line x1="40" y1="200" x2="290" y2="200" stroke="#1c2333"/><text x="35" y="203" fill="#777" font-size="9" text-anchor="end">0</text><line x1="40" y1="153" x2="290" y2="153" stroke="#1c2333"/><text x="35" y="156" fill="#777" font-size="9" text-anchor="end">147</text><line x1="40" y1="105" x2="290" y2="105" stroke="#1c2333"/><text x="35" y="108" fill="#777" font-size="9" text-anchor="end">294</text><line x1="40" y1="58" x2="290" y2="58" stroke="#1c2333"/><text x="35" y="61" fill="#777" font-size="9" text-anchor="end">441</text><line x1="40" y1="11" x2="290" y2="11" stroke="#1c2333"/><text x="35" y="14" fill="#777" font-size="9" text-anchor="end">588</text><line x1="40" y1="200" x2="290" y2="-368.57560797220697" class="gline"/><circle cx="40.0" cy="195.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="141.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="93.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="127.8" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="197.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="189.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="180.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="193.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="160.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="196.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="124.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="74.2" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="66.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="52.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="24.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="36.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="92.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="87.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="59.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="196.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="75.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="196.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="34.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="196.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.3" cy="199.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="195.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.5" cy="129.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="192.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="195.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="46.8" cy="194.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="74.6" cy="139.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.2" cy="199.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="194.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.4" cy="198.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.9" cy="196.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="53.3" cy="199.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="56.5" cy="199.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.5" cy="198.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="56.3" cy="94.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="183.0" cy="184.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.3" cy="173.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="191.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.7" cy="195.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.2" cy="193.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="56.5" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="59.1" cy="199.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="44.1" cy="191.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="46.1" cy="195.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="53.6" cy="194.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="57.3" cy="199.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="59.3" cy="199.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.1" cy="198.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="197.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.3" cy="199.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="195.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="44.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.3" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.8" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.5" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.3" cy="196.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.6" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.2" cy="199.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="48.8" cy="199.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.8" cy="196.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="194.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="156.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="199.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.4" cy="198.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="192.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="193.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="197.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="194.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.6" cy="199.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.4" cy="188.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="47.9" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="54.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.4" cy="190.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="51.7" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="55.9" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="78.1" cy="111.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="49.5" cy="176.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="46.8" cy="30.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="143.5" cy="170.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="46.1" cy="198.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="194.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="47.3" cy="199.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="45.0" cy="191.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="55.7" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.6" cy="150.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="53.4" cy="148.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="195.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.6" cy="198.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="78.0" cy="130.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="194.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.3" cy="199.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="43.7" cy="199.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.6" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.0" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="195.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="199.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.5" cy="158.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="198.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="198.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="195.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.3" cy="194.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="49.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.2" cy="194.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.6" cy="195.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="47.0" cy="198.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="50.7" cy="199.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.9" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="197.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="63.6" cy="184.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="54.8" cy="173.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="66.7" cy="191.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="153.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.0" cy="199.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.9" cy="192.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="52.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.9" cy="199.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="197.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="169.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="49.5" cy="161.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="190.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="49.0" cy="198.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="53.5" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.1" cy="195.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.9" cy="197.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="45.3" cy="198.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="49.3" cy="198.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.4" cy="193.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.8" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="192.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.1" cy="199.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="195.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="194.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="194.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="191.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.5" cy="123.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="97.1" cy="198.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="126.6" cy="190.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="67.5" cy="166.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="104.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="67.7" cy="167.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="105.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="92.3" cy="169.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="126.3" cy="189.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="131.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.6" cy="139.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="177.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="52.0" cy="173.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="197.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.2" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.4" cy="199.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.4" cy="196.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="52.5" cy="180.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="72.6" cy="162.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.7" cy="198.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="198.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.8" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.5" cy="199.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.3" cy="185.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.3" cy="198.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="196.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.4" cy="198.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="64.8" cy="159.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="136.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="195.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="197.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="195.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.5" cy="196.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.0" cy="195.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="199.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="85.4" cy="193.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="198.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="45.0" cy="192.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="176.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="198.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.5" cy="199.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.1" cy="196.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.0" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.4" cy="198.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="193.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.8" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.9" cy="197.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="50.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="52.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.1" cy="194.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.3" cy="198.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="49.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="43.0" cy="129.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="76.2" cy="193.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="109.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="123.6" cy="188.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="207.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="235.5" cy="199.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.3" cy="198.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.9" cy="198.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.2" cy="195.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.2" cy="197.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="47.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.1" cy="194.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="47.4" cy="198.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.2" cy="193.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="52.3" cy="115.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="161.6" cy="185.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="54.6" cy="98.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="155.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="44.2" cy="196.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.5" cy="197.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.5" cy="199.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="199.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="198.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="63.6" cy="197.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="199.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="196.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.8" cy="199.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="46.6" cy="134.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="64.7" cy="102.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="88.1" cy="156.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="214.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="271.5" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.5" cy="190.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.4" cy="199.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="51.8" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="41.1" cy="199.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.7" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="196.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.0" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.2" cy="196.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.8" cy="199.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.5" cy="198.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.4" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.3" cy="197.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.8" cy="143.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="98.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="54.6" cy="145.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="95.5" cy="199.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.9" cy="106.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="85.3" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.4" cy="159.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="117.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="57.0" cy="136.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="199.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="199.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="141.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="196.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.3" cy="197.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="198.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.9" cy="195.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="122.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="194.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.2" cy="198.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.3" cy="123.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.4" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.4" cy="197.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="156.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="139.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="196.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="195.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.2" cy="170.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="196.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.0" cy="199.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="126.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="193.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.1" cy="198.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="197.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="197.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.2" cy="197.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.2" cy="198.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="196.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="198.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="198.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.4" cy="199.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.6" cy="196.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.8" cy="198.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.5" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="194.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.2" cy="197.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="78.3" cy="59.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="104.7" cy="119.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="203.0" cy="187.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="258.7" cy="150.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.1" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="171.2" cy="146.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="233.3" cy="195.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="161.3" cy="117.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="222.2" cy="173.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="262.6" cy="159.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.2" cy="198.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.1" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="50.6" cy="198.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.6" cy="198.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="199.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="67.8" cy="197.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="73.0" cy="191.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.0" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="62.4" cy="180.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="59.6" cy="173.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="53.3" cy="150.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.5" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.1" cy="198.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.4" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.2" cy="197.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.2" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="43.2" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.0" cy="194.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="61.0" cy="190.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.3" cy="199.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.5" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.4" cy="198.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="94.8" cy="155.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="154.0" cy="131.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="94.8" cy="147.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="154.0" cy="131.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.8" cy="199.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="197.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.6" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="196.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.6" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="107.4" cy="145.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="152.8" cy="128.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="42.6" cy="196.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="46.2" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="128.8" cy="163.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="175.6" cy="180.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="40.6" cy="199.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.3" cy="177.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="72.5" cy="196.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><text x="165.0" y="226" fill="#777" font-size="10" text-anchor="middle">MAE（pips）</text><text x="12" y="105.0" fill="#777" font-size="10" transform="rotate(-90 12 105.0)">MFE（pips）</text></svg><div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 44.1%；綠點贏紅點蝕</div></div></div></section>
+<section id="s7"><h2>⑦ 時間維度＋明細</h2><div class="legend">星期×小時 P&amp;L（格色雙向 heat，hover 睇精確值；「·」＝冇數）＋累計 P&amp;L 走勢＋最近 50 筆明細。時間均按平倉時間。</div>
+<h3 style="color:var(--acc);font-size:.95em;margin:8px 0 6px">星期 × 小時 heatmap</h3><div class="heat hm-wrap" style="grid-template-columns:36px repeat(24,minmax(22px,1fr));min-width:720px"><div class="lab"></div><div class="lab" style="justify-content:center">0</div><div class="lab" style="justify-content:center">1</div><div class="lab" style="justify-content:center">2</div><div class="lab" style="justify-content:center">3</div><div class="lab" style="justify-content:center">4</div><div class="lab" style="justify-content:center">5</div><div class="lab" style="justify-content:center">6</div><div class="lab" style="justify-content:center">7</div><div class="lab" style="justify-content:center">8</div><div class="lab" style="justify-content:center">9</div><div class="lab" style="justify-content:center">10</div><div class="lab" style="justify-content:center">11</div><div class="lab" style="justify-content:center">12</div><div class="lab" style="justify-content:center">13</div><div class="lab" style="justify-content:center">14</div><div class="lab" style="justify-content:center">15</div><div class="lab" style="justify-content:center">16</div><div class="lab" style="justify-content:center">17</div><div class="lab" style="justify-content:center">18</div><div class="lab" style="justify-content:center">19</div><div class="lab" style="justify-content:center">20</div><div class="lab" style="justify-content:center">21</div><div class="lab" style="justify-content:center">22</div><div class="lab" style="justify-content:center">23</div><div class="lab">一</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.15)" title="週一 01:00–02:00 $281.50">282</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 02:00–03:00 $1.08">1</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週一 03:00–04:00 $57.11">57</div><div class="c" style="background:rgba(76,175,80,0.12)" title="週一 04:00–05:00 $182.77">183</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 05:00–06:00 $0.12">0</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 07:00–08:00 $0.33">0</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 08:00–09:00 $4.04">4</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 09:00–10:00 $0.33">0</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 10:00–11:00 $0.09">0</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 11:00–12:00 $4.71">5</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 12:00–13:00 $5.99">6</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週一 13:00–14:00 $23.64">24</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週一 14:00–15:00 $86.31">86</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週一 15:00–16:00 $90.18">90</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週一 16:00–17:00 $56.80">57</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週一 17:00–18:00 $40.29">40</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 18:00–19:00 $19.23">19</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週一 19:00–20:00 $57.77">58</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 20:00–21:00 $3.82">4</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 22:00–23:00 $2.63">3</div><div class="c na" title="冇數">·</div><div class="lab">二</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 00:00–01:00 $2.11">2</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 02:00–03:00 $7.03">7</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 03:00–04:00 $14.68">15</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 04:00–05:00 $45.38">45</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週二 05:00–06:00 $122.71">123</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週二 06:00–07:00 $141.57">142</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 07:00–08:00 $0.82">1</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 08:00–09:00 $0.55">1</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 09:00–10:00 $0.98">1</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 10:00–11:00 $21.42">21</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 11:00–12:00 $20.69">21</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 12:00–13:00 $26.49">26</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 13:00–14:00 $11.91">12</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 14:00–15:00 $0.39">0</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 15:00–16:00 $23.84">24</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 16:00–17:00 $54.59">55</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週二 17:00–18:00 $87.38">87</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 18:00–19:00 $0.76">1</div><div class="c" style="background:rgba(76,175,80,0.12)" title="週二 19:00–20:00 $157.04">157</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 20:00–21:00 $35.55">36</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 21:00–22:00 $13.37">13</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 22:00–23:00 $0.43">0</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 23:00–24:00 $22.29">22</div><div class="lab">三</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 01:00–02:00 $9.90">10</div><div class="c" style="background:rgba(255,87,34,0.80)" title="週三 02:00–03:00 -$3,038.73">-3,039</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 03:00–04:00 $35.19">35</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 04:00–05:00 $14.70">15</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 05:00–06:00 $22.54">23</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 06:00–07:00 $22.14">22</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 07:00–08:00 $3.87">4</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 08:00–09:00 $1.87">2</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 09:00–10:00 $9.70">10</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 10:00–11:00 $40.10">40</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 11:00–12:00 $5.53">6</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 12:00–13:00 $0.49">0</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 13:00–14:00 $1.88">2</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 14:00–15:00 $20.95">21</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 15:00–16:00 $46.31">46</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 16:00–17:00 $11.37">11</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 17:00–18:00 $55.38">55</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週三 18:00–19:00 $118.61">119</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週三 19:00–20:00 $73.59">74</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 20:00–21:00 $8.80">9</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週三 21:00–22:00 $128.09">128</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 22:00–23:00 $12.05">12</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 23:00–24:00 $0.22">0</div><div class="lab">四</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 01:00–02:00 $21.89">22</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 02:00–03:00 $0.28">0</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週四 03:00–04:00 $130.99">131</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 04:00–05:00 $35.23">35</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 05:00–06:00 $36.79">37</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 06:00–07:00 $22.05">22</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 07:00–08:00 $0.05">0</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 08:00–09:00 $18.03">18</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 09:00–10:00 $56.98">57</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 10:00–11:00 $25.12">25</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 11:00–12:00 $4.46">4</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 12:00–13:00 $51.45">51</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 13:00–14:00 $2.44">2</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 14:00–15:00 $0.65">1</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 15:00–16:00 $33.51">34</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 16:00–17:00 $32.70">33</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 17:00–18:00 $55.65">56</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週四 18:00–19:00 $83.13">83</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 19:00–20:00 $33.62">34</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 20:00–21:00 $55.26">55</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 21:00–22:00 $44.28">44</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 22:00–23:00 $10.57">11</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 23:00–24:00 $0.52">1</div><div class="lab">五</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 01:00–02:00 $9.29">9</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 02:00–03:00 $1.01">1</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 03:00–04:00 $9.56">10</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週五 04:00–05:00 $99.00">99</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 05:00–06:00 $2.04">2</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 07:00–08:00 $0.60">1</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週五 08:00–09:00 $30.47">30</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 09:00–10:00 $1.45">1</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週五 10:00–11:00 $21.83">22</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 11:00–12:00 $1.13">1</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 12:00–13:00 $1.63">2</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週五 13:00–14:00 $35.15">35</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 14:00–15:00 $0.22">0</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 15:00–16:00 $18.51">19</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 16:00–17:00 $5.67">6</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 17:00–18:00 $10.70">11</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週五 18:00–19:00 $45.28">45</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週五 19:00–20:00 $131.70">132</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 20:00–21:00 $2.24">2</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 21:00–22:00 $2.04">2</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週五 22:00–23:00 $53.57">54</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 23:00–24:00 $6.64">7</div><div class="lab">六</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="lab">日</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div></div>
+<h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">累計 P&amp;L（Growth）</h3><div class="svgbox"><svg viewBox="0 0 620 150" width="100%" height="150"><line x1="46" y1="126" x2="608" y2="126" stroke="#333" stroke-dasharray="3 3"/><polyline points="46.0,125.9 46.8,125.9 47.6,125.9 48.4,125.9 49.2,125.3 50.1,125.3 50.9,123.3 51.7,125.2 52.5,125.2 53.3,125.2 54.1,125.1 54.9,124.9 55.7,124.8 56.5,124.8 57.4,122.7 58.2,122.4 59.0,122.4 59.8,121.8 60.6,122.3 61.4,122.2 62.2,122.1 63.0,122.1 63.8,122.1 64.7,122.0 65.5,122.0 66.3,121.9 67.1,121.9 67.9,121.8 68.7,121.8 69.5,121.6 70.3,121.5 71.1,121.1 72.0,121.1 72.8,121.1 73.6,119.7 74.4,120.4 75.2,117.9 76.0,118.1 76.8,116.5 77.6,114.9 78.4,113.7 79.2,113.7 80.1,113.7 80.9,112.7 81.7,112.7 82.5,112.6 83.3,112.6 84.1,112.6 84.9,110.5 85.7,110.9 86.5,110.9 87.4,108.5 88.2,108.5 89.0,106.9 89.8,106.9 90.6,106.9 91.4,106.9 92.2,106.8 93.0,106.2 93.8,106.1 94.7,106.0 95.5,106.1 96.3,105.5 97.1,105.5 97.9,104.7 98.7,104.7 99.5,104.8 100.3,105.3 101.1,105.5 102.0,105.5 102.8,103.5 103.6,105.2 104.4,105.0 105.2,103.6 106.0,103.6 106.8,104.0 107.6,104.5 108.4,104.7 109.3,104.1 110.1,104.1 110.9,104.1 111.7,102.7 112.5,102.3 113.3,102.8 114.1,103.2 114.9,103.4 115.7,103.4 116.6,101.8 117.4,102.8 118.2,102.8 119.0,102.4 119.8,100.8 120.6,100.7 121.4,100.8 122.2,100.8 123.0,99.2 123.9,100.1 124.7,100.1 125.5,100.1 126.3,100.0 127.1,100.0 127.9,100.0 128.7,100.0 129.5,100.0 130.3,99.9 131.2,99.9 132.0,99.9 132.8,99.8 133.6,99.8 134.4,99.9 135.2,99.8 136.0,99.8 136.8,99.8 137.6,99.6 138.5,99.6 139.3,99.7 140.1,99.8 140.9,99.7 141.7,99.7 142.5,99.7 143.3,98.9 144.1,97.9 144.9,97.5 145.7,97.5 146.6,97.5 147.4,97.5 148.2,97.4 149.0,97.4 149.8,97.3 150.6,97.2 151.4,97.3 152.2,96.9 153.0,97.0 153.9,97.2 154.7,96.6 155.5,96.8 156.3,97.0 157.1,97.2 157.9,96.5 158.7,96.4 159.5,94.2 160.3,95.2 161.2,95.1 162.0,95.0 162.8,95.1 163.6,95.1 164.4,94.8 165.2,94.6 166.0,94.6 166.8,94.8 167.6,94.3 168.5,94.3 169.3,93.8 170.1,93.8 170.9,93.7 171.7,93.7 172.5,93.5 173.3,93.3 174.1,93.2 174.9,93.2 175.8,93.2 176.6,93.2 177.4,93.2 178.2,93.2 179.0,93.2 179.8,93.2 180.6,93.1 181.4,92.1 182.2,92.0 183.1,92.0 183.9,92.0 184.7,91.7 185.5,91.7 186.3,91.6 187.1,91.5 187.9,91.5 188.7,91.6 189.5,91.2 190.4,91.3 191.2,91.5 192.0,91.6 192.8,91.6 193.6,91.6 194.4,91.6 195.2,91.3 196.0,91.3 196.8,90.8 197.7,90.8 198.5,90.8 199.3,90.5 200.1,90.6 200.9,90.8 201.7,90.8 202.5,90.8 203.3,90.8 204.1,90.5 204.9,90.1 205.8,90.1 206.6,89.7 207.4,89.9 208.2,90.1 209.0,89.8 209.8,89.9 210.6,89.9 211.4,90.0 212.2,90.0 213.1,89.0 213.9,89.0 214.7,88.2 215.5,88.2 216.3,88.2 217.1,88.2 217.9,87.7 218.7,87.1 219.5,86.4 220.4,86.4 221.2,86.4 222.0,86.3 222.8,86.3 223.6,86.2 224.4,86.1 225.2,86.1 226.0,86.0 226.8,86.0 227.7,86.0 228.5,85.9 229.3,83.5 230.1,84.3 230.9,85.4 231.7,84.9 232.5,85.4 233.3,84.8 234.1,85.3 235.0,84.7 235.8,85.2 236.6,85.2 237.4,85.1 238.2,85.2 239.0,83.0 239.8,83.0 240.6,81.4 241.4,80.8 242.3,80.2 243.1,80.2 243.9,80.0 244.7,80.0 245.5,79.9 246.3,79.9 247.1,79.9 247.9,79.8 248.7,78.7 249.6,79.6 250.4,79.0 251.2,79.6 252.0,78.9 252.8,79.4 253.6,78.7 254.4,77.5 255.2,77.5 256.0,76.7 256.9,76.7 257.7,76.7 258.5,75.7 259.3,75.7 260.1,75.7 260.9,75.4 261.7,75.4 262.5,75.4 263.3,74.6 264.2,73.8 265.0,73.8 265.8,73.4 266.6,73.3 267.4,73.3 268.2,73.3 269.0,73.3 269.8,72.9 270.6,73.3 271.4,72.5 272.3,72.7 273.1,72.3 273.9,72.6 274.7,72.6 275.5,72.5 276.3,72.5 277.1,72.5 277.9,72.5 278.7,72.4 279.6,72.4 280.4,72.4 281.2,72.4 282.0,69.1 282.8,69.0 283.6,69.8 284.4,71.0 285.2,71.9 286.0,70.8 286.9,71.6 287.7,69.7 288.5,70.5 289.3,70.5 290.1,70.5 290.9,70.5 291.7,70.5 292.5,70.5 293.3,70.5 294.2,70.4 295.0,70.4 295.8,69.8 296.6,69.8 297.4,67.6 298.2,67.5 299.0,67.5 299.8,67.5 300.6,67.4 301.5,67.4 302.3,67.3 303.1,67.3 303.9,67.4 304.7,67.4 305.5,67.3 306.3,67.3 307.1,67.3 307.9,66.8 308.8,66.8 309.6,66.7 310.4,66.7 311.2,66.7 312.0,66.6 312.8,66.4 313.6,66.3 314.4,66.3 315.2,66.2 316.1,66.2 316.9,66.2 317.7,66.1 318.5,66.1 319.3,66.1 320.1,65.7 320.9,65.7 321.7,65.6 322.5,65.6 323.4,65.6 324.2,63.9 325.0,63.9 325.8,63.9 326.6,62.7 327.4,62.7 328.2,62.7 329.0,62.7 329.8,62.7 330.6,62.6 331.5,62.5 332.3,62.3 333.1,62.3 333.9,62.3 334.7,62.3 335.5,62.1 336.3,62.1 337.1,62.1 337.9,62.1 338.8,61.3 339.6,61.3 340.4,61.4 341.2,61.6 342.0,61.8 342.8,61.6 343.6,61.6 344.4,61.7 345.2,40.3 346.1,41.5 346.9,47.9 347.7,52.4 348.5,58.2 349.3,61.7 350.1,61.6 350.9,61.7 351.7,61.5 352.5,61.6 353.4,61.6 354.2,61.6 355.0,61.6 355.8,61.5 356.6,59.9 357.4,61.5 358.2,59.5 359.0,60.7 359.8,60.7 360.7,60.7 361.5,60.7 362.3,60.7 363.1,60.7 363.9,60.7 364.7,60.7 365.5,60.7 366.3,60.6 367.1,60.6 368.0,60.0 368.8,52.6 369.6,51.0 370.4,55.5 371.2,59.0 372.0,58.7 372.8,58.9 373.6,59.0 374.4,59.0 375.3,58.9 376.1,58.9 376.9,58.9 377.7,58.9 378.5,58.9 379.3,58.8 380.1,58.9 380.9,58.8 381.7,58.8 382.6,58.8 383.4,58.8 384.2,58.8 385.0,57.7 385.8,58.2 386.6,57.6 387.4,58.1 388.2,56.4 389.0,56.5 389.8,56.1 390.7,55.3 391.5,54.7 392.3,54.7 393.1,54.7 393.9,54.6 394.7,53.7 395.5,53.1 396.3,53.0 397.1,53.0 398.0,53.0 398.8,53.0 399.6,53.0 400.4,53.0 401.2,53.0 402.0,53.0 402.8,53.0 403.6,52.3 404.4,52.3 405.3,52.3 406.1,52.3 406.9,52.2 407.7,52.2 408.5,52.2 409.3,52.2 410.1,52.2 410.9,52.2 411.7,51.6 412.6,51.6 413.4,51.4 414.2,51.5 415.0,51.6 415.8,51.6 416.6,51.5 417.4,51.3 418.2,51.3 419.0,51.4 419.9,51.4 420.7,51.4 421.5,51.4 422.3,50.7 423.1,50.5 423.9,50.5 424.7,50.6 425.5,44.9 426.3,44.9 427.2,47.1 428.0,50.0 428.8,50.0 429.6,50.0 430.4,49.5 431.2,49.4 432.0,49.4 432.8,49.4 433.6,49.4 434.5,49.4 435.3,49.4 436.1,49.4 436.9,48.1 437.7,48.2 438.5,47.0 439.3,46.9 440.1,44.6 440.9,44.4 441.8,44.2 442.6,44.2 443.4,44.3 444.2,44.3 445.0,44.3 445.8,44.1 446.6,44.1 447.4,44.1 448.2,43.5 449.1,43.4 449.9,42.7 450.7,42.6 451.5,42.6 452.3,42.0 453.1,42.0 453.9,42.0 454.7,41.6 455.5,41.0 456.3,41.0 457.2,41.0 458.0,41.0 458.8,41.0 459.6,40.9 460.4,40.9 461.2,40.9 462.0,40.6 462.8,40.5 463.6,40.5 464.5,39.8 465.3,39.8 466.1,39.6 466.9,39.6 467.7,39.6 468.5,39.6 469.3,39.6 470.1,39.5 470.9,39.5 471.8,39.5 472.6,39.5 473.4,39.5 474.2,39.3 475.0,39.3 475.8,39.0 476.6,38.1 477.4,38.6 478.2,38.6 479.1,38.6 479.9,38.2 480.7,38.2 481.5,38.2 482.3,37.9 483.1,37.8 483.9,37.8 484.7,37.8 485.5,36.8 486.4,34.7 487.2,34.7 488.0,34.7 488.8,34.7 489.6,34.7 490.4,33.9 491.2,34.6 492.0,34.6 492.8,34.6 493.7,34.6 494.5,34.5 495.3,33.7 496.1,31.8 496.9,32.4 497.7,33.2 498.5,32.6 499.3,33.0 500.1,33.0 501.0,33.0 501.8,33.0 502.6,33.0 503.4,33.0 504.2,33.0 505.0,33.0 505.8,32.9 506.6,32.9 507.4,22.2 508.3,19.1 509.1,21.8 509.9,24.3 510.7,24.3 511.5,24.3 512.3,24.2 513.1,23.1 513.9,23.9 514.7,20.7 515.5,21.8 516.4,23.1 517.2,22.4 518.0,22.7 518.8,22.6 519.6,22.6 520.4,22.6 521.2,22.6 522.0,22.6 522.8,22.6 523.7,22.5 524.5,22.5 525.3,22.5 526.1,22.5 526.9,22.4 527.7,22.4 528.5,21.6 529.3,21.8 530.1,21.8 531.0,21.5 531.8,21.2 532.6,20.4 533.4,20.8 534.2,20.8 535.0,20.7 535.8,20.7 536.6,20.7 537.4,20.7 538.3,20.5 539.1,20.1 539.9,20.0 540.7,20.1 541.5,20.0 542.3,20.1 543.1,20.1 543.9,19.9 544.7,19.6 545.6,19.6 546.4,19.5 547.2,19.4 548.0,19.4 548.8,19.5 549.6,19.1 550.4,19.2 551.2,19.3 552.0,19.5 552.9,19.3 553.7,19.4 554.5,19.5 555.3,19.5 556.1,19.3 556.9,19.3 557.7,19.4 558.5,8.0 559.3,10.1 560.2,15.2 561.0,18.4 561.8,18.4 562.6,17.5 563.4,17.9 564.2,18.2 565.0,18.4 565.8,18.4 566.6,18.4 567.5,18.3 568.3,18.4 569.1,17.3 569.9,18.1 570.7,18.0 571.5,18.0 572.3,18.0 573.1,17.9 573.9,17.9 574.8,18.6 575.6,23.1 576.4,25.8 577.2,28.3 578.0,30.5 578.8,32.7 579.6,59.6 580.4,67.5 581.2,87.7 582.0,93.0 582.9,104.6 583.7,110.9 584.5,110.8 585.3,110.8 586.1,110.8 586.9,110.8 587.7,110.8 588.5,110.8 589.3,110.8 590.2,110.1 591.0,110.1 591.8,109.4 592.6,109.4 593.4,109.4 594.2,108.6 595.0,109.4 595.8,108.4 596.6,109.2 597.5,109.1 598.3,109.1 599.1,109.1 599.9,109.1 600.7,109.1 601.5,108.1 602.3,108.5 603.1,108.5 603.9,108.5 604.8,107.8 605.6,108.5 606.4,108.5 607.2,108.0 608.0,108.4" fill="none" stroke="#64b5f6" stroke-width="1.8"/><text x="40" y="12" fill="#777" font-size="9" text-anchor="end">3,882</text><text x="40" y="126" fill="#777" font-size="9" text-anchor="end">0</text><text x="327.0" y="146" fill="#777" font-size="10" text-anchor="middle">逐筆平倉（03-24 → 06-12）</text></svg></div>
+<h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">明細（最近 50 筆／共 694 筆）</h3>
+<table><thead><tr><th>平倉時間</th><th>商品</th><th>方向</th><th>lots</th><th>淨利</th><th>MAE $</th></tr></thead><tbody><tr><td>06-12 13:21</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="neg">-$10.05</td><td class="neg">23.01</td></tr><tr><td>06-12 13:21</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$14.12</td><td class="neg">11.80</td></tr><tr><td>06-12 13:14</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$0.13</td><td class="neg">0.28</td></tr><tr><td>06-12 10:33</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="neg">-$21.39</td><td class="neg">95.55</td></tr><tr><td>06-12 10:33</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$23.65</td><td class="neg">124.95</td></tr><tr><td>06-12 10:14</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="neg">-$1.19</td><td class="neg">3.20</td></tr><tr><td>06-12 10:14</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$1.26</td><td class="neg">2.77</td></tr><tr><td>06-12 04:33</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="neg">-$15.52</td><td class="neg">79.42</td></tr><tr><td>06-12 04:33</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$34.81</td><td class="neg">94.69</td></tr><tr><td>06-12 04:27</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="neg">-$1.32</td><td class="neg">2.90</td></tr><tr><td>06-12 04:27</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$1.31</td><td class="neg">1.86</td></tr><tr><td>06-12 04:25</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$0.01</td><td class="neg">1.39</td></tr><tr><td>06-12 04:23</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$0.39</td><td class="neg">0.92</td></tr><tr><td>06-12 04:08</td><td>EURUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$0.12</td><td class="neg">1.97</td></tr><tr><td>06-12 04:03</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="neg">-$25.22</td><td class="neg">80.28</td></tr><tr><td>06-12 04:03</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$33.27</td><td class="neg">76.85</td></tr><tr><td>06-12 04:03</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="neg">-$27.78</td><td class="neg">80.30</td></tr><tr><td>06-12 04:03</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$28.11</td><td class="neg">76.89</td></tr><tr><td>06-11 11:06</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$0.36</td><td class="neg">0.21</td></tr><tr><td>06-11 10:02</td><td>AUDCAD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$0.13</td><td class="neg">0.23</td></tr><tr><td>06-11 03:17</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$21.90</td><td class="neg">20.09</td></tr><tr><td>06-11 02:19</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$0.21</td><td class="neg">0.24</td></tr><tr><td>06-11 01:37</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$21.89</td><td class="neg">0.00</td></tr><tr><td>06-10 15:31</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$0.39</td><td class="neg">1.31</td></tr><tr><td>06-10 15:30</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$0.38</td><td class="neg">1.28</td></tr><tr><td>06-10 15:14</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$0.48</td><td class="neg">0.40</td></tr><tr><td>06-10 15:13</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="neg">-$0.58</td><td class="neg">1.54</td></tr><tr><td>06-10 15:13</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="pos">$1.58</td><td class="neg">0.34</td></tr><tr><td>06-10 09:50</td><td>EURUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$0.17</td><td class="neg">0.20</td></tr><tr><td>06-10 09:50</td><td>XAUUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$3.05</td><td class="neg">14.88</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="neg">-$209.22</td><td class="neg">209.22</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="neg">-$381.47</td><td class="neg">381.47</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="neg">-$174.83</td><td class="neg">174.83</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.04</td><td class="neg">-$663.63</td><td class="neg">663.63</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="neg">-$260.49</td><td class="neg">260.49</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.08</td><td class="neg">-$882.49</td><td class="neg">882.49</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="neg">-$72.42</td><td class="neg">72.42</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="neg">-$72.34</td><td class="neg">72.34</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="neg">-$83.99</td><td class="neg">83.99</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="neg">-$87.51</td><td class="neg">87.51</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.04</td><td class="neg">-$150.53</td><td class="neg">150.53</td></tr><tr><td>06-10 02:27</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.04</td><td class="neg">-$21.12</td><td class="neg">21.12</td></tr><tr><td>06-09 21:19</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$1.10</td><td class="neg">0.56</td></tr><tr><td>06-09 20:22</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$1.16</td><td class="neg">0.52</td></tr><tr><td>06-09 20:21</td><td>EURUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$0.28</td><td class="neg">1.31</td></tr><tr><td>06-09 20:17</td><td>AUDCAD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="pos">$0.51</td><td class="neg">0.56</td></tr><tr><td>06-09 17:18</td><td>EURUSD</td><td><span class="sell-h"></span>SELL</td><td>0.01</td><td class="pos">$1.68</td><td class="neg">0.02</td></tr><tr><td>06-09 16:49</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="neg">-$25.17</td><td class="neg">109.77</td></tr><tr><td>06-09 16:49</td><td>XAUUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="pos">$36.22</td><td class="neg">135.39</td></tr><tr><td>06-09 12:54</td><td>EURUSD</td><td><span class="buy-h"></span>BUY</td><td>0.01</td><td class="neg">-$2.59</td><td class="neg">8.68</td></tr></tbody></table>
+<details><summary>完整欄位明細（RawData 33 欄版本）</summary><div class="footnote">CSV 源 19 欄（forex-forest 導出）；Excel RawData 33 欄其餘欄位由 OpenClaw 數據 lane 補齊後，重跑本生成器自動帶出。</div></details></section>
+<section id="s8"><h2>⑧ 使用說明</h2><div class="legend">術語、清洗規則、顏色圖例——Excel「說明／匯入說明」兩 sheet 嘅 web 化。</div>
+<details><summary>展開說明</summary><dl class="guide">
+<dt>勝率</dt><dd>Net Profit &gt; 0 嘅交易佔比（含 commission＋swap 後淨值）。</dd>
+<dt>盈虧比</dt><dd>平均贏利 ÷ |平均虧損|。</dd>
+<dt>Profit Factor</dt><dd>總盈利 ÷ |總虧損|；無虧損單時顯示「無虧損」（唔係 ∞）。</dd>
+<dt>MAE / MFE</dt><dd>入場後最大不利／有利偏移，由入場價起算，pips 為主、$ 為輔。</dd>
+<dt>Growth／MaxDD</dt><dd>按平倉時間逐筆累計淨利；MaxDD＝峰值回撤最大深度（$）。</dd>
+<dt>馬丁偵測</dt><dd>白皮書 v3.1 §4：基準 lot＝出現≥2次嘅最小實際 lot；每筆按倍數歸層；最大層≥2 判馬丁。</dd>
+<dt>清洗規則</dt><dd>剔 balance/credit、剔未平倉、按 Close Time 排序。本數據源（forex-forest copy signal）Magic 全 0，「剔 Magic=0」規則豁免並在此注明。</dd>
+<dt>顏色圖例</dt><dd>綠＝贏/BUY、紅＝蝕/SELL、金＝強調、藍＝互動；熱力深淺按 |值| 歸一化；「·」＝冇數（≠$0）。</dd>
+<dt>數據上限</dt><dd>20,000 筆（Excel v8.5 同款上限）。</dd>
+<dt>互動分享</dt><dd>③ 區商品／門檻選擇寫入 URL hash（#sym=…&amp;th=…），可分享可返後。</dd>
+</dl></details></section>
+<div class="footnote" style="text-align:center">TSA · Template B v1（rebuild_martin_v4.py）· 數據源 docs/downloads/forex-forest-signals-page-35436.csv</div>
+</main>
 </div>
-<div class="quick-btns" id="quickBtns">
-<button data-range="1d">1日</button><button data-range="1w">1週</button><button data-range="1m">1月</button>
-<button data-range="3m">3月</button><button data-range="6m">6月</button><button data-range="1y">1年</button>
-<button data-range="all" class="active">全部</button>
-</div>
-<div class="date-inputs">
-<label>From:</label><input type="date" id="dateFrom">
-<label>To:</label><input type="date" id="dateTo">
-<button onclick="applyCustomDate()">套用</button>
-<button onclick="clearDateFilter()">清除</button>
-</div>
-<div class="range-container" id="rangeContainer">
-<div class="range-track"></div><div class="range-fill" id="rangeFill"></div>
-<div class="range-handle" id="handleLeft" data-handle="left"></div>
-<div class="range-handle" id="handleRight" data-handle="right"></div>
-</div>
-<div class="range-labels"><span id="rangeMinLabel">—</span><span id="rangeMaxLabel">—</span></div>
-</div>
-
-<!-- Period Stats -->
-<div class="sec"><div class="sec-h" onclick="toggleSec(this)"><span>📊 交易統計表</span><span class="arrow">▶</span></div><div class="sec-b" id="periodStatsBody"></div></div>
-
-<!-- Summary -->
-<div class="stats-bar" id="summaryBar"></div>
-
-<!-- Content -->
-<div id="content"></div>
-
-<script>
-/**
- * Martin Autopsy V4.1 — Core Computation Engine
- * 純 JavaScript 計算邏輯，唔加公式，只用 CSV 真實數據
- */
-
-// ═══════════════════════════════════════════════════════
-// CSV Parser
-// ═══════════════════════════════════════════════════════
-
-function parseCSV(text) {
-    const lines = text.trim().split('\n');
-    if (lines.length < 2) return [];
-    const headers = lines[0].split(',').map(h => h.trim());
-    const trades = [];
-    for (let i = 1; i < lines.length; i++) {
-        const values = parseCSVLine(lines[i]);
-        if (values.length < headers.length) continue;
-        const row = {};
-        headers.forEach((h, idx) => row[h] = values[idx]);
-        const type = (row['Type'] || '').trim().toLowerCase();
-        if (type !== 'buy' && type !== 'sell') continue;
-        const symbol = (row['Symbol'] || '').trim();
-        if (!symbol) continue;
-        const trade = {
-            symbol, direction: type,
-            lots: Math.abs(parseFloat(row['Lots']) || 0),
-            open_price: parseFloat(row['Open Price']) || 0,
-            close_price: parseFloat(row['Close Price']) || 0,
-            net_profit: parseFloat(row['Net Profit']) || 0,
-            net_pips: parseFloat(row['Net Pips']) || 0,
-            max_profit: parseFloat(row['Max Profit']) || 0,
-            max_loss: parseFloat(row['Max Loss']) || 0,
-            mfe: parseFloat(row['Max Pips']) || 0,
-            mae: Math.abs(parseFloat(row['Max Loss Pips']) || 0),
-            holding_hours: parseFloat(row['Holding Time (Hours)']) || 0,
-            commission: parseFloat(row['Commission']) || 0,
-            swap: parseFloat(row['Swap']) || 0,
-            comment: (row['Comment'] || '').trim(),
-            open_time: (row['Open Time'] || '').trim(),
-            close_time: (row['Close Time'] || '').trim(),
-            magic: parseInt(row['Magic Number']) || 0,
-            _openDate: null,
-        };
-        try {
-            const parts = trade.open_time.split(/[/\s:]+/);
-            if (parts.length >= 6) {
-                trade._openDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), parseInt(parts[3]), parseInt(parts[4]), parseInt(parts[5]));
-            }
-        } catch (e) {}
-        trades.push(trade);
-    }
-    return trades;
-}
-
-function parseCSVLine(line) {
-    const result = []; let current = ''; let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-        const c = line[i];
-        if (c === '"') inQ = !inQ;
-        else if (c === ',' && !inQ) { result.push(current.trim()); current = ''; }
-        else current += c;
-    }
-    result.push(current.trim());
-    return result;
-}
-
-// ═══════════════════════════════════════════════════════
-// Date Filtering
-// ═══════════════════════════════════════════════════════
-
-function filterByDateRange(trades, from, to) {
-    if (!from && !to) return trades;
-    return trades.filter(t => {
-        if (!t._openDate) return false;
-        if (from && t._openDate < from) return false;
-        if (to && t._openDate > to) return false;
-        return true;
-    });
-}
-
-function getDateRange(trades) {
-    const dates = trades.filter(t => t._openDate).map(t => t._openDate.getTime());
-    if (!dates.length) return { min: null, max: null };
-    return { min: new Date(Math.min(...dates)), max: new Date(Math.max(...dates)) };
-}
-
-// ═══════════════════════════════════════════════════════
-// Core Stats
-// ═══════════════════════════════════════════════════════
-
-function computeLayerStats(trades) {
-    const ccyDirMap = {};
-    for (const t of trades) {
-        const key = `${t.symbol}_${t.direction}`;
-        if (!ccyDirMap[key]) ccyDirMap[key] = [];
-        ccyDirMap[key].push(t);
-    }
-    const results = {};
-    for (const [ccyDirKey, ccyTrades] of Object.entries(ccyDirMap)) {
-        const lotsInGroup = [...new Set(ccyTrades.map(t => t.lots))].sort((a, b) => a - b);
-        const lotToIdx = {};
-        lotsInGroup.forEach((lot, idx) => lotToIdx[lot] = idx + 1);
-        const maxDepth = lotsInGroup.length;
-        const layerMap = {};
-        for (const t of ccyTrades) {
-            const label = `L${t.lots}`;
-            if (!layerMap[label]) layerMap[label] = [];
-            layerMap[label].push(t);
-        }
-        for (const [layerLabel, lt] of Object.entries(layerMap)) {
-            const n = lt.length;
-            if (n === 0) continue;
-            const wins = lt.filter(t => t.net_profit > 0);
-            const losses = lt.filter(t => t.net_profit <= 0);
-            const winCount = wins.length;
-            const lossCount = losses.length;
-            const wr = n > 0 ? (winCount / n * 100) : 0;
-            const totalPnl = lt.reduce((s, t) => s + t.net_profit, 0);
-            const totalPips = lt.reduce((s, t) => s + t.net_pips, 0);
-            const avgWinPips = winCount > 0 ? wins.reduce((s, t) => s + t.net_pips, 0) / winCount : 0;
-            const avgLossPips = lossCount > 0 ? Math.abs(losses.reduce((s, t) => s + t.net_pips, 0) / lossCount) : 0;
-            const oddsPips = avgLossPips > 0 ? avgWinPips / avgLossPips : 999;
-            const avgHold = lt.reduce((s, t) => s + t.holding_hours, 0) / n;
-            const mfeVals = lt.map(t => t.mfe);
-            const maeVals = lt.map(t => t.mae);
-            const avgMfe = mfeVals.reduce((s, v) => s + v, 0) / n;
-            const maxMfe = Math.max(...mfeVals);
-            const avgMae = maeVals.reduce((s, v) => s + v, 0) / n;
-            const maxMae = Math.max(...maeVals);
-            const sampleLots = lt[0].lots;
-            const layerIdx = lotToIdx[sampleLots] || 1;
-            const key = `${ccyDirKey}_${layerLabel}`;
-            results[key] = {
-                symbol: ccyDirKey.split('_')[0], direction: ccyDirKey.split('_')[1],
-                layer_label: layerLabel, lots: sampleLots, layer_idx: layerIdx, max_depth: maxDepth,
-                count: n, win_count: winCount, loss_count: lossCount,
-                wr: r2(wr), total_pnl: r2(totalPnl), total_pips: r2(totalPips),
-                avg_win_pips: r2(avgWinPips), avg_loss_pips: r2(avgLossPips),
-                odds_pips: oddsPips < 100 ? r2(oddsPips) : 999,
-                avg_hold: r2(avgHold),
-                avg_mfe: r2(avgMfe), max_mfe: r2(maxMfe),
-                avg_mae: r2(avgMae), max_mae: r2(maxMae),
-                trades: lt, // keep full trades for expand
-            };
-        }
-    }
-    return results;
-}
-
-// ═══════════════════════════════════════════════════════
-// Rating
-// ═══════════════════════════════════════════════════════
-// L15 修復 — 白皮書方案 (b)(2026-10-21 用戶裁決修訂,廢 v1.3 方案 (a)):
-//   score 設計上限 70(30+20+15+5),評級與 danger 改用正規化百分制:
-//     normalized = Math.round(score × 100 / 70)  → 門檻表 85/70/55/40/25/15 不變
-//     danger 基準 = (100 − normalized)            → 取代殘留 (100 − raw score)
-//   computeScore 原值不變,保持跨版本可比。
-//   有效原始分界(0.1 分制網格):S+≥59.2 S≥48.8 A≥38.2 B≥27.7 C≥17.2 D≥10.2
-//   (連續分界 59.15/48.65/38.15/27.65/17.15/10.15;0.35 暗區已入冊白皮書 v1.4)
-//   由 tests/golden.test.mjs [L1b] 邊界測試鎖定,改動即紅。
-
-function normalizeScore(s) {
-    return Math.round(computeScore(s) * 100 / 70);
-}
-
-function computeRating(s) {
-    const sc = normalizeScore(s);
-    if (sc >= 85) return 'S+'; if (sc >= 70) return 'S'; if (sc >= 55) return 'A';
-    if (sc >= 40) return 'B'; if (sc >= 25) return 'C'; if (sc >= 15) return 'D'; return 'E';
-}
-
-function computeScore(s) {
-    const wr = s.wr; const odds = Math.min(s.odds_pips, 999); const cnt = s.count; const hold = s.avg_hold;
-    let score = 0;
-    score += wr >= 80 ? 30 : wr >= 70 ? 25 : wr >= 60 ? 18 : wr >= 50 ? 10 : Math.max(0, wr / 5);
-    score += odds >= 2.0 ? 20 : odds >= 1.5 ? 15 : odds >= 1.0 ? 10 : Math.max(0, odds * 10);
-    score += cnt >= 10 ? 15 : cnt >= 5 ? 12 : cnt >= 3 ? 8 : Math.max(0, cnt * 2);
-    score += hold <= 24 ? 5 : hold <= 72 ? 4 : hold <= 168 ? 3 : hold <= 360 ? 2 : 1;
-    return Math.round(score * 10) / 10;
-}
-
-// ═══════════════════════════════════════════════════════
-// Summary / TP/SL / Blacklist / Recovery / CCY Summary
-// ═══════════════════════════════════════════════════════
-
-function computeSummary(trades) {
-    const n = trades.length;
-    if (n === 0) return { count: 0, win_pct: 0, total_pnl: 0, total_pips: 0, symbols: 0, layers: 0, best_ccy: '', best_pnl: 0 };
-    const wins = trades.filter(t => t.net_profit > 0).length;
-    const totalPnl = trades.reduce((s, t) => s + t.net_profit, 0);
-    const totalPips = trades.reduce((s, t) => s + t.net_pips, 0);
-    const symbols = new Set(trades.map(t => t.symbol)).size;
-    const lots = new Set(trades.map(t => t.lots)).size;
-    const ccyPnl = {};
-    for (const t of trades) ccyPnl[t.symbol] = (ccyPnl[t.symbol] || 0) + t.net_profit;
-    let bestCcy = '', bestPnl = -Infinity;
-    for (const [c, p] of Object.entries(ccyPnl)) { if (p > bestPnl) { bestPnl = p; bestCcy = c; } }
-    return { count: n, win_pct: r2(wins / n * 100), total_pnl: r2(totalPnl), total_pips: r2(totalPips), symbols, layers: lots, best_ccy: bestCcy, best_pnl: r2(bestPnl) };
-}
-
-function computeBlacklist(layerStats) {
-    const bl = [];
-    for (const [key, s] of Object.entries(layerStats)) {
-        const r = computeRating(s);
-        if (['D', 'E'].includes(r) && s.count >= 2) {
-            const danger = (100 - normalizeScore(s)) + Math.abs(s.total_pnl > 0 ? 0 : Math.abs(s.total_pnl) / 10);
-            bl.push({ key, symbol: s.symbol, direction: s.direction, layer: s.layer_label, lots: s.lots, rating: r, score: computeScore(s), danger_score: r2(danger), wr: s.wr, count: s.count, total_pnl: s.total_pnl, reason: getDangerReason(s) });
-        }
-    }
-    return bl.sort((a, b) => b.danger_score - a.danger_score);
-}
-
-function getDangerReason(s) {
-    const reasons = [];
-    if (s.wr < 40) reasons.push('WR<40%');
-    if (s.total_pnl < -50) reasons.push('P&L<-$50');
-    if (s.odds_pips < 0.5) reasons.push('RR<0.5');
-    if (s.avg_hold > 360) reasons.push('Hold>15d');
-    return reasons.join(', ') || 'Underperforming';
-}
-
-function buildCCYDirectionSummary(layerStats) {
-    const map = {};
-    for (const [key, s] of Object.entries(layerStats)) {
-        const cd = `${s.symbol}_${s.direction}`;
-        if (!map[cd]) map[cd] = [];
-        map[cd].push(s);
-    }
-    const summary = [];
-    for (const [cd, layers] of Object.entries(map)) {
-        const totalPnl = layers.reduce((s, l) => s + l.total_pnl, 0);
-        const totalPips = layers.reduce((s, l) => s + (l.total_pips||0), 0);
-        const totalCount = layers.reduce((s, l) => s + l.count, 0);
-        const totalWins = layers.reduce((s, l) => s + l.win_count, 0);
-        const avgWr = totalCount > 0 ? totalWins / totalCount * 100 : 0;
-        const ratings = layers.map(l => computeRating(l));
-        const best = ratings.includes('S+') ? 'S+' : ratings.includes('S') ? 'S' : ratings.includes('A') ? 'A' : ratings.includes('B') ? 'B' : 'C';
-        summary.push({ symbol: layers[0].symbol, direction: layers[0].direction, layers: layers.length, total_pnl: r2(totalPnl), total_pips: r2(totalPips), total_count: totalCount, avg_wr: r2(avgWr), best_rating: best });
-    }
-    return summary.sort((a, b) => b.total_pnl - a.total_pnl);
-}
-
-// ═══════════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════════
-function r2(v) { return Math.round(v * 100) / 100; }
-function fmtPnl(v) { return v >= 0 ? `+${v.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1})}` : v.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
-function ratingClass(r) { return ({ 'S+': 'r-sp', 'S': 'r-s', 'A': 'r-a', 'B': 'r-b', 'C': 'r-c', 'D': 'r-d', 'E': 'r-e' })[r] || 'r-e'; }
-function fmtDate(d) { if (!d) return '—'; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-function fmtTime(h) {
-    if (h < 1) return `${r2(h*60)}m`;
-    if (h < 24) return `${r2(h)}h`;
-    if (h < 168) return `${r2(h/24)}d`;
-    return `${r2(h/168)}w`;
-}
-
-// ═══ SET Data Display ═══
-function getSetConfigsForCCY(symbol, direction) {
-    if (!SET_DATA || !SET_DATA.set_files) return [];
-    const dir = direction.toLowerCase();
-    const results = [];
-    // Deduplicate by ea_type + symbol
-    const seen = new Set();
-    for (const sf of SET_DATA.set_files) {
-        if (sf.error) continue;
-        const sfSym = (sf.symbol || '').toUpperCase();
-        const sfDir = (sf.direction || '').toLowerCase();
-        // Match: same symbol, and direction is 'both' or matches
-        if (sfSym === symbol.toUpperCase() && (sfDir === 'both' || sfDir === dir)) {
-            const key = `${sf.ea_type}_${sfSym}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                results.push(sf);
-            }
-        }
-    }
-    return results;
-}
-
-// EA Name Abbreviation Map
-var EA_DISPLAY_ABBREV = {
-    'DragonWave': 'DW', 'Dragon Wave': 'DW',
-    'MKD Pro': 'MKDPro', 'MKD': 'MKD',
-    'SMA Pro': 'SMAPro', 'SMA': 'SMA',
-    'Flash': 'Flash', 'S10': 'S10',
-    'Gemini Client': 'GC', 'Gemini Server': 'GS',
-    'StableHelper': ''
-};
-
-function abbreviateEaName(name) {
-    if (!name) return '';
-    var lower = name.toLowerCase();
-    // Match longest first to avoid partial matches
-    var keys = Object.keys(EA_DISPLAY_ABBREV).sort(function(a, b) { return b.length - a.length; });
-    for (var i = 0; i < keys.length; i++) {
-        if (lower.indexOf(keys[i].toLowerCase()) >= 0) return EA_DISPLAY_ABBREV[keys[i]];
-    }
-    // Fallback: strip version
-    return name.replace(/\s*v?[\d.]+$/, '').trim();
-}
-
-function renderSetInfo(setConfigs) {
-    if (!setConfigs || setConfigs.length === 0) return '';
-    let html = '<div style="font-size:0.82em;color:var(--text2);margin:4px 0 8px;padding:6px 10px;background:var(--bg);border:1px solid var(--brd);border-radius:6px">';
-    html += '<span style="color:var(--acc);font-weight:bold">📋 SET 配置</span> ';
-    const parts = [];
-    for (const cfg of setConfigs) {
-        if (cfg.lot_mode === 'copy_trade') {
-            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Copy: LV${cfg.start_lv}-${cfg.end_lv}`);
-        } else if (cfg.lots && cfg.lots.length > 0) {
-            const lotsStr = cfg.lots.slice(0, 6).map(l => l.toFixed(l < 0.1 ? 3 : 2)).join('→') + (cfg.lots.length > 6 ? '...' : '');
-            const psStr = cfg.pipsteps && cfg.pipsteps.length > 0 ? cfg.pipsteps.slice(0, 6).map(p => p.toFixed(0)).join('→') + (cfg.pipsteps.length > 6 ? '...' : '') : '—';
-            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Lots: ${lotsStr} | PipStep: ${psStr}`);
-        } else if (cfg.lot_mode === 'fixed' && cfg.lots && cfg.lots.length === 1) {
-            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Fixed: ${cfg.lots[0].toFixed(2)} lots`);
-        } else {
-            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span>`);
-        }
-    }
-    html += parts.join(' | ');
-    html += '</div>';
-    return html;
-}
-
-function getSetLotForLayer(setConfigs, layerIdx, actualLot) {
-    // Get the SET-defined lot for a given layer index, for comparison.
-    if (!setConfigs || setConfigs.length === 0) return null;
-    for (const cfg of setConfigs) {
-        if (cfg.lot_mode === 'copy_trade') continue;
-        if (cfg.lots && cfg.lots[layerIdx - 1] !== undefined) {
-            return cfg.lots[layerIdx - 1];
-        }
-    }
-    return null;
-}
-
-function fmtLotCompare(actualLot, setConfigs, layerIdx) {
-    const setLot = getSetLotForLayer(setConfigs, layerIdx, actualLot);
-    if (setLot === null || setLot === undefined) return `${actualLot}`;
-    const diff = Math.abs(actualLot - setLot);
-    if (diff < 0.001) return `${actualLot}`;
-    // Highlight mismatch
-    return `${actualLot} <span style="color:var(--yel);font-size:0.85em" title="SET 定義: ${setLot.toFixed(3)}">(SET:${setLot.toFixed(setLot < 0.1 ? 3 : 2)})</span>`;
-}
-
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { parseCSV, filterByDateRange, computeLayerStats, computeRating, computeScore, normalizeScore, computeSummary, computeBlacklist, buildCCYDirectionSummary };
-}
-
-</script>
-<script>
-const SIGNAL_ID='35436', EA_TAG='DW', CSV_URL='../downloads/forex-forest-signals-page-35436.csv', SET_DATA={"signal_id": 35436, "set_files": [{"filename": "(35436)DragonWavev2.00AUDCAD_M1_TypeBoth_.set", "ea_name": "Dragon Wave v2.00", "ea_type": "DragonWave", "ea_version": "20250529", "symbol": "AUDCAD", "direction": "both", "lot_mode": "multiplier", "lots": [0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28], "pipsteps": [0, 50.0, 90.0, 162.0, 291.6, 524.9, 944.8, 1700.6], "params": {"Lots": 0.01, "LotMul": 2.0, "PipStepMul": 1.8}}, {"filename": "(35436)DragonWavev2.00EURUSD_M1_TypeBoth_.set", "ea_name": "Dragon Wave v2.00", "ea_type": "DragonWave", "ea_version": "20250529", "symbol": "EURUSD", "direction": "both", "lot_mode": "multiplier", "lots": [0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28], "pipsteps": [0, 50.0, 90.0, 162.0, 291.6, 524.9, 944.8, 1700.6], "params": {"Lots": 0.01, "LotMul": 2.0, "PipStepMul": 1.8}}, {"filename": "(35436)DragonWavev2.00XAUUSD_M1_TypeBoth_.set", "ea_name": "Dragon Wave v2.00", "ea_type": "DragonWave", "ea_version": "20250529", "symbol": "XAUUSD", "direction": "both", "lot_mode": "multiplier", "lots": [0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28], "pipsteps": [0, 50.0, 90.0, 162.0, 291.6, 524.9, 944.8, 1700.6], "params": {"Lots": 0.01, "LotMul": 2.0, "PipStepMul": 1.8}}]};
-let allTrades=[], filteredTrades=[], dateMin=null, dateMax=null, rangeFrom=null, rangeTo=null;
-
-(function init(){
-    loadTheme();
-    document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} (${EA_TAG}) · 載入中...`;
-    fetch(CSV_URL).then(r=>r.ok?r.text():Promise.reject('CSV load failed: '+r.status)).then(text=>{
-        allTrades=parseCSV(text);
-        const dr=getDateRange(allTrades); dateMin=dr.min; dateMax=dr.max;
-        if(!dateMin||!dateMax){document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} — ❌ 冇交易數據`;return;}
-        setupRangeSlider(); setupQuickButtons();
-        filteredTrades=[...allTrades]; renderAll();
-    }).catch(err=>{document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} — ❌ ${err}`;});
-})();
-
-function loadTheme(){const t=localStorage.getItem('tsa-theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀️':'🌙';}
-function toggleTheme(){const c=document.documentElement.getAttribute('data-theme'),n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('tsa-theme',n);document.getElementById('themeToggle').textContent=n==='dark'?'☀️':'🌙';}
-
-function setupQuickButtons(){
-    document.querySelectorAll('#quickBtns button').forEach(btn=>{
-        btn.addEventListener('click',()=>{
-            document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));
-            btn.classList.add('active');
-            const range=btn.dataset.range;
-            // Use CSV max date as reference, not current time
-            const ref=dateMax||new Date();
-            let from=null;
-            if(range==='all'){from=null;} else if(range==='1d')from=new Date(ref.getTime()-86400000);
-            else if(range==='1w')from=new Date(ref.getTime()-7*86400000);
-            else if(range==='1m')from=new Date(ref.getFullYear(),ref.getMonth()-1,ref.getDate());
-            else if(range==='3m')from=new Date(ref.getFullYear(),ref.getMonth()-3,ref.getDate());
-            else if(range==='6m')from=new Date(ref.getFullYear(),ref.getMonth()-6,ref.getDate());
-            else if(range==='1y')from=new Date(ref.getFullYear()-1,ref.getMonth(),ref.getDate());
-            rangeFrom=from; rangeTo=null;
-            document.getElementById('dateFrom').value=from?fmtDate(from):'';
-            document.getElementById('dateTo').value='';
-            updateRangeSliderHandles(); applyFilter();
-        });
-    });
-}
-function applyCustomDate(){rangeFrom=document.getElementById('dateFrom').value?new Date(document.getElementById('dateFrom').value):null;rangeTo=document.getElementById('dateTo').value?new Date(document.getElementById('dateTo').value+'T23:59:59'):null;document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));updateRangeSliderHandles();applyFilter();}
-function clearDateFilter(){rangeFrom=null;rangeTo=null;document.getElementById('dateFrom').value='';document.getElementById('dateTo').value='';document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));document.querySelector('[data-range="all"]').classList.add('active');updateRangeSliderHandles();applyFilter();}
-
-function setupRangeSlider(){
-    const ct=document.getElementById('rangeContainer'),hL=document.getElementById('handleLeft'),hR=document.getElementById('handleRight');
-    document.getElementById('rangeMinLabel').textContent=fmtDate(dateMin);document.getElementById('rangeMaxLabel').textContent=fmtDate(dateMax);
-    setHP(hL,0);setHP(hR,100);updateFill();
-    let dragging=null;
-    function startD(e){dragging=e.target.dataset.handle;e.preventDefault();}
-    function onD(e){if(!dragging)return;const rect=ct.getBoundingClientRect();const cx=e.touches?e.touches[0].clientX:e.clientX;let pct=Math.max(0,Math.min(100,(cx-rect.left)/rect.width*100));
-        if(dragging==='left'){pct=Math.min(pct,(parseFloat(hR.style.left)||100)-2);setHP(hL,pct);}else{pct=Math.max(pct,(parseFloat(hL.style.left)||0)+2);setHP(hR,pct);}
-        updateFill();const totalMs=dateMax.getTime()-dateMin.getTime();
-        if(dragging==='left')rangeFrom=new Date(dateMin.getTime()+(pct/100)*totalMs);else rangeTo=new Date(dateMin.getTime()+(pct/100)*totalMs);}
-    function endD(){if(!dragging)return;dragging=null;applyFilter();}
-    hL.addEventListener('mousedown',startD);hR.addEventListener('mousedown',startD);
-    hL.addEventListener('touchstart',startD,{passive:false});hR.addEventListener('touchstart',startD,{passive:false});
-    document.addEventListener('mousemove',onD);document.addEventListener('touchmove',onD,{passive:false});
-    document.addEventListener('mouseup',endD);document.addEventListener('touchend',endD);
-}
-function setHP(h,p){h.style.left=p+'%';}
-function updateFill(){const hL=document.getElementById('handleLeft'),hR=document.getElementById('handleRight'),f=document.getElementById('rangeFill');const l=parseFloat(hL.style.left)||0,r=parseFloat(hR.style.left)||100;f.style.left=l+'%';f.style.width=(r-l)+'%';}
-function updateRangeSliderHandles(){if(!dateMin||!dateMax)return;const t=dateMax.getTime()-dateMin.getTime();const l=rangeFrom?((rangeFrom.getTime()-dateMin.getTime())/t*100):0;const r=rangeTo?((rangeTo.getTime()-dateMin.getTime())/t*100):100;setHP(document.getElementById('handleLeft'),Math.max(0,l));setHP(document.getElementById('handleRight'),Math.min(100,r));updateFill();}
-
-function applyFilter(){filteredTrades=filterByDateRange(allTrades,rangeFrom,rangeTo);renderAll();}
-
-// ═══ PERIOD STATS ═══
-function computePeriodStats(trades, periodType){
-  if(!trades.length) return [];
-  const groups={};
-  trades.forEach(t=>{
-    if(!t._openDate) return;
-    let key;
-    if(periodType==='day') key=`${t._openDate.getDate()}/${t._openDate.getMonth()+1}`;
-    else if(periodType==='week'){const y=t._openDate.getFullYear();const w=getWeekNumber(t._openDate);key=`${y}-W${w}`;}
-    else {key=`${t._openDate.getFullYear()}-${String(t._openDate.getMonth()+1).padStart(2,'0')}`;}
-    if(!groups[key]) groups[key]={trades:[],buyCnt:0,sellCnt:0,pnlSum:0,swapSum:0,floating:null,wins:0};
-    groups[key].trades.push(t);
-    if(t.direction==='buy') groups[key].buyCnt++; else groups[key].sellCnt++;
-    groups[key].pnlSum+=t.net_profit;
-    groups[key].swapSum+=t.swap;
-    if(t.net_profit>=0) groups[key].wins++;
-    groups[key].floating=t.net_profit; // last trade floating
-  });
-  const rows=Object.entries(groups).sort((a,b)=>a[0]>b[0]?-1:1).slice(0,10);
-  let cumPnl=0;
-  const result=[];
-  for(let i=rows.length-1;i>=0;i--){ // reverse to accumulate equity
-    const [period,d]=rows[i];
-    cumPnl+=d.pnlSum;
-    result.unshift({period,trades:d.trades.length,buy:d.buyCnt,sell:d.sellCnt,
-      wr:((d.wins/d.trades.length)*100).toFixed(1),
-      pnl:d.pnlSum,floating:d.floating,swap:d.swapSum,
-      equity:cumPnl});
-  }
-  return result;
-}
-function getWeekNumber(d){const date=new Date(d.getTime());date.setHours(0,0,0,0);date.setDate(date.getDate()+3-(date.getDay()-1+7)%7);const week1=new Date(date.getFullYear(),0,4);return 1+Math.round(((date.getTime()-week1.getTime())/86400000-3+(week1.getDay()+6)%7)/7);}
-function fmtPnl(v){return(v>=0?'+'+(Math.abs(v)>=1000?(v/1000).toFixed(2)+'k':v.toFixed(2)):(Math.abs(v)>=1000?(v/1000).toFixed(2)+'k':v.toFixed(2)))+'$';}
-function fmtDate(d){return d?`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`:'—';}
-
-function buildPeriodStatsTable(periodType){
-  const stats=computePeriodStats(filteredTrades,periodType);
-  if(!stats.length) return '<div style="color:var(--text2);padding:10px">⚠️ 數據不足，無法生成統計表</div>'; 
-  const total={trades:0,buy:0,sell:0,wins:0,pnl:0,swap:0};
-  stats.forEach(s=>{total.trades+=s.trades;total.buy+=s.buy;total.sell+=s.sell;total.wins+=s.wr*s.trades/100;total.pnl+=s.pnl;total.swap+=s.swap;});
-  const totalWr=(total.wins/total.trades*100).toFixed(1);
-  let html='<div class="period-stats"><table><thead><tr><th>期間</th><th>交易數量</th><th>BUY</th><th>SELL</th><th>Win Rate</th><th>Net Profit</th><th>Floating</th><th>Swap</th><th>Equity</th></tr></thead><tbody>'; 
-  stats.forEach(s=>{
-    const wrCls=s.wr>=60?'p-wr-good':'p-wr-bad';
-    const pnlCls=s.pnl>=0?'p-pos':'p-neg';
-    const floatCls=s.floating>=0?'p-pos':'p-neg';
-    html+=`<tr><td class="p-period">${s.period}</td><td>${s.trades}</td><td>${s.buy}</td><td>${s.sell}</td><td class="${wrCls}">${s.wr}%</td><td class="${pnlCls}">${s.pnl>=0?'+'+s.pnl.toFixed(2):s.pnl.toFixed(2)}$</td><td class="${floatCls}">${s.floating>=0?'+'+s.floating.toFixed(2):s.floating.toFixed(2)}$</td><td>${s.swap>=0?'+'+s.swap.toFixed(2):s.swap.toFixed(2)}$</td><td>${s.equity.toFixed(2)}$</td></tr>`;
-  });
-  const totalPnlCls=total.pnl>=0?'p-pos':'p-neg';
-  html+=`<tfoot><tr><td><strong>總計</strong></td><td><strong>${total.trades}</strong></td><td><strong>${total.buy}</strong></td><td><strong>${total.sell}</strong></td><td><strong>${totalWr}%</strong></td><td class="${totalPnlCls}"><strong>${total.pnl>=0?'+'+total.pnl.toFixed(2):total.pnl.toFixed(2)}$</strong></td><td>—</td><td><strong>${total.swap>=0?'+'+total.swap.toFixed(2):total.swap.toFixed(2)}$</strong></td><td><strong>${total.pnl.toFixed(2)}$</strong></td></tr></tfoot></table></div>`; 
-  return html;
-}
-
-function getPeriodType(){
-  const active=document.querySelector('.quick-btns button.active');
-  if(!active) return 'month';
-  const r=active.dataset.range;
-  if(r==='1d'||r==='1w'||r==='1m') return 'day';
-  if(r==='3m'||r==='6m') return 'week';
-  return 'month';
-}
-
-// ═══ RENDER ═══
-function renderAll(){
-    const n=filteredTrades.length;
-    const summary=computeSummary(filteredTrades);
-    const dr=getDateRange(filteredTrades);
-    const dateStr=dr.min?`${fmtDate(dr.min)} – ${fmtDate(dr.max)}`:'—';
-    document.getElementById('headerSub').innerHTML=`Signal <a href="https://signals.algoforest.com/signals/${SIGNAL_ID}">${SIGNAL_ID}</a> (${EA_TAG}) · ${dateStr}`;
-    document.getElementById('summaryBar').innerHTML=`
-        <div><div class="v">${summary.count}</div><div class="l">交易筆數</div></div>
-        <div><div class="v">${summary.win_pct}%</div><div class="l">勝率</div></div>
-        <div><div class="v ${summary.total_pnl>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(summary.total_pnl)}</div><div class="l">總 P&L $</div></div>
-        <div><div class="v">${fmtPnl(summary.total_pips)}</div><div class="l">總 Pips</div></div>
-        <div><div class="v">${summary.symbols}</div><div class="l">CCY</div></div>
-        <div><div class="v">${summary.layers}</div><div class="l">層數</div></div>
-        <div><div class="v">${summary.best_ccy}</div><div class="l">最佳 (${fmtPnl(summary.best_pnl)})</div></div>`;
-
-    // Period Stats
-    document.getElementById('periodStatsBody').innerHTML=buildPeriodStatsTable(getPeriodType());
-
-    const ls=computeLayerStats(filteredTrades);
-    const ccySum=buildCCYDirectionSummary(ls);
-    const blacklist=computeBlacklist(ls);
-
-    let html='';
-
-    // Global P&L Bar Chart
-    html+=buildGlobalBar(ccySum, ls);
-
-    // CCY×Direction sections
-    html+='<h2>📊 CCY × Direction 逐層分析 <span class="info">i<span class="tip"><b>逐層分析說明</b><br>每個 CCY×Direction 展開後顯示：<br><br><b>Part 1 組合概覽</b>：每層嘅完整統計<br><b>Part 2 MFE/MAE 圖表</b>：分開兩幅圖，hover 睇每筆交易詳情<br><b>Part 3 交易訂單</b>：點擊展開查看每筆交易明細<br><br><b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br><b>綠色行</b> = A 級以上 &nbsp;|&nbsp; <b>紅色行</b> = D 級以下</span></span></h2>';
-
-    for(const cs of ccySum){
-        const layers=Object.values(ls).filter(s=>s.symbol===cs.symbol&&s.direction===cs.direction);
-        layers.sort((a,b)=>a.layer_idx-b.layer_idx);
-        html+=`<div class="sec"><div class="sec-h" onclick="toggleSec(this)">
-            <span>${cs.direction==='buy'?'▲':'▼'} ${cs.symbol} ${cs.direction.toUpperCase()} — ${layers.length} 層 | WR ${cs.avg_wr}% | P&L ${fmtPnl(cs.total_pnl)} | ${cs.best_rating}</span>
-            <span class="arrow">▶</span></div><div class="sec-b">`;
-
-        // SET configuration info for this CCY×Direction
-        const setCfgs = getSetConfigsForCCY(cs.symbol, cs.direction);
-        html += renderSetInfo(setCfgs);;
-
-        // Part 1: Layer stats table
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:8px 0 4px">Part 1 · 組合概覽 <span class="info">i<span class="tip"><b>欄位說明</b><br><b>WR%</b>：勝率<br><b>Net Pips</b>：總盈虧點數<br><b>最大 Win/Lose Pip</b>：平均每筆盈利/虧損點數<br><b>Odds</b>：盈虧比（WinPip/LosePip）<br><b>MFE</b>：最大有利波幅（TP 參考）<br><b>MAE</b>：最大不利波幅（SL 參考）<br><b>MaxMAE</b>：歷史最差（Hard SL）<br><b>Hold</b>：平均持倉時間</span></span></div>`;
-        html+=`<div style="overflow-x:auto"><table><thead><tr>
-            <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
-            <th>WR%</th><th>Net P&L $</th><th>Net Pips</th>
-            <th>Win Pip</th><th>Lose Pip</th><th>Odds</th>
-            <th>Avg MFE</th><th>Avg MAE</th><th>Max MAE</th>
-            <th>Hold</th></tr></thead><tbody>`;
-        for(const l of layers){
-            const rat=computeRating(l),sc=computeScore(l);
-            const cls=rat==='S+'||rat==='S'||rat==='A'?' class="row-a"':rat==='D'||rat==='E'?' class="row-d"':'';
-            const lotDisplay = fmtLotCompare(l.lots, setCfgs, l.layer_idx);
-            html+=`<tr${cls}>
-                <td><b>L${l.layer_idx}</b></td>
-                <td class="${ratingClass(rat)}" title="Score: ${sc}">${rat}</td>
-                <td>${sc}</td>
-                <td>${l.count}</td><td>${l.win_count}:${l.loss_count}</td>
-                <td>${l.wr}%</td>
-                <td class="${l.total_pnl>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(l.total_pnl)}</td>
-                <td class="${l.total_pips>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(l.total_pips)}</td>
-                <td>${l.avg_win_pips}</td><td>${l.avg_loss_pips}</td>
-                <td>${l.odds_pips}x</td>
-                <td>${l.avg_mfe}</td><td>${l.avg_mae}</td><td><b>${l.max_mae}</b></td>
-                <td>${fmtTime(l.avg_hold)}</td>
-            </tr>`;
-        }
-        html+=`</tbody></table></div>`;
-
-        // Part 2: Trade details expand (MOVED before MFE/MAE)
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 2 · 交易訂單明細 <span class="info">i<span class="tip"><b>交易訂單說明</b><br>點擊每層嘅「展開訂單」按鈕，可查看該層所有交易嘅完整資料。<br><br>方便你對比同核對每筆交易嘅實際數據。</span></span></div>`;
-        for(const l of layers){
-            const rat=computeRating(l);
-            html+=`<div style="margin:6px 0 10px"><div style="font-size:0.82em;color:var(--text2);margin-bottom:2px"><b>${l.layer_label}</b> (${l.lots} lots) <span class="${ratingClass(rat)}">${rat}</span> | n=${l.count} | WR ${l.wr}%</div>`;
-            html+=`<div class="chart-row">
-                <div class="chart-box"><h4>MFE (最大有利波幅)</h4><canvas id="mfe_${l.symbol}_${l.direction}_${String(l.lots).replace(/\./g,'_')}" height="160"></canvas></div>
-                <div class="chart-box"><h4>MAE (最大不利波幅)</h4><canvas id="mae_${l.symbol}_${l.direction}_${String(l.lots).replace(/\./g,'_')}" height="160"></canvas></div>
-            </div></div>`;
-        }
-
-        // Part 3: MFE / MAE charts (separate)
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 3 · MFE / MAE 圖表 <span class="info">i<span class="tip"><b>圖表說明</b><br><b>MFE 圖</b>：每筆交易嘅最大有利波幅（點數）<br><b>MAE 圖</b>：每筆交易嘅最大不利波幅（點數）<br><br>綠色圓點 = 盈利交易 | 紅色圓點 = 虧損交易<br>Mouseover 顯示每筆交易詳情<br><br>MFE 越大 = 可設更高 TP<br>MAE 越大 = 需設更寬 SL</span></span></div>`;
-        for(const l of layers){
-            const tid=`trades_${l.symbol}_${l.direction}_${l.lots}`.replace(/\./g,'_');
-            html+=`<div class="trades-toggle" onclick="toggleTrades('${tid}',this)">📋 展開訂單 — ${l.layer_label} (${l.count} 筆)</div>
-            <div class="trades-panel" id="${tid}"><table><thead><tr>
-                <th>#</th><th>Open Time</th><th>Type</th><th>Lots</th><th>Symbol</th>
-                <th>Open</th><th>Close</th><th>Pips</th><th>P&L $</th><th>MFE</th><th>MAE</th><th>Hold</th>
-            </tr></thead><tbody>`;
-            l.trades.forEach((t,i)=>{
-                html+=`<tr${t.net_profit>0?' class="row-a"':t.net_profit<-10?' class="row-d"':''}>
-                    <td>${i+1}</td><td>${t.open_time}</td><td>${t.direction}</td><td>${t.lots}</td><td>${t.symbol}</td>
-                    <td>${t.open_price}</td><td>${t.close_price}</td>
-                    <td class="${t.net_pips>=0?'pnl-pos':'pnl-neg'}">${t.net_pips}</td>
-                    <td class="${t.net_profit>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(t.net_profit)}</td>
-                    <td>${t.mfe}</td><td>${t.mae}</td><td>${fmtTime(t.holding_hours)}</td>
-                </tr>`;
-            });
-            html+=`</tbody></table></div>`;
-        }
-
-        // Part 4: TP/SL table
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 4 · TP/SL 建議（原始值） <span class="info">i<span class="tip"><b>TP/SL 說明</b><br><b>TP</b> = 該層平均 MFE（不乘倍數）<br><b>Soft SL</b> = 該層平均 MAE（不乘倍數）<br><b>Hard SL</b> = 該層歷史最大 MAE<br><b>R:R</b> = TP / Soft SL<br><br>R:R ≥ 1.5x 可接受 | ≥ 3.0x 優秀</span></span></div>`;
-        html+=`<div style="overflow-x:auto"><table><thead><tr>
-            <th>Layer</th><th>Rating</th><th>n</th>
-            <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
-        </tr></thead><tbody>`;
-        for(const l of layers){
-            const rat=computeRating(l);
-            const tp=l.avg_mfe, soft=l.avg_mae, hard=l.max_mae;
-            const rr=soft>0?tp/soft:0;
-            const rrCls=rr>=3?'pnl-pos':rr>=1.5?'':'pnl-neg';
-            html+=`<tr><td><b>${l.layer_label}</b></td>
-                <td class="${ratingClass(rat)}">${rat}</td><td>${l.count}</td>
-                <td class="pnl-pos">${tp} pip</td>
-                <td>${soft} pip</td><td class="pnl-neg">${hard} pip</td>
-                <td class="${rrCls}">${rr>0?rr.toFixed(2)+'x':'—'}</td></tr>`;
-        }
-        html+=`</tbody></table></div>`;
-
-        // Part 5: Ranking (A級以上)
-        const aPlus=layers.filter(l=>computeRating(l)>='A').sort((a,b)=>computeRating(b)>computeRating(a)?1:-1);
-        if(aPlus.length>0){
-            html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 5 · 排行榜（A級以上）<span class=\"info\">i<span class=\"tip\"><b>排行榜說明</b><br>此 CCY×Direction 內 A級以上嘅層級，按評級降序排列。</span></span></div>`;
-            html+=`<div style=\"overflow-x:auto\"><table><thead><tr><th>#</th><th>Rating</th><th>Layer</th><th>n</th><th>WR%</th><th>EV$</th><th>Odds$</th><th>MFE</th><th>MAE</th><th>Total$</th><th>Hold</th></tr></thead><tbody>`;
-            aPlus.forEach((l,i)=>{
-                const rat=computeRating(l);
-                const ev=l.total_pnl/l.count;
-                html+=`<tr><td>${i+1}</td><td class=\"${ratingClass(rat)}\">${rat}</td><td><b>${l.layer_label}</b></td><td>${l.count}</td><td>${(l.wr||0).toFixed(1)}%</td><td class=\"pnl-pos\">${ev.toFixed(2)}</td><td>${l.odds||'—'}</td><td>${(l.avg_mfe||0).toFixed(1)}</td><td>${(l.avg_mae||0).toFixed(1)}</td><td class=\"${l.total_pnl>=0?'pnl-pos':'pnl-neg'}\">${fmtPnl(l.total_pnl)}</td><td>${(l.avg_hold||0).toFixed(1)}h</td></tr>`;
-            });
-            html+=`</tbody></table></div>`;
-        }
-
-        // Part 6: TP/SL Profitability Analysis
-        html+=`<div style=\"font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px\">Part 6 · 層級 TP/SL 盈利分析 <span class=\"info\">i<span class=\"tip\"><b>盈利邊緣說明</b><br>Edge = WR×TP - (1-WR)×SL<br>正值=有盈利邊緣，負值=虧損邊緣<br>綠色=盈利層 | 紅色=虧損層</span></span></div>`;
-        html+=`<div style=\"overflow-x:auto\"><table><thead><tr><th>Layer</th><th>Rating</th><th>狀態</th><th>n</th><th>WR%</th><th>TP</th><th>SL</th><th>HardSL</th><th>Edge</th><th>Total$</th></tr></thead><tbody>`;
-        layers.forEach(l=>{
-            const rat=computeRating(l);
-            const wr=l.wr||0, tp=l.avg_mfe||0, sl=l.avg_mae||0, hard=l.max_mae||0;
-            const edge=wr/100*tp - (1-wr/100)*sl;
-            const profitable=edge>=0;
-            html+=`<tr class=\"${profitable?'row-a':'row-d'}\"><td><b>${l.layer_label}</b></td><td class=\"${ratingClass(rat)}\">${rat}</td><td>${profitable?'✅':'❌'}</td><td>${l.count}</td><td>${wr.toFixed(1)}%</td><td class=\"pnl-pos\">${tp.toFixed(1)}</td><td>${sl.toFixed(1)}</td><td class=\"pnl-neg\">${hard.toFixed(1)}</td><td class=\"${profitable?'pnl-pos':'pnl-neg'}\">${edge>=0?'+'+edge.toFixed(1):edge.toFixed(1)}</td><td class=\"${l.total_pnl>=0?'pnl-pos':'pnl-neg'}\">${fmtPnl(l.total_pnl)}</td></tr>`;
-        });
-        html+=`</tbody></table></div>`;
-
-        html+=`</div></div>`; // close sec-b, sec
-    }
-
-    // Blacklist
-    if(blacklist.length>0){
-        html+='<h2>🚫 黑名單（危險層數） <span class="info">i<span class="tip"><b>黑名單說明</b><br>D/E 級嘅層數，按危險分數排序。<br>建議考慮減少或停用呢啲層數。</span></span></h2>';
-        for(const b of blacklist){
-            html+=`<div class="blk"><strong>${b.symbol} ${b.direction.toUpperCase()} ${b.layer}</strong> (${b.lots} lots) <span class="${ratingClass(b.rating)}">${b.rating}</span> | Danger: ${b.danger_score} | WR ${b.wr}% | P&L ${fmtPnl(b.total_pnl)} | <span style="color:var(--red)">${b.reason}</span></div>`;
-        }
-    }
-
-    document.getElementById('content').innerHTML=html;
-
-    // Draw charts after DOM ready
-    requestAnimationFrame(()=>drawAllCharts(ls));
-}
-
-function toggleSec(el){el.classList.toggle('open');el.nextElementSibling.classList.toggle('open');}
-function toggleTrades(id,btn){const p=document.getElementById(id);p.classList.toggle('open');btn.textContent=p.classList.contains('open')?'📋 收起訂單':'📋 展開訂單';}
-
-// ═══ Global Bar ═══
-function buildGlobalBar(ccySum, ls){
-    const top=ccySum.slice(0,20);
-    const maxAbs=Math.max(...top.map(c=>Math.abs(c.total_pnl)),1);
-    const maxPips=Math.max(...top.map(c=>Math.abs(c.total_pips||0)),1);
-    const n=top.length, svgH=Math.max(200,n*36+50), gap=36, lm=80, rm=60, cw=900, pw=cw-lm-rm, zx=lm+pw/2;
-    let svg=`<svg viewBox="0 0 ${cw} ${svgH}" style="width:100%;height:auto;font-family:var(--font)" xmlns="http://www.w3.org/2000/svg">`;
-    svg+=`<rect width="${cw}" height="${svgH}" fill="var(--bg)" rx="6"/>`;
-    svg+=`<line x1="${zx}" y1="30" x2="${zx}" y2="${svgH-20}" stroke="var(--brd)" stroke-width="1"/>`;
-    // Header legend
-    svg+=`<rect x="${lm}" y="${svgH-8}" width="10" height="8" fill="var(--grn)" rx="1"/><text x="${lm+14}" y="${svgH}" fill="#aaa" font-size="8">盈利$</text>`;
-    svg+=`<rect x="${lm+55}" y="${svgH-8}" width="10" height="8" fill="var(--red)" rx="1"/><text x="${lm+69}" y="${svgH}" fill="#aaa" font-size="8">虧損$</text>`;
-    svg+=`<rect x="${lm+120}" y="${svgH-8}" width="10" height="4" fill="#5dade2" rx="1"/><text x="${lm+134}" y="${svgH}" fill="#aaa" font-size="8">盈利PIP</text>`;
-    svg+=`<rect x="${lm+195}" y="${svgH-8}" width="10" height="4" fill="#e67e22" rx="1"/><text x="${lm+209}" y="${svgH}" fill="#aaa" font-size="8">虧損PIP</text>`;
-    for(const c of top){
-        const yb=30+top.indexOf(c)*gap+10;
-        const symId=`gbar_${c.symbol}_${c.direction}`;
-        // Symbol text (clickable)
-        svg+=`<a href="#ccy-${c.symbol}-${c.direction}" style="cursor:pointer"><text x="4" y="${yb+6}" fill="var(--pri)" font-size="9" font-weight="bold">${c.symbol} ${c.direction.toUpperCase().substr(0,1)}</text></a>`;
-        // $ bar
-        const frac=Math.abs(c.total_pnl)/maxAbs;
-        const bw=Math.max(frac*pw/2,1);
-        const col=c.total_pnl>=0?'var(--grn)':'var(--red)';
-        const bx=c.total_pnl>=0?zx:zx-bw;
-        svg+=`<rect x="${bx}" y="${yb-4}" width="${bw}" height="16" fill="${col}" rx="2" opacity="0.85"/>`;
-        const tx=c.total_pnl>=0?zx+bw+4:zx-bw-4;
-        svg+=`<text x="${tx}" y="${yb+8}" fill="${col}" font-size="8" font-weight="bold" text-anchor="${c.total_pnl>=0?'start':'end'}">${fmtPnl(c.total_pnl)}</text>`;
-        // Pips bar (thin)
-        const pips=c.total_pips||0;
-        const fracP=Math.abs(pips)/maxPips;
-        const pw2=Math.max(fracP*pw/2,1);
-        const colP=pips>=0?'#5dade2':'#e67e22';
-        const bxP=pips>=0?zx:zx-pw2;
-        svg+=`<rect x="${bxP}" y="${yb+14}" width="${pw2}" height="6" fill="${colP}" rx="1" opacity="0.8"/>`;
-        // PIP value text
-        const ptx=pips>=0?zx+pw2+4:zx-pw2-4;
-        svg+=`<text x="${ptx}" y="${yb+21}" fill="${colP}" font-size="7" text-anchor="${pips>=0?'start':'end'}">${pips>=0?'+':''}${pips.toFixed(1)} pip</text>`;
-    }
-    svg+=`</svg>`;
-    return `<div class="global-bar"><div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin-bottom:4px">📊 全局 P&L 分佈（$ + PIP） <span class="info">i<span class="tip"><b>全局 P&L 分佈</b><br>顯示每個 CCY×Direction 嘅總盈虧（$ + PIP）。<br>粗棒 = 金額 | 細棒 = Pips<br>綠色 = 盈利 | 紅色 = 虧損<br><br><b>點擊 Symbol 可跳到該分析</b></span></span></div>${svg}</div>`;
-}
-
-// ═══ Canvas Charts ═══
-function drawAllCharts(ls){
-    for(const [key,s] of Object.entries(ls)){
-        const id=`${s.symbol}_${s.direction}_${String(s.lots).replace(/\./g,'_')}`;
-        drawScatter(`mfe_${id}`, s.trades, 'mfe', s);
-        drawScatter(`mae_${id}`, s.trades, 'mae', s);
-    }
-}
-
-function drawScatter(canvasId, trades, mode, stats){
-    const canvas=document.getElementById(canvasId);
-    if(!canvas) return;
-    const ctx=canvas.getContext('2d');
-    const dpr=window.devicePixelRatio||1;
-    const rect=canvas.getBoundingClientRect();
-    canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
-    ctx.scale(dpr,dpr); const w=rect.width, h=rect.height;
-    const pad={t:15,r:15,b:25,l:35}; const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
-
-    // Background
-    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0a0e17';
-    ctx.fillRect(0,0,w,h);
-
-    if(!trades||trades.length===0) return;
-
-    const vals=trades.map(t=>mode==='mfe'?t.mfe:t.mae);
-    const maxVal=Math.max(...vals,1);
-
-    // Grid
-    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--brd').trim()||'#1e2433';
-    ctx.lineWidth=0.5;
-    for(let i=0;i<=4;i++){
-        const y=pad.t+ph*(1-i/4);
-        ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+pw,y);ctx.stroke();
-        ctx.fillStyle='#555';ctx.font='9px sans-serif';ctx.textAlign='right';
-        ctx.fillText((maxVal*i/4).toFixed(0),pad.l-4,y+3);
-    }
-    // Axis label
-    ctx.fillStyle='#777';ctx.font='10px sans-serif';ctx.textAlign='center';
-    ctx.fillText(mode==='mfe'?'MFE (pips)':'MAE (pips)',pad.l+pw/2,h-2);
-
-    // Tooltip handling
-    let hoveredIdx=-1;
-    const dots=[]; // store dot positions
-
-    // Draw dots
-    trades.forEach((t,i)=>{
-        const x=pad.l+(i/(trades.length-1||1))*pw;
-        const v=mode==='mfe'?t.mfe:t.mae;
-        const y=pad.t+ph*(1-v/maxVal);
-        const isWin=t.net_profit>0;
-        dots.push({x,y,i,t,isWin});
-        ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);
-        ctx.fillStyle=isWin?'#4CAF50':'#FF5722';ctx.fill();
-    });
-
-    // Hover overlay
-    canvas.onmousemove=function(e){
-        const cr=canvas.getBoundingClientRect();
-        const mx=e.clientX-cr.left, my=e.clientY-cr.top;
-        let found=-1;
-        for(const d of dots){
-            if(Math.abs(mx-d.x)<8&&Math.abs(my-d.y)<8){found=d.i;break;}
-        }
-        if(found!==hoveredIdx){
-            hoveredIdx=found;
-            // Redraw
-            ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0a0e17';
-            ctx.fillRect(0,0,w,h);
-            // Grid
-            ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--brd').trim()||'#1e2433';
-            ctx.lineWidth=0.5;
-            for(let i=0;i<=4;i++){
-                const y=pad.t+ph*(1-i/4);
-                ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+pw,y);ctx.stroke();
-                ctx.fillStyle='#555';ctx.font='9px sans-serif';ctx.textAlign='right';
-                ctx.fillText((maxVal*i/4).toFixed(0),pad.l-4,y+3);
-            }
-            ctx.fillStyle='#777';ctx.font='10px sans-serif';ctx.textAlign='center';
-            ctx.fillText(mode==='mfe'?'MFE (pips)':'MAE (pips)',pad.l+pw/2,h-2);
-            // Dots
-            for(const d of dots){
-                ctx.beginPath();ctx.arc(d.x,d.y,d.i===found?5:2.5,0,Math.PI*2);
-                ctx.fillStyle=d.isWin?'#4CAF50':'#FF5722';ctx.fill();
-            }
-            // Tooltip
-            if(found>=0){
-                const d=dots.find(d=>d.i===found);
-                const t=d.t;
-                const lines=[
-                    `#${found+1} ${t.direction.toUpperCase()} ${t.symbol}`,
-                    `Lots: ${t.lots} | Pips: ${t.net_pips}`,
-                    `P&L: ${fmtPnl(t.net_profit)}`,
-                    `${mode==='mfe'?'MFE':'MAE'}: ${mode==='mfe'?t.mfe:t.mae}`,
-                    `Hold: ${fmtTime(t.holding_hours)}`
-                ];
-                const tw=140, th=lines.length*14+10;
-                let tx=d.x+10, ty=d.y-th/2;
-                if(tx+tw>w) tx=d.x-tw-10;
-                if(ty<0) ty=2; if(ty+th>h) ty=h-th-2;
-                ctx.fillStyle='rgba(20,20,40,0.92)';ctx.strokeStyle='var(--acc)';
-                ctx.lineWidth=1;roundRect(ctx,tx,ty,tw,th,4);ctx.fill();ctx.stroke();
-                ctx.fillStyle='#eee';ctx.font='10px sans-serif';ctx.textAlign='left';
-                lines.forEach((l,li)=>{ctx.fillText(l,tx+6,ty+14+li*14);});
-            }
-        }
-    };
-    canvas.onmouseleave=function(){hoveredIdx=-1;drawScatter(canvasId,trades,mode,stats);};
-}
-
-function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
-</script>
 <script src="../sidebar.js"></script>
+<script>
+let SYM_DATA={"XAUUSD": {"table_html": "<table class=\"buysell\"><thead><tr><th>指標<\/th><th><span class=\"buy-h\"><\/span>BUY<\/th><th><span class=\"sell-h\"><\/span>SELL<\/th><\/tr><\/thead><tbody><tr><td>筆數<\/td><td class=\"\">147<\/td><td>118<\/td><\/tr><tr><td>勝率<\/td><td class=\"\">70.7%<\/td><td>71.2%<\/td><\/tr><tr><td>P&L<\/td><td class=\"\">-$1,212.52<\/td><td>$1,539.01<\/td><\/tr><tr><td>avg MAE $<\/td><td class=\"\">45.73<\/td><td>53.56<\/td><\/tr><tr><td>avg MFE $<\/td><td class=\"\">24.03<\/td><td>31.03<\/td><\/tr><tr><td>avg MAE pips<\/td><td class=\"\">269.2<\/td><td>303.8<\/td><\/tr><tr><td>avg MFE pips<\/td><td class=\"\">142.1<\/td><td>138.6<\/td><\/tr><tr><td>PF<\/td><td class=\"\">0.7<\/td><td>1.86<\/td><\/tr><tr><td>平均持倉 h<\/td><td class=\"\">10.3<\/td><td>10.6<\/td><\/tr><tr><td>最大 lot<\/td><td class=\"\">0.08<\/td><td>0.32<\/td><\/tr><\/tbody><\/table>", "box_html": "<table><thead><tr><th>方向<\/th><th>筆數<\/th><th>止蝕參考（MAE P90/P95 pips）<\/th><th>止賺參考（MFE P50/75/90 pips）<\/th><th>平均持倉 h<\/th><\/tr><\/thead><tbody><tr><td>BUY<\/td><td>147<\/td><td class=\"neg\">P90 677.5 / P95 1225.3<\/td><td class=\"pos\">P50 118.5 / P75 213.7 / P90 338.5<\/td><td>10.3<\/td><\/tr><tr><td>SELL<\/td><td>118<\/td><td class=\"neg\">P90 879.9 / P95 1240.8<\/td><td class=\"pos\">P50 117.7 / P75 212.2 / P90 306.6<\/td><td>10.6<\/td><\/tr><\/tbody><\/table><div class=\"footnote\">樣本 n&lt;5 嘅方向行已灰化，參考值僅供示意。<\/div>", "note": "清洗後 265 筆", "curve": {"0": [100.0, 100.0], "1": [100.0, 87.2], "2": [100.0, 87.2], "3": [100.0, 86.8], "4": [100.0, 86.4], "5": [100.0, 86.0], "6": [100.0, 85.7], "7": [100.0, 84.9], "8": [100.0, 84.9], "9": [100.0, 84.2], "10": [100.0, 83.4], "11": [100.0, 83.4], "12": [100.0, 82.6], "13": [100.0, 82.3], "14": [100.0, 81.9], "15": [100.0, 81.1], "16": [100.0, 81.1], "17": [100.0, 80.8], "18": [100.0, 80.4], "19": [100.0, 80.4], "20": [100.0, 79.6], "21": [100.0, 78.9], "22": [100.0, 78.5], "23": [100.0, 78.5], "24": [100.0, 78.5], "25": [100.0, 78.1], "26": [100.0, 77.7], "27": [100.0, 77.7], "28": [100.0, 77.0], "29": [100.0, 77.0], "30": [100.0, 77.0], "31": [100.0, 76.2], "32": [100.0, 76.2], "33": [100.0, 75.8], "34": [100.0, 75.8], "35": [100.0, 75.5], "36": [100.0, 75.5], "37": [100.0, 74.3], "38": [100.0, 74.0], "39": [100.0, 73.6], "40": [100.0, 73.6], "41": [100.0, 73.6], "42": [100.0, 73.6], "43": [100.0, 73.6], "44": [100.0, 72.8], "45": [100.0, 72.5], "46": [100.0, 72.1], "47": [100.0, 71.3], "48": [100.0, 70.9], "49": [100.0, 70.9], "50": [100.0, 70.2], "51": [100.0, 69.8], "52": [100.0, 69.8], "53": [98.7, 69.8], "54": [98.7, 69.8], "55": [98.7, 69.8], "56": [98.7, 69.8], "57": [98.7, 69.1], "58": [98.7, 68.7], "59": [98.7, 68.3], "60": [98.7, 67.5]}, "curve_pts": [[0, 100.0], [2, 87.2], [4, 86.4], [6, 85.7], [8, 84.9], [10, 83.4], [12, 82.6], [14, 81.9], [16, 81.1], [18, 80.4], [20, 79.6], [22, 78.5], [24, 78.5], [26, 77.7], [28, 77.0], [30, 77.0], [32, 76.2], [34, 75.8], [36, 75.5], [38, 74.0], [40, 73.6], [42, 73.6], [44, 72.8], [46, 72.1], [48, 70.9], [50, 70.2], [52, 69.8], [54, 69.8], [56, 69.8], [58, 68.7], [60, 67.5]]}, "EURUSD": {"table_html": "<table class=\"buysell\"><thead><tr><th>指標<\/th><th><span class=\"buy-h\"><\/span>BUY<\/th><th><span class=\"sell-h\"><\/span>SELL<\/th><\/tr><\/thead><tbody><tr><td>筆數<\/td><td class=\"\">93<\/td><td>120<\/td><\/tr><tr><td>勝率<\/td><td class=\"\">79.6%<\/td><td>69.2%<\/td><\/tr><tr><td>P&L<\/td><td class=\"\">$54.54<\/td><td>$94.72<\/td><\/tr><tr><td>avg MAE $<\/td><td class=\"\">2.32<\/td><td>4.54<\/td><\/tr><tr><td>avg MFE $<\/td><td class=\"\">1.20<\/td><td>2.60<\/td><\/tr><tr><td>avg MAE pips<\/td><td class=\"\">14.5<\/td><td>21.5<\/td><\/tr><tr><td>avg MFE pips<\/td><td class=\"\">6.8<\/td><td>8.0<\/td><\/tr><tr><td>PF<\/td><td class=\"\">2.1<\/td><td>1.58<\/td><\/tr><tr><td>平均持倉 h<\/td><td class=\"\">8.8<\/td><td>6.8<\/td><\/tr><tr><td>最大 lot<\/td><td class=\"\">0.08<\/td><td>0.16<\/td><\/tr><\/tbody><\/table>", "box_html": "<table><thead><tr><th>方向<\/th><th>筆數<\/th><th>止蝕參考（MAE P90/P95 pips）<\/th><th>止賺參考（MFE P50/75/90 pips）<\/th><th>平均持倉 h<\/th><\/tr><\/thead><tbody><tr><td>BUY<\/td><td>93<\/td><td class=\"neg\">P90 44.0 / P95 52.2<\/td><td class=\"pos\">P50 4.2 / P75 10.1 / P90 15.3<\/td><td>8.8<\/td><\/tr><tr><td>SELL<\/td><td>120<\/td><td class=\"neg\">P90 63.6 / P95 95.5<\/td><td class=\"pos\">P50 6.0 / P75 12.5 / P90 16.8<\/td><td>6.8<\/td><\/tr><\/tbody><\/table><div class=\"footnote\">樣本 n&lt;5 嘅方向行已灰化，參考值僅供示意。<\/div>", "note": "清洗後 213 筆", "curve": {"0": [100.0, 100.0], "1": [100.0, 82.6], "2": [100.0, 77.9], "3": [98.2, 69.5], "4": [98.2, 58.7], "5": [98.2, 52.6], "6": [98.2, 47.4], "7": [98.2, 42.7], "8": [96.4, 37.6], "9": [96.4, 33.8], "10": [96.4, 29.1], "11": [96.4, 26.3], "12": [96.4, 23.0], "13": [94.5, 21.1], "14": [94.5, 18.8], "15": [92.7, 16.4], "16": [90.9, 11.7], "17": [85.5, 8.0], "18": [83.6, 7.0], "19": [80.0, 6.6], "20": [80.0, 5.6], "21": [80.0, 4.2], "22": [76.4, 4.2], "23": [74.5, 3.3], "24": [67.3, 2.8], "25": [63.6, 2.3], "26": [60.0, 2.3], "27": [60.0, 2.3], "28": [60.0, 1.9], "29": [60.0, 1.4], "30": [58.2, 0.9], "31": [58.2, 0.9], "32": [56.4, 0.9], "33": [56.4, 0.9], "34": [56.4, 0.9], "35": [54.5, 0.9], "36": [52.7, 0.9], "37": [52.7, 0.9], "38": [52.7, 0.5], "39": [52.7, 0.0], "40": [52.7, 0.0], "41": [52.7, 0.0], "42": [50.9, 0.0], "43": [49.1, 0.0], "44": [49.1, 0.0], "45": [47.3, 0.0], "46": [45.5, 0.0], "47": [45.5, 0.0], "48": [41.8, 0.0], "49": [41.8, 0.0], "50": [38.2, 0.0], "51": [36.4, 0.0], "52": [34.5, 0.0], "53": [34.5, 0.0], "54": [34.5, 0.0], "55": [34.5, 0.0], "56": [34.5, 0.0], "57": [32.7, 0.0], "58": [32.7, 0.0], "59": [32.7, 0.0], "60": [32.7, 0.0]}, "curve_pts": [[0, 100.0], [2, 77.9], [4, 58.7], [6, 47.4], [8, 37.6], [10, 29.1], [12, 23.0], [14, 18.8], [16, 11.7], [18, 7.0], [20, 5.6], [22, 4.2], [24, 2.8], [26, 2.3], [28, 1.9], [30, 0.9], [32, 0.9], [34, 0.9], [36, 0.9], [38, 0.5], [40, 0.0], [42, 0.0], [44, 0.0], [46, 0.0], [48, 0.0], [50, 0.0], [52, 0.0], [54, 0.0], [56, 0.0], [58, 0.0], [60, 0.0]]}, "AUDCAD": {"table_html": "<table class=\"buysell\"><thead><tr><th>指標<\/th><th><span class=\"buy-h\"><\/span>BUY<\/th><th><span class=\"sell-h\"><\/span>SELL<\/th><\/tr><\/thead><tbody><tr><td>筆數<\/td><td class=\"\">96<\/td><td>120<\/td><\/tr><tr><td>勝率<\/td><td class=\"\">78.1%<\/td><td>75.8%<\/td><\/tr><tr><td>P&L<\/td><td class=\"\">$49.64<\/td><td>$55.26<\/td><\/tr><tr><td>avg MAE $<\/td><td class=\"\">2.01<\/td><td>2.31<\/td><\/tr><tr><td>avg MFE $<\/td><td class=\"\">0.94<\/td><td>1.24<\/td><\/tr><tr><td>avg MAE pips<\/td><td class=\"\">17.5<\/td><td>19.8<\/td><\/tr><tr><td>avg MFE pips<\/td><td class=\"\">7.2<\/td><td>7.1<\/td><\/tr><tr><td>PF<\/td><td class=\"\">2.41<\/td><td>1.7<\/td><\/tr><tr><td>平均持倉 h<\/td><td class=\"\">9.3<\/td><td>6.2<\/td><\/tr><tr><td>最大 lot<\/td><td class=\"\">0.08<\/td><td>0.16<\/td><\/tr><\/tbody><\/table>", "box_html": "<table><thead><tr><th>方向<\/th><th>筆數<\/th><th>止蝕參考（MAE P90/P95 pips）<\/th><th>止賺參考（MFE P50/75/90 pips）<\/th><th>平均持倉 h<\/th><\/tr><\/thead><tbody><tr><td>BUY<\/td><td>96<\/td><td class=\"neg\">P90 52.6 / P95 74.5<\/td><td class=\"pos\">P50 5.6 / P75 10.2 / P90 16.9<\/td><td>9.3<\/td><\/tr><tr><td>SELL<\/td><td>120<\/td><td class=\"neg\">P90 58.9 / P95 80.0<\/td><td class=\"pos\">P50 5.3 / P75 9.3 / P90 16.2<\/td><td>6.2<\/td><\/tr><\/tbody><\/table><div class=\"footnote\">樣本 n&lt;5 嘅方向行已灰化，參考值僅供示意。<\/div>", "note": "清洗後 216 筆", "curve": {"0": [100.0, 100.0], "1": [100.0, 84.3], "2": [100.0, 75.5], "3": [100.0, 69.9], "4": [100.0, 61.6], "5": [100.0, 55.1], "6": [100.0, 45.8], "7": [100.0, 40.3], "8": [100.0, 32.9], "9": [100.0, 28.2], "10": [100.0, 24.5], "11": [100.0, 20.4], "12": [97.9, 18.5], "13": [97.9, 16.2], "14": [97.9, 14.8], "15": [97.9, 14.4], "16": [97.9, 13.4], "17": [97.9, 9.7], "18": [95.8, 7.9], "19": [89.6, 6.5], "20": [89.6, 6.0], "21": [87.5, 5.1], "22": [85.4, 3.7], "23": [83.3, 3.2], "24": [77.1, 2.8], "25": [77.1, 2.8], "26": [77.1, 2.8], "27": [77.1, 2.3], "28": [77.1, 1.9], "29": [75.0, 1.4], "30": [72.9, 0.9], "31": [70.8, 0.5], "32": [70.8, 0.5], "33": [70.8, 0.5], "34": [68.8, 0.5], "35": [68.8, 0.5], "36": [68.8, 0.0], "37": [68.8, 0.0], "38": [66.7, 0.0], "39": [64.6, 0.0], "40": [60.4, 0.0], "41": [60.4, 0.0], "42": [58.3, 0.0], "43": [56.2, 0.0], "44": [54.2, 0.0], "45": [52.1, 0.0], "46": [52.1, 0.0], "47": [50.0, 0.0], "48": [50.0, 0.0], "49": [50.0, 0.0], "50": [50.0, 0.0], "51": [50.0, 0.0], "52": [50.0, 0.0], "53": [47.9, 0.0], "54": [47.9, 0.0], "55": [47.9, 0.0], "56": [47.9, 0.0], "57": [45.8, 0.0], "58": [45.8, 0.0], "59": [39.6, 0.0], "60": [37.5, 0.0]}, "curve_pts": [[0, 100.0], [2, 75.5], [4, 61.6], [6, 45.8], [8, 32.9], [10, 24.5], [12, 18.5], [14, 14.8], [16, 13.4], [18, 7.9], [20, 6.0], [22, 3.7], [24, 2.8], [26, 2.8], [28, 1.9], [30, 0.9], [32, 0.5], [34, 0.5], [36, 0.0], [38, 0.0], [40, 0.0], [42, 0.0], [44, 0.0], [46, 0.0], [48, 0.0], [50, 0.0], [52, 0.0], [54, 0.0], [56, 0.0], [58, 0.0], [60, 0.0]]}}, TH_MIN=0, TH_MAX=60;
+function loadTheme(){const t=localStorage.getItem('tsa-theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀️':'🌙';}
+function toggleTheme(){const c=document.documentElement.getAttribute('data-theme')||'dark',n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('tsa-theme',n);document.getElementById('themeToggle').textContent=n==='dark'?'☀️':'🌙';}
+function fmt$(x){return (x<0?'-$':'$')+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function hashState(){const h=new URLSearchParams(location.hash.slice(1));return {sym:h.get('sym')||null,th:Math.max(TH_MIN,Math.min(TH_MAX,parseInt(h.get('th')||'20')))};}
+function setHash(st){const p=new URLSearchParams();if(st.sym)p.set('sym',st.sym);p.set('th',st.th);history.replaceState(null,'','#'+p.toString());}
+let state=hashState();
+function renderSymbol(){
+  const d=SYM_DATA[state.sym];if(!d)return;
+  document.getElementById('an-name').textContent=state.sym;
+  document.getElementById('an-table').innerHTML=d.table_html;
+  document.getElementById('an-box').innerHTML=d.box_html;
+  document.getElementById('an-note').textContent=d.note||'';
+  const thOut=document.getElementById('th-out');thOut.textContent=state.th+' pips';
+  document.getElementById('th-avoid').textContent=d.curve[state.th]!==undefined?d.curve[state.th][0]+'%':'—';
+  document.getElementById('th-catch').textContent=d.curve[state.th]!==undefined?d.curve[state.th][1]+'%':'—';
+  const pts=d.curve_pts.map(p=>p[0]+','+p[1]).join(' ');
+  let svg='<svg viewBox="0 0 620 190" width="100%" height="190" preserveAspectRatio="xMidYMid meet">';
+  svg+='<line x1="40" y1="160" x2="600" y2="160" stroke="#333"/>';svg+='<line x1="40" y1="20" x2="40" y2="160" stroke="#333"/>';
+  for(const g of [0,50,100]){const y=160-g*1.4;svg+='<line x1="40" y1="'+y+'" x2="600" y2="'+y+'" stroke="#222"/><text x="34" y="'+(y+4)+'" fill="#777" font-size="10" text-anchor="end">'+g+'</text>';}
+  if(pts){const av=d.curve_pts.map(p=>40+p[0]*(560/60)).join(' ');const ca=d.curve_pts.map(p=>(40+p[0]*(560/60))+','+(160-p[1]*1.4)).join(' ');
+    svg+='<polyline points="'+ca+'" fill="none" stroke="#4CAF50" stroke-width="2"/>';}
+  svg+='<text x="320" y="182" fill="#777" font-size="10" text-anchor="middle">入場門檻（pips，0–60）</text>';
+  svg+='<text x="12" y="90" fill="#777" font-size="10" transform="rotate(-90 12 90)">%</text></svg>';
+  document.getElementById('an-curve').innerHTML=svg;
+}
+window.addEventListener('DOMContentLoaded',()=>{
+  loadTheme();
+  const sel=document.getElementById('sym-select');
+  if(sel){
+    if(state.sym&&SYM_DATA[state.sym])sel.value=state.sym;else state.sym=sel.value;
+    sel.addEventListener('change',()=>{state.sym=sel.value;setHash(state);renderSymbol();});
+    const rg=document.getElementById('th-slider');
+    rg.value=state.th;
+    rg.addEventListener('input',()=>{state.th=parseInt(rg.value);document.getElementById('th-out').textContent=state.th+' pips';});
+    rg.addEventListener('change',()=>{state.th=parseInt(rg.value);setHash(state);renderSymbol();});
+    renderSymbol();
+  }
+});
+</script>
 </body>
 </html>

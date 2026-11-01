@@ -1,937 +1,198 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-Hant" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Martin v4 · Signal 12173 · TSA</title>
 <link rel="stylesheet" href="../sidebar.css">
-<title>🔄 馬丁剖析法 V4 — Signal 12173</title>
 <style>
-:root{--font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px}
-[data-theme="dark"]{--bg:#0a0e17;--card:#111520;--hover:#1a1f2e;--text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;--brd:#1e2433;--th:#111520;--zebra:#151b28}
-[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--hover:#eef2f7;--text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107;--brd:#ddd;--th:#eef2f7;--zebra:#f0f4fa}
+:root{--bg:#0a0e17;--card:#111520;--card2:#1a1f2e;--zebra:#151b28;--brd:#1e2433;--th:#111520;
+--text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;
+--radius:12px}
+[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--card2:#eef2f7;--zebra:#f0f4fa;--brd:#ddd;--th:#eef2f7;
+--text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:var(--font);background:var(--bg);color:var(--text);padding:12px;max-width:1400px;margin:0 auto}
-h1{font-size:1.3em;color:var(--pri);margin-bottom:4px}
-h2{font-size:1.05em;color:var(--pri);margin:16px 0 8px}
-a{color:var(--acc);text-decoration:none;font-weight:bold}
-.theme-btn{width:36px;height:36px;border:1px solid var(--brd);border-radius:50%;background:var(--card);color:var(--text);font-size:18px;cursor:pointer;flex-shrink:0}
-/* Stats bar */
-.stats-bar{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap}
-.stats-bar .v{font-size:1.3em;font-weight:bold;color:var(--pri)}.stats-bar .l{font-size:0.75em;color:var(--text2)}
-/* Date controls */
-.date-controls{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:12px 16px;margin-bottom:12px}
-.quick-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.quick-btns button{padding:5px 12px;border:1px solid var(--brd);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.85em}
-.quick-btns button.active{background:var(--pri);color:#000;border-color:var(--pri);font-weight:bold}
-.quick-btns button:hover{border-color:var(--pri)}
-.date-inputs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.date-inputs label{color:var(--text2);font-size:0.85em}
-.date-inputs input[type="date"]{background:var(--bg);border:1px solid var(--brd);color:var(--text);padding:5px 8px;border-radius:6px;font-size:0.9em}
-.date-inputs button{padding:5px 10px;border:1px solid var(--brd);border-radius:6px;background:var(--bg);color:var(--text2);cursor:pointer;font-size:0.8em}
-.range-container{position:relative;height:40px;margin:4px 0}
-.range-track{position:absolute;top:18px;left:0;right:0;height:4px;background:var(--brd);border-radius:2px}
-.range-fill{position:absolute;top:18px;height:4px;background:var(--pri);border-radius:2px}
-.range-handle{position:absolute;top:10px;width:20px;height:20px;background:var(--pri);border-radius:50%;cursor:grab;z-index:2;touch-action:none}
-.range-handle:active{cursor:grabbing}
-.range-labels{display:flex;justify-content:space-between;font-size:0.75em;color:var(--text2);margin-top:24px}
-/* Sections */
-.sec{background:var(--card);border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;overflow:hidden}
-.sec-h{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:0.95em}
-.sec-h:hover{background:var(--hover)}
-.sec-h .arrow{transition:transform 0.2s;font-size:0.8em;color:var(--text2)}
-.sec-h.open .arrow{transform:rotate(90deg)}
-.sec-b{display:none;padding:10px 14px;border-top:1px solid var(--brd)}
-.sec-b.open{display:block}
-/* Info tooltip */
-.info{display:inline-block;margin-left:6px;width:16px;height:16px;border-radius:50%;background:var(--acc);color:#fff;font-size:10px;text-align:center;line-height:16px;cursor:help;position:relative}
-.info .tip{display:none;position:absolute;left:20px;top:-10px;z-index:100;background:var(--card);border:1px solid var(--brd);border-radius:6px;padding:10px;width:280px;font-size:0.85em;font-weight:normal;text-align:left;color:var(--text);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
-.info:hover .tip,.info:focus .tip{display:block}
-/* Tables */
-table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:0.85em}
-th{background:var(--th);padding:5px 7px;text-align:left;border-bottom:2px solid var(--pri);color:var(--pri);font-size:0.8em;white-space:nowrap;cursor:pointer;user-select:none}
-th:hover{background:var(--hover)}
-td{padding:4px 7px;border-bottom:1px solid var(--brd);font-size:0.85em}
-tr:hover{background:var(--card)}
-.row-a{background:rgba(76,175,80,0.08)}.row-d{background:rgba(255,87,34,0.08)}
-/* Expand trades */
-.trades-toggle{color:var(--acc);cursor:pointer;font-size:0.8em;margin:4px 0;padding:3px 8px;border:1px solid var(--brd);border-radius:4px;display:inline-block;background:var(--bg)}
-.trades-toggle:hover{border-color:var(--acc)}
-.trades-panel{display:none;margin:6px 0;max-height:400px;overflow-y:auto}
-.trades-panel.open{display:block}
-.trades-panel table{font-size:0.78em}
-.trades-panel th{font-size:0.75em}
-/* Rating */
-.r-sp{color:#FFD700;font-weight:bold}.r-s{color:#FFA500;font-weight:bold}.r-a{color:var(--grn);font-weight:bold}.r-b{color:var(--acc);font-weight:bold}.r-c{color:var(--yel)}.r-d{color:var(--red)}.r-e{color:#999}
-.pnl-pos{color:var(--grn);font-weight:bold}.pnl-neg{color:var(--red);font-weight:bold}
-/* Charts */
-.chart-row{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}
-.chart-box{flex:1;min-width:300px;background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:8px}
-.chart-box h4{font-size:0.85em;color:var(--acc);margin-bottom:4px}
-.chart-box canvas{width:100%;height:180px}
-/* Blacklist / Recovery */
-.blk{background:var(--card);border:1px solid var(--red);border-radius:8px;padding:10px 14px;margin-bottom:6px}
-.rec{background:var(--card);border:1px solid var(--yel);border-radius:8px;padding:10px 14px;margin-bottom:6px}
-/* Global bar */
-.global-bar{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:10px 14px;margin-bottom:12px;overflow-x:auto}
-.global-bar svg{width:100%;height:auto}
-/* Period Stats */
-.period-stats{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:14px;margin-bottom:12px;overflow-x:auto}
-.period-stats table{width:100%;border-collapse:collapse;font-size:0.85em}
-.period-stats th{background:var(--th);padding:8px 10px;text-align:center;border:1px solid var(--brd);color:var(--pri);font-size:0.8em;white-space:nowrap}
-.period-stats td{padding:7px 10px;text-align:center;border:1px solid var(--brd);white-space:nowrap}
-.period-stats tbody tr:nth-child(even){background:var(--zebra)}
-.period-stats tbody tr:hover{background:var(--bg)}
-.period-stats .p-period{font-weight:bold;color:var(--acc)}
-.period-stats .p-pos{color:var(--grn);font-weight:bold}
-.period-stats .p-neg{color:var(--red);font-weight:bold}
-.period-stats .p-wr-good{color:var(--grn)}
-.period-stats .p-wr-bad{color:var(--red)}
-.period-stats tfoot td{font-weight:bold;border:1px solid var(--brd);background:var(--th)}
-/* Responsive */
-@media(max-width:768px){body{padding:8px;font-size:13px}.quick-btns button{padding:4px 8px;font-size:0.8em}.date-inputs{flex-direction:column;align-items:flex-start}.chart-row{flex-direction:column}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
+a{color:var(--acc);text-decoration:none}
+.layout{max-width:1200px;margin:0 auto;padding:16px;display:grid;grid-template-columns:168px 1fr;gap:20px}
+main{min-width:0}
+.toc{position:sticky;top:16px;align-self:start;background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:14px 12px;font-size:.85em}
+.toc h3{color:var(--pri);font-size:.95em;margin-bottom:8px}
+.toc a{display:block;padding:5px 6px;border-radius:6px;color:var(--text2)}
+.toc a:hover{background:var(--card2);color:var(--text)}
+header.top{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+header.top h1{font-size:1.2em;color:#fff}
+header.top .sub{color:var(--text2);font-size:.85em}
+#themeToggle{background:var(--card2);border:1px solid var(--brd);color:var(--text);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1em}
+section{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;overflow-x:auto}
+section table{min-width:max-content}
+@media(max-width:520px){.sel-bar select{max-width:44vw}}
+section>h2{color:var(--pri);font-size:1.15em;margin-bottom:4px}
+section>.legend{color:var(--text2);font-size:.8em;margin-bottom:12px}
+.banner{background:rgba(255,193,7,.12);border:1px solid var(--yel);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;color:var(--yel);font-size:.88em}
+.hero-grid{display:grid;grid-template-columns:2fr 3fr;gap:16px}
+.hero-left .badge{display:inline-block;border:2px solid var(--grn);color:var(--grn);border-radius:10px;padding:8px 18px;font-weight:800;font-size:1.25em;background:rgba(76,175,80,.08)}
+.hero-left .badge.martin{border-color:var(--pri);color:var(--pri);background:rgba(255,215,0,.08);box-shadow:0 0 18px rgba(255,215,0,.15)}
+.hero-left .badge.none{border-color:#8B95A5;color:#8B95A5;background:rgba(139,149,165,.08)}
+.hero-left .meta{color:var(--text2);font-size:.85em;margin-top:10px}
+.hero-left .meta b{color:var(--text)}
+.six{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.six .cell{background:var(--card2);border:1px solid var(--brd);border-radius:10px;padding:10px 12px}
+.six .k{color:var(--text2);font-size:.75em}
+.six .v{font-size:1.18em;font-weight:700;margin-top:2px}
+.v.pos{color:var(--grn)}.v.neg{color:var(--red)}
+.narrow{margin-top:14px;background:var(--card2);border:1px solid var(--brd);border-radius:10px;padding:8px 14px;display:flex;gap:18px;flex-wrap:wrap;font-size:.82em;color:var(--text2)}
+.narrow b{color:var(--text)}
+.pills{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.pill{background:var(--card2);border:1px solid var(--brd);border-radius:999px;padding:8px 14px;text-align:center}
+.pill .k{color:var(--text2);font-size:.72em}
+.pill .v{font-weight:700;font-size:1.02em}
+table{width:100%;border-collapse:collapse;font-size:.88em}
+th{background:var(--th);color:var(--text2);font-weight:600;padding:7px 9px;text-align:right;border-bottom:1px solid var(--brd);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:6px 9px;border-bottom:1px solid var(--brd);text-align:right;white-space:nowrap}
+tbody tr:nth-child(even){background:var(--zebra)}
+.pos{color:var(--grn)}.neg{color:var(--red)}.muted{color:var(--text2)}
+.dim{opacity:.45}
+.buysell th:nth-child(2),.buysell td:nth-child(2){border-left:3px solid var(--grn)}
+.buysell th:last-child,.buysell td:last-child{border-left:3px solid var(--red)}
+.buy-h,.sell-h{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.buy-h{background:var(--grn)}.sell-h{background:var(--red)}
+.bar-cell{background:linear-gradient(90deg,rgba(100,181,246,.55),rgba(100,181,246,.15));border-radius:3px;min-height:12px}
+.heat{display:grid;gap:2px;font-size:.72em}
+.heat .lab{color:var(--text2);display:flex;align-items:center;justify-content:flex-end;padding-right:4px}
+.heat .c{border-radius:3px;min-height:22px;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.heat .c.na{background:var(--card2);color:var(--text2)}
+.hm-wrap{overflow-x:auto}
+details{border:1px solid var(--brd);border-radius:10px;padding:10px 14px;margin-top:12px;background:var(--card2)}
+details>summary{cursor:pointer;color:var(--acc);font-weight:600}
+select,input[type=range]{accent-color:var(--acc)}
+.sel-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.sel-bar label{color:var(--text2);font-size:.85em}
+.sel-bar select{background:var(--card2);color:var(--text);border:1px solid var(--brd);border-radius:8px;padding:6px 10px;font-size:.95em}
+.slider-row{display:flex;gap:12px;align-items:center;margin:10px 0 4px;flex-wrap:wrap}
+.slider-row input[type=range]{flex:1;min-width:200px}
+.slider-val{font-weight:700;color:var(--pri);min-width:64px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.svgbox{background:var(--card2);border:1px solid var(--brd);border-radius:10px;padding:10px;overflow-x:auto}
+.svgbox svg{display:block;margin:0 auto}
+.svgbox .cap{color:var(--text2);font-size:.78em;text-align:center;margin-top:4px}
+.gline{stroke:#666;stroke-dasharray:4 4;stroke-width:1}
+.footnote{color:var(--text2);font-size:.8em;margin-top:8px}
+.guide{display:grid;grid-template-columns:1fr 1fr;gap:4px 22px;font-size:.85em}
+.guide dt{color:var(--pri);font-weight:600}
+.guide dd{color:var(--text2);margin-bottom:6px}
+@media(max-width:860px){.layout{grid-template-columns:1fr}.toc{position:static;display:flex;flex-wrap:wrap;gap:2px}
+.toc a{padding:4px 10px;background:var(--card2);border-radius:999px}
+.hero-grid{grid-template-columns:1fr}.six{grid-template-columns:repeat(2,1fr)}.pills{grid-template-columns:repeat(2,1fr)}
+.two{grid-template-columns:1fr}.guide{grid-template-columns:1fr}
+.hm-wrap{max-height:280px}}
 </style>
 </head>
 <body>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-<h1>🔄 馬丁剖析法 V4</h1>
-<button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="切換主題">☀️</button>
+<div class="layout">
+<nav class="toc"><h3>目錄</h3>
+<a href="#s1">① 整倉總覽</a><a href="#s2">② 馬丁偵測</a><a href="#s3">③ 商品分析器</a>
+<a href="#s4">④ 商品方向總表</a><a href="#s5">⑤ 月度樞紐</a><a href="#s6">⑥ MAE/MFE 散點</a>
+<a href="#s7">⑦ 時間維度＋明細</a><a href="#s8">⑧ 使用說明</a></nav>
+<main>
+<header class="top"><div><h1>Martin v4 分析 · Signal 12173</h1>
+<div class="sub">照老闆 Excel v8.5 八區動線重建（Template B）· CSV fetch 架構保留＋全數據預渲染底</div></div>
+<button id="themeToggle" onclick="toggleTheme()">☀️</button></header>
+<div class="banner">⚠ 樣本頁：清洗後 247 筆（CSV 原始 252 行）；CSV 33 欄補齊前，部分指標按降級軍規處理（pips 主 $ 輔）。生成於 2026-11-02 05:36 HKT。</div>
+<section id="s1"><h2>① 整倉總覽</h2><div class="legend">10 秒結論：賺唔賺、係唔係馬丁。圖例：P&amp;L／勝率按平倉淨值（含 commission+swap）。</div>
+<div class="hero-grid"><div class="hero-left"><span class="badge martin">偵測到馬丁 ×None</span><div class="meta"><b>247</b> 筆交易　·　數據範圍 <b>2025-05-12 → 2026-07-21</b>（按平倉時間）</div></div>
+<div class="six"><div class="cell"><div class="k">總 P&L</div><div class="v pos">$6,667.57</div></div><div class="cell"><div class="k">勝率</div><div class="v ">71.7%<span class="muted">（177/247）</span></div></div><div class="cell"><div class="k">Profit Factor</div><div class="v ">3.51</div></div><div class="cell"><div class="k">盈虧比</div><div class="v ">1.39</div></div><div class="cell"><div class="k">MaxDD $</div><div class="v neg">-$1,743.66</div></div><div class="cell"><div class="k">最大 lot</div><div class="v ">0.77</div></div></div></div>
+<div class="narrow"><div>MAE pips 平均 <b>53.2</b>·中位 <b>45.3</b>·P90 <b>115.9</b>（$45.09）</div><div>MFE pips 平均 <b>44.9</b>·中位 <b>43.2</b>·P90 <b>76.6</b>（$49.49）</div></div><details><summary>分層摘要（3 層）</summary><table><thead><tr><th>層</th><th>理論 lot</th><th>筆數</th><th>P&amp;L</th><th>佔 P&amp;L%</th></tr></thead><tbody><tr><td>L1</td><td>0.02</td><td>69</td><td>-$33.78</td><td>-0.5%</td></tr><tr><td>L5</td><td>0.02</td><td>21</td><td>$304.12</td><td>4.6%</td></tr><tr><td>L17</td><td>0.02</td><td>9</td><td>$1,817.50</td><td>27.3%</td></tr><tr><td>未分類</td><td class="muted">—</td><td>148</td><td class="muted">—</td><td class="muted">—</td></tr></tbody></table></details></section>
+<section id="s2"><h2>② 馬丁偵測</h2><div class="legend">判定方法：白皮書 v3.1 §4.3——校準用「出現≥2次嘅最小 lot」做基準。基準 lot 0.02（出現≥2次最小 lot），單層無倍數</div>
+<div class="pills">
+<div class="pill"><div class="k">基準 lot</div><div class="v">0.02</div></div>
+<div class="pill"><div class="k">偵測倍數</div><div class="v">—（單層）</div></div>
+<div class="pill"><div class="k">歸層比例</div><div class="v">40.1%</div></div>
+<div class="pill"><div class="k">校準層差</div><div class="v">0.0%</div></div>
 </div>
-<div class="sub" id="headerSub">Signal 12173 (SMA) · 載入中...</div>
-
-<!-- Date Range -->
-<div class="date-controls" id="dateControls">
-<div style="color:var(--text2);font-size:0.85em;margin-bottom:6px">
-📅 時間範圍
-<span class="info">i<span class="tip">選擇時間範圍後，所有分析會即時重新計算。<br><br><b>快速按鈕</b>：選擇預設時段<br><b>自訂日期</b>：手動輸入 From/To<br><b>拖拉 Bar</b>：拖動手柄選擇範圍</span></span>
+<table><thead><tr><th>層</th><th>實際 lot</th><th>筆數</th><th>分佈</th><th>P&amp;L</th></tr></thead><tbody><tr><td>L1</td><td>0.02</td><td>69</td><td><div class="bar-cell" style="width:100%"></div></td><td>-$33.78</td></tr><tr><td>L5</td><td>0.10</td><td>21</td><td><div class="bar-cell" style="width:30%"></div></td><td>$304.12</td></tr><tr><td>L17</td><td>0.34</td><td>9</td><td><div class="bar-cell" style="width:13%"></div></td><td>$1,817.50</td></tr><tr class="dim"><td>未分類</td><td class="muted">lot 不符倍數</td><td>148</td><td></td><td></td></tr></tbody></table><div class="footnote" style="color:var(--yel)">⚠ 歸屬比例低於 80%，判定宜保守。</div>
+<details><summary>判定方法（六步）</summary><div class="footnote">① 剔除 balance／未平倉列 → ② 統計實際 lot 分佈 → ③ 基準 lot＝出現≥2次嘅最小 lot → ④ 每筆按 lot/基準 倍數歸層（容差 2%）→ ⑤ 相鄰層比值眾數＝偵測倍數 → ⑥ 最大層≥2 即判馬丁；未分類列於表尾。</div></details></section>
+<section id="s3"><h2>③ 商品分析器</h2><div class="legend">單商品手術台：預設總 P&amp;L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。</div>
+<div class="sel-bar"><label>商品</label><select id="sym-select"><option value="AUDUSD">AUDUSD</option><option value="EURGBP">EURGBP</option></select>
+<label>入場門檻</label><div class="slider-row" style="margin:0;flex:1"><input type="range" id="th-slider" min="0" max="60" step="1" value="20"><span class="slider-val" id="th-out">20 pips</span></div></div>
+<div id="an-note" class="footnote"></div>
+<div class="two"><div><h3 style="color:var(--acc);font-size:.95em;margin-bottom:6px">指標 × BUY/SELL（<span id="an-name"></span>）</h3><div id="an-table"></div></div>
+<div><h3 style="color:var(--acc);font-size:.95em;margin-bottom:6px">止賺止蝕參考（層×方向）</h3><div id="an-box"></div></div></div>
+<h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">61 級入場效益曲線</h3>
+<div class="slider-row"><span class="muted" style="font-size:.82em">可避開虧損 <b id="th-avoid" style="color:var(--red)">—</b>　可捕捉盈利 <b id="th-catch" style="color:var(--grn)">—</b>（門檻命中佔比）</span></div>
+<div class="svgbox" id="an-curve"></div>
+<div class="footnote">綠線＝可捕捉盈利%（MFE≥門檻佔比）；無虧損單時避開虧損% 不出線。門檻與商品選擇寫入 URL hash，可分享。</div></section>
+<section id="s4"><h2>④ 商品方向總表</h2><div class="legend">全場商品×方向成績表，按勝率排序；L5+ 深層馬丁暴露喺深層馬丁帳戶先會有數（本訊號見 ② 區）。</div>
+<table><thead><tr><th>商品</th><th>方向</th><th>筆數</th><th>勝率</th><th>P&amp;L</th><th>avg MAE $</th><th>avg MFE $</th><th>avg MAE p</th><th>avg MFE p</th><th>max lot</th><th>L5+ 筆數</th></tr></thead>
+<tbody><tr><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>103</td><td>80.6%</td><td class="pos">$3,100.30</td><td>28.84</td><td>40.05</td><td>48.6</td><td>47.5</td><td>0.77</td><td class="muted">—</td></tr><tr><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>65</td><td>73.8%</td><td class="pos">$2,469.43</td><td>32.27</td><td>52.86</td><td>54.1</td><td>43.4</td><td>0.51</td><td class="muted">—</td></tr><tr><td>EURGBP</td><td><span class="sell-h"></span>SELL</td><td>15</td><td>60.0%</td><td class="pos">$753.11</td><td>73.68</td><td>79.57</td><td>56.6</td><td>25.5</td><td>0.77</td><td class="muted">—</td></tr><tr><td>EURGBP</td><td><span class="buy-h"></span>BUY</td><td>64</td><td>57.8%</td><td class="pos">$344.73</td><td>77.55</td><td>54.18</td><td>58.9</td><td>46.9</td><td>0.51</td><td class="muted">—</td></tr></tbody></table>
+<div class="footnote">零交易子集唔出行（軍規 A④）。</div></section>
+<section id="s5"><h2>⑤ 月度樞紐</h2><div class="legend">年×月 P&amp;L 熱力表（按平倉月）＋全年合計。圖例：綠贏紅蝕，深淺按該表 max|值| 歸一化；「·」＝未覆蓋（冇數≠$0）。</div>
+<div class="heat" style="grid-template-columns:64px repeat(13,1fr)"><div class="lab"></div><div class="lab" style="justify-content:center">1</div><div class="lab" style="justify-content:center">2</div><div class="lab" style="justify-content:center">3</div><div class="lab" style="justify-content:center">4</div><div class="lab" style="justify-content:center">5</div><div class="lab" style="justify-content:center">6</div><div class="lab" style="justify-content:center">7</div><div class="lab" style="justify-content:center">8</div><div class="lab" style="justify-content:center">9</div><div class="lab" style="justify-content:center">10</div><div class="lab" style="justify-content:center">11</div><div class="lab" style="justify-content:center">12</div><div class="lab" style="justify-content:center">全年</div><div class="lab">2025</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c" style="background:rgba(76,175,80,0.27)" title="2025-05: $490.95">0.5k</div><div class="c" style="background:rgba(76,175,80,0.35)" title="2025-06: $677.55">0.7k</div><div class="c" style="background:rgba(76,175,80,0.80)" title="2025-07: $1,829.26">1.8k</div><div class="c" style="background:rgba(76,175,80,0.68)" title="2025-08: $1,517.21">1.5k</div><div class="c" style="background:rgba(76,175,80,0.16)" title="2025-09: $197.29">0.2k</div><div class="c" style="background:rgba(76,175,80,0.20)" title="2025-10: $301.37">0.3k</div><div class="c" style="background:rgba(76,175,80,0.24)" title="2025-11: $396.46">0.4k</div><div class="c" style="background:rgba(76,175,80,0.23)" title="2025-12: $388.84">0.4k</div><div class="c" style="background:rgba(76,175,80,0.80)">$5,798.93</div><div class="lab">2026</div><div class="c" style="background:rgba(76,175,80,0.38)" title="2026-01: $773.33">0.8k</div><div class="c" style="background:rgba(76,175,80,0.34)" title="2026-02: $661.96">0.7k</div><div class="c" style="background:rgba(76,175,80,0.39)" title="2026-03: $794.69">0.8k</div><div class="c" style="background:rgba(76,175,80,0.19)" title="2026-04: $273.09">0.3k</div><div class="c" style="background:rgba(76,175,80,0.11)" title="2026-05: $88.89">0.1k</div><div class="c na" title="未覆蓋">·</div><div class="c" style="background:rgba(255,87,34,0.76)" title="2026-07: -$1,723.32">-1.7k</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c na" title="未覆蓋">·</div><div class="c" style="background:rgba(76,175,80,0.42)">$868.64</div></div></section>
+<section id="s6"><h2>⑥ MAE/MFE 散點</h2><div class="legend">入場質素四象限：MFE=入場後最大有利、MAE=最大不利（pips，由入場價起算）。y=x 線上＝好單。</div>
+<div class="two"><div class="svgbox"><b style="color:var(--acc)">BUY</b><svg viewBox="0 0 300 230" width="100%" height="230"><rect x="40" y="10" width="250" height="190" fill="#0d1120" stroke="#222"/><line x1="40" y1="10" x2="40" y2="200" stroke="#1c2333"/><text x="40" y="214" fill="#777" font-size="9" text-anchor="middle">0</text><line x1="102" y1="10" x2="102" y2="200" stroke="#1c2333"/><text x="102" y="214" fill="#777" font-size="9" text-anchor="middle">52</text><line x1="164" y1="10" x2="164" y2="200" stroke="#1c2333"/><text x="164" y="214" fill="#777" font-size="9" text-anchor="middle">104</text><line x1="226" y1="10" x2="226" y2="200" stroke="#1c2333"/><text x="226" y="214" fill="#777" font-size="9" text-anchor="middle">156</text><line x1="288" y1="10" x2="288" y2="200" stroke="#1c2333"/><text x="288" y="214" fill="#777" font-size="9" text-anchor="middle">208</text><line x1="40" y1="200" x2="290" y2="200" stroke="#1c2333"/><text x="35" y="203" fill="#777" font-size="9" text-anchor="end">0</text><line x1="40" y1="153" x2="290" y2="153" stroke="#1c2333"/><text x="35" y="156" fill="#777" font-size="9" text-anchor="end">45</text><line x1="40" y1="106" x2="290" y2="106" stroke="#1c2333"/><text x="35" y="109" fill="#777" font-size="9" text-anchor="end">90</text><line x1="40" y1="59" x2="290" y2="59" stroke="#1c2333"/><text x="35" y="62" fill="#777" font-size="9" text-anchor="end">135</text><line x1="40" y1="12" x2="290" y2="12" stroke="#1c2333"/><text x="35" y="15" fill="#777" font-size="9" text-anchor="end">180</text><line x1="40" y1="200" x2="290" y2="-18.75370919881306" class="gline"/><circle cx="186.4" cy="191.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="88.9" cy="106.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="124.2" cy="137.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.6" cy="73.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="142.4" cy="153.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="70.1" cy="89.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="106.5" cy="121.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.9" cy="149.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="60.5" cy="142.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="115.6" cy="166.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="77.3" cy="132.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="59.1" cy="116.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="96.3" cy="149.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="64.8" cy="174.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.0" cy="159.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.0" cy="158.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="61.5" cy="174.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="79.9" cy="168.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="61.7" cy="152.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="94.1" cy="170.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="58.1" cy="139.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="75.9" cy="154.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="194.5" cy="187.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="112.0" cy="148.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="158.4" cy="188.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="75.7" cy="116.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="93.9" cy="132.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="176.4" cy="199.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="140.3" cy="172.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="57.7" cy="100.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="190.6" cy="178.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="140.6" cy="193.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="65.5" cy="148.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="104.6" cy="182.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="158.7" cy="195.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="86.5" cy="166.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="49.5" cy="131.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="122.8" cy="189.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="98.0" cy="183.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="61.6" cy="152.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="79.9" cy="167.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.4" cy="136.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.7" cy="143.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.9" cy="156.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="140.9" cy="188.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="55.9" cy="118.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="105.0" cy="161.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="122.9" cy="173.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="75.2" cy="135.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.9" cy="144.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="191.2" cy="166.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="144.9" cy="183.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="99.1" cy="166.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="52.3" cy="125.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="163.6" cy="163.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="70.1" cy="141.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="117.4" cy="182.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="103.8" cy="182.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="67.1" cy="150.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="85.9" cy="167.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="53.6" cy="141.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="219.7" cy="200.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="147.0" cy="157.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="108.8" cy="136.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="168.3" cy="176.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="56.1" cy="105.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="129.1" cy="154.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="56.8" cy="126.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.9" cy="123.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="135.6" cy="158.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="171.6" cy="163.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="97.0" cy="147.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="58.9" cy="141.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="153.5" cy="174.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="78.5" cy="148.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="117.0" cy="165.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="44.0" cy="126.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="120.7" cy="182.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="72.8" cy="152.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="91.3" cy="168.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="54.8" cy="136.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.6" cy="146.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="110.0" cy="178.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="73.1" cy="145.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="91.4" cy="161.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="54.6" cy="129.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="113.9" cy="157.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="78.2" cy="152.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="96.1" cy="168.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="60.4" cy="137.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="202.6" cy="183.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="167.1" cy="176.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="131.3" cy="173.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="94.8" cy="159.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.3" cy="119.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="185.1" cy="167.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="112.8" cy="157.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="149.1" cy="187.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="76.9" cy="143.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="64.7" cy="165.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="40.8" cy="148.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.6" cy="146.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.9" cy="140.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="57.9" cy="131.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="81.3" cy="167.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="49.9" cy="139.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="133.9" cy="151.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="108.3" cy="187.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="42.1" cy="132.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="62.9" cy="148.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="116.6" cy="176.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="60.9" cy="151.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="43.2" cy="136.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="80.7" cy="169.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="134.5" cy="149.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="198.1" cy="193.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="97.4" cy="116.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="60.0" cy="84.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="152.9" cy="165.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="79.5" cy="101.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="115.9" cy="133.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="47.0" cy="127.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="90.7" cy="170.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.7" cy="139.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="170.4" cy="179.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="69.1" cy="142.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="108.4" cy="175.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.1" cy="127.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="89.6" cy="158.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="127.7" cy="189.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="146.0" cy="183.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="54.9" cy="131.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="98.1" cy="145.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="271.5" cy="185.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="162.1" cy="180.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="201.1" cy="164.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="125.2" cy="173.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="87.8" cy="140.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="143.2" cy="189.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="230.0" cy="176.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="69.5" cy="124.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="106.1" cy="156.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="181.3" cy="190.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="100.6" cy="177.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.5" cy="128.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="63.7" cy="145.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="153.2" cy="178.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="54.6" cy="105.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="126.9" cy="154.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="53.6" cy="138.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="106.5" cy="142.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="52.8" cy="122.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="75.0" cy="137.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="102.8" cy="161.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="140.5" cy="193.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="75.7" cy="137.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="122.5" cy="178.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.2" cy="113.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="129.1" cy="24.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="147.3" cy="39.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="165.3" cy="55.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="183.2" cy="71.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="202.6" cy="88.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="220.7" cy="104.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="263.2" cy="141.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="70.8" cy="159.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="46.0" cy="138.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><text x="165.0" y="226" fill="#777" font-size="10" text-anchor="middle">MAE（pips）</text><text x="12" y="105.0" fill="#777" font-size="10" transform="rotate(-90 12 105.0)">MFE（pips）</text></svg><div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 50.9%；綠點贏紅點蝕</div></div><div class="svgbox"><b style="color:var(--acc)">SELL</b><svg viewBox="0 0 300 230" width="100%" height="230"><rect x="40" y="10" width="250" height="190" fill="#0d1120" stroke="#222"/><line x1="40" y1="10" x2="40" y2="200" stroke="#1c2333"/><text x="40" y="214" fill="#777" font-size="9" text-anchor="middle">0</text><line x1="102" y1="10" x2="102" y2="200" stroke="#1c2333"/><text x="102" y="214" fill="#777" font-size="9" text-anchor="middle">54</text><line x1="165" y1="10" x2="165" y2="200" stroke="#1c2333"/><text x="165" y="214" fill="#777" font-size="9" text-anchor="middle">108</text><line x1="227" y1="10" x2="227" y2="200" stroke="#1c2333"/><text x="227" y="214" fill="#777" font-size="9" text-anchor="middle">162</text><line x1="289" y1="10" x2="289" y2="200" stroke="#1c2333"/><text x="289" y="214" fill="#777" font-size="9" text-anchor="middle">216</text><line x1="40" y1="200" x2="290" y2="200" stroke="#1c2333"/><text x="35" y="203" fill="#777" font-size="9" text-anchor="end">0</text><line x1="40" y1="153" x2="290" y2="153" stroke="#1c2333"/><text x="35" y="156" fill="#777" font-size="9" text-anchor="end">26</text><line x1="40" y1="106" x2="290" y2="106" stroke="#1c2333"/><text x="35" y="109" fill="#777" font-size="9" text-anchor="end">52</text><line x1="40" y1="60" x2="290" y2="60" stroke="#1c2333"/><text x="35" y="63" fill="#777" font-size="9" text-anchor="end">78</text><line x1="40" y1="13" x2="290" y2="13" stroke="#1c2333"/><text x="35" y="16" fill="#777" font-size="9" text-anchor="end">104</text><line x1="40" y1="200" x2="290" y2="-190.10224948875262" class="gline"/><circle cx="40.9" cy="127.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="201.7" cy="192.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="163.5" cy="199.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="128.6" cy="190.3" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="83.5" cy="126.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="60.0" cy="89.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="180.9" cy="199.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="49.6" cy="60.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="100.7" cy="153.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="146.1" cy="185.4" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="93.1" cy="165.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="55.9" cy="114.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="73.3" cy="134.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.1" cy="123.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.4" cy="63.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="205.5" cy="166.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="170.7" cy="192.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="135.7" cy="170.9" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="100.6" cy="179.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="64.8" cy="123.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="188.1" cy="195.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="116.4" cy="197.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="47.4" cy="96.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="153.1" cy="173.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="83.1" cy="152.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="271.5" cy="192.1" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="116.2" cy="156.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="80.6" cy="101.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="133.6" cy="155.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="63.1" cy="73.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="98.2" cy="128.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="157.2" cy="185.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="64.2" cy="82.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="99.1" cy="135.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="130.5" cy="181.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="81.6" cy="109.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="79.7" cy="146.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="56.3" cy="109.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="211.7" cy="161.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="168.7" cy="172.5" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="131.2" cy="146.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="52.9" cy="24.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="95.9" cy="91.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="186.3" cy="197.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="113.4" cy="118.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="78.2" cy="63.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="149.1" cy="141.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="56.1" cy="79.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="176.3" cy="143.0" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="94.0" cy="127.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="129.0" cy="102.7" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="58.8" cy="74.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="41.7" cy="48.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="158.9" cy="115.8" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="76.1" cy="100.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="111.6" cy="155.4" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="50.5" cy="95.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="183.5" cy="162.2" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="94.8" cy="146.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="58.2" cy="89.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="112.2" cy="137.3" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.6" cy="62.7" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="77.2" cy="119.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="57.2" cy="43.1" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="157.0" cy="187.6" r="3.2" fill="#FF5722" fill-opacity=".75"/><circle cx="108.4" cy="146.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="72.6" cy="91.0" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="126.6" cy="175.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="48.6" cy="51.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="91.1" cy="119.8" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="53.6" cy="84.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="71.8" cy="100.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="44.4" cy="67.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="45.0" cy="105.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="77.1" cy="121.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="51.2" cy="81.5" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="114.8" cy="132.9" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="75.0" cy="103.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="96.8" cy="137.6" r="3.2" fill="#4CAF50" fill-opacity=".75"/><circle cx="57.5" cy="76.2" r="3.2" fill="#4CAF50" fill-opacity=".75"/><text x="165.0" y="226" fill="#777" font-size="10" text-anchor="middle">MAE（pips）</text><text x="12" y="105.0" fill="#777" font-size="10" transform="rotate(-90 12 105.0)">MFE（pips）</text></svg><div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 47.5%；綠點贏紅點蝕</div></div></div></section>
+<section id="s7"><h2>⑦ 時間維度＋明細</h2><div class="legend">星期×小時 P&amp;L（格色雙向 heat，hover 睇精確值；「·」＝冇數）＋累計 P&amp;L 走勢＋最近 50 筆明細。時間均按平倉時間。</div>
+<h3 style="color:var(--acc);font-size:.95em;margin:8px 0 6px">星期 × 小時 heatmap</h3><div class="heat hm-wrap" style="grid-template-columns:36px repeat(24,minmax(22px,1fr));min-width:720px"><div class="lab"></div><div class="lab" style="justify-content:center">0</div><div class="lab" style="justify-content:center">1</div><div class="lab" style="justify-content:center">2</div><div class="lab" style="justify-content:center">3</div><div class="lab" style="justify-content:center">4</div><div class="lab" style="justify-content:center">5</div><div class="lab" style="justify-content:center">6</div><div class="lab" style="justify-content:center">7</div><div class="lab" style="justify-content:center">8</div><div class="lab" style="justify-content:center">9</div><div class="lab" style="justify-content:center">10</div><div class="lab" style="justify-content:center">11</div><div class="lab" style="justify-content:center">12</div><div class="lab" style="justify-content:center">13</div><div class="lab" style="justify-content:center">14</div><div class="lab" style="justify-content:center">15</div><div class="lab" style="justify-content:center">16</div><div class="lab" style="justify-content:center">17</div><div class="lab" style="justify-content:center">18</div><div class="lab" style="justify-content:center">19</div><div class="lab" style="justify-content:center">20</div><div class="lab" style="justify-content:center">21</div><div class="lab" style="justify-content:center">22</div><div class="lab" style="justify-content:center">23</div><div class="lab">一</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 00:00–01:00 $9.20">9</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 01:00–02:00 $8.15">8</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.14)" title="週一 08:00–09:00 $135.80">136</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.42)" title="週一 11:00–12:00 $823.80">824</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.30)" title="週一 13:00–14:00 $521.31">521</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週一 14:00–15:00 $12.99">13</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.42)" title="週一 17:00–18:00 $822.68">823</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週一 18:00–19:00 $49.44">49</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週一 19:00–20:00 $7.98">8</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="lab">二</div><div class="c" style="background:rgba(76,175,80,0.15)" title="週二 00:00–01:00 $165.18">165</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.14)" title="週二 03:00–04:00 $143.83">144</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週二 08:00–09:00 $57.55">58</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週二 09:00–10:00 $76.94">77</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 11:00–12:00 $18.70">19</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 13:00–14:00 $22.50">22</div><div class="c" style="background:rgba(76,175,80,0.29)" title="週二 14:00–15:00 $504.23">504</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.15)" title="週二 16:00–17:00 $164.93">165</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週二 17:00–18:00 $15.80">16</div><div class="c" style="background:rgba(76,175,80,0.12)" title="週二 18:00–19:00 $96.86">97</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週二 19:00–20:00 $11.02">11</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="lab">三</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 00:00–01:00 $7.38">7</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 06:00–07:00 $21.22">21</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 10:00–11:00 $8.22">8</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 15:00–16:00 $33.51">34</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週三 17:00–18:00 $10.76">11</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 18:00–19:00 $15.32">15</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週三 20:00–21:00 $17.66">18</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.22)" title="週三 23:00–24:00 $331.32">331</div><div class="lab">四</div><div class="c" style="background:rgba(76,175,80,0.27)" title="週四 00:00–01:00 $464.75">465</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 02:00–03:00 $9.04">9</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 04:00–05:00 $15.49">15</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 06:00–07:00 $8.57">9</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.19)" title="週四 08:00–09:00 $255.08">255</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週四 11:00–12:00 $20.97">21</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週四 13:00–14:00 $11.75">12</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(255,87,34,0.80)" title="週四 16:00–17:00 -$1,743.66">-1,744</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.15)" title="週四 19:00–20:00 $172.76">173</div><div class="c" style="background:rgba(76,175,80,0.39)" title="週四 20:00–21:00 $739.00">739</div><div class="c" style="background:rgba(76,175,80,0.28)" title="週四 21:00–22:00 $489.16">489</div><div class="c" style="background:rgba(76,175,80,0.16)" title="週四 22:00–23:00 $186.58">187</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週四 23:00–24:00 $64.00">64</div><div class="lab">五</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.08)" title="週五 09:00–10:00 $7.84">8</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.11)" title="週五 13:00–14:00 $77.00">77</div><div class="c" style="background:rgba(76,175,80,0.10)" title="週五 14:00–15:00 $57.60">58</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.09)" title="週五 16:00–17:00 $17.19">17</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.35)" title="週五 18:00–19:00 $653.62">654</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c" style="background:rgba(76,175,80,0.39)" title="週五 21:00–22:00 $746.67">747</div><div class="c" style="background:rgba(76,175,80,0.20)" title="週五 22:00–23:00 $299.88">300</div><div class="c na" title="冇數">·</div><div class="lab">六</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="lab">日</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div><div class="c na" title="冇數">·</div></div>
+<h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">累計 P&amp;L（Growth）</h3><div class="svgbox"><svg viewBox="0 0 620 150" width="100%" height="150"><line x1="46" y1="125" x2="608" y2="125" stroke="#333" stroke-dasharray="3 3"/><polyline points="46.0,125.2 48.3,125.5 50.6,125.8 52.9,126.0 55.1,125.2 57.4,123.1 59.7,123.4 62.0,119.0 64.3,118.9 66.6,119.2 68.8,119.1 71.1,118.8 73.4,118.6 75.7,118.5 78.0,118.5 80.3,117.5 82.6,117.2 84.8,113.8 87.1,113.7 89.4,111.8 91.7,111.2 94.0,111.1 96.3,110.9 98.5,110.9 100.8,110.5 103.1,109.8 105.4,109.7 107.7,109.6 110.0,109.4 112.3,109.2 114.5,109.2 116.8,109.0 119.1,109.3 121.4,109.9 123.7,110.4 126.0,110.2 128.2,106.7 130.5,107.1 132.8,107.4 135.1,100.0 137.4,100.5 139.7,99.3 142.0,99.6 144.2,99.5 146.5,98.9 148.8,98.9 151.1,97.6 153.4,97.4 155.7,97.3 157.9,97.1 160.2,97.2 162.5,96.4 164.8,96.3 167.1,96.3 169.4,95.9 171.7,95.8 173.9,95.7 176.2,95.6 178.5,95.3 180.8,95.1 183.1,95.2 185.4,95.3 187.6,95.1 189.9,88.9 192.2,87.3 194.5,87.4 196.8,86.7 199.1,83.6 201.3,83.6 203.6,83.4 205.9,83.6 208.2,83.0 210.5,83.1 212.8,80.4 215.1,79.1 217.3,79.3 219.6,79.2 221.9,74.3 224.2,74.4 226.5,74.1 228.8,74.1 231.0,72.3 233.3,68.9 235.6,69.0 237.9,68.2 240.2,68.1 242.5,67.9 244.8,68.2 247.0,68.5 249.3,66.8 251.6,66.8 253.9,67.1 256.2,66.6 258.5,63.1 260.7,63.3 263.0,63.3 265.3,63.0 267.6,62.9 269.9,62.2 272.2,62.4 274.5,62.3 276.7,61.6 279.0,61.6 281.3,60.2 283.6,59.9 285.9,59.8 288.2,59.7 290.4,59.5 292.7,59.5 295.0,59.4 297.3,58.7 299.6,58.7 301.9,57.2 304.2,56.8 306.4,56.7 308.7,56.8 311.0,55.8 313.3,55.7 315.6,55.8 317.9,55.3 320.1,55.2 322.4,55.4 324.7,55.6 327.0,55.4 329.3,53.6 331.6,53.8 333.9,52.9 336.1,52.9 338.4,52.9 340.7,52.6 343.0,52.5 345.3,52.3 347.6,52.5 349.8,52.3 352.1,51.7 354.4,51.7 356.7,50.0 359.0,49.7 361.3,49.5 363.6,49.4 365.8,49.8 368.1,50.1 370.4,50.1 372.7,48.5 375.0,48.8 377.3,48.4 379.5,48.7 381.8,45.2 384.1,45.2 386.4,44.9 388.7,44.9 391.0,44.4 393.3,44.3 395.5,44.2 397.8,43.9 400.1,43.8 402.4,43.3 404.7,43.3 407.0,43.1 409.2,43.0 411.5,42.5 413.8,42.8 416.1,43.3 418.4,43.7 420.7,42.8 423.0,37.2 425.2,37.6 427.5,37.6 429.8,38.1 432.1,35.8 434.4,35.8 436.7,35.6 438.9,35.5 441.2,35.4 443.5,35.2 445.8,35.2 448.1,35.0 450.4,35.1 452.7,35.1 454.9,34.5 457.2,34.2 459.5,34.3 461.8,34.0 464.1,33.5 466.4,33.4 468.6,33.2 470.9,33.2 473.2,32.2 475.5,29.0 477.8,28.9 480.1,27.1 482.3,26.6 484.6,26.4 486.9,26.4 489.2,26.2 491.5,26.3 493.8,25.7 496.1,25.6 498.3,24.4 500.6,24.2 502.9,24.2 505.2,24.2 507.5,23.8 509.8,23.7 512.0,24.0 514.3,24.2 516.6,24.6 518.9,24.1 521.2,20.9 523.5,20.9 525.8,21.2 528.0,14.6 530.3,13.1 532.6,13.4 534.9,13.3 537.2,13.2 539.5,13.1 541.7,13.0 544.0,12.6 546.3,12.5 548.6,12.4 550.9,11.9 553.2,11.7 555.5,11.6 557.7,11.5 560.0,11.1 562.3,10.9 564.6,10.7 566.9,10.7 569.2,10.3 571.4,10.2 573.7,9.2 576.0,9.2 578.3,8.9 580.6,8.9 582.9,8.6 585.2,8.5 587.4,8.0 589.7,15.5 592.0,20.8 594.3,24.6 596.6,27.6 598.9,29.8 601.1,31.3 603.4,32.4 605.7,32.3 608.0,32.1" fill="none" stroke="#64b5f6" stroke-width="1.8"/><text x="40" y="12" fill="#777" font-size="9" text-anchor="end">8,391</text><text x="40" y="126" fill="#777" font-size="9" text-anchor="end">-46</text><text x="327.0" y="146" fill="#777" font-size="10" text-anchor="middle">逐筆平倉（05-12 → 07-21）</text></svg></div>
+<h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">明細（最近 50 筆／共 247 筆）</h3>
+<table><thead><tr><th>平倉時間</th><th>商品</th><th>方向</th><th>lots</th><th>淨利</th><th>MAE $</th></tr></thead><tbody><tr><td>07-21 14:09</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="pos">$14.68</td><td class="neg">1.67</td></tr><tr><td>07-21 14:09</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="pos">$5.66</td><td class="neg">5.24</td></tr><tr><td>07-02 16:20</td><td>EURGBP</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="neg">-$79.13</td><td class="neg">84.21</td></tr><tr><td>07-02 16:20</td><td>EURGBP</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="neg">-$103.62</td><td class="neg">111.21</td></tr><tr><td>07-02 16:20</td><td>EURGBP</td><td><span class="buy-h"></span>BUY</td><td>0.05</td><td class="neg">-$161.97</td><td class="neg">174.69</td></tr><tr><td>07-02 16:20</td><td>EURGBP</td><td><span class="buy-h"></span>BUY</td><td>0.07</td><td class="neg">-$209.35</td><td class="neg">227.09</td></tr><tr><td>07-02 16:20</td><td>EURGBP</td><td><span class="buy-h"></span>BUY</td><td>0.10</td><td class="neg">-$275.66</td><td class="neg">301.12</td></tr><tr><td>07-02 16:20</td><td>EURGBP</td><td><span class="buy-h"></span>BUY</td><td>0.15</td><td class="neg">-$380.06</td><td class="neg">418.27</td></tr><tr><td>07-02 16:20</td><td>EURGBP</td><td><span class="buy-h"></span>BUY</td><td>0.23</td><td class="neg">-$533.87</td><td class="neg">592.18</td></tr><tr><td>05-28 08:20</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.07</td><td class="pos">$39.12</td><td class="neg">12.12</td></tr><tr><td>05-28 08:20</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.03</td><td class="pos">$6.28</td><td class="neg">15.62</td></tr><tr><td>05-28 08:20</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.05</td><td class="pos">$19.94</td><td class="neg">16.56</td></tr><tr><td>05-28 08:20</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$1.05</td><td class="neg">13.55</td></tr><tr><td>05-19 13:23</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.03</td><td class="pos">$16.20</td><td class="neg">3.09</td></tr><tr><td>05-19 13:23</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$6.30</td><td class="neg">6.56</td></tr><tr><td>04-30 19:18</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.10</td><td class="pos">$70.96</td><td class="neg">7.50</td></tr><tr><td>04-30 19:18</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="pos">$2.61</td><td class="neg">20.88</td></tr><tr><td>04-30 19:18</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.07</td><td class="pos">$33.64</td><td class="neg">21.35</td></tr><tr><td>04-30 19:18</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="neg">-$1.25</td><td class="neg">16.95</td></tr><tr><td>04-30 19:18</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.05</td><td class="pos">$12.69</td><td class="neg">26.56</td></tr><tr><td>04-27 18:04</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="pos">$14.18</td><td class="neg">8.92</td></tr><tr><td>04-27 18:04</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.05</td><td class="pos">$31.07</td><td class="neg">5.63</td></tr><tr><td>04-27 18:04</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="pos">$4.19</td><td class="neg">11.21</td></tr><tr><td>04-14 18:04</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="pos">$9.64</td><td class="neg">2.40</td></tr><tr><td>04-14 03:05</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="pos">$9.82</td><td class="neg">22.01</td></tr><tr><td>04-14 03:05</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.05</td><td class="pos">$40.16</td><td class="neg">6.40</td></tr><tr><td>04-14 03:05</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="pos">$2.13</td><td class="neg">19.09</td></tr><tr><td>04-09 21:08</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="pos">$12.42</td><td class="neg">6.15</td></tr><tr><td>04-09 21:08</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.05</td><td class="pos">$28.75</td><td class="neg">2.20</td></tr><tr><td>04-09 21:08</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="pos">$2.08</td><td class="neg">10.28</td></tr><tr><td>03-30 01:20</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$8.15</td><td class="neg">0.38</td></tr><tr><td>03-26 23:31</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$10.78</td><td class="neg">0.88</td></tr><tr><td>03-26 06:14</td><td>AUDUSD</td><td><span class="sell-h"></span>SELL</td><td>0.02</td><td class="pos">$8.57</td><td class="neg">5.64</td></tr><tr><td>03-16 17:31</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.07</td><td class="neg">-$22.69</td><td class="neg">83.38</td></tr><tr><td>03-16 17:31</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.34</td><td class="pos">$104.20</td><td class="neg">190.40</td></tr><tr><td>03-16 17:31</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.77</td><td class="pos">$472.36</td><td class="neg">194.81</td></tr><tr><td>03-16 17:31</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="neg">-$21.99</td><td class="neg">48.03</td></tr><tr><td>03-16 17:31</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.15</td><td class="neg">-$0.08</td><td class="neg">130.65</td></tr><tr><td>03-16 17:30</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.51</td><td class="pos">$231.77</td><td class="neg">207.57</td></tr><tr><td>03-16 17:30</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.23</td><td class="pos">$32.31</td><td class="neg">165.60</td></tr><tr><td>03-16 17:30</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.05</td><td class="neg">-$24.71</td><td class="neg">67.86</td></tr><tr><td>03-16 17:30</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.10</td><td class="neg">-$16.80</td><td class="neg">103.00</td></tr><tr><td>03-16 17:30</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="neg">-$21.73</td><td class="neg">38.97</td></tr><tr><td>03-03 03:52</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="pos">$9.32</td><td class="neg">14.83</td></tr><tr><td>03-03 03:52</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.05</td><td class="pos">$27.02</td><td class="neg">6.55</td></tr><tr><td>03-03 03:52</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.02</td><td class="neg">-$1.79</td><td class="neg">17.93</td></tr><tr><td>02-20 21:07</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.03</td><td class="neg">-$1.86</td><td class="neg">22.38</td></tr><tr><td>02-20 21:07</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.07</td><td class="pos">$18.00</td><td class="neg">29.81</td></tr><tr><td>02-20 21:07</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.15</td><td class="pos">$87.90</td><td class="neg">14.85</td></tr><tr><td>02-20 21:07</td><td>AUDUSD</td><td><span class="buy-h"></span>BUY</td><td>0.05</td><td class="pos">$4.85</td><td class="neg">29.15</td></tr></tbody></table>
+<details><summary>完整欄位明細（RawData 33 欄版本）</summary><div class="footnote">CSV 源 19 欄（forex-forest 導出）；Excel RawData 33 欄其餘欄位由 OpenClaw 數據 lane 補齊後，重跑本生成器自動帶出。</div></details></section>
+<section id="s8"><h2>⑧ 使用說明</h2><div class="legend">術語、清洗規則、顏色圖例——Excel「說明／匯入說明」兩 sheet 嘅 web 化。</div>
+<details><summary>展開說明</summary><dl class="guide">
+<dt>勝率</dt><dd>Net Profit &gt; 0 嘅交易佔比（含 commission＋swap 後淨值）。</dd>
+<dt>盈虧比</dt><dd>平均贏利 ÷ |平均虧損|。</dd>
+<dt>Profit Factor</dt><dd>總盈利 ÷ |總虧損|；無虧損單時顯示「無虧損」（唔係 ∞）。</dd>
+<dt>MAE / MFE</dt><dd>入場後最大不利／有利偏移，由入場價起算，pips 為主、$ 為輔。</dd>
+<dt>Growth／MaxDD</dt><dd>按平倉時間逐筆累計淨利；MaxDD＝峰值回撤最大深度（$）。</dd>
+<dt>馬丁偵測</dt><dd>白皮書 v3.1 §4：基準 lot＝出現≥2次嘅最小實際 lot；每筆按倍數歸層；最大層≥2 判馬丁。</dd>
+<dt>清洗規則</dt><dd>剔 balance/credit、剔未平倉、按 Close Time 排序。本數據源（forex-forest copy signal）Magic 全 0，「剔 Magic=0」規則豁免並在此注明。</dd>
+<dt>顏色圖例</dt><dd>綠＝贏/BUY、紅＝蝕/SELL、金＝強調、藍＝互動；熱力深淺按 |值| 歸一化；「·」＝冇數（≠$0）。</dd>
+<dt>數據上限</dt><dd>20,000 筆（Excel v8.5 同款上限）。</dd>
+<dt>互動分享</dt><dd>③ 區商品／門檻選擇寫入 URL hash（#sym=…&amp;th=…），可分享可返後。</dd>
+</dl></details></section>
+<div class="footnote" style="text-align:center">TSA · Template B v1（rebuild_martin_v4.py）· 數據源 docs/downloads/forex-forest-signals-page-12173.csv</div>
+</main>
 </div>
-<div class="quick-btns" id="quickBtns">
-<button data-range="1d">1日</button><button data-range="1w">1週</button><button data-range="1m">1月</button>
-<button data-range="3m">3月</button><button data-range="6m">6月</button><button data-range="1y">1年</button>
-<button data-range="all" class="active">全部</button>
-</div>
-<div class="date-inputs">
-<label>From:</label><input type="date" id="dateFrom">
-<label>To:</label><input type="date" id="dateTo">
-<button onclick="applyCustomDate()">套用</button>
-<button onclick="clearDateFilter()">清除</button>
-</div>
-<div class="range-container" id="rangeContainer">
-<div class="range-track"></div><div class="range-fill" id="rangeFill"></div>
-<div class="range-handle" id="handleLeft" data-handle="left"></div>
-<div class="range-handle" id="handleRight" data-handle="right"></div>
-</div>
-<div class="range-labels"><span id="rangeMinLabel">—</span><span id="rangeMaxLabel">—</span></div>
-</div>
-
-<!-- Period Stats -->
-<div class="sec"><div class="sec-h" onclick="toggleSec(this)"><span>📊 交易統計表</span><span class="arrow">▶</span></div><div class="sec-b" id="periodStatsBody"></div></div>
-
-<!-- Summary -->
-<div class="stats-bar" id="summaryBar"></div>
-
-<!-- Content -->
-<div id="content"></div>
-
-<script>
-/**
- * Martin Autopsy V4.1 — Core Computation Engine
- * 純 JavaScript 計算邏輯，唔加公式，只用 CSV 真實數據
- */
-
-// ═══════════════════════════════════════════════════════
-// CSV Parser
-// ═══════════════════════════════════════════════════════
-
-function parseCSV(text) {
-    const lines = text.trim().split('\n');
-    if (lines.length < 2) return [];
-    const headers = lines[0].split(',').map(h => h.trim());
-    const trades = [];
-    for (let i = 1; i < lines.length; i++) {
-        const values = parseCSVLine(lines[i]);
-        if (values.length < headers.length) continue;
-        const row = {};
-        headers.forEach((h, idx) => row[h] = values[idx]);
-        const type = (row['Type'] || '').trim().toLowerCase();
-        if (type !== 'buy' && type !== 'sell') continue;
-        const symbol = (row['Symbol'] || '').trim();
-        if (!symbol) continue;
-        const trade = {
-            symbol, direction: type,
-            lots: Math.abs(parseFloat(row['Lots']) || 0),
-            open_price: parseFloat(row['Open Price']) || 0,
-            close_price: parseFloat(row['Close Price']) || 0,
-            net_profit: parseFloat(row['Net Profit']) || 0,
-            net_pips: parseFloat(row['Net Pips']) || 0,
-            max_profit: parseFloat(row['Max Profit']) || 0,
-            max_loss: parseFloat(row['Max Loss']) || 0,
-            mfe: parseFloat(row['Max Pips']) || 0,
-            mae: Math.abs(parseFloat(row['Max Loss Pips']) || 0),
-            holding_hours: parseFloat(row['Holding Time (Hours)']) || 0,
-            commission: parseFloat(row['Commission']) || 0,
-            swap: parseFloat(row['Swap']) || 0,
-            comment: (row['Comment'] || '').trim(),
-            open_time: (row['Open Time'] || '').trim(),
-            close_time: (row['Close Time'] || '').trim(),
-            magic: parseInt(row['Magic Number']) || 0,
-            _openDate: null,
-        };
-        try {
-            const parts = trade.open_time.split(/[/\s:]+/);
-            if (parts.length >= 6) {
-                trade._openDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), parseInt(parts[3]), parseInt(parts[4]), parseInt(parts[5]));
-            }
-        } catch (e) {}
-        trades.push(trade);
-    }
-    return trades;
-}
-
-function parseCSVLine(line) {
-    const result = []; let current = ''; let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-        const c = line[i];
-        if (c === '"') inQ = !inQ;
-        else if (c === ',' && !inQ) { result.push(current.trim()); current = ''; }
-        else current += c;
-    }
-    result.push(current.trim());
-    return result;
-}
-
-// ═══════════════════════════════════════════════════════
-// Date Filtering
-// ═══════════════════════════════════════════════════════
-
-function filterByDateRange(trades, from, to) {
-    if (!from && !to) return trades;
-    return trades.filter(t => {
-        if (!t._openDate) return false;
-        if (from && t._openDate < from) return false;
-        if (to && t._openDate > to) return false;
-        return true;
-    });
-}
-
-function getDateRange(trades) {
-    const dates = trades.filter(t => t._openDate).map(t => t._openDate.getTime());
-    if (!dates.length) return { min: null, max: null };
-    return { min: new Date(Math.min(...dates)), max: new Date(Math.max(...dates)) };
-}
-
-// ═══════════════════════════════════════════════════════
-// Core Stats
-// ═══════════════════════════════════════════════════════
-
-function computeLayerStats(trades) {
-    const ccyDirMap = {};
-    for (const t of trades) {
-        const key = `${t.symbol}_${t.direction}`;
-        if (!ccyDirMap[key]) ccyDirMap[key] = [];
-        ccyDirMap[key].push(t);
-    }
-    const results = {};
-    for (const [ccyDirKey, ccyTrades] of Object.entries(ccyDirMap)) {
-        const lotsInGroup = [...new Set(ccyTrades.map(t => t.lots))].sort((a, b) => a - b);
-        const lotToIdx = {};
-        lotsInGroup.forEach((lot, idx) => lotToIdx[lot] = idx + 1);
-        const maxDepth = lotsInGroup.length;
-        const layerMap = {};
-        for (const t of ccyTrades) {
-            const label = `L${t.lots}`;
-            if (!layerMap[label]) layerMap[label] = [];
-            layerMap[label].push(t);
-        }
-        for (const [layerLabel, lt] of Object.entries(layerMap)) {
-            const n = lt.length;
-            if (n === 0) continue;
-            const wins = lt.filter(t => t.net_profit > 0);
-            const losses = lt.filter(t => t.net_profit <= 0);
-            const winCount = wins.length;
-            const lossCount = losses.length;
-            const wr = n > 0 ? (winCount / n * 100) : 0;
-            const totalPnl = lt.reduce((s, t) => s + t.net_profit, 0);
-            const totalPips = lt.reduce((s, t) => s + t.net_pips, 0);
-            const avgWinPips = winCount > 0 ? wins.reduce((s, t) => s + t.net_pips, 0) / winCount : 0;
-            const avgLossPips = lossCount > 0 ? Math.abs(losses.reduce((s, t) => s + t.net_pips, 0) / lossCount) : 0;
-            const oddsPips = avgLossPips > 0 ? avgWinPips / avgLossPips : 999;
-            const avgHold = lt.reduce((s, t) => s + t.holding_hours, 0) / n;
-            const mfeVals = lt.map(t => t.mfe);
-            const maeVals = lt.map(t => t.mae);
-            const avgMfe = mfeVals.reduce((s, v) => s + v, 0) / n;
-            const maxMfe = Math.max(...mfeVals);
-            const avgMae = maeVals.reduce((s, v) => s + v, 0) / n;
-            const maxMae = Math.max(...maeVals);
-            const sampleLots = lt[0].lots;
-            const layerIdx = lotToIdx[sampleLots] || 1;
-            const key = `${ccyDirKey}_${layerLabel}`;
-            results[key] = {
-                symbol: ccyDirKey.split('_')[0], direction: ccyDirKey.split('_')[1],
-                layer_label: layerLabel, lots: sampleLots, layer_idx: layerIdx, max_depth: maxDepth,
-                count: n, win_count: winCount, loss_count: lossCount,
-                wr: r2(wr), total_pnl: r2(totalPnl), total_pips: r2(totalPips),
-                avg_win_pips: r2(avgWinPips), avg_loss_pips: r2(avgLossPips),
-                odds_pips: oddsPips < 100 ? r2(oddsPips) : 999,
-                avg_hold: r2(avgHold),
-                avg_mfe: r2(avgMfe), max_mfe: r2(maxMfe),
-                avg_mae: r2(avgMae), max_mae: r2(maxMae),
-                trades: lt, // keep full trades for expand
-            };
-        }
-    }
-    return results;
-}
-
-// ═══════════════════════════════════════════════════════
-// Rating
-// ═══════════════════════════════════════════════════════
-// L15 修復 — 白皮書方案 (b)(2026-10-21 用戶裁決修訂,廢 v1.3 方案 (a)):
-//   score 設計上限 70(30+20+15+5),評級與 danger 改用正規化百分制:
-//     normalized = Math.round(score × 100 / 70)  → 門檻表 85/70/55/40/25/15 不變
-//     danger 基準 = (100 − normalized)            → 取代殘留 (100 − raw score)
-//   computeScore 原值不變,保持跨版本可比。
-//   有效原始分界(0.1 分制網格):S+≥59.2 S≥48.8 A≥38.2 B≥27.7 C≥17.2 D≥10.2
-//   (連續分界 59.15/48.65/38.15/27.65/17.15/10.15;0.35 暗區已入冊白皮書 v1.4)
-//   由 tests/golden.test.mjs [L1b] 邊界測試鎖定,改動即紅。
-
-function normalizeScore(s) {
-    return Math.round(computeScore(s) * 100 / 70);
-}
-
-function computeRating(s) {
-    const sc = normalizeScore(s);
-    if (sc >= 85) return 'S+'; if (sc >= 70) return 'S'; if (sc >= 55) return 'A';
-    if (sc >= 40) return 'B'; if (sc >= 25) return 'C'; if (sc >= 15) return 'D'; return 'E';
-}
-
-function computeScore(s) {
-    const wr = s.wr; const odds = Math.min(s.odds_pips, 999); const cnt = s.count; const hold = s.avg_hold;
-    let score = 0;
-    score += wr >= 80 ? 30 : wr >= 70 ? 25 : wr >= 60 ? 18 : wr >= 50 ? 10 : Math.max(0, wr / 5);
-    score += odds >= 2.0 ? 20 : odds >= 1.5 ? 15 : odds >= 1.0 ? 10 : Math.max(0, odds * 10);
-    score += cnt >= 10 ? 15 : cnt >= 5 ? 12 : cnt >= 3 ? 8 : Math.max(0, cnt * 2);
-    score += hold <= 24 ? 5 : hold <= 72 ? 4 : hold <= 168 ? 3 : hold <= 360 ? 2 : 1;
-    return Math.round(score * 10) / 10;
-}
-
-// ═══════════════════════════════════════════════════════
-// Summary / TP/SL / Blacklist / Recovery / CCY Summary
-// ═══════════════════════════════════════════════════════
-
-function computeSummary(trades) {
-    const n = trades.length;
-    if (n === 0) return { count: 0, win_pct: 0, total_pnl: 0, total_pips: 0, symbols: 0, layers: 0, best_ccy: '', best_pnl: 0 };
-    const wins = trades.filter(t => t.net_profit > 0).length;
-    const totalPnl = trades.reduce((s, t) => s + t.net_profit, 0);
-    const totalPips = trades.reduce((s, t) => s + t.net_pips, 0);
-    const symbols = new Set(trades.map(t => t.symbol)).size;
-    const lots = new Set(trades.map(t => t.lots)).size;
-    const ccyPnl = {};
-    for (const t of trades) ccyPnl[t.symbol] = (ccyPnl[t.symbol] || 0) + t.net_profit;
-    let bestCcy = '', bestPnl = -Infinity;
-    for (const [c, p] of Object.entries(ccyPnl)) { if (p > bestPnl) { bestPnl = p; bestCcy = c; } }
-    return { count: n, win_pct: r2(wins / n * 100), total_pnl: r2(totalPnl), total_pips: r2(totalPips), symbols, layers: lots, best_ccy: bestCcy, best_pnl: r2(bestPnl) };
-}
-
-function computeBlacklist(layerStats) {
-    const bl = [];
-    for (const [key, s] of Object.entries(layerStats)) {
-        const r = computeRating(s);
-        if (['D', 'E'].includes(r) && s.count >= 2) {
-            const danger = (100 - normalizeScore(s)) + Math.abs(s.total_pnl > 0 ? 0 : Math.abs(s.total_pnl) / 10);
-            bl.push({ key, symbol: s.symbol, direction: s.direction, layer: s.layer_label, lots: s.lots, rating: r, score: computeScore(s), danger_score: r2(danger), wr: s.wr, count: s.count, total_pnl: s.total_pnl, reason: getDangerReason(s) });
-        }
-    }
-    return bl.sort((a, b) => b.danger_score - a.danger_score);
-}
-
-function getDangerReason(s) {
-    const reasons = [];
-    if (s.wr < 40) reasons.push('WR<40%');
-    if (s.total_pnl < -50) reasons.push('P&L<-$50');
-    if (s.odds_pips < 0.5) reasons.push('RR<0.5');
-    if (s.avg_hold > 360) reasons.push('Hold>15d');
-    return reasons.join(', ') || 'Underperforming';
-}
-
-function buildCCYDirectionSummary(layerStats) {
-    const map = {};
-    for (const [key, s] of Object.entries(layerStats)) {
-        const cd = `${s.symbol}_${s.direction}`;
-        if (!map[cd]) map[cd] = [];
-        map[cd].push(s);
-    }
-    const summary = [];
-    for (const [cd, layers] of Object.entries(map)) {
-        const totalPnl = layers.reduce((s, l) => s + l.total_pnl, 0);
-        const totalPips = layers.reduce((s, l) => s + (l.total_pips||0), 0);
-        const totalCount = layers.reduce((s, l) => s + l.count, 0);
-        const totalWins = layers.reduce((s, l) => s + l.win_count, 0);
-        const avgWr = totalCount > 0 ? totalWins / totalCount * 100 : 0;
-        const ratings = layers.map(l => computeRating(l));
-        const best = ratings.includes('S+') ? 'S+' : ratings.includes('S') ? 'S' : ratings.includes('A') ? 'A' : ratings.includes('B') ? 'B' : 'C';
-        summary.push({ symbol: layers[0].symbol, direction: layers[0].direction, layers: layers.length, total_pnl: r2(totalPnl), total_pips: r2(totalPips), total_count: totalCount, avg_wr: r2(avgWr), best_rating: best });
-    }
-    return summary.sort((a, b) => b.total_pnl - a.total_pnl);
-}
-
-// ═══════════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════════
-function r2(v) { return Math.round(v * 100) / 100; }
-function fmtPnl(v) { return v >= 0 ? `+${v.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1})}` : v.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
-function ratingClass(r) { return ({ 'S+': 'r-sp', 'S': 'r-s', 'A': 'r-a', 'B': 'r-b', 'C': 'r-c', 'D': 'r-d', 'E': 'r-e' })[r] || 'r-e'; }
-function fmtDate(d) { if (!d) return '—'; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-function fmtTime(h) {
-    if (h < 1) return `${r2(h*60)}m`;
-    if (h < 24) return `${r2(h)}h`;
-    if (h < 168) return `${r2(h/24)}d`;
-    return `${r2(h/168)}w`;
-}
-
-// ═══ SET Data Display ═══
-function getSetConfigsForCCY(symbol, direction) {
-    if (!SET_DATA || !SET_DATA.set_files) return [];
-    const dir = direction.toLowerCase();
-    const results = [];
-    // Deduplicate by ea_type + symbol
-    const seen = new Set();
-    for (const sf of SET_DATA.set_files) {
-        if (sf.error) continue;
-        const sfSym = (sf.symbol || '').toUpperCase();
-        const sfDir = (sf.direction || '').toLowerCase();
-        // Match: same symbol, and direction is 'both' or matches
-        if (sfSym === symbol.toUpperCase() && (sfDir === 'both' || sfDir === dir)) {
-            const key = `${sf.ea_type}_${sfSym}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                results.push(sf);
-            }
-        }
-    }
-    return results;
-}
-
-// EA Name Abbreviation Map
-var EA_DISPLAY_ABBREV = {
-    'DragonWave': 'DW', 'Dragon Wave': 'DW',
-    'MKD Pro': 'MKDPro', 'MKD': 'MKD',
-    'SMA Pro': 'SMAPro', 'SMA': 'SMA',
-    'Flash': 'Flash', 'S10': 'S10',
-    'Gemini Client': 'GC', 'Gemini Server': 'GS',
-    'StableHelper': ''
-};
-
-function abbreviateEaName(name) {
-    if (!name) return '';
-    var lower = name.toLowerCase();
-    // Match longest first to avoid partial matches
-    var keys = Object.keys(EA_DISPLAY_ABBREV).sort(function(a, b) { return b.length - a.length; });
-    for (var i = 0; i < keys.length; i++) {
-        if (lower.indexOf(keys[i].toLowerCase()) >= 0) return EA_DISPLAY_ABBREV[keys[i]];
-    }
-    // Fallback: strip version
-    return name.replace(/\s*v?[\d.]+$/, '').trim();
-}
-
-function renderSetInfo(setConfigs) {
-    if (!setConfigs || setConfigs.length === 0) return '';
-    let html = '<div style="font-size:0.82em;color:var(--text2);margin:4px 0 8px;padding:6px 10px;background:var(--bg);border:1px solid var(--brd);border-radius:6px">';
-    html += '<span style="color:var(--acc);font-weight:bold">📋 SET 配置</span> ';
-    const parts = [];
-    for (const cfg of setConfigs) {
-        if (cfg.lot_mode === 'copy_trade') {
-            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Copy: LV${cfg.start_lv}-${cfg.end_lv}`);
-        } else if (cfg.lots && cfg.lots.length > 0) {
-            const lotsStr = cfg.lots.slice(0, 6).map(l => l.toFixed(l < 0.1 ? 3 : 2)).join('→') + (cfg.lots.length > 6 ? '...' : '');
-            const psStr = cfg.pipsteps && cfg.pipsteps.length > 0 ? cfg.pipsteps.slice(0, 6).map(p => p.toFixed(0)).join('→') + (cfg.pipsteps.length > 6 ? '...' : '') : '—';
-            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Lots: ${lotsStr} | PipStep: ${psStr}`);
-        } else if (cfg.lot_mode === 'fixed' && cfg.lots && cfg.lots.length === 1) {
-            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span> Fixed: ${cfg.lots[0].toFixed(2)} lots`);
-        } else {
-            parts.push(`<span style="color:var(--pri)">${abbreviateEaName(cfg.ea_name)}</span>`);
-        }
-    }
-    html += parts.join(' | ');
-    html += '</div>';
-    return html;
-}
-
-function getSetLotForLayer(setConfigs, layerIdx, actualLot) {
-    // Get the SET-defined lot for a given layer index, for comparison.
-    if (!setConfigs || setConfigs.length === 0) return null;
-    for (const cfg of setConfigs) {
-        if (cfg.lot_mode === 'copy_trade') continue;
-        if (cfg.lots && cfg.lots[layerIdx - 1] !== undefined) {
-            return cfg.lots[layerIdx - 1];
-        }
-    }
-    return null;
-}
-
-function fmtLotCompare(actualLot, setConfigs, layerIdx) {
-    const setLot = getSetLotForLayer(setConfigs, layerIdx, actualLot);
-    if (setLot === null || setLot === undefined) return `${actualLot}`;
-    const diff = Math.abs(actualLot - setLot);
-    if (diff < 0.001) return `${actualLot}`;
-    // Highlight mismatch
-    return `${actualLot} <span style="color:var(--yel);font-size:0.85em" title="SET 定義: ${setLot.toFixed(3)}">(SET:${setLot.toFixed(setLot < 0.1 ? 3 : 2)})</span>`;
-}
-
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { parseCSV, filterByDateRange, computeLayerStats, computeRating, computeScore, normalizeScore, computeSummary, computeBlacklist, buildCCYDirectionSummary };
-}
-
-</script>
-<script>
-const SIGNAL_ID='12173', EA_TAG='SMA', CSV_URL='../downloads/forex-forest-signals-page-12173.csv', SET_DATA={"signal_id": 12173, "set_files": []};
-let allTrades=[], filteredTrades=[], dateMin=null, dateMax=null, rangeFrom=null, rangeTo=null;
-
-(function init(){
-    loadTheme();
-    document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} (${EA_TAG}) · 載入中...`;
-    fetch(CSV_URL).then(r=>r.ok?r.text():Promise.reject('CSV load failed: '+r.status)).then(text=>{
-        allTrades=parseCSV(text);
-        const dr=getDateRange(allTrades); dateMin=dr.min; dateMax=dr.max;
-        if(!dateMin||!dateMax){document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} — ❌ 冇交易數據`;return;}
-        setupRangeSlider(); setupQuickButtons();
-        filteredTrades=[...allTrades]; renderAll();
-    }).catch(err=>{document.getElementById('headerSub').textContent=`Signal ${SIGNAL_ID} — ❌ ${err}`;});
-})();
-
-function loadTheme(){const t=localStorage.getItem('tsa-theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀️':'🌙';}
-function toggleTheme(){const c=document.documentElement.getAttribute('data-theme'),n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('tsa-theme',n);document.getElementById('themeToggle').textContent=n==='dark'?'☀️':'🌙';}
-
-function setupQuickButtons(){
-    document.querySelectorAll('#quickBtns button').forEach(btn=>{
-        btn.addEventListener('click',()=>{
-            document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));
-            btn.classList.add('active');
-            const range=btn.dataset.range;
-            // Use CSV max date as reference, not current time
-            const ref=dateMax||new Date();
-            let from=null;
-            if(range==='all'){from=null;} else if(range==='1d')from=new Date(ref.getTime()-86400000);
-            else if(range==='1w')from=new Date(ref.getTime()-7*86400000);
-            else if(range==='1m')from=new Date(ref.getFullYear(),ref.getMonth()-1,ref.getDate());
-            else if(range==='3m')from=new Date(ref.getFullYear(),ref.getMonth()-3,ref.getDate());
-            else if(range==='6m')from=new Date(ref.getFullYear(),ref.getMonth()-6,ref.getDate());
-            else if(range==='1y')from=new Date(ref.getFullYear()-1,ref.getMonth(),ref.getDate());
-            rangeFrom=from; rangeTo=null;
-            document.getElementById('dateFrom').value=from?fmtDate(from):'';
-            document.getElementById('dateTo').value='';
-            updateRangeSliderHandles(); applyFilter();
-        });
-    });
-}
-function applyCustomDate(){rangeFrom=document.getElementById('dateFrom').value?new Date(document.getElementById('dateFrom').value):null;rangeTo=document.getElementById('dateTo').value?new Date(document.getElementById('dateTo').value+'T23:59:59'):null;document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));updateRangeSliderHandles();applyFilter();}
-function clearDateFilter(){rangeFrom=null;rangeTo=null;document.getElementById('dateFrom').value='';document.getElementById('dateTo').value='';document.querySelectorAll('#quickBtns button').forEach(b=>b.classList.remove('active'));document.querySelector('[data-range="all"]').classList.add('active');updateRangeSliderHandles();applyFilter();}
-
-function setupRangeSlider(){
-    const ct=document.getElementById('rangeContainer'),hL=document.getElementById('handleLeft'),hR=document.getElementById('handleRight');
-    document.getElementById('rangeMinLabel').textContent=fmtDate(dateMin);document.getElementById('rangeMaxLabel').textContent=fmtDate(dateMax);
-    setHP(hL,0);setHP(hR,100);updateFill();
-    let dragging=null;
-    function startD(e){dragging=e.target.dataset.handle;e.preventDefault();}
-    function onD(e){if(!dragging)return;const rect=ct.getBoundingClientRect();const cx=e.touches?e.touches[0].clientX:e.clientX;let pct=Math.max(0,Math.min(100,(cx-rect.left)/rect.width*100));
-        if(dragging==='left'){pct=Math.min(pct,(parseFloat(hR.style.left)||100)-2);setHP(hL,pct);}else{pct=Math.max(pct,(parseFloat(hL.style.left)||0)+2);setHP(hR,pct);}
-        updateFill();const totalMs=dateMax.getTime()-dateMin.getTime();
-        if(dragging==='left')rangeFrom=new Date(dateMin.getTime()+(pct/100)*totalMs);else rangeTo=new Date(dateMin.getTime()+(pct/100)*totalMs);}
-    function endD(){if(!dragging)return;dragging=null;applyFilter();}
-    hL.addEventListener('mousedown',startD);hR.addEventListener('mousedown',startD);
-    hL.addEventListener('touchstart',startD,{passive:false});hR.addEventListener('touchstart',startD,{passive:false});
-    document.addEventListener('mousemove',onD);document.addEventListener('touchmove',onD,{passive:false});
-    document.addEventListener('mouseup',endD);document.addEventListener('touchend',endD);
-}
-function setHP(h,p){h.style.left=p+'%';}
-function updateFill(){const hL=document.getElementById('handleLeft'),hR=document.getElementById('handleRight'),f=document.getElementById('rangeFill');const l=parseFloat(hL.style.left)||0,r=parseFloat(hR.style.left)||100;f.style.left=l+'%';f.style.width=(r-l)+'%';}
-function updateRangeSliderHandles(){if(!dateMin||!dateMax)return;const t=dateMax.getTime()-dateMin.getTime();const l=rangeFrom?((rangeFrom.getTime()-dateMin.getTime())/t*100):0;const r=rangeTo?((rangeTo.getTime()-dateMin.getTime())/t*100):100;setHP(document.getElementById('handleLeft'),Math.max(0,l));setHP(document.getElementById('handleRight'),Math.min(100,r));updateFill();}
-
-function applyFilter(){filteredTrades=filterByDateRange(allTrades,rangeFrom,rangeTo);renderAll();}
-
-// ═══ PERIOD STATS ═══
-function computePeriodStats(trades, periodType){
-  if(!trades.length) return [];
-  const groups={};
-  trades.forEach(t=>{
-    if(!t._openDate) return;
-    let key;
-    if(periodType==='day') key=`${t._openDate.getDate()}/${t._openDate.getMonth()+1}`;
-    else if(periodType==='week'){const y=t._openDate.getFullYear();const w=getWeekNumber(t._openDate);key=`${y}-W${w}`;}
-    else {key=`${t._openDate.getFullYear()}-${String(t._openDate.getMonth()+1).padStart(2,'0')}`;}
-    if(!groups[key]) groups[key]={trades:[],buyCnt:0,sellCnt:0,pnlSum:0,swapSum:0,floating:null,wins:0};
-    groups[key].trades.push(t);
-    if(t.direction==='buy') groups[key].buyCnt++; else groups[key].sellCnt++;
-    groups[key].pnlSum+=t.net_profit;
-    groups[key].swapSum+=t.swap;
-    if(t.net_profit>=0) groups[key].wins++;
-    groups[key].floating=t.net_profit; // last trade floating
-  });
-  const rows=Object.entries(groups).sort((a,b)=>a[0]>b[0]?-1:1).slice(0,10);
-  let cumPnl=0;
-  const result=[];
-  for(let i=rows.length-1;i>=0;i--){ // reverse to accumulate equity
-    const [period,d]=rows[i];
-    cumPnl+=d.pnlSum;
-    result.unshift({period,trades:d.trades.length,buy:d.buyCnt,sell:d.sellCnt,
-      wr:((d.wins/d.trades.length)*100).toFixed(1),
-      pnl:d.pnlSum,floating:d.floating,swap:d.swapSum,
-      equity:cumPnl});
-  }
-  return result;
-}
-function getWeekNumber(d){const date=new Date(d.getTime());date.setHours(0,0,0,0);date.setDate(date.getDate()+3-(date.getDay()-1+7)%7);const week1=new Date(date.getFullYear(),0,4);return 1+Math.round(((date.getTime()-week1.getTime())/86400000-3+(week1.getDay()+6)%7)/7);}
-function fmtPnl(v){return(v>=0?'+'+(Math.abs(v)>=1000?(v/1000).toFixed(2)+'k':v.toFixed(2)):(Math.abs(v)>=1000?(v/1000).toFixed(2)+'k':v.toFixed(2)))+'$';}
-function fmtDate(d){return d?`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`:'—';}
-
-function buildPeriodStatsTable(periodType){
-  const stats=computePeriodStats(filteredTrades,periodType);
-  if(!stats.length) return '<div style="color:var(--text2);padding:10px">⚠️ 數據不足，無法生成統計表</div>'; 
-  const total={trades:0,buy:0,sell:0,wins:0,pnl:0,swap:0};
-  stats.forEach(s=>{total.trades+=s.trades;total.buy+=s.buy;total.sell+=s.sell;total.wins+=s.wr*s.trades/100;total.pnl+=s.pnl;total.swap+=s.swap;});
-  const totalWr=(total.wins/total.trades*100).toFixed(1);
-  let html='<div class="period-stats"><table><thead><tr><th>期間</th><th>交易數量</th><th>BUY</th><th>SELL</th><th>Win Rate</th><th>Net Profit</th><th>Floating</th><th>Swap</th><th>Equity</th></tr></thead><tbody>'; 
-  stats.forEach(s=>{
-    const wrCls=s.wr>=60?'p-wr-good':'p-wr-bad';
-    const pnlCls=s.pnl>=0?'p-pos':'p-neg';
-    const floatCls=s.floating>=0?'p-pos':'p-neg';
-    html+=`<tr><td class="p-period">${s.period}</td><td>${s.trades}</td><td>${s.buy}</td><td>${s.sell}</td><td class="${wrCls}">${s.wr}%</td><td class="${pnlCls}">${s.pnl>=0?'+'+s.pnl.toFixed(2):s.pnl.toFixed(2)}$</td><td class="${floatCls}">${s.floating>=0?'+'+s.floating.toFixed(2):s.floating.toFixed(2)}$</td><td>${s.swap>=0?'+'+s.swap.toFixed(2):s.swap.toFixed(2)}$</td><td>${s.equity.toFixed(2)}$</td></tr>`;
-  });
-  const totalPnlCls=total.pnl>=0?'p-pos':'p-neg';
-  html+=`<tfoot><tr><td><strong>總計</strong></td><td><strong>${total.trades}</strong></td><td><strong>${total.buy}</strong></td><td><strong>${total.sell}</strong></td><td><strong>${totalWr}%</strong></td><td class="${totalPnlCls}"><strong>${total.pnl>=0?'+'+total.pnl.toFixed(2):total.pnl.toFixed(2)}$</strong></td><td>—</td><td><strong>${total.swap>=0?'+'+total.swap.toFixed(2):total.swap.toFixed(2)}$</strong></td><td><strong>${total.pnl.toFixed(2)}$</strong></td></tr></tfoot></table></div>`; 
-  return html;
-}
-
-function getPeriodType(){
-  const active=document.querySelector('.quick-btns button.active');
-  if(!active) return 'month';
-  const r=active.dataset.range;
-  if(r==='1d'||r==='1w'||r==='1m') return 'day';
-  if(r==='3m'||r==='6m') return 'week';
-  return 'month';
-}
-
-// ═══ RENDER ═══
-function renderAll(){
-    const n=filteredTrades.length;
-    const summary=computeSummary(filteredTrades);
-    const dr=getDateRange(filteredTrades);
-    const dateStr=dr.min?`${fmtDate(dr.min)} – ${fmtDate(dr.max)}`:'—';
-    document.getElementById('headerSub').innerHTML=`Signal <a href="https://signals.algoforest.com/signals/${SIGNAL_ID}">${SIGNAL_ID}</a> (${EA_TAG}) · ${dateStr}`;
-    document.getElementById('summaryBar').innerHTML=`
-        <div><div class="v">${summary.count}</div><div class="l">交易筆數</div></div>
-        <div><div class="v">${summary.win_pct}%</div><div class="l">勝率</div></div>
-        <div><div class="v ${summary.total_pnl>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(summary.total_pnl)}</div><div class="l">總 P&L $</div></div>
-        <div><div class="v">${fmtPnl(summary.total_pips)}</div><div class="l">總 Pips</div></div>
-        <div><div class="v">${summary.symbols}</div><div class="l">CCY</div></div>
-        <div><div class="v">${summary.layers}</div><div class="l">層數</div></div>
-        <div><div class="v">${summary.best_ccy}</div><div class="l">最佳 (${fmtPnl(summary.best_pnl)})</div></div>`;
-
-    // Period Stats
-    document.getElementById('periodStatsBody').innerHTML=buildPeriodStatsTable(getPeriodType());
-
-    const ls=computeLayerStats(filteredTrades);
-    const ccySum=buildCCYDirectionSummary(ls);
-    const blacklist=computeBlacklist(ls);
-
-    let html='';
-
-    // Global P&L Bar Chart
-    html+=buildGlobalBar(ccySum, ls);
-
-    // CCY×Direction sections
-    html+='<h2>📊 CCY × Direction 逐層分析 <span class="info">i<span class="tip"><b>逐層分析說明</b><br>每個 CCY×Direction 展開後顯示：<br><br><b>Part 1 組合概覽</b>：每層嘅完整統計<br><b>Part 2 MFE/MAE 圖表</b>：分開兩幅圖，hover 睇每筆交易詳情<br><b>Part 3 交易訂單</b>：點擊展開查看每筆交易明細<br><br><b>Rating</b>: S+(金) S(紫) A(綠) B(藍) C(橙) D(灰) E(紅)<br><b>綠色行</b> = A 級以上 &nbsp;|&nbsp; <b>紅色行</b> = D 級以下</span></span></h2>';
-
-    for(const cs of ccySum){
-        const layers=Object.values(ls).filter(s=>s.symbol===cs.symbol&&s.direction===cs.direction);
-        layers.sort((a,b)=>a.layer_idx-b.layer_idx);
-        html+=`<div class="sec"><div class="sec-h" onclick="toggleSec(this)">
-            <span>${cs.direction==='buy'?'▲':'▼'} ${cs.symbol} ${cs.direction.toUpperCase()} — ${layers.length} 層 | WR ${cs.avg_wr}% | P&L ${fmtPnl(cs.total_pnl)} | ${cs.best_rating}</span>
-            <span class="arrow">▶</span></div><div class="sec-b">`;
-
-        // SET configuration info for this CCY×Direction
-        const setCfgs = getSetConfigsForCCY(cs.symbol, cs.direction);
-        html += renderSetInfo(setCfgs);;
-
-        // Part 1: Layer stats table
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:8px 0 4px">Part 1 · 組合概覽 <span class="info">i<span class="tip"><b>欄位說明</b><br><b>WR%</b>：勝率<br><b>Net Pips</b>：總盈虧點數<br><b>最大 Win/Lose Pip</b>：平均每筆盈利/虧損點數<br><b>Odds</b>：盈虧比（WinPip/LosePip）<br><b>MFE</b>：最大有利波幅（TP 參考）<br><b>MAE</b>：最大不利波幅（SL 參考）<br><b>MaxMAE</b>：歷史最差（Hard SL）<br><b>Hold</b>：平均持倉時間</span></span></div>`;
-        html+=`<div style="overflow-x:auto"><table><thead><tr>
-            <th>Layer</th><th>Rating</th><th>Score</th><th>Trades</th><th>W:L</th>
-            <th>WR%</th><th>Net P&L $</th><th>Net Pips</th>
-            <th>Win Pip</th><th>Lose Pip</th><th>Odds</th>
-            <th>Avg MFE</th><th>Avg MAE</th><th>Max MAE</th>
-            <th>Hold</th></tr></thead><tbody>`;
-        for(const l of layers){
-            const rat=computeRating(l),sc=computeScore(l);
-            const cls=rat==='S+'||rat==='S'||rat==='A'?' class="row-a"':rat==='D'||rat==='E'?' class="row-d"':'';
-            const lotDisplay = fmtLotCompare(l.lots, setCfgs, l.layer_idx);
-            html+=`<tr${cls}>
-                <td><b>L${l.layer_idx}</b></td>
-                <td class="${ratingClass(rat)}" title="Score: ${sc}">${rat}</td>
-                <td>${sc}</td>
-                <td>${l.count}</td><td>${l.win_count}:${l.loss_count}</td>
-                <td>${l.wr}%</td>
-                <td class="${l.total_pnl>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(l.total_pnl)}</td>
-                <td class="${l.total_pips>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(l.total_pips)}</td>
-                <td>${l.avg_win_pips}</td><td>${l.avg_loss_pips}</td>
-                <td>${l.odds_pips}x</td>
-                <td>${l.avg_mfe}</td><td>${l.avg_mae}</td><td><b>${l.max_mae}</b></td>
-                <td>${fmtTime(l.avg_hold)}</td>
-            </tr>`;
-        }
-        html+=`</tbody></table></div>`;
-
-        // Part 2: Trade details expand (MOVED before MFE/MAE)
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 2 · 交易訂單明細 <span class="info">i<span class="tip"><b>交易訂單說明</b><br>點擊每層嘅「展開訂單」按鈕，可查看該層所有交易嘅完整資料。<br><br>方便你對比同核對每筆交易嘅實際數據。</span></span></div>`;
-        for(const l of layers){
-            const rat=computeRating(l);
-            html+=`<div style="margin:6px 0 10px"><div style="font-size:0.82em;color:var(--text2);margin-bottom:2px"><b>${l.layer_label}</b> (${l.lots} lots) <span class="${ratingClass(rat)}">${rat}</span> | n=${l.count} | WR ${l.wr}%</div>`;
-            html+=`<div class="chart-row">
-                <div class="chart-box"><h4>MFE (最大有利波幅)</h4><canvas id="mfe_${l.symbol}_${l.direction}_${String(l.lots).replace(/\./g,'_')}" height="160"></canvas></div>
-                <div class="chart-box"><h4>MAE (最大不利波幅)</h4><canvas id="mae_${l.symbol}_${l.direction}_${String(l.lots).replace(/\./g,'_')}" height="160"></canvas></div>
-            </div></div>`;
-        }
-
-        // Part 3: MFE / MAE charts (separate)
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 3 · MFE / MAE 圖表 <span class="info">i<span class="tip"><b>圖表說明</b><br><b>MFE 圖</b>：每筆交易嘅最大有利波幅（點數）<br><b>MAE 圖</b>：每筆交易嘅最大不利波幅（點數）<br><br>綠色圓點 = 盈利交易 | 紅色圓點 = 虧損交易<br>Mouseover 顯示每筆交易詳情<br><br>MFE 越大 = 可設更高 TP<br>MAE 越大 = 需設更寬 SL</span></span></div>`;
-        for(const l of layers){
-            const tid=`trades_${l.symbol}_${l.direction}_${l.lots}`.replace(/\./g,'_');
-            html+=`<div class="trades-toggle" onclick="toggleTrades('${tid}',this)">📋 展開訂單 — ${l.layer_label} (${l.count} 筆)</div>
-            <div class="trades-panel" id="${tid}"><table><thead><tr>
-                <th>#</th><th>Open Time</th><th>Type</th><th>Lots</th><th>Symbol</th>
-                <th>Open</th><th>Close</th><th>Pips</th><th>P&L $</th><th>MFE</th><th>MAE</th><th>Hold</th>
-            </tr></thead><tbody>`;
-            l.trades.forEach((t,i)=>{
-                html+=`<tr${t.net_profit>0?' class="row-a"':t.net_profit<-10?' class="row-d"':''}>
-                    <td>${i+1}</td><td>${t.open_time}</td><td>${t.direction}</td><td>${t.lots}</td><td>${t.symbol}</td>
-                    <td>${t.open_price}</td><td>${t.close_price}</td>
-                    <td class="${t.net_pips>=0?'pnl-pos':'pnl-neg'}">${t.net_pips}</td>
-                    <td class="${t.net_profit>=0?'pnl-pos':'pnl-neg'}">${fmtPnl(t.net_profit)}</td>
-                    <td>${t.mfe}</td><td>${t.mae}</td><td>${fmtTime(t.holding_hours)}</td>
-                </tr>`;
-            });
-            html+=`</tbody></table></div>`;
-        }
-
-        // Part 4: TP/SL table
-        html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 4 · TP/SL 建議（原始值） <span class="info">i<span class="tip"><b>TP/SL 說明</b><br><b>TP</b> = 該層平均 MFE（不乘倍數）<br><b>Soft SL</b> = 該層平均 MAE（不乘倍數）<br><b>Hard SL</b> = 該層歷史最大 MAE<br><b>R:R</b> = TP / Soft SL<br><br>R:R ≥ 1.5x 可接受 | ≥ 3.0x 優秀</span></span></div>`;
-        html+=`<div style="overflow-x:auto"><table><thead><tr>
-            <th>Layer</th><th>Rating</th><th>n</th>
-            <th>TP (AvgMFE)</th><th>Soft SL (AvgMAE)</th><th>Hard SL (MaxMAE)</th><th>R:R</th>
-        </tr></thead><tbody>`;
-        for(const l of layers){
-            const rat=computeRating(l);
-            const tp=l.avg_mfe, soft=l.avg_mae, hard=l.max_mae;
-            const rr=soft>0?tp/soft:0;
-            const rrCls=rr>=3?'pnl-pos':rr>=1.5?'':'pnl-neg';
-            html+=`<tr><td><b>${l.layer_label}</b></td>
-                <td class="${ratingClass(rat)}">${rat}</td><td>${l.count}</td>
-                <td class="pnl-pos">${tp} pip</td>
-                <td>${soft} pip</td><td class="pnl-neg">${hard} pip</td>
-                <td class="${rrCls}">${rr>0?rr.toFixed(2)+'x':'—'}</td></tr>`;
-        }
-        html+=`</tbody></table></div>`;
-
-        // Part 5: Ranking (A級以上)
-        const aPlus=layers.filter(l=>computeRating(l)>='A').sort((a,b)=>computeRating(b)>computeRating(a)?1:-1);
-        if(aPlus.length>0){
-            html+=`<div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px">Part 5 · 排行榜（A級以上）<span class=\"info\">i<span class=\"tip\"><b>排行榜說明</b><br>此 CCY×Direction 內 A級以上嘅層級，按評級降序排列。</span></span></div>`;
-            html+=`<div style=\"overflow-x:auto\"><table><thead><tr><th>#</th><th>Rating</th><th>Layer</th><th>n</th><th>WR%</th><th>EV$</th><th>Odds$</th><th>MFE</th><th>MAE</th><th>Total$</th><th>Hold</th></tr></thead><tbody>`;
-            aPlus.forEach((l,i)=>{
-                const rat=computeRating(l);
-                const ev=l.total_pnl/l.count;
-                html+=`<tr><td>${i+1}</td><td class=\"${ratingClass(rat)}\">${rat}</td><td><b>${l.layer_label}</b></td><td>${l.count}</td><td>${(l.wr||0).toFixed(1)}%</td><td class=\"pnl-pos\">${ev.toFixed(2)}</td><td>${l.odds||'—'}</td><td>${(l.avg_mfe||0).toFixed(1)}</td><td>${(l.avg_mae||0).toFixed(1)}</td><td class=\"${l.total_pnl>=0?'pnl-pos':'pnl-neg'}\">${fmtPnl(l.total_pnl)}</td><td>${(l.avg_hold||0).toFixed(1)}h</td></tr>`;
-            });
-            html+=`</tbody></table></div>`;
-        }
-
-        // Part 6: TP/SL Profitability Analysis
-        html+=`<div style=\"font-size:0.9em;font-weight:bold;color:var(--acc);margin:12px 0 4px\">Part 6 · 層級 TP/SL 盈利分析 <span class=\"info\">i<span class=\"tip\"><b>盈利邊緣說明</b><br>Edge = WR×TP - (1-WR)×SL<br>正值=有盈利邊緣，負值=虧損邊緣<br>綠色=盈利層 | 紅色=虧損層</span></span></div>`;
-        html+=`<div style=\"overflow-x:auto\"><table><thead><tr><th>Layer</th><th>Rating</th><th>狀態</th><th>n</th><th>WR%</th><th>TP</th><th>SL</th><th>HardSL</th><th>Edge</th><th>Total$</th></tr></thead><tbody>`;
-        layers.forEach(l=>{
-            const rat=computeRating(l);
-            const wr=l.wr||0, tp=l.avg_mfe||0, sl=l.avg_mae||0, hard=l.max_mae||0;
-            const edge=wr/100*tp - (1-wr/100)*sl;
-            const profitable=edge>=0;
-            html+=`<tr class=\"${profitable?'row-a':'row-d'}\"><td><b>${l.layer_label}</b></td><td class=\"${ratingClass(rat)}\">${rat}</td><td>${profitable?'✅':'❌'}</td><td>${l.count}</td><td>${wr.toFixed(1)}%</td><td class=\"pnl-pos\">${tp.toFixed(1)}</td><td>${sl.toFixed(1)}</td><td class=\"pnl-neg\">${hard.toFixed(1)}</td><td class=\"${profitable?'pnl-pos':'pnl-neg'}\">${edge>=0?'+'+edge.toFixed(1):edge.toFixed(1)}</td><td class=\"${l.total_pnl>=0?'pnl-pos':'pnl-neg'}\">${fmtPnl(l.total_pnl)}</td></tr>`;
-        });
-        html+=`</tbody></table></div>`;
-
-        html+=`</div></div>`; // close sec-b, sec
-    }
-
-    // Blacklist
-    if(blacklist.length>0){
-        html+='<h2>🚫 黑名單（危險層數） <span class="info">i<span class="tip"><b>黑名單說明</b><br>D/E 級嘅層數，按危險分數排序。<br>建議考慮減少或停用呢啲層數。</span></span></h2>';
-        for(const b of blacklist){
-            html+=`<div class="blk"><strong>${b.symbol} ${b.direction.toUpperCase()} ${b.layer}</strong> (${b.lots} lots) <span class="${ratingClass(b.rating)}">${b.rating}</span> | Danger: ${b.danger_score} | WR ${b.wr}% | P&L ${fmtPnl(b.total_pnl)} | <span style="color:var(--red)">${b.reason}</span></div>`;
-        }
-    }
-
-    document.getElementById('content').innerHTML=html;
-
-    // Draw charts after DOM ready
-    requestAnimationFrame(()=>drawAllCharts(ls));
-}
-
-function toggleSec(el){el.classList.toggle('open');el.nextElementSibling.classList.toggle('open');}
-function toggleTrades(id,btn){const p=document.getElementById(id);p.classList.toggle('open');btn.textContent=p.classList.contains('open')?'📋 收起訂單':'📋 展開訂單';}
-
-// ═══ Global Bar ═══
-function buildGlobalBar(ccySum, ls){
-    const top=ccySum.slice(0,20);
-    const maxAbs=Math.max(...top.map(c=>Math.abs(c.total_pnl)),1);
-    const maxPips=Math.max(...top.map(c=>Math.abs(c.total_pips||0)),1);
-    const n=top.length, svgH=Math.max(200,n*36+50), gap=36, lm=80, rm=60, cw=900, pw=cw-lm-rm, zx=lm+pw/2;
-    let svg=`<svg viewBox="0 0 ${cw} ${svgH}" style="width:100%;height:auto;font-family:var(--font)" xmlns="http://www.w3.org/2000/svg">`;
-    svg+=`<rect width="${cw}" height="${svgH}" fill="var(--bg)" rx="6"/>`;
-    svg+=`<line x1="${zx}" y1="30" x2="${zx}" y2="${svgH-20}" stroke="var(--brd)" stroke-width="1"/>`;
-    // Header legend
-    svg+=`<rect x="${lm}" y="${svgH-8}" width="10" height="8" fill="var(--grn)" rx="1"/><text x="${lm+14}" y="${svgH}" fill="#aaa" font-size="8">盈利$</text>`;
-    svg+=`<rect x="${lm+55}" y="${svgH-8}" width="10" height="8" fill="var(--red)" rx="1"/><text x="${lm+69}" y="${svgH}" fill="#aaa" font-size="8">虧損$</text>`;
-    svg+=`<rect x="${lm+120}" y="${svgH-8}" width="10" height="4" fill="#5dade2" rx="1"/><text x="${lm+134}" y="${svgH}" fill="#aaa" font-size="8">盈利PIP</text>`;
-    svg+=`<rect x="${lm+195}" y="${svgH-8}" width="10" height="4" fill="#e67e22" rx="1"/><text x="${lm+209}" y="${svgH}" fill="#aaa" font-size="8">虧損PIP</text>`;
-    for(const c of top){
-        const yb=30+top.indexOf(c)*gap+10;
-        const symId=`gbar_${c.symbol}_${c.direction}`;
-        // Symbol text (clickable)
-        svg+=`<a href="#ccy-${c.symbol}-${c.direction}" style="cursor:pointer"><text x="4" y="${yb+6}" fill="var(--pri)" font-size="9" font-weight="bold">${c.symbol} ${c.direction.toUpperCase().substr(0,1)}</text></a>`;
-        // $ bar
-        const frac=Math.abs(c.total_pnl)/maxAbs;
-        const bw=Math.max(frac*pw/2,1);
-        const col=c.total_pnl>=0?'var(--grn)':'var(--red)';
-        const bx=c.total_pnl>=0?zx:zx-bw;
-        svg+=`<rect x="${bx}" y="${yb-4}" width="${bw}" height="16" fill="${col}" rx="2" opacity="0.85"/>`;
-        const tx=c.total_pnl>=0?zx+bw+4:zx-bw-4;
-        svg+=`<text x="${tx}" y="${yb+8}" fill="${col}" font-size="8" font-weight="bold" text-anchor="${c.total_pnl>=0?'start':'end'}">${fmtPnl(c.total_pnl)}</text>`;
-        // Pips bar (thin)
-        const pips=c.total_pips||0;
-        const fracP=Math.abs(pips)/maxPips;
-        const pw2=Math.max(fracP*pw/2,1);
-        const colP=pips>=0?'#5dade2':'#e67e22';
-        const bxP=pips>=0?zx:zx-pw2;
-        svg+=`<rect x="${bxP}" y="${yb+14}" width="${pw2}" height="6" fill="${colP}" rx="1" opacity="0.8"/>`;
-        // PIP value text
-        const ptx=pips>=0?zx+pw2+4:zx-pw2-4;
-        svg+=`<text x="${ptx}" y="${yb+21}" fill="${colP}" font-size="7" text-anchor="${pips>=0?'start':'end'}">${pips>=0?'+':''}${pips.toFixed(1)} pip</text>`;
-    }
-    svg+=`</svg>`;
-    return `<div class="global-bar"><div style="font-size:0.9em;font-weight:bold;color:var(--acc);margin-bottom:4px">📊 全局 P&L 分佈（$ + PIP） <span class="info">i<span class="tip"><b>全局 P&L 分佈</b><br>顯示每個 CCY×Direction 嘅總盈虧（$ + PIP）。<br>粗棒 = 金額 | 細棒 = Pips<br>綠色 = 盈利 | 紅色 = 虧損<br><br><b>點擊 Symbol 可跳到該分析</b></span></span></div>${svg}</div>`;
-}
-
-// ═══ Canvas Charts ═══
-function drawAllCharts(ls){
-    for(const [key,s] of Object.entries(ls)){
-        const id=`${s.symbol}_${s.direction}_${String(s.lots).replace(/\./g,'_')}`;
-        drawScatter(`mfe_${id}`, s.trades, 'mfe', s);
-        drawScatter(`mae_${id}`, s.trades, 'mae', s);
-    }
-}
-
-function drawScatter(canvasId, trades, mode, stats){
-    const canvas=document.getElementById(canvasId);
-    if(!canvas) return;
-    const ctx=canvas.getContext('2d');
-    const dpr=window.devicePixelRatio||1;
-    const rect=canvas.getBoundingClientRect();
-    canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
-    ctx.scale(dpr,dpr); const w=rect.width, h=rect.height;
-    const pad={t:15,r:15,b:25,l:35}; const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
-
-    // Background
-    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0a0e17';
-    ctx.fillRect(0,0,w,h);
-
-    if(!trades||trades.length===0) return;
-
-    const vals=trades.map(t=>mode==='mfe'?t.mfe:t.mae);
-    const maxVal=Math.max(...vals,1);
-
-    // Grid
-    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--brd').trim()||'#1e2433';
-    ctx.lineWidth=0.5;
-    for(let i=0;i<=4;i++){
-        const y=pad.t+ph*(1-i/4);
-        ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+pw,y);ctx.stroke();
-        ctx.fillStyle='#555';ctx.font='9px sans-serif';ctx.textAlign='right';
-        ctx.fillText((maxVal*i/4).toFixed(0),pad.l-4,y+3);
-    }
-    // Axis label
-    ctx.fillStyle='#777';ctx.font='10px sans-serif';ctx.textAlign='center';
-    ctx.fillText(mode==='mfe'?'MFE (pips)':'MAE (pips)',pad.l+pw/2,h-2);
-
-    // Tooltip handling
-    let hoveredIdx=-1;
-    const dots=[]; // store dot positions
-
-    // Draw dots
-    trades.forEach((t,i)=>{
-        const x=pad.l+(i/(trades.length-1||1))*pw;
-        const v=mode==='mfe'?t.mfe:t.mae;
-        const y=pad.t+ph*(1-v/maxVal);
-        const isWin=t.net_profit>0;
-        dots.push({x,y,i,t,isWin});
-        ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);
-        ctx.fillStyle=isWin?'#4CAF50':'#FF5722';ctx.fill();
-    });
-
-    // Hover overlay
-    canvas.onmousemove=function(e){
-        const cr=canvas.getBoundingClientRect();
-        const mx=e.clientX-cr.left, my=e.clientY-cr.top;
-        let found=-1;
-        for(const d of dots){
-            if(Math.abs(mx-d.x)<8&&Math.abs(my-d.y)<8){found=d.i;break;}
-        }
-        if(found!==hoveredIdx){
-            hoveredIdx=found;
-            // Redraw
-            ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0a0e17';
-            ctx.fillRect(0,0,w,h);
-            // Grid
-            ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--brd').trim()||'#1e2433';
-            ctx.lineWidth=0.5;
-            for(let i=0;i<=4;i++){
-                const y=pad.t+ph*(1-i/4);
-                ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+pw,y);ctx.stroke();
-                ctx.fillStyle='#555';ctx.font='9px sans-serif';ctx.textAlign='right';
-                ctx.fillText((maxVal*i/4).toFixed(0),pad.l-4,y+3);
-            }
-            ctx.fillStyle='#777';ctx.font='10px sans-serif';ctx.textAlign='center';
-            ctx.fillText(mode==='mfe'?'MFE (pips)':'MAE (pips)',pad.l+pw/2,h-2);
-            // Dots
-            for(const d of dots){
-                ctx.beginPath();ctx.arc(d.x,d.y,d.i===found?5:2.5,0,Math.PI*2);
-                ctx.fillStyle=d.isWin?'#4CAF50':'#FF5722';ctx.fill();
-            }
-            // Tooltip
-            if(found>=0){
-                const d=dots.find(d=>d.i===found);
-                const t=d.t;
-                const lines=[
-                    `#${found+1} ${t.direction.toUpperCase()} ${t.symbol}`,
-                    `Lots: ${t.lots} | Pips: ${t.net_pips}`,
-                    `P&L: ${fmtPnl(t.net_profit)}`,
-                    `${mode==='mfe'?'MFE':'MAE'}: ${mode==='mfe'?t.mfe:t.mae}`,
-                    `Hold: ${fmtTime(t.holding_hours)}`
-                ];
-                const tw=140, th=lines.length*14+10;
-                let tx=d.x+10, ty=d.y-th/2;
-                if(tx+tw>w) tx=d.x-tw-10;
-                if(ty<0) ty=2; if(ty+th>h) ty=h-th-2;
-                ctx.fillStyle='rgba(20,20,40,0.92)';ctx.strokeStyle='var(--acc)';
-                ctx.lineWidth=1;roundRect(ctx,tx,ty,tw,th,4);ctx.fill();ctx.stroke();
-                ctx.fillStyle='#eee';ctx.font='10px sans-serif';ctx.textAlign='left';
-                lines.forEach((l,li)=>{ctx.fillText(l,tx+6,ty+14+li*14);});
-            }
-        }
-    };
-    canvas.onmouseleave=function(){hoveredIdx=-1;drawScatter(canvasId,trades,mode,stats);};
-}
-
-function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
-</script>
 <script src="../sidebar.js"></script>
+<script>
+let SYM_DATA={"AUDUSD": {"table_html": "<table class=\"buysell\"><thead><tr><th>指標<\/th><th><span class=\"buy-h\"><\/span>BUY<\/th><th><span class=\"sell-h\"><\/span>SELL<\/th><\/tr><\/thead><tbody><tr><td>筆數<\/td><td class=\"\">103<\/td><td>65<\/td><\/tr><tr><td>勝率<\/td><td class=\"\">80.6%<\/td><td>73.8%<\/td><\/tr><tr><td>P&L<\/td><td class=\"\">$3,100.30<\/td><td>$2,469.43<\/td><\/tr><tr><td>avg MAE $<\/td><td class=\"\">28.84<\/td><td>32.27<\/td><\/tr><tr><td>avg MFE $<\/td><td class=\"\">40.05<\/td><td>52.86<\/td><\/tr><tr><td>avg MAE pips<\/td><td class=\"\">48.6<\/td><td>54.1<\/td><\/tr><tr><td>avg MFE pips<\/td><td class=\"\">47.5<\/td><td>43.4<\/td><\/tr><tr><td>PF<\/td><td class=\"\">18.34<\/td><td>14.25<\/td><\/tr><tr><td>平均持倉 h<\/td><td class=\"\">123.4<\/td><td>148.1<\/td><\/tr><tr><td>最大 lot<\/td><td class=\"\">0.77<\/td><td>0.51<\/td><\/tr><\/tbody><\/table>", "box_html": "<table><thead><tr><th>方向<\/th><th>筆數<\/th><th>止蝕參考（MAE P90/P95 pips）<\/th><th>止賺參考（MFE P50/75/90 pips）<\/th><th>平均持倉 h<\/th><\/tr><\/thead><tbody><tr><td>BUY<\/td><td>103<\/td><td class=\"neg\">P90 103.3 / P95 126.3<\/td><td class=\"pos\">P50 48.5 / P75 61.0 / P90 74.9<\/td><td>123.4<\/td><\/tr><tr><td>SELL<\/td><td>65<\/td><td class=\"neg\">P90 115.6 / P95 126.4<\/td><td class=\"pos\">P50 44.6 / P75 61.3 / P90 75.9<\/td><td>148.1<\/td><\/tr><\/tbody><\/table><div class=\"footnote\">樣本 n&lt;5 嘅方向行已灰化，參考值僅供示意。<\/div>", "note": "清洗後 168 筆", "curve": {"0": [100.0, 100.0], "1": [100.0, 98.2], "2": [100.0, 97.6], "3": [100.0, 97.6], "4": [100.0, 97.6], "5": [100.0, 96.4], "6": [100.0, 95.2], "7": [100.0, 94.0], "8": [100.0, 93.5], "9": [100.0, 91.7], "10": [100.0, 91.1], "11": [100.0, 89.9], "12": [100.0, 89.3], "13": [100.0, 89.3], "14": [100.0, 88.7], "15": [100.0, 88.1], "16": [100.0, 86.9], "17": [100.0, 85.1], "18": [100.0, 85.1], "19": [100.0, 84.5], "20": [100.0, 83.9], "21": [100.0, 82.7], "22": [100.0, 80.4], "23": [100.0, 78.6], "24": [100.0, 78.0], "25": [100.0, 76.2], "26": [100.0, 75.6], "27": [100.0, 75.0], "28": [100.0, 75.0], "29": [100.0, 74.4], "30": [100.0, 71.4], "31": [100.0, 70.2], "32": [100.0, 69.0], "33": [100.0, 66.7], "34": [100.0, 64.9], "35": [100.0, 63.7], "36": [100.0, 62.5], "37": [100.0, 61.9], "38": [100.0, 60.7], "39": [100.0, 60.1], "40": [100.0, 58.9], "41": [100.0, 57.1], "42": [100.0, 56.0], "43": [100.0, 56.0], "44": [100.0, 54.2], "45": [100.0, 52.4], "46": [100.0, 51.2], "47": [100.0, 48.8], "48": [100.0, 48.8], "49": [100.0, 47.6], "50": [100.0, 46.4], "51": [100.0, 45.2], "52": [100.0, 43.5], "53": [100.0, 41.7], "54": [100.0, 40.5], "55": [100.0, 38.1], "56": [100.0, 36.3], "57": [100.0, 34.5], "58": [100.0, 33.3], "59": [100.0, 32.1], "60": [100.0, 30.4]}, "curve_pts": [[0, 100.0], [2, 97.6], [4, 97.6], [6, 95.2], [8, 93.5], [10, 91.1], [12, 89.3], [14, 88.7], [16, 86.9], [18, 85.1], [20, 83.9], [22, 80.4], [24, 78.0], [26, 75.6], [28, 75.0], [30, 71.4], [32, 69.0], [34, 64.9], [36, 62.5], [38, 60.7], [40, 58.9], [42, 56.0], [44, 54.2], [46, 51.2], [48, 48.8], [50, 46.4], [52, 43.5], [54, 40.5], [56, 36.3], [58, 33.3], [60, 30.4]]}, "EURGBP": {"table_html": "<table class=\"buysell\"><thead><tr><th>指標<\/th><th><span class=\"buy-h\"><\/span>BUY<\/th><th><span class=\"sell-h\"><\/span>SELL<\/th><\/tr><\/thead><tbody><tr><td>筆數<\/td><td class=\"\">64<\/td><td>15<\/td><\/tr><tr><td>勝率<\/td><td class=\"\">57.8%<\/td><td>60.0%<\/td><\/tr><tr><td>P&L<\/td><td class=\"\">$344.73<\/td><td>$753.11<\/td><\/tr><tr><td>avg MAE $<\/td><td class=\"\">77.55<\/td><td>73.68<\/td><\/tr><tr><td>avg MFE $<\/td><td class=\"\">54.18<\/td><td>79.57<\/td><\/tr><tr><td>avg MAE pips<\/td><td class=\"\">58.9<\/td><td>56.6<\/td><\/tr><tr><td>avg MFE pips<\/td><td class=\"\">46.9<\/td><td>25.5<\/td><\/tr><tr><td>PF<\/td><td class=\"\">1.16<\/td><td>5.11<\/td><\/tr><tr><td>平均持倉 h<\/td><td class=\"\">673.2<\/td><td>83.8<\/td><\/tr><tr><td>最大 lot<\/td><td class=\"\">0.51<\/td><td>0.77<\/td><\/tr><\/tbody><\/table>", "box_html": "<table><thead><tr><th>方向<\/th><th>筆數<\/th><th>止蝕參考（MAE P90/P95 pips）<\/th><th>止賺參考（MFE P50/75/90 pips）<\/th><th>平均持倉 h<\/th><\/tr><\/thead><tbody><tr><td>BUY<\/td><td>64<\/td><td class=\"neg\">P90 121.1 / P95 135.3<\/td><td class=\"pos\">P50 39.8 / P75 56.6 / P90 88.3<\/td><td>673.2<\/td><\/tr><tr><td>SELL<\/td><td>15<\/td><td class=\"neg\">P90 122.4 / P95 133.0<\/td><td class=\"pos\">P50 19.0 / P75 41.4 / P90 45.8<\/td><td>83.8<\/td><\/tr><\/tbody><\/table><div class=\"footnote\">樣本 n&lt;5 嘅方向行已灰化，參考值僅供示意。<\/div>", "note": "清洗後 79 筆", "curve": {"0": [100.0, 100.0], "1": [100.0, 98.7], "2": [100.0, 97.5], "3": [100.0, 96.2], "4": [100.0, 96.2], "5": [100.0, 93.7], "6": [100.0, 93.7], "7": [100.0, 92.4], "8": [100.0, 92.4], "9": [100.0, 92.4], "10": [100.0, 92.4], "11": [100.0, 88.6], "12": [100.0, 87.3], "13": [100.0, 84.8], "14": [100.0, 84.8], "15": [100.0, 83.5], "16": [100.0, 82.3], "17": [100.0, 77.2], "18": [100.0, 77.2], "19": [100.0, 75.9], "20": [100.0, 74.7], "21": [100.0, 74.7], "22": [100.0, 73.4], "23": [100.0, 72.2], "24": [100.0, 72.2], "25": [100.0, 68.4], "26": [100.0, 65.8], "27": [100.0, 63.3], "28": [100.0, 63.3], "29": [100.0, 62.0], "30": [100.0, 62.0], "31": [100.0, 58.2], "32": [100.0, 55.7], "33": [100.0, 55.7], "34": [100.0, 54.4], "35": [100.0, 53.2], "36": [100.0, 53.2], "37": [100.0, 50.6], "38": [100.0, 50.6], "39": [100.0, 50.6], "40": [100.0, 45.6], "41": [100.0, 43.0], "42": [100.0, 41.8], "43": [100.0, 39.2], "44": [100.0, 38.0], "45": [100.0, 38.0], "46": [100.0, 36.7], "47": [100.0, 35.4], "48": [97.0, 32.9], "49": [97.0, 30.4], "50": [97.0, 27.8], "51": [97.0, 26.6], "52": [97.0, 26.6], "53": [97.0, 26.6], "54": [97.0, 26.6], "55": [97.0, 25.3], "56": [97.0, 22.8], "57": [97.0, 21.5], "58": [97.0, 20.3], "59": [97.0, 19.0], "60": [97.0, 19.0]}, "curve_pts": [[0, 100.0], [2, 97.5], [4, 96.2], [6, 93.7], [8, 92.4], [10, 92.4], [12, 87.3], [14, 84.8], [16, 82.3], [18, 77.2], [20, 74.7], [22, 73.4], [24, 72.2], [26, 65.8], [28, 63.3], [30, 62.0], [32, 55.7], [34, 54.4], [36, 53.2], [38, 50.6], [40, 45.6], [42, 41.8], [44, 38.0], [46, 36.7], [48, 32.9], [50, 27.8], [52, 26.6], [54, 26.6], [56, 22.8], [58, 20.3], [60, 19.0]]}}, TH_MIN=0, TH_MAX=60;
+function loadTheme(){const t=localStorage.getItem('tsa-theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀️':'🌙';}
+function toggleTheme(){const c=document.documentElement.getAttribute('data-theme')||'dark',n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('tsa-theme',n);document.getElementById('themeToggle').textContent=n==='dark'?'☀️':'🌙';}
+function fmt$(x){return (x<0?'-$':'$')+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function hashState(){const h=new URLSearchParams(location.hash.slice(1));return {sym:h.get('sym')||null,th:Math.max(TH_MIN,Math.min(TH_MAX,parseInt(h.get('th')||'20')))};}
+function setHash(st){const p=new URLSearchParams();if(st.sym)p.set('sym',st.sym);p.set('th',st.th);history.replaceState(null,'','#'+p.toString());}
+let state=hashState();
+function renderSymbol(){
+  const d=SYM_DATA[state.sym];if(!d)return;
+  document.getElementById('an-name').textContent=state.sym;
+  document.getElementById('an-table').innerHTML=d.table_html;
+  document.getElementById('an-box').innerHTML=d.box_html;
+  document.getElementById('an-note').textContent=d.note||'';
+  const thOut=document.getElementById('th-out');thOut.textContent=state.th+' pips';
+  document.getElementById('th-avoid').textContent=d.curve[state.th]!==undefined?d.curve[state.th][0]+'%':'—';
+  document.getElementById('th-catch').textContent=d.curve[state.th]!==undefined?d.curve[state.th][1]+'%':'—';
+  const pts=d.curve_pts.map(p=>p[0]+','+p[1]).join(' ');
+  let svg='<svg viewBox="0 0 620 190" width="100%" height="190" preserveAspectRatio="xMidYMid meet">';
+  svg+='<line x1="40" y1="160" x2="600" y2="160" stroke="#333"/>';svg+='<line x1="40" y1="20" x2="40" y2="160" stroke="#333"/>';
+  for(const g of [0,50,100]){const y=160-g*1.4;svg+='<line x1="40" y1="'+y+'" x2="600" y2="'+y+'" stroke="#222"/><text x="34" y="'+(y+4)+'" fill="#777" font-size="10" text-anchor="end">'+g+'</text>';}
+  if(pts){const av=d.curve_pts.map(p=>40+p[0]*(560/60)).join(' ');const ca=d.curve_pts.map(p=>(40+p[0]*(560/60))+','+(160-p[1]*1.4)).join(' ');
+    svg+='<polyline points="'+ca+'" fill="none" stroke="#4CAF50" stroke-width="2"/>';}
+  svg+='<text x="320" y="182" fill="#777" font-size="10" text-anchor="middle">入場門檻（pips，0–60）</text>';
+  svg+='<text x="12" y="90" fill="#777" font-size="10" transform="rotate(-90 12 90)">%</text></svg>';
+  document.getElementById('an-curve').innerHTML=svg;
+}
+window.addEventListener('DOMContentLoaded',()=>{
+  loadTheme();
+  const sel=document.getElementById('sym-select');
+  if(sel){
+    if(state.sym&&SYM_DATA[state.sym])sel.value=state.sym;else state.sym=sel.value;
+    sel.addEventListener('change',()=>{state.sym=sel.value;setHash(state);renderSymbol();});
+    const rg=document.getElementById('th-slider');
+    rg.value=state.th;
+    rg.addEventListener('input',()=>{state.th=parseInt(rg.value);document.getElementById('th-out').textContent=state.th+' pips';});
+    rg.addEventListener('change',()=>{state.th=parseInt(rg.value);setHash(state);renderSymbol();});
+    renderSymbol();
+  }
+});
+</script>
 </body>
 </html>
