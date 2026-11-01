@@ -106,6 +106,13 @@ select,input[type=range]{accent-color:var(--acc)}
 .svgbox .cap{color:var(--text2);font-size:.78em;text-align:center;margin-top:4px}
 .gline{stroke:#666;stroke-dasharray:4 4;stroke-width:1}
 .footnote{color:var(--text2);font-size:.8em;margin-top:8px}
+/* 自製 tooltip（老闆 0619：說明收 mouseover）——共享 bubble＋JS 定位，hover/tap/focus 出、離開/Esc/外點收 */
+.tt{position:relative;display:inline-flex;align-items:center;cursor:help;color:var(--acc);font-size:.88em;line-height:1;vertical-align:baseline}
+.tt.tt-w{color:var(--yel)}
+.tt.tt-pill{border:1px solid var(--brd);background:var(--card2);border-radius:999px;padding:3px 10px;font-size:.78em}
+.tt:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+#tt-global{position:fixed;z-index:999;display:none;max-width:min(480px,84vw);background:var(--card);color:var(--text);border:1px solid var(--brd);border-radius:8px;padding:9px 12px;font-size:.85em;line-height:1.55;box-shadow:0 6px 20px rgba(0,0,0,.3);white-space:pre-line;pointer-events:none;font-weight:400}
+.heat .c.tt{color:var(--text2)}
 .guide{display:grid;grid-template-columns:1fr 1fr;gap:4px 22px;font-size:.85em}
 .guide dt{color:var(--pri);font-weight:600}
 .guide dd{color:var(--text2);margin-bottom:6px}
@@ -143,6 +150,15 @@ function renderSymbol(){
   svg+='<text x="12" y="90" fill="#777" font-size="10" transform="rotate(-90 12 90)">%%</text></svg>';
   document.getElementById('an-curve').innerHTML=svg;
 }
+const TTB=document.createElement('div');TTB.id='tt-global';TTB.setAttribute('role','tooltip');document.body.appendChild(TTB);let TTCUR=null,ttByFocus=false;
+function ttShow(el){TTB.textContent=el.dataset.tip||'';TTB.style.display='block';TTB.style.left='0px';TTB.style.top='0px';const r=el.getBoundingClientRect(),bw=TTB.offsetWidth,bh=TTB.offsetHeight;let x=Math.max(8,Math.min(r.left,innerWidth-bw-8));let y=r.bottom+8;if(y+bh>innerHeight-8)y=r.top-bh-8;TTB.style.left=x+'px';TTB.style.top=y+'px';}
+function ttHide(){TTB.style.display='none';TTCUR=null;}
+if(matchMedia('(hover:hover)').matches){document.addEventListener('mouseover',e=>{const t=e.target.closest('.tt');if(t){TTCUR=t;ttShow(t)}else if(TTCUR){ttHide()}});}
+document.addEventListener('focusin',e=>{const t=e.target.closest('.tt');if(t){TTCUR=t;ttByFocus=true;ttShow(t)}});
+document.addEventListener('focusout',()=>ttHide());
+document.addEventListener('click',e=>{const t=e.target.closest('.tt');if(t){if(TTCUR===t&&TTB.style.display==='block'&&!ttByFocus){ttHide()}else{TTCUR=t;ttShow(t)}ttByFocus=false;}else if(TTCUR){ttHide()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')ttHide()});
+addEventListener('scroll',()=>ttHide(),true);addEventListener('resize',()=>ttHide());
 window.addEventListener('DOMContentLoaded',()=>{
   loadTheme();
   const sel=document.getElementById('sym-select');
@@ -157,6 +173,14 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
 });
 """
+
+# ── tooltip helper（老闆 0619：說明收 mouseover）─────────────────────
+def tt(tip, label='ℹ️', cls=''):
+    """自製 tooltip 觸發器：hover/tap/focus 出（共享 #tt-global bubble），唔用 title 屬性。"""
+    import html as _htt
+    return (f'<span class="tt {cls}" tabindex="0" role="button" aria-label="說明" '
+            f'data-tip="{_htt.escape(tip, quote=True)}">{label}</span>')
+
 
 # ── 數據層 ────────────────────────────────────────────────────────────
 def parse_dt(s):
@@ -312,8 +336,7 @@ def sec_hero(t, m, det):
                   f'<div>MFE pips 平均 <b>{round(statistics.mean(mfep),1)}</b>·中位 <b>{round(statistics.median(mfep),1)}</b>·P90 <b>{pctile(mfep,90)}</b>'
                   f'（{fmt_money(statistics.mean([x["mfe_$"] for x in vt]))}）</div>')
         if len(vt) < len(t):
-            narrow += (f'<div class="footnote" style="color:var(--text2)">⚠ {len(t) - len(vt)} 筆 MAE/MFE 欄為 0 值'
-                       f'（與淨利矛盾，判定缺欄）——窄帶統計剔除計算（冇數≠$0）。</div>')
+            narrow += (f'<div class="footnote">{tt(f"⚠ {len(t) - len(vt)} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——窄帶統計剔除計算（冇數≠$0）。", "⚠", "tt-w")}</div>')
     else:
         narrow = '<div class="muted">MAE/MFE：·冇數（全數缺欄）</div>'
     # 分層摘要迷你表
@@ -331,7 +354,7 @@ def sec_hero(t, m, det):
         rows += f'<tr><td>未分類</td><td class="muted">—</td><td>{det["uncls"]}</td><td class="muted">—</td><td class="muted">—</td></tr>'
     mini = (f'<details><summary>分層摘要（{len(lay)} 層）</summary><table><thead><tr><th>層</th><th>理論 lot</th><th>筆數</th>'
             f'<th>P&amp;L</th><th>佔 P&amp;L%</th></tr></thead><tbody>{rows}</tbody></table></details>')
-    return f'''<section id="s1"><h2>① 整倉總覽</h2><div class="legend">10 秒結論：賺唔賺、係唔係馬丁。圖例：P&amp;L／勝率按平倉淨值（含 commission+swap）。</div>
+    return f'''<section id="s1"><h2>① 整倉總覽 {tt('10 秒結論：賺唔賺、係唔係馬丁。圖例：P&L／勝率按平倉淨值（含 commission+swap）。')}</h2>
 <div class="hero-grid"><div class="hero-left">{badge}<div class="meta"><b>{len(t)}</b> 筆交易　·　數據範圍 <b>{dmin:%Y-%m-%d} → {dmax:%Y-%m-%d}</b>（按平倉時間）</div></div>
 <div class="six">{six_html}</div></div>
 <div class="narrow">{narrow}</div>{mini}</section>'''
@@ -339,8 +362,9 @@ def sec_hero(t, m, det):
 
 def sec_martin(det, t):
     if not det['layers']:
-        return '''<section id="s2"><h2>② 馬丁偵測</h2><div class="legend">判定章可追溯：基準 lot 點嚟、倍數幾多。</div>
-<div class="footnote">未有足夠數據分層——唔出膠囊與分佈表。</div></section>'''
+        return ('<section id="s2"><h2>② 馬丁偵測 '
+                + tt('判定章可追溯：基準 lot 點嚟、倍數幾多。\n未有足夠數據分層——唔出膠囊與分佈表。')
+                + '</h2></section>')
     bar_max = max(d['n'] for d in det['layers'].values()) or 1
     rows = ''
     for L in sorted(det['layers']):
@@ -351,17 +375,16 @@ def sec_martin(det, t):
         rows += (f'<tr><td>L{L}</td><td>{lot_s}</td><td>{d["n"]}</td>'
                  f'<td><div class="bar-cell" style="width:{max(w,4)}%"></div></td><td>{fmt_money(d["pl"])}</td></tr>')
     uncls_row = f'<tr class="dim"><td>未分類</td><td class="muted">lot 不符倍數</td><td>{det["uncls"]}</td><td></td><td></td></tr>' if det['uncls'] else ''
-    warn = '' if (det['ratio_ok'] or 0) >= 80 else '<div class="footnote" style="color:var(--yel)">⚠ 歸屬比例低於 80%，判定宜保守。</div>'
+    warn = '' if (det['ratio_ok'] or 0) >= 80 else f'<div class="footnote">{tt("⚠ 歸屬比例低於 80%，判定宜保守。", "⚠", "tt-w")}</div>'
     cap = f'基準 lot {det["base"]:.2f}（出現≥2次最小 lot）' + (f'，倍數 ×{det["step"]:g}' if det['step'] else '，單層無倍數')
-    return f'''<section id="s2"><h2>② 馬丁偵測</h2><div class="legend">判定方法：白皮書 v3.1 §4.3——校準用「出現≥2次嘅最小 lot」做基準。{cap}</div>
+    return f'''<section id="s2"><h2>② 馬丁偵測 {tt('判定方法：白皮書 v3.1 §4.3——校準用「出現≥2次嘅最小 lot」做基準。' + cap + '\n六步：① 剔除 balance／未平倉列 → ② 統計實際 lot 分佈 → ③ 基準 lot＝出現≥2次嘅最小 lot → ④ 每筆按 lot/基準 倍數歸層（容差 2%）→ ⑤ 相鄰層比值眾數＝偵測倍數 → ⑥ 最大層≥2 即判馬丁；未分類列於表尾。', 'ℹ️ 判定方法', 'tt-pill')}</h2>
 <div class="pills">
 <div class="pill"><div class="k">基準 lot</div><div class="v">{det["base"]:.2f}</div></div>
 <div class="pill"><div class="k">偵測倍數</div><div class="v">{'×%g' % det["step"] if det["step"] else "—（單層）"}</div></div>
 <div class="pill"><div class="k">歸層比例</div><div class="v">{det["ratio_ok"] if det["ratio_ok"] is not None else "—"}%</div></div>
 <div class="pill"><div class="k">校準層差</div><div class="v">{det["calib"]}%</div></div>
 </div>
-<table><thead><tr><th>層</th><th>實際 lot</th><th>筆數</th><th>分佈</th><th>P&amp;L</th></tr></thead><tbody>{rows}{uncls_row}</tbody></table>{warn}
-<details><summary>判定方法（六步）</summary><div class="footnote">① 剔除 balance／未平倉列 → ② 統計實際 lot 分佈 → ③ 基準 lot＝出現≥2次嘅最小 lot → ④ 每筆按 lot/基準 倍數歸層（容差 2%）→ ⑤ 相鄰層比值眾數＝偵測倍數 → ⑥ 最大層≥2 即判馬丁；未分類列於表尾。</div></details></section>'''
+<table><thead><tr><th>層</th><th>實際 lot</th><th>筆數</th><th>分佈</th><th>P&amp;L</th></tr></thead><tbody>{rows}{uncls_row}</tbody></table>{warn}</section>'''
 
 
 def sym_group(trades):
@@ -447,28 +470,26 @@ def build_analyzer(t, det):
         curve_pts = [[th, curve[th][1]] for th in range(0, 61, 2)]
         box_html = (f'<table><thead><tr><th>方向</th><th>筆數</th><th>止蝕參考（MAE P90/P95 pips）</th>'
                     f'<th>止賺參考（MFE P50/75/90 pips）</th><th>平均持倉 h</th></tr></thead><tbody>{crow}</tbody></table>'
-                    f'<div class="footnote">樣本 n&lt;5 嘅方向行已灰化，參考值僅供示意。</div>')
+                    f'<div class="footnote">{tt("樣本 n&lt;5 嘅方向行已灰化，參考值僅供示意。")}</div>')
         table_html = (f'<table class="buysell"><thead><tr><th>指標</th>'
                       f'<th><span class="buy-h"></span>BUY</th><th><span class="sell-h"></span>SELL</th></tr></thead>'
                       f'<tbody>{rows}</tbody></table>'
-                      + (f'<div class="footnote" style="color:var(--yel)">⚠ {note}</div>' if note else ''))
+                      + (f'<div class="footnote">{tt("⚠ " + note, "⚠", "tt-w")}</div>' if note else ''))
         sym_data[s] = {'table_html': table_html, 'box_html': box_html,
                        'note': f'清洗後 {len(tr)} 筆' if tr else '零交易',
                        'curve': {str(k): v for k, v in curve.items()}, 'curve_pts': curve_pts}
     options = ''.join(f'<option value="{s}">{s}</option>' for s in order)
     n_mm = sum(1 for x in t if x['mm'])
-    mm_note = (f'<div class="footnote" style="color:var(--text2)">⚠ {n_mm} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——'
-               f'相關商品 avg 值顯示「—」、統計分母剔除（冇數≠$0）。</div>') if n_mm else ''
-    return f'''<section id="s3"><h2>③ 商品分析器</h2>{mm_note}<div class="legend">單商品手術台：預設總 P&amp;L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。</div>
+    mm_tip = (f'⚠ {n_mm} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——相關商品 avg 值顯示「—」、統計分母剔除（冇數≠$0）。') if n_mm else ''
+    return f'''<section id="s3"><h2>③ 商品分析器 {tt('單商品手術台：預設總 P&L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。')}{f' {tt(mm_tip, "⚠", "tt-w")}' if n_mm else ''}</h2>
 <div class="sel-bar"><label>商品</label><select id="sym-select">{options}</select>
 <label>入場門檻</label><div class="slider-row" style="margin:0;flex:1"><input type="range" id="th-slider" min="0" max="60" step="1" value="20"><span class="slider-val" id="th-out">20 pips</span></div></div>
 <div id="an-note" class="footnote"></div>
 <div class="two"><div><h3 style="color:var(--acc);font-size:.95em;margin-bottom:6px">指標 × BUY/SELL（<span id="an-name"></span>）</h3><div id="an-table"></div></div>
 <div><h3 style="color:var(--acc);font-size:.95em;margin-bottom:6px">止賺止蝕參考（層×方向）</h3><div id="an-box"></div></div></div>
-<h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">61 級入場效益曲線</h3>
+<h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">61 級入場效益曲線 {tt('綠線＝可捕捉盈利%（MFE≥門檻佔比）；無虧損單時避開虧損% 不出線。門檻與商品選擇寫入 URL hash，可分享。')}</h3>
 <div class="slider-row"><span class="muted" style="font-size:.82em">可避開虧損 <b id="th-avoid" style="color:var(--red)">—</b>　可捕捉盈利 <b id="th-catch" style="color:var(--grn)">—</b>（門檻命中佔比）</span></div>
-<div class="svgbox" id="an-curve"></div>
-<div class="footnote">綠線＝可捕捉盈利%（MFE≥門檻佔比）；無虧損單時避開虧損% 不出線。門檻與商品選擇寫入 URL hash，可分享。</div></section>''', sym_data, default_sym
+<div class="svgbox" id="an-curve"></div></section>''', sym_data, default_sym
 
 
 def sec_dir_table(t):
@@ -496,10 +517,9 @@ def sec_dir_table(t):
                  f'<td>{format(g["avg_maep"], ".1f") if g["avg_maep"] is not None else "—"}</td>'
                  f'<td>{format(g["avg_mfep"], ".1f") if g["avg_mfep"] is not None else "—"}</td>'
                  f'<td>{g["max_lot"]:.2f}</td><td class="muted">—</td></tr>')
-    return f'''<section id="s4"><h2>④ 商品方向總表</h2><div class="legend">全場商品×方向成績表，按勝率排序；L5+ 深層馬丁暴露喺深層馬丁帳戶先會有數（本訊號見 ② 區）。</div>
+    return f'''<section id="s4"><h2>④ 商品方向總表 {tt('全場商品×方向成績表，按勝率排序；L5+ 深層馬丁暴露喺深層馬丁帳戶先會有數（本訊號見 ② 區）。零交易子集唔出行（軍規 A④）。')}</h2>
 <table><thead><tr><th>商品</th><th>方向</th><th>筆數</th><th>勝率</th><th>P&amp;L</th><th>avg MAE $</th><th>avg MFE $</th><th>avg MAE p</th><th>avg MFE p</th><th>max lot</th><th>L5+ 筆數</th></tr></thead>
-<tbody>{rows}</tbody></table>
-<div class="footnote">零交易子集唔出行（軍規 A④）。</div></section>'''
+<tbody>{rows}</tbody></table></section>'''
 
 
 def heat_color(v, vmax):
@@ -522,11 +542,10 @@ def sec_pivot(t):
         (yy, mm), val = next(iter(by_ym.items()))
         vmax = abs(val) or 1
         bg, _ = heat_color(val, vmax)
-        return f'''<section id="s5"><h2>⑤ 月度樞紐</h2><div class="legend">年×月 P&amp;L（按平倉月）。圖例：綠贏紅蝕，深淺按 |值| 歸一化。</div>
-<div class="footnote" style="color:var(--yel)">⚠ 數據只覆蓋單一月份——熱力表降級做單月 bar。</div>
+        return f'''<section id="s5"><h2>⑤ 月度樞紐 {tt('年×月 P&L（按平倉月）。圖例：綠贏紅蝕，深淺按 |值| 歸一化。\n「·」＝未覆蓋月份（冇數），唔係 $0。')}</h2>
+<div class="footnote">{tt('⚠ 數據只覆蓋單一月份——熱力表降級做單月 bar。', '⚠', 'tt-w')}</div>
 <div style="display:flex;align-items:center;gap:14px;margin-top:10px"><b>{yy}-{mm:02d}</b>
-<div style="flex:1;background:var(--card2);border-radius:6px;padding:4px"><div style="width:100%;background:{bg};border-radius:4px;padding:6px 10px;font-weight:700">{fmt_money(val)}</div></div></div>
-<div class="footnote">「·」＝未覆蓋月份（冇數），唔係 $0。</div></section>'''
+<div style="flex:1;background:var(--card2);border-radius:6px;padding:4px"><div style="width:100%;background:{bg};border-radius:4px;padding:6px 10px;font-weight:700">{fmt_money(val)}</div></div></div></section>'''
     vmax = max((abs(v) for v in by_ym.values()), default=1)
     head = '<div class="heat" style="grid-template-columns:64px repeat(13,1fr)">'
     cells = ['<div class="lab"></div>'] + [f'<div class="lab" style="justify-content:center">{m}</div>' for m in range(1, 13)] + ['<div class="lab" style="justify-content:center">全年</div>']
@@ -540,11 +559,11 @@ def sec_pivot(t):
                 bg, _ = heat_color(v, vmax)
                 cells.append(f'<div class="c" style="background:{bg}" title="{y}-{m:02d}: {fmt_money(v)}">{v / 1000:.1f}k</div>')
             else:
-                cells.append('<div class="c na" title="未覆蓋">·</div>')
+                cells.append(f'<div class="c na tt" tabindex="0" role="button" aria-label="說明" data-tip="未覆蓋月份——冇數，唔係 $0">·</div>')
         bg, _ = heat_color(ytot, vmax)
         cells.append(f'<div class="c" style="background:{bg}">{fmt_money(ytot)}</div>')
     grid = head + ''.join(cells) + '</div>'
-    return f'''<section id="s5"><h2>⑤ 月度樞紐</h2><div class="legend">年×月 P&amp;L 熱力表（按平倉月）＋全年合計。圖例：綠贏紅蝕，深淺按該表 max|值| 歸一化；「·」＝未覆蓋（冇數≠$0）。</div>
+    return f'''<section id="s5"><h2>⑤ 月度樞紐 {tt('年×月 P&L 熱力表（按平倉月）＋全年合計。圖例：綠贏紅蝕，深淺按該表 max|值| 歸一化。\n「·」＝未覆蓋（冇數≠$0），hover 格去睇。')}</h2>
 {grid}</section>'''
 
 
@@ -587,23 +606,23 @@ def sec_scatter(t):
             continue
         vtr = valid_mm(tr)
         if not vtr:
-            panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b><div class="footnote" style="color:var(--yel)">⚠ {len(tr)} 筆全部缺 MAE/MFE 欄——無有效點可繪（冇數≠$0）。</div></div>')
+            panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b><div class="footnote">{tt(f"⚠ {len(tr)} 筆全部缺 MAE/MFE 欄——無有效點可繪（冇數≠$0）。", "⚠", "tt-w")}</div></div>')
             continue
         if len(vtr) < 10:
             rows = ''.join(
                 (f'<tr><td>{x["mae_p"]:.1f}</td><td>{x["mfe_p"]:.1f}</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td></tr>'
                  if not x['mm'] else
-                 f'<tr><td class="muted" colspan="2">·冇數（缺欄）</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td></tr>')
+                 f'<tr><td class="muted" colspan="2">{tt("冇數——MAE/MFE 欄缺（0 值與淨利矛盾），唔係 $0。", "·冇數（缺欄）")}</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td></tr>')
                 for x in tr)
-            panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b><div class="footnote" style="color:var(--yel)">⚠ 有效 MAE/MFE {len(vtr)} 筆（&lt;10）——散點改列點表。</div><table><thead><tr><th>MAE p</th><th>MFE p</th><th>淨利</th></tr></thead><tbody>{rows}</tbody></table></div>')
+            panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b><div class="footnote">{tt(f"⚠ 有效 MAE/MFE {len(vtr)} 筆（<10）——散點改列點表。", "⚠", "tt-w")}</div><table><thead><tr><th>MAE p</th><th>MFE p</th><th>淨利</th></tr></thead><tbody>{rows}</tbody></table></div>')
             continue
         svg = scatter_svg(vtr, side)
         online = pct(sum(1 for x in vtr if x['mfe_p'] >= x['mae_p']), len(vtr))
         drop = f'（剔除 {len(tr) - len(vtr)} 筆缺數）' if len(tr) > len(vtr) else ''
         panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b>{svg}<div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 {online}%{drop}；綠點贏紅點蝕</div></div>')
-    mm_note = (f'<div class="footnote" style="color:var(--text2)">⚠ {n_mm} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——'
-               f'相關點位剔除散點（冇數≠$0）。</div>') if n_mm else ''
-    return f'''<section id="s6"><h2>⑥ MAE/MFE 散點</h2>{mm_note}<div class="legend">入場質素四象限：MFE=入場後最大有利、MAE=最大不利（pips，由入場價起算）。y=x 線上＝好單。</div>
+    quad = tt('入場質素四象限：MFE＝入場後最大有利偏移、MAE＝最大不利偏移（pips，由入場價起算）。y=x 對角線上＝好單（MFE≥MAE，入場後唔使挨逆風）。綠點贏紅點蝕。')
+    mm_note = (f' {tt(f"⚠ {n_mm} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——相關點位剔除散點（冇數≠$0）。", "⚠", "tt-w")}') if n_mm else ''
+    return f'''<section id="s6"><h2>⑥ MAE/MFE 散點{mm_note}{quad}</h2>
 <div class="two">{''.join(panels)}</div></section>'''
 
 
@@ -625,7 +644,7 @@ def sec_time(t):
         for h in range(24):
             v = hm.get((d, h))
             if v is None:
-                g.append('<div class="c na" title="冇數">·</div>')
+                g.append(f'<div class="c na tt" tabindex="0" role="button" aria-label="說明" data-tip="冇數——該時段無平倉交易，唔係 $0">·</div>')
             else:
                 bg, _ = heat_color(v, vmax)
                 g.append(f'<div class="c" style="background:{bg}" title="週{days[d]} {h:02d}:00–{h + 1:02d}:00 {fmt_money(v)}">{"" if abs(v) < 0.005 else f"{v:,.0f}"}</div>')
@@ -650,12 +669,12 @@ def sec_time(t):
     # 明細（最近 50 筆）
     rows = ''
     for x in t[-50:][::-1]:
-        mae_cell = f'{x["mae_$"]:,.2f}' if not x['mm'] else '·冇數'
+        mae_cell = f'{x["mae_$"]:,.2f}' if not x['mm'] else tt("冇數——MAE/MFE 欄缺（0 值與淨利矛盾），唔係 $0。", "·冇數")
         rows += (f'<tr><td>{x["close"]:%m-%d %H:%M}</td><td>{_h.escape(x["sym"])}</td>'
                  f'<td><span class="{"buy-h" if x["type"] == "buy" else "sell-h"}"></span>{x["type"].upper()}</td>'
                  f'<td>{x["lots"]:.2f}</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td>'
                  f'<td class="neg">{mae_cell}</td></tr>')
-    return f'''<section id="s7"><h2>⑦ 時間維度＋明細</h2><div class="legend">星期×小時 P&amp;L（格色雙向 heat，hover 睇精確值；「·」＝冇數）＋累計 P&amp;L 走勢＋最近 50 筆明細。時間均按平倉時間。</div>
+    return f'''<section id="s7"><h2>⑦ 時間維度＋明細 {tt('星期×小時 P&L（格色雙向 heat，hover 格去睇精確值；「·」＝冇數，符號本身 hover 也有解釋）＋累計 P&L 走勢＋最近 50 筆明細。時間均按平倉時間。')}</h2>
 <h3 style="color:var(--acc);font-size:.95em;margin:8px 0 6px">星期 × 小時 heatmap</h3>{''.join(g)}
 <h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">累計 P&amp;L（Growth）</h3><div class="svgbox">{s}</div>
 <h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">明細（最近 {min(len(t), 50)} 筆／共 {len(t)} 筆）</h3>
@@ -708,8 +727,7 @@ def build_page(signal_id, csv_path, force=False):
 <div class="layout">
 {TOC}
 <main>
-<header class="top"><div><h1>Martin v4 分析 · Signal {signal_id}</h1>
-<div class="sub">照老闆 Excel v8.5 八區動線重建（Template B）· CSV fetch 架構保留＋全數據預渲染底</div></div>
+<header class="top"><div><h1>Martin v4 分析 · Signal {signal_id} {tt('照老闆 Excel v8.5 八區動線重建（Template B）· CSV fetch 架構保留＋全數據預渲染底')}</h1></div>
 <button id="themeToggle" onclick="toggleTheme()">☀️</button></header>
 {banner}
 {sec_hero(trades, None, det)}
