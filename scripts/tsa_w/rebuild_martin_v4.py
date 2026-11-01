@@ -23,9 +23,10 @@ import json
 import math
 import statistics
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+HKT = timezone(timedelta(hours=8))
 BASE = Path(__file__).resolve().parents[2]
 REPORTS = BASE / 'docs' / 'reports'
 DOWNLOADS = BASE / 'docs' / 'downloads'
@@ -180,16 +181,25 @@ def load_trades(csv_path):
         ct = parse_dt(r.get('Close Time'))
         if ct is None:          # 未平倉
             continue
+        np_ = float(r.get('Net Profit') or 0)
+        mp, mlp = float(r.get('Max Profit') or 0), abs(float(r.get('Max Loss Pips') or 0))
+        # 缺數判定（OpenClaw 0235 P1-B）：MAE/MFE 全 0 而淨利為正＝數學上不可能＝源 CSV 缺欄非真 0
+        mm = (mp == 0 and mlp == 0 and np_ > 0)
         trades.append({
             'open': parse_dt(r.get('Open Time')), 'close': ct, 'type': typ,
             'lots': float(r.get('Lots') or 0), 'sym': (r.get('Symbol') or '').strip(),
-            'net_pips': float(r.get('Net Pips') or 0), 'np': float(r.get('Net Profit') or 0),
-            'mfe_$': float(r.get('Max Profit') or 0), 'mfe_p': abs(float(r.get('Max Pips') or 0)),
-            'mae_$': abs(float(r.get('Max Loss') or 0)), 'mae_p': abs(float(r.get('Max Loss Pips') or 0)),
-            'hours': float(r.get('Holding Time (Hours)') or 0),
+            'net_pips': float(r.get('Net Pips') or 0), 'np': np_,
+            'mfe_$': mp, 'mfe_p': abs(float(r.get('Max Pips') or 0)),
+            'mae_$': abs(float(r.get('Max Loss') or 0)), 'mae_p': mlp,
+            'hours': float(r.get('Holding Time (Hours)') or 0), 'mm': mm,
         })
     trades.sort(key=lambda t: t['close'])
     return trades
+
+
+def valid_mm(tr):
+    """MAE/MFE 缺數筆剔除（OpenClaw 0235 P1-B：缺就係缺，唔好扮 0）。"""
+    return [x for x in tr if not x['mm']]
 
 
 def pct(n, d):
@@ -288,12 +298,19 @@ def sec_hero(t, m, det):
            ('MaxDD $', f'{fmt_money(-equity_maxdd(t))}', 'neg' if equity_maxdd(t) else ''),
            ('最大 lot', f'{max(x["lots"] for x in t):.2f}', '')]
     six_html = ''.join(f'<div class="cell"><div class="k">{k}</div><div class="v {c}">{v}</div></div>' for k, v, c in six)
-    maep = [x['mae_p'] for x in t]
-    mfep = [x['mfe_p'] for x in t]
-    narrow = (f'<div>MAE pips 平均 <b>{round(statistics.mean(maep),1)}</b>·中位 <b>{round(statistics.median(maep),1)}</b>·P90 <b>{pctile(maep,90)}</b>'
-              f'（$ {fmt_money(statistics.mean([x["mae_$"] for x in t]))}）</div>'
-              f'<div>MFE pips 平均 <b>{round(statistics.mean(mfep),1)}</b>·中位 <b>{round(statistics.median(mfep),1)}</b>·P90 <b>{pctile(mfep,90)}</b>'
-              f'（$ {fmt_money(statistics.mean([x["mfe_$"] for x in t]))}）</div>')
+    vt = valid_mm(t)
+    if vt:
+        maep = [x['mae_p'] for x in vt]
+        mfep = [x['mfe_p'] for x in vt]
+        narrow = (f'<div>MAE pips 平均 <b>{round(statistics.mean(maep),1)}</b>·中位 <b>{round(statistics.median(maep),1)}</b>·P90 <b>{pctile(maep,90)}</b>'
+                  f'（{fmt_money(statistics.mean([x["mae_$"] for x in vt]))}）</div>'
+                  f'<div>MFE pips 平均 <b>{round(statistics.mean(mfep),1)}</b>·中位 <b>{round(statistics.median(mfep),1)}</b>·P90 <b>{pctile(mfep,90)}</b>'
+                  f'（{fmt_money(statistics.mean([x["mfe_$"] for x in vt]))}）</div>')
+        if len(vt) < len(t):
+            narrow += (f'<div class="footnote" style="color:var(--text2)">⚠ {len(t) - len(vt)} 筆缺 MAE/MFE 欄'
+                       f'（Max Profit/Max Loss 空白）——窄帶統計剔除計算（冇數≠$0，非真 0）。</div>')
+    else:
+        narrow = '<div class="muted">MAE/MFE：·冇數（全數缺欄）</div>'
     # 分層摘要迷你表
     rows = ''
     lay = sorted(det['layers'].items())
@@ -343,12 +360,13 @@ def sym_group(trades):
     gw = sum(x['np'] for x in wins)
     gl = abs(sum(x['np'] for x in losses))
     pf = '無虧損' if gl == 0 and gw > 0 else (round(gw / gl, 2) if gl else None)
+    vt = valid_mm(trades)
     return {'n': len(trades), 'wr': pct(len(wins), len(trades)) if trades else None,
             'pl': sum(x['np'] for x in trades), 'pf': pf,
-            'avg_mae$': round(statistics.mean([x['mae_$'] for x in trades]), 2) if trades else None,
-            'avg_mfe$': round(statistics.mean([x['mfe_$'] for x in trades]), 2) if trades else None,
-            'avg_maep': round(statistics.mean([x['mae_p'] for x in trades]), 1) if trades else None,
-            'avg_mfep': round(statistics.mean([x['mfe_p'] for x in trades]), 1) if trades else None,
+            'avg_mae$': round(statistics.mean([x['mae_$'] for x in vt]), 2) if vt else None,
+            'avg_mfe$': round(statistics.mean([x['mfe_$'] for x in vt]), 2) if vt else None,
+            'avg_maep': round(statistics.mean([x['mae_p'] for x in vt]), 1) if vt else None,
+            'avg_mfep': round(statistics.mean([x['mfe_p'] for x in vt]), 1) if vt else None,
             'max_lot': max((x['lots'] for x in trades), default=None),
             'avg_h': round(statistics.mean([x['hours'] for x in trades]), 1) if trades else None}
 
@@ -394,20 +412,27 @@ def build_analyzer(t, det):
             if not side_tr:
                 crow += f'<tr class="dim"><td>{side_name}</td><td class="muted">無記錄</td><td colspan="4" class="muted">—</td></tr>'
                 continue
-            maep = [x['mae_p'] for x in side_tr]
-            mfep = [x['mfe_p'] for x in side_tr]
+            vst = valid_mm(side_tr)
             dimc = ' class="dim"' if len(side_tr) < 5 else ''
             sm = ' title="樣本少 n=%d"' % len(side_tr) if len(side_tr) < 5 else ''
-            crow += (f'<tr{dimc}><td>{side_name}{sm}</td><td>{len(side_tr)}</td>'
-                     f'<td class="neg">P90 {pctile(maep, 90)} / P95 {pctile(maep, 95)}</td>'
-                     f'<td class="pos">P50 {pctile(mfep, 50)} / P75 {pctile(mfep, 75)} / P90 {pctile(mfep, 90)}</td>'
+            if vst:
+                maep = [x['mae_p'] for x in vst]
+                mfep = [x['mfe_p'] for x in vst]
+                sl_ref = f'<td class="neg">P90 {pctile(maep, 90)} / P95 {pctile(maep, 95)}</td>'
+                tp_ref = f'<td class="pos">P50 {pctile(mfep, 50)} / P75 {pctile(mfep, 75)} / P90 {pctile(mfep, 90)}</td>'
+            else:
+                sl_ref = '<td class="muted">缺數</td>'
+                tp_ref = '<td class="muted">缺數</td>'
+            crow += (f'<tr{dimc}><td{sm}>{side_name}</td><td>{len(side_tr)}</td>'
+                     f'{sl_ref}{tp_ref}'
                      f'<td>{round(statistics.mean([x["hours"] for x in side_tr]), 1):.1f}</td></tr>')
-        # 61 級效益曲線（v8.4 延遲入場）
+        # 61 級效益曲線（v8.4 延遲入場）；缺 MAE/MFE 筆剔除分母（P1-B）
         curve = {}
-        loss_tr = [x for x in tr if x['np'] < 0]
+        vtr = valid_mm(tr)
+        loss_tr = [x for x in vtr if x['np'] < 0]
         for th in range(0, 61):
             avoid = pct(sum(1 for x in loss_tr if x['mae_p'] >= th), len(loss_tr)) if loss_tr else None
-            catch = pct(sum(1 for x in tr if x['mfe_p'] >= th), len(tr)) if tr else None
+            catch = pct(sum(1 for x in vtr if x['mfe_p'] >= th), len(vtr)) if vtr else None
             curve[th] = (avoid if avoid is not None else 0, catch if catch is not None else 0)
         curve_pts = [[th, curve[th][1]] for th in range(0, 61, 2)]
         box_html = (f'<table><thead><tr><th>方向</th><th>筆數</th><th>止蝕參考（MAE P90/P95 pips）</th>'
@@ -421,7 +446,10 @@ def build_analyzer(t, det):
                        'note': f'清洗後 {len(tr)} 筆' if tr else '零交易',
                        'curve': {str(k): v for k, v in curve.items()}, 'curve_pts': curve_pts}
     options = ''.join(f'<option value="{s}">{s}</option>' for s in order)
-    return f'''<section id="s3"><h2>③ 商品分析器</h2><div class="legend">單商品手術台：預設總 P&amp;L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。</div>
+    n_mm = sum(1 for x in t if x['mm'])
+    mm_note = (f'<div class="footnote" style="color:var(--text2)">⚠ {n_mm} 筆缺 MAE/MFE 欄（Max Profit/Max Loss 空白）——'
+               f'相關商品 avg 值顯示「—」、統計分母剔除（冇數≠$0，非真 0）。</div>') if n_mm else ''
+    return f'''<section id="s3"><h2>③ 商品分析器</h2>{mm_note}<div class="legend">單商品手術台：預設總 P&amp;L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。</div>
 <div class="sel-bar"><label>商品</label><select id="sym-select">{options}</select>
 <label>入場門檻</label><div class="slider-row" style="margin:0;flex:1"><input type="range" id="th-slider" min="0" max="60" step="1" value="20"><span class="slider-val" id="th-out">20 pips</span></div></div>
 <div id="an-note" class="footnote"></div>
@@ -453,8 +481,10 @@ def sec_dir_table(t):
         rows += (f'<tr><td>{s}</td><td><span class="{"buy-h" if side == "buy" else "sell-h"}"></span>{side.upper()}</td>'
                  f'<td>{g["n"]}</td><td>{g["wr"] if g["wr"] is not None else "—"}%</td>'
                  f'<td class="{"pos" if g["pl"] > 0 else "neg"}">{fmt_money(g["pl"])}</td>'
-                 f'<td>{g["avg_mae$"]:.2f}</td><td>{g["avg_mfe$"]:.2f}</td>'
-                 f'<td>{g["avg_maep"]:.1f}</td><td>{g["avg_mfep"]:.1f}</td>'
+                 f'<td>{format(g["avg_mae$"], ".2f") if g["avg_mae$"] is not None else "—"}</td>'
+                 f'<td>{format(g["avg_mfe$"], ".2f") if g["avg_mfe$"] is not None else "—"}</td>'
+                 f'<td>{format(g["avg_maep"], ".1f") if g["avg_maep"] is not None else "—"}</td>'
+                 f'<td>{format(g["avg_mfep"], ".1f") if g["avg_mfep"] is not None else "—"}</td>'
                  f'<td>{g["max_lot"]:.2f}</td><td class="muted">—</td></tr>')
     return f'''<section id="s4"><h2>④ 商品方向總表</h2><div class="legend">全場商品×方向成績表，按勝率排序；L5+ 深層馬丁暴露喺深層馬丁帳戶先會有數（本訊號見 ② 區）。</div>
 <table><thead><tr><th>商品</th><th>方向</th><th>筆數</th><th>勝率</th><th>P&amp;L</th><th>avg MAE $</th><th>avg MFE $</th><th>avg MAE p</th><th>avg MFE p</th><th>max lot</th><th>L5+ 筆數</th></tr></thead>
@@ -488,7 +518,7 @@ def sec_pivot(t):
 <div style="flex:1;background:var(--card2);border-radius:6px;padding:4px"><div style="width:100%;background:{bg};border-radius:4px;padding:6px 10px;font-weight:700">{fmt_money(val)}</div></div></div>
 <div class="footnote">「·」＝未覆蓋月份（冇數），唔係 $0。</div></section>'''
     vmax = max((abs(v) for v in by_ym.values()), default=1)
-    head = '<div class="heat" style="grid-template-columns:64px repeat(12,1fr)">'
+    head = '<div class="heat" style="grid-template-columns:64px repeat(13,1fr)">'
     cells = ['<div class="lab"></div>'] + [f'<div class="lab" style="justify-content:center">{m}</div>' for m in range(1, 13)] + ['<div class="lab" style="justify-content:center">全年</div>']
     for y in years:
         cells.append(f'<div class="lab">{y}</div>')
@@ -536,22 +566,34 @@ def scatter_svg(tr, side, w=300, h=230):
 
 
 def sec_scatter(t):
-    """⑥ MAE/MFE 散點：BUY/SELL 兩幅 SVG＋y=x 對角線；點<10 改點表。"""
+    """⑥ MAE/MFE 散點：BUY/SELL 兩幅 SVG＋y=x 對角線；缺 MAE/MFE 筆唔入散點（P1-B）；點<10 改點表。"""
     import html as _h
     panels = []
+    n_mm = sum(1 for x in t if x['mm'])
     for side, label in (('buy', 'BUY'), ('sell', 'SELL')):
         tr = [x for x in t if x['type'] == side]
         if not tr:
             panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b><div class="footnote">無 {label} 記錄</div></div>')
             continue
-        if len(tr) < 10:
-            rows = ''.join(f'<tr><td>{x["mae_p"]:.1f}</td><td>{x["mfe_p"]:.1f}</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td></tr>' for x in tr)
-            panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b><div class="footnote" style="color:var(--yel)">⚠ 只有 {len(tr)} 筆（&lt;10）——散點改列點表。</div><table><thead><tr><th>MAE p</th><th>MFE p</th><th>淨利</th></tr></thead><tbody>{rows}</tbody></table></div>')
+        vtr = valid_mm(tr)
+        if not vtr:
+            panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b><div class="footnote" style="color:var(--yel)">⚠ {len(tr)} 筆全部缺 MAE/MFE 欄——無有效點可繪（冇數≠$0）。</div></div>')
             continue
-        svg = scatter_svg(tr, side)
-        online = pct(sum(1 for x in tr if x['mfe_p'] >= x['mae_p']), len(tr))
-        panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b>{svg}<div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 {online}%；綠點贏紅點蝕</div></div>')
-    return f'''<section id="s6"><h2>⑥ MAE/MFE 散點</h2><div class="legend">入場質素四象限：MFE=入場後最大有利、MAE=最大不利（pips，由入場價起算）。y=x 線上＝好單。</div>
+        if len(vtr) < 10:
+            rows = ''.join(
+                (f'<tr><td>{x["mae_p"]:.1f}</td><td>{x["mfe_p"]:.1f}</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td></tr>'
+                 if not x['mm'] else
+                 f'<tr><td class="muted" colspan="2">·冇數（缺欄）</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td></tr>')
+                for x in tr)
+            panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b><div class="footnote" style="color:var(--yel)">⚠ 有效 MAE/MFE {len(vtr)} 筆（&lt;10）——散點改列點表。</div><table><thead><tr><th>MAE p</th><th>MFE p</th><th>淨利</th></tr></thead><tbody>{rows}</tbody></table></div>')
+            continue
+        svg = scatter_svg(vtr, side)
+        online = pct(sum(1 for x in vtr if x['mfe_p'] >= x['mae_p']), len(vtr))
+        drop = f'（剔除 {len(tr) - len(vtr)} 筆缺數）' if len(tr) > len(vtr) else ''
+        panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b>{svg}<div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 {online}%{drop}；綠點贏紅點蝕</div></div>')
+    mm_note = (f'<div class="footnote" style="color:var(--text2)">⚠ {n_mm} 筆缺 MAE/MFE 欄（Max Profit/Max Loss 空白）——'
+               f'相關點位剔除散點（冇數≠$0，非真 0）。</div>') if n_mm else ''
+    return f'''<section id="s6"><h2>⑥ MAE/MFE 散點</h2>{mm_note}<div class="legend">入場質素四象限：MFE=入場後最大有利、MAE=最大不利（pips，由入場價起算）。y=x 線上＝好單。</div>
 <div class="two">{''.join(panels)}</div></section>'''
 
 
@@ -598,10 +640,11 @@ def sec_time(t):
     # 明細（最近 50 筆）
     rows = ''
     for x in t[-50:][::-1]:
+        mae_cell = f'{x["mae_$"]:,.2f}' if not x['mm'] else '·冇數'
         rows += (f'<tr><td>{x["close"]:%m-%d %H:%M}</td><td>{_h.escape(x["sym"])}</td>'
                  f'<td><span class="{"buy-h" if x["type"] == "buy" else "sell-h"}"></span>{x["type"].upper()}</td>'
                  f'<td>{x["lots"]:.2f}</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td>'
-                 f'<td class="neg">{x["mae_$"]:,.2f}</td></tr>')
+                 f'<td class="neg">{mae_cell}</td></tr>')
     return f'''<section id="s7"><h2>⑦ 時間維度＋明細</h2><div class="legend">星期×小時 P&amp;L（格色雙向 heat，hover 睇精確值；「·」＝冇數）＋累計 P&amp;L 走勢＋最近 50 筆明細。時間均按平倉時間。</div>
 <h3 style="color:var(--acc);font-size:.95em;margin:8px 0 6px">星期 × 小時 heatmap</h3>{''.join(g)}
 <h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">累計 P&amp;L（Growth）</h3><div class="svgbox">{s}</div>
@@ -640,7 +683,7 @@ def build_page(signal_id, csv_path, force=False):
     s3, sym_data, default_sym = build_analyzer(trades, det)
     n_raw = len(list(csv.DictReader(open(csv_path, encoding='utf-8-sig'))))
     banner = (f'<div class="banner">⚠ 樣本頁：清洗後 {len(trades)} 筆（CSV 原始 {n_raw} 行）；'
-              f'CSV 33 欄補齊前，部分指標按降級軍規處理（pips 主 $ 輔）。生成於 {datetime.now():%Y-%m-%d %H:%M}。</div>')
+              f'CSV 33 欄補齊前，部分指標按降級軍規處理（pips 主 $ 輔）。生成於 {datetime.now(HKT):%Y-%m-%d %H:%M} HKT。</div>')
     sym_json = json.dumps(sym_data, ensure_ascii=False).replace('</', '<\\/')
     js_block = (JS % {'sym_data': sym_json, 'th_default': '20'})
     html = f'''<!DOCTYPE html>
