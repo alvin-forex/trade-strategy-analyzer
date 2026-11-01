@@ -430,7 +430,7 @@ score_v5_batch() ──► 跨全部實體排名 → 百分位 → 加權 = DDE 
 generate_signal_ranking_v5.py ──► 聚合 per Signal Avg v5
         │
         ▼
-signal_ranking_dde_v5.html（GitHub Pages 排名總表）
+signal_ranking.html（GitHub Pages 排名總表；原 dde_v5 副本已於 2026-11-01 裁決刪除）
 ```
 
 ### 4.3 MT4 帳戶監控（帳戶 → 通知）
