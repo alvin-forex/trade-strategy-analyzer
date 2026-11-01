@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📰 外匯新聞 - TSA</title>
+<style>
+:root{--font-main:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px;--shadow:0 2px 8px rgba(0,0,0,0.12)}
+[data-theme="dark"]{--bg:#0a0e17;--bg-card:#111520;--bg-hover:#1a1f2e;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--orange:#fd7e14;--border:#1e2433}
+[data-theme="light"]{--bg:#f5f7fa;--bg-card:#ffffff;--bg-hover:#eef2f7;--text:#333;--text2:#666;--primary:#0f3460;--accent:#e94560;--green:#28a745;--red:#dc3545;--yellow:#ffc107;--orange:#fd7e14;--border:#ddd}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-main);background:var(--bg);color:var(--text)}
+.theme-toggle:hover{background:var(--bg-hover);transform:scale(1.1)}
+
+/* Layout */
+.page-header{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.page-header h1{font-size:1.3em;color:var(--primary)}
+.page-header .sub{color:var(--text2);font-size:.82em;margin-left:auto}
+
+.main{display:flex;height:calc(100vh - 60px);overflow:hidden}
+
+/* Left: Report List */
+.report-list{width:320px;min-width:280px;border-right:1px solid var(--border);overflow-y:auto;padding:0;background:var(--bg-card)}
+.report-list-header{padding:12px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-card);z-index:10}
+.report-list-header h2{font-size:.95em;color:var(--primary);margin-bottom:4px}
+.report-count{font-size:.75em;color:var(--text2)}
+
+.date-group{border-bottom:1px solid var(--border)}
+.date-label{padding:8px 16px;font-size:.78em;font-weight:700;color:var(--text2);background:var(--bg);position:sticky;top:56px;z-index:5}
+
+.report-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s}
+.report-item:hover{background:var(--bg-hover)}
+.report-item.active{background:var(--bg-hover);border-left:3px solid var(--primary)}
+.report-item .icon{font-size:1.4em;flex-shrink:0}
+.report-item .info{flex:1;min-width:0}
+.report-item .info .title{font-size:.88em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.report-item .info .time{font-size:.72em;color:var(--text2)}
+.report-item .badge{font-size:.68em;padding:2px 7px;border-radius:4px;font-weight:600;white-space:nowrap}
+.badge-morning{background:rgba(26,35,126,.3);color:#90caf9}
+.badge-evening{background:rgba(183,28,28,.2);color:#ef9a9a}
+.badge-4h{background:rgba(0,77,64,.3);color:#80cbc4}
+[data-theme="light"] .badge-morning{background:#e3f2fd;color:#1565c0}
+[data-theme="light"] .badge-evening{background:#fce4ec;color:#c62828}
+[data-theme="light"] .badge-4h{background:#e0f2f1;color:#00695c}
+
+/* Right: Report Viewer */
+.report-viewer{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.viewer-empty{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text2)}
+.viewer-empty .icon{font-size:3em;margin-bottom:12px}
+.viewer-empty h3{font-size:1.1em;color:var(--text);margin-bottom:8px}
+.viewer-empty p{font-size:.85em}
+
+.viewer-toolbar{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg-card)}
+.viewer-toolbar .title{font-size:.9em;color:var(--primary);font-weight:600}
+.viewer-toolbar .spacer{flex:1}
+.viewer-toolbar button{background:var(--bg-hover);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.82em}
+.viewer-toolbar button:hover{background:var(--border)}
+
+.viewer-frame{flex:1;border:none;width:100%;background:var(--bg)}
+
+/* Mobile */
+@media(max-width:768px){
+  .main{flex-direction:column}
+  .report-list{width:100%;min-width:100%;max-height:40vh;border-right:none;border-bottom:1px solid var(--border)}
+  .report-viewer{min-height:50vh}
+}
+</style>
+<script>
+(function(){
+  const saved=localStorage.getItem('tsa-theme');
+  const t=saved||'dark';
+  document.documentElement.setAttribute('data-theme',t);
+  document.addEventListener('DOMContentLoaded',function(){
+    const btn=document.getElementById('theme-toggle');
+    if(btn)btn.textContent=t==='dark'?'☀️':'🌙';
+  });
+})();
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('tsa-theme',next);
+  const btn=document.getElementById('theme-toggle');
+  if(btn)btn.textContent=next==='dark'?'☀️':'🌙';
+}
+</script>
+
+<link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+
+<div class="page-header">
+  <h1>📰 外匯新聞</h1>
+  <span class="sub">每日早晚盤外匯市場報告 · AUDCAD · EURCHF · XAUUSD</span>
+  </div>
+
+<!-- ③ 站務（2026-10-28 ZCODE 交付）：早晚報區 -->
+<section id="reports" class="card" style="margin:16px 0;">
+  <h2>外匯早晚報</h2>
+  <ul>
+    <li><a href="forex_reports/index.html">報告總覽（歷史全檔）</a></li>
+    <li><a href="forex_reports/2026-10-29_morning.html">早報 2026-10-29</a></li>
+    <li><a href="forex_reports/forex_morning_report_2026-10-28.html">早報 2026-10-28</a></li>
+    <li><a href="forex_reports/forex_morning_report_2026-10-27.html">早報 2026-10-27</a></li>
+  </ul>
+</section>
+
+<div class="main">
+  <!-- Left: Report List -->
+  <div class="report-list" id="reportList">
+    <div class="report-list-header">
+      <h2>📅 報告列表</h2>
+      <span class="report-count" id="reportCount">載入中...</span>
+    </div>
+    <div id="reportItems"></div>
+  </div>
+
+  <!-- Right: Report Viewer -->
+  <div class="report-viewer" id="reportViewer">
+    <div class="viewer-empty" id="viewerEmpty">
+      <div>
+        <div class="icon">📰</div>
+        <h3>選擇一份報告</h3>
+        <p>點擊左側列表查看完整報告<br>報告每日 07:00 / 18:00 HKT 自動生成</p>
+      </div>
+    </div>
+    <div id="viewerContent" style="display:none;flex:1;display:flex;flex-direction:column">
+      <div class="viewer-toolbar">
+        <span class="title" id="viewerTitle"></span>
+        <span class="spacer"></span>
+        <button onclick="openInNewTab()" title="新視窗開啟">🔗 開新視窗</button>
+      </div>
+      <iframe class="viewer-frame" id="viewerFrame"></iframe>
+    </div>
+  </div>
+</div>
+
+<script>
+// Report registry — updated when new reports arrive
+const REPORTS = [
+  /* REPORT_REGISTRY_START */
+  {date:'2026-10-29',type:'evening',file:'2026-10-29_evening.html',label:'晚盤報告'},
+  {date:'2026-10-29',type:'morning',file:'2026-10-29_morning.html',label:'早盤報告'},
+  {date:'2026-10-28',type:'evening',file:'2026-10-28_evening.html',label:'晚盤報告'},
+  {date:'2026-10-28',type:'morning',file:'forex_morning_report_2026-10-28.html',label:'早盤報告'},
+  {date:'2026-10-27',type:'morning',file:'forex_morning_report_2026-10-27.html',label:'早盤報告'},
+  {date:'2026-10-26',type:'evening',file:'2026-10-26_evening.html',label:'晚盤報告'},
+  {date:'2026-10-26',type:'morning',file:'forex_morning_report_2026-10-26.html',label:'早盤報告'},
+  {date:'2026-10-23',type:'evening',file:'2026-10-23_evening.html',label:'晚盤報告'},
+  {date:'2026-10-23',type:'morning',file:'forex_morning_report_2026-10-23.html',label:'早盤報告'},
+  {date:'2026-10-22',type:'evening',file:'forex_combined_20261022_1800.html',label:'晚盤報告（綜合版）'},
+  {date:'2026-10-22',type:'morning',file:'forex_morning_report_20261022.html',label:'早盤報告'},
+  {date:'2026-10-21',type:'morning',file:'forex_morning_report_2026-10-21.html',label:'早盤報告'},
+  {date:'2026-10-20',type:'evening',file:'2026-10-20_evening.html',label:'晚盤報告'},
+  {date:'2026-10-20',type:'morning',file:'2026-10-20_morning.html',label:'早盤報告'},
+  {date:'2026-10-06',type:'morning',file:'2026-10-06_morning.html',label:'早盤報告'},
+  {date:'2026-10-05',type:'evening',file:'2026-10-05_evening.html',label:'晚盤報告'},
+  {date:'2026-10-02',type:'evening',file:'2026-10-02_evening.html',label:'晚盤報告'},
+  {date:'2026-10-02',type:'morning',file:'2026-10-02_morning.html',label:'早盤報告'},
+  {date:'2026-10-01',type:'evening',file:'2026-10-01_evening.html',label:'晚盤報告'},
+  {date:'2026-10-01',type:'morning',file:'2026-10-01_morning.html',label:'早盤報告'},
+  {date:'2026-09-30',type:'evening',file:'2026-09-30_evening.html',label:'晚盤報告'},
+  {date:'2026-09-30',type:'morning',file:'2026-09-30_morning.html',label:'早盤報告'},
+  {date:'2026-09-29',type:'evening',file:'2026-09-29_evening.html',label:'晚盤報告'},
+  {date:'2026-09-25',type:'evening',file:'2026-09-25_evening.html',label:'晚盤報告'},
+  {date:'2026-09-25',type:'morning',file:'2026-09-25_morning.html',label:'早盤報告'},
+  {date:'2026-09-24',type:'evening',file:'2026-09-24_evening.html',label:'晚盤報告'},
+  {date:'2026-09-24',type:'morning',file:'2026-09-24_morning.html',label:'早盤報告'},
+  {date:'2026-09-23',type:'evening',file:'2026-09-23_evening.html',label:'晚盤報告'},
+  {date:'2026-09-23',type:'morning',file:'2026-09-23_morning.html',label:'早盤報告'},
+  {date:'2026-09-22',type:'evening',file:'2026-09-22_evening.html',label:'晚盤報告'},
+  {date:'2026-09-18',type:'evening',file:'2026-09-18_evening.html',label:'晚盤報告'},
+  {date:'2026-09-18',type:'morning',file:'2026-09-18_morning.html',label:'早盤報告'},
+  {date:'2026-09-17',type:'evening',file:'2026-09-17_evening.html',label:'晚盤報告'},
+  {date:'2026-09-17',type:'morning',file:'2026-09-17_morning.html',label:'早盤報告'},
+  {date:'2026-09-16',type:'evening',file:'2026-09-16_evening.html',label:'晚盤報告'},
+  {date:'2026-09-16',type:'morning',file:'2026-09-16_morning.html',label:'早盤報告'},
+  {date:'2026-09-15',type:'evening',file:'2026-09-15_evening.html',label:'晚盤報告'},
+  {date:'2026-09-15',type:'morning',file:'2026-09-15_morning.html',label:'早盤報告'},
+  {date:'2026-09-14',type:'evening',file:'2026-09-14_evening.html',label:'晚盤報告'},
+  {date:'2026-09-14',type:'morning',file:'2026-09-14_morning.html',label:'早盤報告'},
+  {date:'2026-09-11',type:'evening',file:'2026-09-11_evening.html',label:'晚盤報告'},
+  {date:'2026-09-11',type:'morning',file:'2026-09-11_morning.html',label:'早盤報告'},
+  {date:'2026-09-10',type:'evening',file:'2026-09-10_evening.html',label:'晚盤報告'},
+  {date:'2026-09-10',type:'morning',file:'2026-09-10_morning.html',label:'早盤報告'},
+  {date:'2026-09-09',type:'morning',file:'2026-09-09_morning.html',label:'早盤報告'},
+  {date:'2026-09-08',type:'evening',file:'2026-09-08_evening.html',label:'晚盤報告'},
+  {date:'2026-09-08',type:'morning',file:'2026-09-08_morning.html',label:'早盤報告'},
+  {date:'2026-09-07',type:'morning',file:'2026-09-07_morning.html',label:'早盤報告'},
+  {date:'2026-09-04',type:'evening',file:'2026-09-04_evening.html',label:'晚盤報告'},
+  {date:'2026-09-04',type:'morning',file:'2026-09-04_morning.html',label:'早盤報告'},
+  {date:'2026-09-03',type:'evening',file:'2026-09-03_evening.html',label:'晚盤報告'},
+  {date:'2026-09-03',type:'morning',file:'2026-09-03_morning.html',label:'早盤報告'},
+  {date:'2026-09-02',type:'evening',file:'2026-09-02_evening.html',label:'晚盤報告'},
+  {date:'2026-09-02',type:'morning',file:'2026-09-02_morning.html',label:'早盤報告'},
+  {date:'2026-09-01',type:'evening',file:'2026-09-01_evening.html',label:'晚盤報告'},
+  {date:'2026-09-01',type:'morning',file:'2026-09-01_morning.html',label:'早盤報告'},
+  {date:'2026-08-31',type:'evening',file:'2026-08-31_evening.html',label:'晚盤報告'},
+  {date:'2026-08-31',type:'morning',file:'2026-08-31_morning.html',label:'早盤報告'},
+  {date:'2026-08-28',type:'evening',file:'2026-08-28_evening.html',label:'晚盤報告'},
+  {date:'2026-08-28',type:'morning',file:'2026-08-28_morning.html',label:'早盤報告'},
+  {date:'2026-08-27',type:'evening',file:'2026-08-27_evening.html',label:'晚盤報告'},
+  {date:'2026-08-27',type:'morning',file:'2026-08-27_morning.html',label:'早盤報告'},
+  {date:'2026-08-26',type:'evening',file:'2026-08-26_evening.html',label:'晚盤報告'},
+  {date:'2026-08-26',type:'morning',file:'2026-08-26_morning.html',label:'早盤報告'},
+  {date:'2026-08-25',type:'evening',file:'2026-08-25_evening.html',label:'晚盤報告'},
+  {date:'2026-08-25',type:'morning',file:'2026-08-25_morning.html',label:'早盤報告'},
+  {date:'2026-08-24',type:'evening',file:'2026-08-24_evening.html',label:'晚盤報告'},
+  {date:'2026-08-24',type:'morning',file:'2026-08-24_morning.html',label:'早盤報告'},
+  {date:'2026-08-21',type:'evening',file:'2026-08-21_evening.html',label:'晚盤報告'},
+  {date:'2026-08-21',type:'morning',file:'2026-08-21_morning.html',label:'早盤報告'},
+  {date:'2026-08-20',type:'evening',file:'2026-08-20_evening.html',label:'晚盤報告'},
+  {date:'2026-08-20',type:'morning',file:'2026-08-20_morning.html',label:'早盤報告'},
+  {date:'2026-08-19',type:'evening',file:'2026-08-19_evening.html',label:'晚盤報告'},
+  {date:'2026-08-19',type:'morning',file:'2026-08-19_morning.html',label:'早盤報告'},
+  {date:'2026-08-18',type:'evening',file:'2026-08-18_evening.html',label:'晚盤報告'},
+  {date:'2026-08-18',type:'morning',file:'2026-08-18_morning.html',label:'早盤報告'},
+  {date:'2026-08-17',type:'evening',file:'2026-08-17_evening.html',label:'晚盤報告'},
+  {date:'2026-08-17',type:'morning',file:'2026-08-17_morning.html',label:'早盤報告'},
+  {date:'2026-08-14',type:'evening',file:'2026-08-14_evening.html',label:'晚盤報告'},
+  {date:'2026-08-14',type:'morning',file:'2026-08-14_morning.html',label:'早盤報告'},
+  {date:'2026-08-13',type:'evening',file:'2026-08-13_evening.html',label:'晚盤報告'},
+  {date:'2026-08-13',type:'morning',file:'2026-08-13_morning.html',label:'早盤報告'},
+  {date:'2026-08-12',type:'evening',file:'2026-08-12_evening.html',label:'晚盤報告'},
+  {date:'2026-08-12',type:'morning',file:'2026-08-12_morning.html',label:'早盤報告'},
+  {date:'2026-08-11',type:'evening',file:'2026-08-11_evening.html',label:'晚盤報告'},
+  {date:'2026-08-11',type:'morning',file:'2026-08-11_morning.html',label:'早盤報告'},
+  {date:'2026-08-10',type:'evening',file:'2026-08-10_evening.html',label:'晚盤報告'},
+  {date:'2026-08-10',type:'morning',file:'2026-08-10_morning.html',label:'早盤報告'},
+  {date:'2026-08-07',type:'evening',file:'2026-08-07_evening.html',label:'晚盤報告'},
+  {date:'2026-08-07',type:'morning',file:'2026-08-07_morning.html',label:'早盤報告'},
+  {date:'2026-08-06',type:'evening',file:'2026-08-06_evening.html',label:'晚盤報告'},
+  {date:'2026-08-06',type:'morning',file:'2026-08-06_morning.html',label:'早盤報告'},
+  {date:'2026-08-05',type:'evening',file:'2026-08-05_evening.html',label:'晚盤報告'},
+  {date:'2026-08-05',type:'morning',file:'2026-08-05_morning.html',label:'早盤報告'},
+  {date:'2026-08-04',type:'evening',file:'2026-08-04_evening.html',label:'晚盤報告'},
+  {date:'2026-08-04',type:'morning',file:'2026-08-04_morning.html',label:'早盤報告'},
+  {date:'2026-08-03',type:'evening',file:'2026-08-03_evening.html',label:'晚盤報告'},
+  {date:'2026-08-03',type:'morning',file:'2026-08-03_morning.html',label:'早盤報告'},
+  {date:'2026-07-31',type:'evening',file:'2026-07-31_evening.html',label:'晚盤報告'},
+  {date:'2026-07-31',type:'morning',file:'2026-07-31_morning.html',label:'早盤報告'},
+  {date:'2026-07-30',type:'evening',file:'2026-07-30_evening.html',label:'晚盤報告'},
+  {date:'2026-07-30',type:'morning',file:'2026-07-30_morning.html',label:'早盤報告'},
+  {date:'2026-07-29',type:'evening',file:'2026-07-29_evening.html',label:'晚盤報告'},
+  {date:'2026-07-29',type:'morning',file:'2026-07-29_morning.html',label:'早盤報告'},
+  {date:'2026-07-28',type:'evening',file:'2026-07-28_evening.html',label:'晚盤報告'},
+  {date:'2026-07-28',type:'morning',file:'2026-07-28_morning.html',label:'早盤報告'},
+  {date:'2026-07-27',type:'evening',file:'2026-07-27_evening.html',label:'晚盤報告'},
+  {date:'2026-07-27',type:'morning',file:'2026-07-27_morning.html',label:'早盤報告'},
+  {date:'2026-07-24',type:'evening',file:'2026-07-24_evening.html',label:'晚盤報告'},
+  {date:'2026-07-24',type:'morning',file:'2026-07-24_morning.html',label:'早盤報告'},
+  {date:'2026-07-23',type:'evening',file:'2026-07-23_evening.html',label:'晚盤報告'},
+  {date:'2026-07-23',type:'morning',file:'2026-07-23_morning.html',label:'早盤報告'},
+  {date:'2026-07-22',type:'evening',file:'2026-07-22_evening.html',label:'晚盤報告'},
+  {date:'2026-07-22',type:'morning',file:'2026-07-22_morning.html',label:'早盤報告'},
+  {date:'2026-07-21',type:'evening',file:'2026-07-21_evening.html',label:'晚盤報告'},
+  {date:'2026-07-21',type:'morning',file:'2026-07-21_morning.html',label:'早盤報告'},
+  {date:'2026-07-17',type:'evening',file:'2026-07-17_evening.html',label:'晚盤報告'},
+  {date:'2026-07-17',type:'morning',file:'2026-07-17_morning.html',label:'早盤報告'},
+  {date:'2026-07-16',type:'evening',file:'2026-07-16_evening.html',label:'晚盤報告'},
+  {date:'2026-07-16',type:'morning',file:'2026-07-16_morning.html',label:'早盤報告'},
+  {date:'2026-07-15',type:'evening',file:'2026-07-15_evening.html',label:'晚盤報告'},
+  {date:'2026-07-15',type:'morning',file:'2026-07-15_morning.html',label:'早盤報告'},
+  {date:'2026-07-14',type:'evening',file:'2026-07-14_evening.html',label:'晚盤報告'},
+  {date:'2026-07-14',type:'morning',file:'2026-07-14_morning.html',label:'早盤報告'},
+  {date:'2026-07-13',type:'evening',file:'2026-07-13_evening.html',label:'晚盤報告'},
+  {date:'2026-07-13',type:'morning',file:'2026-07-13_morning.html',label:'早盤報告'},
+  {date:'2026-07-10',type:'evening',file:'2026-07-10_evening.html',label:'晚盤報告'},
+  {date:'2026-07-10',type:'morning',file:'2026-07-10_morning.html',label:'早盤報告'},
+  {date:'2026-07-09',type:'evening',file:'2026-07-09_evening.html',label:'晚盤報告'},
+  {date:'2026-07-09',type:'morning',file:'2026-07-09_morning.html',label:'早盤報告'},
+  {date:'2026-07-08',type:'evening',file:'2026-07-08_evening.html',label:'晚盤報告'},
+  {date:'2026-07-08',type:'morning',file:'2026-07-08_morning.html',label:'早盤報告'},
+  {date:'2026-07-07',type:'evening',file:'2026-07-07_evening.html',label:'晚盤報告'},
+  {date:'2026-07-07',type:'morning',file:'2026-07-07_morning.html',label:'早盤報告'},
+  {date:'2026-07-06',type:'evening',file:'2026-07-06_evening.html',label:'晚盤報告'},
+  {date:'2026-07-06',type:'morning',file:'2026-07-06_morning.html',label:'早盤報告'},
+  {date:'2026-07-03',type:'evening',file:'2026-07-03_evening.html',label:'晚盤報告'},
+  {date:'2026-07-03',type:'morning',file:'2026-07-03_morning.html',label:'早盤報告'},
+  {date:'2026-07-02',type:'evening',file:'2026-07-02_evening.html',label:'晚盤報告'},
+  {date:'2026-07-02',type:'morning',file:'2026-07-02_morning.html',label:'早盤報告'},
+  {date:'2026-07-01',type:'evening',file:'2026-07-01_evening.html',label:'晚盤報告'},
+  {date:'2026-07-01',type:'morning',file:'2026-07-01_morning.html',label:'早盤報告'},
+  {date:'2026-06-30',type:'evening',file:'2026-06-30_evening.html',label:'晚盤報告'},
+  {date:'2026-06-30',type:'morning',file:'2026-06-30_morning.html',label:'早盤報告'},
+  {date:'2026-06-29',type:'evening',file:'2026-06-29_evening.html',label:'晚盤報告'},
+  {date:'2026-06-29',type:'morning',file:'2026-06-29_morning.html',label:'早盤報告'},
+  {date:'2026-06-26',type:'evening',file:'2026-06-26_evening.html',label:'晚盤報告'},
+  {date:'2026-06-26',type:'morning',file:'2026-06-26_morning.html',label:'早盤報告'},
+  {date:'2026-06-25',type:'evening',file:'2026-06-25_evening.html',label:'晚盤報告'},
+  {date:'2026-06-25',type:'morning',file:'2026-06-25_morning.html',label:'早盤報告'},
+  {date:'2026-06-24',type:'evening',file:'2026-06-24_evening.html',label:'晚盤報告'},
+  {date:'2026-06-24',type:'morning',file:'2026-06-24_morning.html',label:'早盤報告'},
+  {date:'2026-06-23',type:'evening',file:'2026-06-23_evening.html',label:'晚盤報告'},
+  {date:'2026-06-23',type:'morning',file:'2026-06-23_morning.html',label:'早盤報告'},
+  {date:'2026-06-22',type:'evening',file:'2026-06-22_evening.html',label:'晚盤報告'},
+  {date:'2026-06-22',type:'morning',file:'2026-06-22_morning.html',label:'早盤報告'},
+  {date:'2026-06-18',type:'evening',file:'2026-06-18_evening.html',label:'晚盤報告'},
+  {date:'2026-06-18',type:'morning',file:'2026-06-18_morning.html',label:'早盤報告'},
+  {date:'2026-06-17',type:'morning',file:'2026-06-17_morning.html',label:'早盤報告'},
+  {date:'2026-06-16',type:'evening',file:'2026-06-16_evening.html',label:'晚盤報告'},
+  {date:'2026-06-16',type:'morning',file:'2026-06-16_morning.html',label:'早盤報告'},
+  {date:'2026-06-15',type:'evening',file:'2026-06-15_evening.html',label:'晚盤報告'},
+  {date:'2026-06-15',type:'morning',file:'2026-06-15_morning.html',label:'早盤報告'},
+  {date:'2026-06-12',type:'morning_b',file:'2026-06-12_morning_b.html',label:'早盤報告（補充）'},
+  {date:'2026-06-12',type:'morning',file:'2026-06-12_morning.html',label:'早盤報告'},
+  {date:'2026-06-11',type:'evening',file:'2026-06-11_evening.html',label:'晚盤報告'},
+  {date:'2026-06-11',type:'morning',file:'2026-06-11_morning.html',label:'早盤報告'},
+  {date:'2026-06-10',type:'evening',file:'2026-06-10_evening.html',label:'晚盤報告'},
+  {date:'2026-06-10',type:'morning',file:'2026-06-10_morning.html',label:'早盤報告'},
+  {date:'2026-06-09',type:'morning',file:'2026-06-09_morning.html',label:'早盤報告'},
+  {date:'2026-06-08',type:'evening',file:'2026-06-08_evening.html',label:'晚盤報告'},
+  {date:'2026-06-08',type:'morning',file:'2026-06-08_morning.html',label:'早盤報告'},
+  {date:'2026-06-05',type:'evening',file:'2026-06-05_evening.html',label:'晚盤報告'},
+  {date:'2026-06-05',type:'morning',file:'2026-06-05_morning.html',label:'早盤報告'},
+  {date:'2026-06-04',type:'evening',file:'2026-06-04_evening.html',label:'晚盤報告'},
+  {date:'2026-06-04',type:'morning',file:'2026-06-04_morning.html',label:'早盤報告'},
+  {date:'2026-06-03',type:'evening',file:'2026-06-03_evening.html',label:'晚盤報告'},
+  {date:'2026-06-03',type:'morning',file:'2026-06-03_morning.html',label:'早盤報告'},
+  {date:'2026-06-02',type:'morning',file:'2026-06-02_morning.html',label:'早盤報告'},
+  {date:'2026-06-01',type:'evening',file:'2026-06-01_evening.html',label:'晚盤報告'},
+  {date:'2026-06-01',type:'morning',file:'2026-06-01_morning.html',label:'早盤報告'},
+  {date:'2026-05-30',type:'morning',file:'2026-05-30_morning.html',label:'早盤報告'},
+  {date:'2026-05-29',type:'evening',file:'2026-05-29_evening.html',label:'晚盤報告'},
+  {date:'2026-05-29',type:'morning',file:'2026-05-29_morning.html',label:'早盤報告'},
+  {date:'2026-05-28',type:'evening',file:'2026-05-28_evening.html',label:'晚盤報告'},
+  {date:'2026-05-28',type:'morning',file:'2026-05-28_morning.html',label:'早盤報告'},
+  {date:'2026-05-26',type:'evening',file:'2026-05-26_evening.html',label:'晚盤報告'},
+  {date:'2026-05-26',type:'morning',file:'2026-05-26_morning.html',label:'早盤報告'},
+  {date:'2026-05-25',type:'evening',file:'2026-05-25_evening.html',label:'晚盤報告'},
+  {date:'2026-05-25',type:'morning',file:'2026-05-25_morning.html',label:'早盤報告'},
+  {date:'2026-05-24',type:'evening',file:'2026-05-24_evening.html',label:'晚盤報告'},
+  {date:'2026-05-24',type:'morning',file:'2026-05-24_morning.html',label:'早盤報告'},
+  {date:'2026-05-23',type:'evening',file:'2026-05-23_evening.html',label:'晚盤報告'},
+  {date:'2026-05-23',type:'morning',file:'2026-05-23_morning.html',label:'早盤報告'},
+  /* REPORT_REGISTRY_END */
+];
+
+const REPORTS_DIR = './forex_reports/';
+let currentFile = null;
+
+function renderList() {
+  const container = document.getElementById('reportItems');
+  const countEl = document.getElementById('reportCount');
+  countEl.textContent = REPORTS.length + ' 份報告';
+
+  // Group by date
+  const groups = {};
+  REPORTS.forEach(r => {
+    if (!groups[r.date]) groups[r.date] = [];
+    groups[r.date].push(r);
+  });
+
+  const dates = Object.keys(groups).sort().reverse();
+  let html = '';
+
+  dates.forEach(date => {
+    const d = new Date(date + 'T00:00:00');
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const dayName = dayNames[d.getDay()];
+    html += `<div class="date-group">`;
+    html += `<div class="date-label">📅 ${date} (${dayName})</div>`;
+    // Sort: morning first, then evening, then 4h, then daily
+    const typeOrder = {morning:0, evening:1, '4h':2, daily:3};
+    const sorted = groups[date].sort((a,b) => (typeOrder[a.type]||9) - (typeOrder[b.type]||9));
+    sorted.forEach(r => {
+      const icons = {morning:'🌅', evening:'🌆', '4h':'📊', daily:'📋'};
+      const badges = {morning:'badge-morning', evening:'badge-evening', '4h':'badge-4h', daily:'badge-morning'};
+      const badgeTexts = {morning:'早盤', evening:'晚盤', '4h':'4H', daily:'日報'};
+      const times = {morning:'07:00 HKT', evening:'18:00 HKT', '4h':'4H週期', daily:'每日'};
+      const icon = icons[r.type] || '📄';
+      const badgeClass = badges[r.type] || 'badge-morning';
+      const badgeText = badgeTexts[r.type] || r.type;
+      const timeText = times[r.type] || '';
+      html += `<div class="report-item" data-file="${r.file}" onclick="loadReport('${r.file}','${date} ${r.label}')">
+        <span class="icon">${icon}</span>
+        <div class="info">
+          <div class="title">${r.label} — ${date}</div>
+          <div class="time">${timeText} · AUDCAD · EURCHF · XAUUSD</div>
+        </div>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function loadReport(file, title) {
+  currentFile = file;
+  document.getElementById('viewerEmpty').style.display = 'none';
+  const content = document.getElementById('viewerContent');
+  content.style.display = 'flex';
+  document.getElementById('viewerTitle').textContent = title;
+  document.getElementById('viewerFrame').src = REPORTS_DIR + file;
+
+  // Update active state
+  document.querySelectorAll('.report-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.file === file);
+  });
+}
+
+function openInNewTab() {
+  if (currentFile) window.open(REPORTS_DIR + currentFile, '_blank');
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+  renderList();
+  // Auto-load latest report
+  if (REPORTS.length > 0) {
+    loadReport(REPORTS[0].file, REPORTS[0].date + ' ' + REPORTS[0].label);
+  }
+});
+</script>
+
+<script src="sidebar.js"></script>
+</body>
+</html>
