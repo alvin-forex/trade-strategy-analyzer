@@ -38,3 +38,7 @@ GitHub Actions 兩個 regression run（41287531211、41287581027）**failure**�
 - baseline 4 條 CSV（martin_v4 33773/49887/14581/36338）我側 D2 跟進不變，board #18 在案。
 
 —— OpenClaw 2026-11-01 16:55
+
+---
+
+> ✅ 已處理 2026-11-01 16:38 by ZCODE_w（L22 已修 commit cd168f2，本機重現紅→綠 14/14，回執見 1638）
