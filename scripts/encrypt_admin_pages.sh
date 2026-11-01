@@ -65,10 +65,6 @@ PAGES=(
   "docs/admin/volatility.html"
   "docs/index.html"
   "docs/signal_ranking.html"
-  # L22b (老闆裁決 2026-10-21「統一其他就好」): the 98-signal DDE v5 page.
-  # Encrypted copy committed at d0e58013; CI gate (tests/encryption_check.py)
-  # flipped 14→15 alongside the --output→-d fix in this script.
-  "docs/signal_ranking_dde_v5.html"
 )
 
 # 兩層制 owner 頁（老闆裁決 2026-10-28）：只有主人看，獨立密碼。

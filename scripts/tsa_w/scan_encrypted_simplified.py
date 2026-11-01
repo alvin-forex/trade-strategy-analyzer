@@ -13,8 +13,7 @@ cc = OpenCC('s2t')
 GENERAL = ['docs/admin/ccy_ranking.html', 'docs/admin/forex_news.html', 'docs/admin/index.html',
            'docs/admin/mfe_mae.html', 'docs/admin/period_stats.html', 'docs/admin/pivot_table.html',
            'docs/admin/signal_ranking.html', 'docs/admin/symbol_ranking.html',
-           'docs/admin/volatility.html', 'docs/index.html', 'docs/signal_ranking.html',
-           'docs/signal_ranking_dde_v5.html']
+           'docs/admin/volatility.html', 'docs/index.html', 'docs/signal_ranking.html']
 OWNER = ['docs/admin/db-browser.html', 'docs/admin/tasks_board.html', 'docs/admin/mt5_mcp_tools.html']
 
 # 已判定為合法繁體/粵語用法嘅字（唔當簡體處理）：台(平台) 晒(睇晒) 游(游標) 群(群組) 准(批准)

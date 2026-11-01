@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """L22 StatiCrypt anti-resurrection gate.
 
-The 15 core pages are StatiCrypt-wrapped (AES-256, client-side): 14 pages in
-7ad97b7f, and the 98-signal docs/signal_ranking_dde_v5.html in d0e58013
-(L22b gate flip). Generators (generate_signal_ranking_v5.py 等) write
+The 14 core pages are StatiCrypt-wrapped (AES-256, client-side), committed in
+7ad97b7f. (A 15th, docs/signal_ranking_dde_v5.html, was added in d0e58013 and
+removed again in c9e7e185+370c7df as a duplicate — list synced 2026-11-01.)
+Generators (generate_signal_ranking_v5.py 等) write
 PLAINTEXT to some of these paths — if a regenerated page is committed
 unencrypted, its content is public again on Pages. This gate fails CI
 whenever any core page is not StatiCrypt-wrapped, forcing re-encryption via
@@ -31,7 +32,6 @@ CORE_PAGES = [
     "docs/admin/volatility.html",
     "docs/index.html",
     "docs/signal_ranking.html",
-    "docs/signal_ranking_dde_v5.html",
 ]
 
 
