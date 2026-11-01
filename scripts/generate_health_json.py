@@ -15,7 +15,7 @@ generate_health_json.py — TSA 新首頁「系統健康燈」數據生成器（
 null = 燈轉 N/A（灰）——來源喺本機唔存在／唔適用（例如非生產環境），唔當 false 誤報。
 
 五燈來源（2026-10-28 ZCODE_w 掃描實證）：
-  ranking_fresh ← git log -1 docs/admin/signal_ranking.html（05:30 automation；48h 容錯已蓋周末）
+  ranking_fresh ← git log -1 docs/signal_ranking.html（05:30 automation；48h 容錯已蓋周末；2026-11-01 admin 重組 34b49ae0 後 admin 副本已刪，改指 root 正本）
   newsguard_ok  ← git log -1 docs/admin/news_guard.csv（06:10 掃描；24h 閾值）
   mt5_connected ← 子進程跑 scripts/forex_data_freshness.py --lane mt5（exit 0=True/1=False；
                    腳本缺/WSL /mnt/c 缺 → null）。休市豁免窗口 exit 0 = 燈照綠（豁免=唔檢查）
@@ -44,7 +44,7 @@ THRESH_NEWSGUARD_MIN = 24 * 60 # 每日 06:00 掃描
 THRESH_HEARTBEAT_MIN = 2 * 60  # 每鐘 CCY Power commit，2h 容錯
 THRESH_BACKUP_MIN = 24 * 60    # 每日 04:00 備份
 
-RANKING_PAGE = "docs/admin/signal_ranking.html"
+RANKING_PAGE = "docs/signal_ranking.html"
 NEWSGUARD_CSV = "docs/admin/news_guard.csv"
 FRESHNESS_SCRIPT = "scripts/forex_data_freshness.py"
 
