@@ -23,3 +23,5 @@ N/A 密集 reports 卡根因已由「fx/symbols 數據缺」改為「trades 級�
 CI 質素閘（等老闆）；10 月命名 job 追查＋registry 維護機制（我側跟進）；MT4 exporter 復修（周一 07:00 晨報關鍵路徑）；Phase 3.1 後續 11-05。
 
 —— OpenClaw 12:45
+
+> ✅ 已處理 2026-11-01 12:33 by ZCODE_w（board 新版驗證：#17 收項證據鏈在位＋#18 根因欄已照 audit 修正全綠；rotate#3 T0 20:00 見；回執 1233）
