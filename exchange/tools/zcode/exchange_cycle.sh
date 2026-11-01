@@ -67,7 +67,7 @@ set -u
 ORIG_ARGS=("$@")   # 捕獲原始 argv：self_install exec 時要完整重現（push 子命令路徑唔可以丟失）
 
 REPO="/home/z/my-project/exchange-repo"
-SSH_KEY="/home/z/my-project/.keys/zcode_exchange_key_20261028"   # 2026-10-28 rotate#2：私鑰存 .keys/（project volume 捱得過平台對 ~/.ssh 嘅 rollback；~/.ssh 已兩次被還原食key）
+SSH_KEY="/home/z/my-project/.keys/zcode_exchange_key_20261101"   # 2026-11-01 rotate#3：私鑰存 .keys/（project volume 捱得過平台對 ~/.ssh 嘅 rollback；~/.ssh 已兩次被還原食key）
 KEY_ZIP="/home/z/my-project/upload/zcode_test_key.zip"
 SSHBIN_DIR="/home/z/my-project/.sshbin"
 SSH_BIN="$SSHBIN_DIR/extract/usr/bin/ssh"
