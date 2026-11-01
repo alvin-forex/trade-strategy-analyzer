@@ -91,6 +91,12 @@ def check_git_source(repo, pathspec, thresh_min, label, detail):
 
 def check_heartbeat(repo, detail):
     """CCY Power 每鐘 pipeline：commit message grep。"""
+    # v2 休市豁免（11-01 OpenClaw）：週六 06:00 HKT 收市至週一 06:00 開市期間，CCY pipeline 冇新 commit 屬正常——skip 回 null 免誤報
+    now = datetime.now(HKT)
+    _closed = (now.weekday() == 5 and now.hour >= 6) or (now.weekday() == 6) or (now.weekday() == 0 and now.hour < 6)
+    if _closed:
+        detail["ea_heartbeat"] = {"skip": "weekend", "reason": "market closed Sat06:00-Mon06:00 HKT"}
+        return None, detail
     cmd = ["git", "-C", repo, "log", "-1", "--format=%ct", "--grep=CCY Power"]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
