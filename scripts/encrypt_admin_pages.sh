@@ -53,16 +53,9 @@ ST_REMEMBER="${TSA_ST_REMEMBER:-30}"
 WRAPPER="scripts/staticrypt/encrypt_pages_deterministic.mjs"
 
 PAGES=(
-  "docs/admin/ccy_ranking.html"
-  "docs/admin/forex_news.html"
   "docs/admin/index.html"
-  "docs/admin/mfe_mae.html"
-  "docs/admin/period_stats.html"
   "docs/admin/projection.html"
-  "docs/admin/pivot_table.html"
   "docs/admin/signal_ranking.html"
-  "docs/admin/symbol_ranking.html"
-  "docs/admin/volatility.html"
   "docs/index.html"
   "docs/signal_ranking.html"
 )
