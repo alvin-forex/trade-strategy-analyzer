@@ -36,39 +36,56 @@ def normalize(url: str) -> str | None:
     return path
 
 
+def build_real_files() -> set[str]:
+    """docs-相對可達目標集：全部檔案＋有 index.html 嘅目錄（Pages 目錄 URL 語義）。"""
+    real = {str(p.relative_to(DOCS)) for p in DOCS.rglob('*') if p.is_file()}
+    real |= {str(p.parent.relative_to(DOCS)) for p in DOCS.rglob('index.html')}
+    return real
+
+
+def resolve_check(rel_dir: str, tgt: str, real_files: set[str]) -> str | None:
+    """Return failure reason for resolved target, or None if it resolves.
+
+    rel_dir = page dir relative to docs/ ('.' for root pages); tgt = normalized
+    link target; real_files = docs-relative set of existing files."""
+    resolved = (Path(rel_dir) / tgt).as_posix() if rel_dir != '.' else tgt
+    escaped_root = False
+    parts: list[str] = []
+    for seg in resolved.split('/'):
+        if seg == '..':
+            if parts:
+                parts.pop()
+            else:
+                escaped_root = True
+        elif seg in ('.', ''):
+            continue
+        else:
+            parts.append(seg)
+    if escaped_root:
+        return 'ESCAPED_SITE_ROOT'
+    resolved = '/'.join(parts)
+    if resolved not in real_files:
+        return resolved
+    return None
+
+
 def main() -> int:
     html_files = sorted(DOCS.rglob('*.html'))
-    real_files = {str(p.relative_to(DOCS)) for p in DOCS.rglob('*') if p.is_file()}
+    real_files = build_real_files()
 
     dead = []
     checked = 0
     for f in html_files:
-        rel_dir = f.parent.relative_to(DOCS)
+        rel_dir = f.parent.relative_to(DOCS).as_posix()
         text = f.read_text(encoding='utf-8', errors='replace')
         for m in ATTR_RE.finditer(text):
             tgt = normalize(m.group(1))
             if tgt is None:
                 continue
             checked += 1
-            resolved = (rel_dir / tgt).as_posix() if str(rel_dir) != '.' else tgt
-            escaped_root = False
-            parts = []
-            for seg in resolved.split('/'):
-                if seg == '..':
-                    if parts:
-                        parts.pop()
-                    else:
-                        escaped_root = True
-                elif seg in ('.', ''):
-                    continue
-                else:
-                    parts.append(seg)
-            if escaped_root:
-                dead.append((f.relative_to(REPO), m.group(1), 'ESCAPED_SITE_ROOT'))
-                continue
-            resolved = '/'.join(parts)
-            if resolved not in real_files:
-                dead.append((f.relative_to(REPO), m.group(1), resolved))
+            reason = resolve_check(rel_dir, tgt, real_files)
+            if reason is not None:
+                dead.append((f.relative_to(REPO), m.group(1), reason))
 
     print(f'[link-check] html files: {len(html_files)}  internal links: {checked}  dead: {len(dead)}')
     for src, raw, res in dead[:30]:

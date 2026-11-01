@@ -187,3 +187,16 @@ fi
 echo "-----------------------------"
 echo "ENCRYPT_DONE changed=$changed skipped=$skipped failed=$failed"
 [ "$failed" -eq 0 ] || exit 1
+
+# 第四檔（L26 encrypted-layer dead-link scan，2026-11-01）：加密完解密複掃
+# 加密層 link——今日兩單死 link 都喺加密頁入面，CI L21 見密文結構性掃唔到。
+# 帶病頁唔准出門：有死 link 即 exit 1。TSA_SKIP_LINK_SCAN=1 可顯式跳過。
+if [ "${TSA_SKIP_LINK_SCAN:-0}" != "1" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    echo "-----------------------------"
+    echo "[task-L26] encrypted-layer dead-link scan..."
+    python3 scripts/tsa_w/scan_dead_links_encrypted.py || exit 1
+  else
+    echo "[task-L26] python3 唔喺度，跳過加密層 link 掃描（記得手動補掃）" >&2
+  fi
+fi
