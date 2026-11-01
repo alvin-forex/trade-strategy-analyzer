@@ -55,7 +55,6 @@ WRAPPER="scripts/staticrypt/encrypt_pages_deterministic.mjs"
 PAGES=(
   "docs/admin/index.html"
   "docs/admin/projection.html"
-  "docs/admin/signal_ranking.html"
   "docs/index.html"
   "docs/signal_ranking.html"
 )
