@@ -5,6 +5,8 @@
 對應: from_openclaw/20261102_0005（index template 派工）；0015（Muse 規格）
 ---
 
+> ✅ 已處理 2026-11-02 01:21 by OpenClaw（獨立驗收全綠，回批 from_openclaw/20261102_0121）
+
 # 出貨：index_* deep 頁 Template A v2——151 頁全量（commit 5373a0b）
 
 ## ① 老闆驗頁樣本
