@@ -36,6 +36,8 @@ CSS = """
 :root{--bg:#0a0e17;--card:#111520;--card2:#1a1f2e;--zebra:#151b28;--brd:#1e2433;--th:#111520;
 --text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;
 --radius:12px}
+[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--card2:#eef2f7;--zebra:#f0f4fa;--brd:#ddd;--th:#eef2f7;
+--text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
 a{color:var(--acc);text-decoration:none}
@@ -307,8 +309,8 @@ def sec_hero(t, m, det):
                   f'<div>MFE pips 平均 <b>{round(statistics.mean(mfep),1)}</b>·中位 <b>{round(statistics.median(mfep),1)}</b>·P90 <b>{pctile(mfep,90)}</b>'
                   f'（{fmt_money(statistics.mean([x["mfe_$"] for x in vt]))}）</div>')
         if len(vt) < len(t):
-            narrow += (f'<div class="footnote" style="color:var(--text2)">⚠ {len(t) - len(vt)} 筆缺 MAE/MFE 欄'
-                       f'（Max Profit/Max Loss 空白）——窄帶統計剔除計算（冇數≠$0，非真 0）。</div>')
+            narrow += (f'<div class="footnote" style="color:var(--text2)">⚠ {len(t) - len(vt)} 筆 MAE/MFE 欄為 0 值'
+                       f'（與淨利矛盾，判定缺欄）——窄帶統計剔除計算（冇數≠$0）。</div>')
     else:
         narrow = '<div class="muted">MAE/MFE：·冇數（全數缺欄）</div>'
     # 分層摘要迷你表
@@ -447,8 +449,8 @@ def build_analyzer(t, det):
                        'curve': {str(k): v for k, v in curve.items()}, 'curve_pts': curve_pts}
     options = ''.join(f'<option value="{s}">{s}</option>' for s in order)
     n_mm = sum(1 for x in t if x['mm'])
-    mm_note = (f'<div class="footnote" style="color:var(--text2)">⚠ {n_mm} 筆缺 MAE/MFE 欄（Max Profit/Max Loss 空白）——'
-               f'相關商品 avg 值顯示「—」、統計分母剔除（冇數≠$0，非真 0）。</div>') if n_mm else ''
+    mm_note = (f'<div class="footnote" style="color:var(--text2)">⚠ {n_mm} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——'
+               f'相關商品 avg 值顯示「—」、統計分母剔除（冇數≠$0）。</div>') if n_mm else ''
     return f'''<section id="s3"><h2>③ 商品分析器</h2>{mm_note}<div class="legend">單商品手術台：預設總 P&amp;L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。</div>
 <div class="sel-bar"><label>商品</label><select id="sym-select">{options}</select>
 <label>入場門檻</label><div class="slider-row" style="margin:0;flex:1"><input type="range" id="th-slider" min="0" max="60" step="1" value="20"><span class="slider-val" id="th-out">20 pips</span></div></div>
@@ -591,8 +593,8 @@ def sec_scatter(t):
         online = pct(sum(1 for x in vtr if x['mfe_p'] >= x['mae_p']), len(vtr))
         drop = f'（剔除 {len(tr) - len(vtr)} 筆缺數）' if len(tr) > len(vtr) else ''
         panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b>{svg}<div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 {online}%{drop}；綠點贏紅點蝕</div></div>')
-    mm_note = (f'<div class="footnote" style="color:var(--text2)">⚠ {n_mm} 筆缺 MAE/MFE 欄（Max Profit/Max Loss 空白）——'
-               f'相關點位剔除散點（冇數≠$0，非真 0）。</div>') if n_mm else ''
+    mm_note = (f'<div class="footnote" style="color:var(--text2)">⚠ {n_mm} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——'
+               f'相關點位剔除散點（冇數≠$0）。</div>') if n_mm else ''
     return f'''<section id="s6"><h2>⑥ MAE/MFE 散點</h2>{mm_note}<div class="legend">入場質素四象限：MFE=入場後最大有利、MAE=最大不利（pips，由入場價起算）。y=x 線上＝好單。</div>
 <div class="two">{''.join(panels)}</div></section>'''
 
@@ -725,7 +727,7 @@ def build_page(signal_id, csv_path, force=False):
             print(f'[skip] {out.name} 內容無變化')
             return out
     out.write_text(html, encoding='utf-8')
-    print(f'[write] {out} ({len(html):,} bytes, {len(trades)} trades, layers={sorted(det["layers"])}, detected={det["detected"]})')
+    print(f'[write] {out} ({len(html.encode("utf-8")):,} bytes / {len(html):,} chars, {len(trades)} trades, layers={sorted(det["layers"])}, detected={det["detected"]})')
     return out
 
 
