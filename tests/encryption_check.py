@@ -26,6 +26,16 @@ CORE_PAGES = [
     "docs/signal_ranking.html",
 ]
 
+# 2026-11-04 #26 派工（OpenClaw 0335 ③）：負向斷言——禁止復活清單。
+# docs/admin/ccy_ranking.html 係 6.9MB 明文復活實錄（11-03 137d1ddc）：內容與
+# root 公開頁同類（老闆裁定 CCY 分析頁公開）、secrets 0 命中，副本無存在價值；
+# 生成器已停寫（generate_ranking_ccy_v5.py 11-04 起）。呢條路徑唔在 CORE_PAGES
+# 六頁名單——正負兩閘都攔唔住先會復活，此斷言補上；存在即 FAIL（無論形態）。
+BLOCKED_PAGES = [
+    ("docs/admin/ccy_ranking.html",
+     "CCY 排名已裁定公開於 root，admin 副本禁止復活"),
+]
+
 
 def git(args: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], capture_output=True, text=True, check=False)
@@ -46,14 +56,25 @@ def main() -> int:
         elif b"staticrypt" not in blob[:4096].lower():
             bad.append((rel, "PLAINTEXT"))
 
+    # 負向斷言：禁止復活清單——存在即 FAIL（唔理加密定明文，副本本身唔應存在）
+    resurrected = []
+    for rel, msg in BLOCKED_PAGES:
+        r = git(["cat-file", "-e", f"HEAD:{rel}"])
+        if r.returncode == 0:
+            resurrected.append((rel, msg))
+
     total = len(CORE_PAGES)
-    if bad:
-        print(f"[enc-check] FAIL: {len(bad)}/{total} core pages not StatiCrypt-wrapped (HEAD={head}):")
+    if bad or resurrected:
+        print(f"[enc-check] FAIL: {len(bad)}/{total} core pages not StatiCrypt-wrapped, "
+              f"{len(resurrected)} blocked-path resurrected (HEAD={head}):")
         for rel, why in bad:
             print(f"[enc-check]   {why:9s} {rel}")
+        for rel, msg in resurrected:
+            print(f"[enc-check]   RESURRECTED {rel} — {msg}")
         print("[enc-check] fix: bash scripts/encrypt_admin_pages.sh   (password from $TSA_PW_FILE)")
         return 1
-    print(f"[enc-check] PASS: {total}/{total} core pages StatiCrypt-wrapped (HEAD={head})")
+    print(f"[enc-check] PASS: {total}/{total} core pages StatiCrypt-wrapped + "
+          f"{len(BLOCKED_PAGES)} blocked-path negative assert (HEAD={head})")
     return 0
 
 
