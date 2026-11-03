@@ -5,8 +5,14 @@
   // === 自動注入 sidebar.css（新頁面只需加 <script src="sidebar.js">）===
   var path = window.location.pathname;
   var cssDepth = '';
-  if(path.includes('/admin/ccy_power/') || path.includes('/admin/forex_reports/') || path.includes('/admin/forex_hub/') || path.includes('/admin/reviews/') || path.includes('/admin/portfolios/') || path.includes('/admin/4h_reports/')) cssDepth='../../';
-  else if(path.includes('/admin/') || path.includes('/reports/')) cssDepth='../';
+  /* 2026-11-04 P5：深度邏輯升級 root 層感知——11-01 重組（34b49ae0）後大多數
+     子站已落 root 層（ccy_power/portfolios/reviews/reports/4h_reports/
+     forex_reports/forex_hub/ccy/downloads/data/home/prd），舊清單只識 admin
+     舊路徑 → root 子目錄頁 depth='' 全部 link 死。改：admin/=../，
+     root 一層子目錄=../，其餘（root 頁）=''。 */
+  var rootSub = /^\/(ccy|ccy_power|portfolios|reviews|reports|4h_reports|forex_reports|forex_hub|downloads|data|home|prd)\//.test(path);
+  if(path.indexOf('/admin/') >= 0) cssDepth='../';
+  else if(rootSub) cssDepth='../';
   else cssDepth='';
 
   // Check if sidebar.css already loaded
@@ -48,13 +54,13 @@
       <a href="${depth}volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
       <a href="${depth}portfolios/portfolio_master_report_v2.html" class="sidebar-link" data-page="portfolios"><span class="icon">💼</span>Portfolio 統一版</a>
       <div class="sidebar-sep"></div>
-      <a href="${depth}admin/reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
-      <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
+      <a href="${depth}reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
+      <a href="${depth}ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
       <div class="sidebar-sep"></div>
       <div class="sidebar-section-title"><span class="icon">📊</span>外匯分析</div>
-      <a href="${depth}admin/forex_hub/index.html#4h" class="sidebar-link sub-link" data-page="forex_hub_4h"><span class="icon">🦀</span>4H 市場分析</a>
-      <a href="${depth}admin/forex_hub/index.html#daily" class="sidebar-link sub-link" data-page="forex_hub_daily"><span class="icon">📰</span>每日報告</a>
-      <a href="${depth}admin/forex_news.html" class="sidebar-link sub-link" data-page="forex_news"><span class="icon">📄</span>外匯新聞</a>
+      <!-- 2026-11-04 P5：forex_hub 兩條移除——實檔全 repo 不存在（純死 link，實測 404），
+           如日後復建請重加。forex_news 改指 root 實檔。 -->
+      <a href="${depth}forex_news.html" class="sidebar-link sub-link" data-page="forex_news"><span class="icon">📄</span>外匯新聞</a>
       <div class="sidebar-sep"></div>
       <div class="sidebar-section-title"><span class="icon">🧮</span>工具</div>
       <a href="${depth}tug_of_war_calculator.html" class="sidebar-link sub-link" data-page="tug_of_war"><span class="icon">⚔️</span>拔河計算機</a>

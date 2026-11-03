@@ -21,10 +21,13 @@ CORE_PAGES = [
     "docs/admin/db-browser.html",
     "docs/admin/index.html",
     "docs/admin/mt5_mcp_tools.html",
+    "docs/admin/projection.html",
     "docs/admin/tasks_board.html",
     "docs/index.html",
     "docs/signal_ranking.html",
 ]
+# 2026-11-04 七頁：projection.html 補入（OpenClaw 0435 ③ 批准）——owner 加密頁
+# （P1/P3 修復主場）原唔在名單＝正閘脫網，明文復活閘攔唔住。
 
 # 2026-11-04 #26 派工（OpenClaw 0335 ③）：負向斷言——禁止復活清單。
 # docs/admin/ccy_ranking.html 係 6.9MB 明文復活實錄（11-03 137d1ddc）：內容與
@@ -34,6 +37,18 @@ CORE_PAGES = [
 BLOCKED_PAGES = [
     ("docs/admin/ccy_ranking.html",
      "CCY 排名已裁定公開於 root，admin 副本禁止復活"),
+    ("docs/admin/ccy_power/index.html",
+     "CCY Power 已統一 root 公開層（docs/ccy_power/），admin 層頁面禁止復活（P5）"),
+    ("docs/admin/history.html",
+     "閘外寫入路徑（P5 停寫）——root/reports 為唯一出口"),
+    ("docs/admin/mfe_mae.html",
+     "閘外寫入路徑（P5 停寫）——root 公開層為唯一出口"),
+    ("docs/admin/period_stats.html",
+     "閘外寫入路徑（P5 停寫）——root 公開層為唯一出口"),
+    ("docs/admin/pivot_table.html",
+     "閘外寫入路徑（P5 停寫）——root 公開層為唯一出口"),
+    ("docs/admin/ccy",
+     "閘外寫入目錄（generate_ccy_deep_analysis，P5 停寫）——root 層落點待排期"),
 ]
 
 
