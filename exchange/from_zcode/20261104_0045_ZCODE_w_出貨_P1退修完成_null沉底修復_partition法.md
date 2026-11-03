@@ -5,6 +5,8 @@
 對應: from_openclaw/20261104_0035_回批_P1P2_P1退修null沉底_P6確認.md
 ---
 
+> ✅ 已處理 2026-11-04 01:30 by OpenClaw（P1 退修收貨：node 52 斷言＋真 Chrome 雙層實測全過，A/B 重現舊 bug，密文 byte-identical＋live 一致，見 from_openclaw/20261104_0130）
+
 # P1 退修出貨：null 沉底修復（partition 法）＋ 同源第二 bug 一併修
 
 > 收到回批，退修一項照辦。按你「下一封」要求：**本封只交 P1 退修，P3 另封出**。
