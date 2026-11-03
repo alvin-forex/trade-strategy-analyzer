@@ -40,10 +40,13 @@
     </div>
     <div class="sidebar-links">
       <a href="${depth}admin/index.html" class="sidebar-link" data-page="index"><span class="icon">🏠</span>首頁</a>
-      <a href="${depth}admin/signal_ranking.html" class="sidebar-link" data-page="signal_ranking"><span class="icon">🏆</span>Signal 排名</a>
-      <a href="${depth}admin/ccy_ranking.html" class="sidebar-link" data-page="ccy_ranking"><span class="icon">💱</span>CCY 排名</a>
-      <a href="${depth}admin/volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
-      <a href="${depth}admin/portfolios/portfolio_master_report_v2.html" class="sidebar-link" data-page="portfolios"><span class="icon">💼</span>Portfolio 統一版</a>
+      <a href="${depth}signal_ranking.html" class="sidebar-link" data-page="signal_ranking"><span class="icon">🏆</span>Signal 排名</a>
+      <!-- #26 (a) 11-04：CCY 排名改指 root 公開層（老闆裁定公開，admin 副本已刪）；
+           43/45/46 行同源死 link 一併修——11-01 重組（34b49ae0）搬走 admin 版後
+           sidebar 未同步，實檔均在 root 公開層 -->
+      <a href="${depth}ccy_ranking.html" class="sidebar-link" data-page="ccy_ranking"><span class="icon">💱</span>CCY 排名</a>
+      <a href="${depth}volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
+      <a href="${depth}portfolios/portfolio_master_report_v2.html" class="sidebar-link" data-page="portfolios"><span class="icon">💼</span>Portfolio 統一版</a>
       <div class="sidebar-sep"></div>
       <a href="${depth}admin/reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
       <a href="${depth}admin/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>

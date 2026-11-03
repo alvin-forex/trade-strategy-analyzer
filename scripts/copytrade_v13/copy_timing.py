@@ -76,7 +76,11 @@ def load_m5_json(path):
 
 
 def _bar_ts(bar):
-    return datetime.fromisoformat(bar["timestamp"])
+    # 2026-11-04 派工（OpenClaw 0335 ④）：fromisoformat 食唔到 MT4 點號格式
+    # （XAU 四檔實錄）→ 改 parse_ts() 權威入口（含 %Y.%m.%d 容錯＋ISO fallback）。
+    # 對合規 ISO 契約（YYYY-MM-DDTHH:MM）行為不變：六 fmt 全 fail → fallback
+    # fromisoformat(s[:16])，與原直呼 fromisoformat 同值。wrapper 保留單一落點。
+    return parse_ts(bar["timestamp"])
 
 
 def _cycle_close_price(cycle):

@@ -86,7 +86,7 @@ def generate_html(all_results: List[Dict[str, Any]], link_prefix: str = '../repo
         link_prefix: relative URL path from the OUTPUT page's directory up to
             the martin v4 reports dir. Depth depends on the output location:
             output/, reports/ (repo root copies) -> '../reports'
-            docs/admin/                          -> '../../reports'
+            (#26 11-04 起停寫 docs/admin/ 副本——此深度分支退役)
             Never hardcode '../reports/' inside the row builder — it breaks
             when the same HTML is written to directories at different depths.
 
@@ -494,13 +494,15 @@ def main() -> None:
         print("❌ No data available")
         return
 
-    # Repo-root copies (output/, reports/) keep the '../reports' prefix;
-    # the docs/admin/ copy sits one level deeper and needs '../../reports'.
+    # Repo-root copies (output/, reports/) keep the '../reports' prefix.
+    # 2026-11-04 #26 (a) 派工（OpenClaw 0335 ③）：停寫 docs/admin/ccy_ranking.html
+    # —— CCY 排名已裁定公開於 root（docs/ccy_ranking.html，老闆 1803/1804），
+    # admin 副本係 6.9MB 重複頁且曾脫閘復活（11-03 137d1ddc）；
+    # 單一來源＝root 公開頁，回歸由 tests/encryption_check.py BLOCKED_PAGES 攔。
     html_root: str = generate_html(all_results, link_prefix='../reports')
-    html_admin: str = generate_html(all_results, link_prefix='../../reports')
 
-    # Write to output/, reports/, and docs/
-    for out_dir, page in [(OUTPUT_DIR, html_root), (REPORTS_DIR, html_root), (DOCS_DIR / 'admin', html_admin)]:
+    # Write to output/ and reports/
+    for out_dir, page in [(OUTPUT_DIR, html_root), (REPORTS_DIR, html_root)]:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / 'ccy_ranking.html'
         with open(out_path, 'w', encoding='utf-8') as f:
