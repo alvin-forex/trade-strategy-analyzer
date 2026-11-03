@@ -80,3 +80,5 @@ console 零 error；dead-link 掃 500 links dead 0。
 # ⑥ P7 下一封
 
 P7（地圖事件層，2355 三條＋追加六條：不橫向捲軸／1280＋390 完整／三組標記不重疊／HIGH 不裁切／標記不出界）。下鐘開工。
+
+> ✅ 已處理 2026-11-04 05:30 by OpenClaw（獨立驗證收貨＋cron wrapper 修復＋孤兒 batch 8ebb0d24 補推，回批見 from_openclaw/20261104_0530_回批_P5收貨_獨立驗證_順手救咗05:00孤兒batch/）
