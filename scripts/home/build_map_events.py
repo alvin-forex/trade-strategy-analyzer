@@ -4,11 +4,13 @@
 源：docs/admin/news_guard.csv（OpenClaw news_guard cron 產物，ForexFactory 抓取）
 出：docs/home/map_events.json
 
-契約（設計基準 v1.1 §⑥ + 地圖模組裁決 2026-10-28）：
+契約（設計基準 v1.1 §⑥ + 地圖模組裁決 2026-10-28；P7 擴充 2026-11-04）：
   events[]:   currency(3) / country(ISO3166-1 alpha-2, EU 為 pseudo-code) /
-              impact(HIGH|MED) / event / time_hkt(ISO8601+08:00) / source
+              impact(HIGH|MED) / event / time_hkt(ISO8601+08:00) / source / url
   countries[]: currency / country / event_count_24h / max_impact(HIGH|MED|none)   ← 未來 24h 口徑
   generated_at: ISO8601+08:00
+  url：事件當日 ForexFactory 日曆（ET 日錨 #day=<mon><d>.<year>）——P7 派工
+      「事件資料要帶可點連結」；無 ET 日錨可用時 fallback HKT 日期計。
 
 窗口：滾動 48h（過去 24h ＋ 未來 24h）。
   - 地圖 L1/L2/L3／strip／popover：前端 filter 未來 24h（裁決 ③修正1／④）
@@ -30,10 +32,22 @@ CSV = REPO / "docs" / "admin" / "news_guard.csv"
 OUT = REPO / "docs" / "home" / "map_events.json"
 
 HKT = timezone(timedelta(hours=8))
+# P7（2026-11-04 派工）：G8 之外加主要交易貨幣國（老闆要求標記覆蓋 ≥9 國）——
+# CNY/INR/KRW/MXN（ForexFactory 有排程嘅主要貨幣，news_guard 實錄 CNY）。
+# 對應首頁 SVG 新增 CN/IN/KR/MX 四 path（menelabs 同源提取，零座標改動）。
 CCY2COUNTRY = {
     "USD": "US", "EUR": "EU", "JPY": "JP", "GBP": "GB", "CHF": "CH",
     "CAD": "CA", "AUD": "AU", "NZD": "NZ",
+    "CNY": "CN", "INR": "IN", "KRW": "KR", "MXN": "MX",
 }
+# FF 日曆日錨月份縮寫（ET 口徑）
+MON3 = ["jan", "feb", "mar", "apr", "may", "jun",
+        "jul", "aug", "sep", "oct", "nov", "dec"]
+try:
+    from zoneinfo import ZoneInfo
+    ET = ZoneInfo("America/New_York")
+except Exception:  # 無 tzdata：fallback HKT（日錨可能差一日，可接受）
+    ET = HKT
 IMPACT_RANK = {"HIGH": 2, "MED": 1, "none": 0}
 
 
@@ -69,6 +83,10 @@ def main():
             dt = parse_row({"time": t}, now)
             if dt is None or not (lo <= dt <= hi):
                 continue
+            # url：FF 日曆日錨（ET 日期；zoneinfo 失效時 ET=HKT fallback）
+            loc = dt.astimezone(ET)
+            url = ("https://www.forexfactory.com/calendar#day="
+                   + f"{MON3[loc.month - 1]}{loc.day}.{loc.year}")
             events.append({
                 "currency": ccy,
                 "country": CCY2COUNTRY[ccy],
@@ -76,6 +94,7 @@ def main():
                 "event": name,
                 "time_hkt": dt.strftime("%Y-%m-%dT%H:%M:%S+08:00"),
                 "source": "forexfactory",
+                "url": url,
             })
     events.sort(key=lambda e: (e["time_hkt"], e["currency"]))
 
