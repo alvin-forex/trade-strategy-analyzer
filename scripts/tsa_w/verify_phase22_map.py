@@ -5,7 +5,8 @@
 - [2.2] SVG ≤40KB inline；⏸ 關閉後全停、資訊零流失（L1 留）、localStorage 記住
 - reduced-motion 模擬全停；HIGH 三重編碼（色＋▲＋字）齊；灰階仍分 HIGH/MED；同時呼吸點 ≤3
 - 口徑：地圖環＝未來 24h——countries[] 在場食 generator rollup；唔在場由 events[] 自行 filter
-- 回歸：8 國標籤不變、1280/390 零溢出、零 JS 錯、無數據 fallback 靜態零錯
+- 回歸：12 國標籤不變（P7 擴 CN/IN/KR/MX）、1280/390 零溢出、零 JS 錯、無數據 fallback 靜態零錯
+- P7（11-04 派工）：抽象底圈（無事件國 ev-idle）、環 hover tooltip、快捷入口展開收起、標籤零裁切
 fixture 經 route 攔截注入（home/map_events.json），唔會推上 repo。
 """
 import json, sys, datetime, pathlib, threading, functools
@@ -87,15 +88,15 @@ with sync_playwright() as pw:
     page.wait_for_timeout(400)
 
     print('T1 L1 靜態環＋三重編碼（countries[] 口徑＝未來 24h）')
-    rings = page.locator('#evLayer .ev-ring')
-    check('L1 環 3 國（USD/EUR/JPY）', rings.count() == 3, f'got {rings.count()}')
+    rings = page.locator('#evLayer .ev-ring:not(.ev-idle)')  # P7：底層抽象圈（ev-idle）唔計入主環
+    check('L1 環 3 國（USD/EUR/JPY）', rings.count() == 3, f'got {rings.count()}')  # :not(.ev-idle)——P7 底層抽象圈唔計
     hi_txt = page.locator('#evLayer .ev-high-txt')
     check('HIGH 字 2 個（USD/EUR）', hi_txt.count() == 2 and txts(page, '#evLayer .ev-high-txt') == ['HIGH', 'HIGH'], f'got {txts(page, "#evLayer .ev-high-txt")}')
     marks = page.locator('#evLayer .ev-marker')
     check('▲◆ 標記 3 個', marks.count() == 3, f'got {marks.count()}')
     mark_txt = txts(page, '#evLayer .ev-marker')
     check('▲ 2＋◆ 1', mark_txt.count('▲') == 2 and mark_txt.count('◆') == 1, str(mark_txt))
-    hi_stroke = page.eval_on_selector_all('#evLayer .ev-ring', """els=>els.map(e=>({
+    hi_stroke = page.eval_on_selector_all('#evLayer .ev-ring:not(.ev-idle)', """els=>els.map(e=>({
         s:e.querySelector('circle[stroke]').getAttribute('stroke'),
         f:e.querySelector('circle[opacity]').getAttribute('fill')}))""")
     red = [x for x in hi_stroke if x['s'] == '#FF6B6B']; amb = [x for x in hi_stroke if x['s'] == '#FFB454']
@@ -112,7 +113,7 @@ with sync_playwright() as pw:
     inland = page.evaluate("""()=>{
       const map={};document.querySelectorAll('#world-g8 path[data-ccy]').forEach(p=>{
         const c=p.getAttribute('data-ccy').split('-')[0];(map[c]=map[c]||[]).push(p)});
-      return [...document.querySelectorAll('#evLayer .ev-ring')].every(g=>{
+      return [...document.querySelectorAll('#evLayer .ev-ring:not(.ev-idle)')].every(g=>{
         const c=g.querySelector('circle[stroke]');
         const pt=new DOMPoint(+c.getAttribute('cx'),+c.getAttribute('cy'));
         return Object.values(map).some(ps=>ps.some(p=>{try{return p.isPointInFill(pt)}catch(e){return false}}));
@@ -147,7 +148,7 @@ with sync_playwright() as pw:
     btn.click(); page.wait_for_timeout(120)
     check('⏸ 後 .map-paused', page.eval_on_selector('.map-mod', "el=>el.classList.contains('map-paused')"))
     check('⏸ 後 halo 全停（display none）', page.eval_on_selector('#evLayer .ev-halo', "el=>getComputedStyle(el).display") == 'none')
-    check('L1 資訊零流失（環仍在 DOM）', page.locator('#evLayer .ev-ring').count() == 3)
+    check('L1 資訊零流失（環仍在 DOM）', page.locator('#evLayer .ev-ring:not(.ev-idle)').count() == 3)
     check('aria-pressed true＋aria-label 恢復', btn.get_attribute('aria-pressed') == 'true' and btn.get_attribute('aria-label') == '恢復地圖動效')
     check('localStorage motion=off', page.evaluate("localStorage.getItem('tsa_map_motion')") == 'off')
     page.screenshot(path=str(SHOT / 'map_paused_1280.png'), clip={'x': 0, 'y': 130, 'width': 1280, 'height': 300})
@@ -166,7 +167,60 @@ with sync_playwright() as pw:
     # 溢出＋標籤回歸
     ovf = page.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth")
     check('1280 零溢出', ovf == 0, f'ovf={ovf}')
-    check('8 國標籤不變（回歸）', page.locator('#world-g8 text.map-lbl').count() == 8)
+    lbl_n = page.locator('#world-g8 text.map-lbl').count()
+    # P7：12 國中 ≥11 放字標——KRG 等極細國（KR 18×23）防碰撞不放置＝正確行為
+    #（國土 idle 圈＋path title 仍呈現）；大國（USD/EUR/JPY/CNY/INR/MXN）必在
+    lbl_have = page.evaluate("()=>[...document.querySelectorAll('#world-g8 text.map-lbl')].map(t=>t.textContent)")
+    check('12 國標籤 ≥11（P7 擴充；KR 細國容許不放置）', lbl_n >= 11 and all(c in lbl_have for c in ['USD','EUR','JPY','GBP','CHF','CAD','AUD','NZD','CNY','INR','MXN']),
+          f'got {lbl_n} {lbl_have}')
+    # P7 驗收（2355 ②）：所有 ev 標籤（▲/◆/HIGH）完整落 viewBox 內——零 HIGI 裁切
+    lbl_ok = page.evaluate("""() => {
+      const svg=document.getElementById('world-g8');
+      const vb=svg.getAttribute('viewBox').split(/\\s+/).map(Number);
+      return [...svg.querySelectorAll('#evLayer text')].every(t=>{
+        const b=t.getBBox();
+        return b.x>=0&&b.y>=0&&b.x+b.width<=vb[2]&&b.y+b.height<=vb[3];
+      });
+    }""")
+    check('ev 標籤全落 viewBox 內（P7 防裁切）', lbl_ok)
+    # P7 抽象熱點層：fixture 12 國中 3 國有環 → 其餘 9 國 ev-idle 底圈
+    check('ev-idle 底圈 9 個（12 國－3 環）',
+          page.locator('#evLayer .ev-idle').count() == 9,
+          f'got ' + str(page.locator('#evLayer .ev-idle').count()))
+    # P7-2 tooltip：hover USD 環線——hit 透明帶 30 viewBox 單位在 1280 縮放下只有
+    # ~5px 顯示寬，硬編碼偏移易出帶 → elementFromPoint 掃描環底（r±4px）找命中點
+    good = page.evaluate("""() => {
+      const c=document.querySelector('#evLayer .ev-hit');
+      const b=c.getBoundingClientRect();
+      const cx=b.x+b.width/2, cy=b.y+b.height/2, r=b.width/2;
+      for(let dy=-4;dy<=4;dy+=0.5){
+        const x=cx, y=cy+r+dy;
+        if(document.elementFromPoint(x,y)===c)return [x,y];
+      }
+      return null;
+    }""")
+    check('ev-hit 熱區可命中（elementFromPoint）', good is not None)
+    if good:
+        page.mouse.move(good[0], good[1], steps=4)
+        page.wait_for_timeout(200)
+    tip_vis = page.evaluate("()=>{const t=document.querySelector('.ev-tip');return t&&t.style.display==='block'}")
+    tip_txt = page.evaluate("()=>{const t=document.querySelector('.ev-tip');return t?t.textContent:''}")
+    check('環 hover tooltip 顯示', bool(tip_vis))
+    check('tooltip 含貨幣名', 'USD' in tip_txt, tip_txt[:40])
+    check('tooltip 含 impact 標記', 'HIGH' in tip_txt)
+    page.mouse.move(10, 10); page.wait_for_timeout(120)
+    check('移開後 tooltip 收起', page.evaluate("()=>{const t=document.querySelector('.ev-tip');return !t||t.style.display==='none'}"))
+    # P7-3 快捷入口：桌面預設展開；收起→只留第一行；再展開
+    check('chipsTgl 存在', page.locator('#chipsTgl').count() == 1)
+    check('桌面預設展開', page.locator('#chipsTgl').get_attribute('aria-expanded') == 'true')
+    page.click('#chipsTgl'); page.wait_for_timeout(150)
+    vis_chips = page.evaluate("()=>[...document.querySelectorAll('#chipsRow .chip')].filter(c=>c.style.display!=='none').length")
+    all_chips = page.evaluate("()=>document.querySelectorAll('#chipsRow .chip').length")
+    check('收起後只留第一行', 0 < vis_chips < all_chips, f'{vis_chips}/{all_chips}')
+    check('收起後零橫向溢出', page.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth") == 0)
+    check('localStorage 已記收起', page.evaluate("localStorage.getItem('tsa_quick_expanded')") == '0')
+    page.click('#chipsTgl'); page.wait_for_timeout(150)
+    check('再展開全可見', page.evaluate("()=>[...document.querySelectorAll('#chipsRow .chip')].every(c=>c.style.display!=='none')"))
     page.screenshot(path=str(SHOT / 'map_events_1280.png'), clip={'x': 0, 'y': 130, 'width': 1280, 'height': 300})
     check('零 JS 錯（fixture A 場景）', not errors, str(errors[:3]))
     ctx.close()
@@ -180,7 +234,7 @@ with sync_playwright() as pw:
     print('T4 reduced-motion 自停')
     check('halo display none', p2.eval_on_selector('#evLayer .ev-halo', "el=>getComputedStyle(el).display") == 'none')
     check('L3 唔播（0 pulse）', p2.locator('#evLayer .map-pulse').count() == 0)
-    check('L1 環仍在（資訊零流失）', p2.locator('#evLayer .ev-ring').count() == 3)
+    check('L1 環仍在（資訊零流失）', p2.locator('#evLayer .ev-ring:not(.ev-idle)').count() == 3)
     check('aria-pressed true（自動暫停態）', p2.locator('#mapTgl').get_attribute('aria-pressed') == 'true')
     p2.screenshot(path=str(SHOT / 'map_reduced_motion_1280.png'), clip={'x': 0, 'y': 130, 'width': 1280, 'height': 300})
     check('零 JS 錯（reduced 場景）', not e2, str(e2[:3]))
@@ -193,8 +247,8 @@ with sync_playwright() as pw:
     p5.route('**/home/map_events.json', route_fix(FIX_B))
     p5.goto(f'{BASE}/index_p22.html'); p5.wait_for_timeout(400)
     print('T5 舊契約 fallback（events[] 未來 24h 自聚合）')
-    check('環 2 國（USD/JPY 未來；GBP 過去唔出）', p5.locator('#evLayer .ev-ring').count() == 2,
-          f'got {p5.locator("#evLayer .ev-ring").count()}')
+    check('環 2 國（USD/JPY 未來；GBP 過去唔出）', p5.locator('#evLayer .ev-ring:not(.ev-idle)').count() == 2,
+          f'got {p5.locator("#evLayer .ev-ring:not(.ev-idle)").count()}')
     halos5 = p5.locator('#evLayer .ev-halo')
     check('呼吸 ≤3（=2）', halos5.count() == 2, f'got {halos5.count()}')
     kpi5 = p5.eval_on_selector_all('.kpi', """els=>els.find(e=>/今日\\s*HIGH/.test(e.querySelector('.kpi-t').textContent))?.querySelector('.kpi-v').textContent""")
@@ -210,7 +264,7 @@ with sync_playwright() as pw:
     p3.route('**/home/map_events.json', lambda r: r.abort())
     p3.goto(f'{BASE}/index_p22.html'); p3.wait_for_timeout(500)
     print('T6 無數據 fallback（404）')
-    check('0 環 0 halo', p3.locator('#evLayer .ev-ring').count() == 0 and p3.locator('#evLayer .ev-halo').count() == 0)
+    check('0 環 0 halo', p3.locator('#evLayer .ev-ring:not(.ev-idle)').count() == 0 and p3.locator('#evLayer .ev-halo').count() == 0)
     kpi3 = p3.eval_on_selector_all('.kpi', """els=>els.find(e=>/今日\\s*HIGH/.test(e.querySelector('.kpi-t').textContent))?.querySelector('.kpi-v').textContent""")
     check('KPI 維持 —', kpi3 == '—', f'got {kpi3!r}')
     check('⏸ 在場（idle）', p3.locator('#mapTgl').count() == 1)
@@ -225,6 +279,17 @@ with sync_playwright() as pw:
     ovf4 = p4.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth")
     check('390 零溢出', ovf4 == 0, f'ovf={ovf4}')
     check('390 地圖唔出（裁決④）', p4.eval_on_selector('.map-mod', "el=>getComputedStyle(el).display") == 'none')
+    # P7-3：手機（≤767）未存過偏好 → 預設收起；第一行完整不裁切＋零橫捲軸
+    check('390 chips 預設收起', p4.locator('#chipsTgl').get_attribute('aria-expanded') == 'false')
+    vis4 = p4.evaluate("()=>[...document.querySelectorAll('#chipsRow .chip')].filter(c=>c.style.display!=='none').length")
+    tops4 = p4.evaluate("()=>[...document.querySelectorAll('#chipsRow .chip')].filter(c=>c.style.display!=='none').map(c=>c.offsetTop)")
+    check('390 收起＝第一行（同 offsetTop）', 0 < vis4 < 9 and len(set(tops4)) == 1, f'{vis4} {tops4}')
+    row4 = p4.evaluate("()=>{const r=document.getElementById('chipsRow');const cb=r.getBoundingClientRect();return [...r.querySelectorAll('.chip')].every(c=>c.getBoundingClientRect().right<=cb.right+0.5)}")
+    check('390 第一行唔裁切（右緣唔出容器）', row4)
+    p4.click('#chipsTgl'); p4.wait_for_timeout(150)
+    check('390 展開後零橫向溢出', p4.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth") == 0)
+    check('390 展開後全可見', p4.evaluate("()=>[...document.querySelectorAll('#chipsRow .chip')].every(c=>c.style.display!=='none')"))
+    p4.screenshot(path=str(SHOT / 'chips_390.png'), full_page=False)
     ctx4.close()
     b.close()
 
