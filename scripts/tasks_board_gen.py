@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""tasks_board_gen.py v2——TASKS Board 生成器重構（Muse 規格 2026-10-29 版）。
+"""tasks_board_gen.py v3——TASKS Board 生成器（Muse 規格 2026-10-29 版＋P3 NAV 方案 C 2026-11-04）。
 
 老闆 07:43 落令：「個BOARD手機同電腦都唔能夠清晰顯示，你同MUSE執執要求，
 叫ZCODE重構啦」→ Muse 設計已簽核（A1-A10 驗收）→ 本檔照 §六 checklist 落地。
@@ -44,7 +44,66 @@ STATUS = {  # emoji → (status key, badge 符號, KPI 標籤)
 }
 ORDER = ["active", "owner", "todo", "sched", "done"]
 OTHER = ("other", "◇", "其他")  # 未知 emoji fallback（§6.1）
-GEN = "ZCODE tasks_board_gen v2"
+GEN = "ZCODE tasks_board_gen v3（2026-11-04 P3：＋NAV 方案 C，沿用首頁；A10 零 script 範圍=任務內容渲染，NAV UI script 自包含唔掂任務數據）"
+
+# ---- NAV BAR 方案 C（2026-11-04 P3 派工）----------------------------------
+# 沿用首頁 docs/index.html 方案 C：sticky 48px、手機漢堡 drawer、aria-current。
+# admin 層相對路徑重算：../index.html 等；admin 互連 tasks_board.html。
+# 硬色值（零變量依賴）：board --l1/--line/--t2/--info 對應 #161E2E/#2A3650/#A8B4C4/#5CA8FF。
+NAV_CSS = """
+/* ==== NAV BAR 方案 C（2026-11-04 P3，ZCODE；沿用首頁）==== */
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:stretch;height:48px;background:#161E2E;border-bottom:1px solid #2A3650;padding:0 16px;overflow-x:auto;overflow-y:hidden}
+.nav a{display:inline-flex;align-items:center;padding:0 12px;color:#A8B4C4;font-size:14px;font-weight:500;white-space:nowrap;border-bottom:2px solid transparent;transition:color .15s,border-color .15s;text-decoration:none}
+.nav a:hover{color:#E6EDF5}
+.nav a[aria-current="page"]{color:#5CA8FF;font-weight:700;border-bottom-color:#5CA8FF}
+.navdrawer{position:fixed;inset:0;z-index:220;background:rgba(10,14,20,.88);display:flex;flex-direction:column;align-items:stretch;justify-content:center;padding:32px}
+.navdrawer[hidden]{display:none}
+.navdrawer nav{display:flex;flex-direction:column;gap:8px;max-width:420px;margin:0 auto;width:100%}
+.navdrawer a{display:flex;align-items:center;height:56px;padding:0 16px;background:#161E2E;border:1px solid #2A3650;border-radius:6px;color:#E6EDF5;font-size:16px;font-weight:500;text-decoration:none}
+.navdrawer a[aria-current="page"]{color:#5CA8FF;font-weight:700;border-color:#5CA8FF}
+.navdrawer-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border:1px solid #2A3650;border-radius:6px;background:#161E2E;color:#E6EDF5;font-size:18px;cursor:pointer}
+.burger{display:none}
+@media(max-width:640px){
+ .nav{display:none}
+ .burger{display:block;position:fixed;top:8px;right:10px;z-index:60;width:40px;height:40px;border:1px solid #2A3650;border-radius:8px;background:#161E2E;color:#E6EDF5;font-size:18px;cursor:pointer}
+}
+"""
+
+# NAV 清單：ADMIN_CUR=本頁高亮任務板（board 用）；projection 等無對應項時用 NAV_HTML 零 aria-current
+_NAV_ITEMS = [
+    ("../index.html", "首頁"),
+    ("../signal_ranking.html", "排名"),
+    ("../forex_news.html", "新聞"),
+    ("../ccy_power/index.html", "CCY"),
+    ("tasks_board.html", "任務板"),
+    ("../tug_of_war_calculator.html", "工具"),
+]
+
+def _nav_html(current_href=None):
+    a = lambda h, t: ('<a href="%s"%s>%s</a>' % (h, ' aria-current="page"' if h == current_href else '', t))
+    items = "".join(a(h, t) for h, t in _NAV_ITEMS)
+    return ('<nav class="nav" aria-label="主導航">%s</nav>'
+            '<div id="navDrawer" class="navdrawer" hidden role="dialog" aria-modal="true" aria-label="導航選單">'
+            '<button id="navDrawerClose" class="navdrawer-x" aria-label="關閉導航">✕</button>'
+            '<nav aria-label="主導清單（手機）">%s</nav></div>'
+            '<button id="burgerBtn" class="burger" aria-label="開啟導航" aria-expanded="false">☰</button>'
+            % (items, items))
+
+NAV_HTML_BOARD = _nav_html("tasks_board.html")   # 任務板頁：任務板項高亮
+NAV_HTML_PLAIN = _nav_html(None)                 # 其他 admin 頁：無對應項不設 aria-current
+
+NAV_JS = ("(function(){"
+          "var d=document.getElementById('navDrawer'),b=document.getElementById('burgerBtn'),x=document.getElementById('navDrawerClose');"
+          "if(!d||!b||!x)return;"
+          "var bar=[].map.call(document.querySelectorAll('.nav>a'),function(a){return a.getAttribute('href')});"
+          "var dr=[].map.call(document.querySelectorAll('.navdrawer nav>a'),function(a){return a.getAttribute('href')});"
+          "if(JSON.stringify(bar)!==JSON.stringify(dr))console.error('[nav] bar/drawer 清單唔一致',bar,dr);"
+          "function open(){d.hidden=false;b.setAttribute('aria-expanded','true');x.focus()}"
+          "function close(){d.hidden=true;b.setAttribute('aria-expanded','false');b.focus()}"
+          "b.addEventListener('click',open);x.addEventListener('click',close);"
+          "d.addEventListener('click',function(e){if(e.target===d)close()});"
+          "document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!d.hidden)close()});"
+          "})();")
 
 
 # ---- 解析層 ------------------------------------------------------------
@@ -382,14 +441,16 @@ def render_html(page, now_str):
     cards = "\n".join(_render_section(s, i) for i, s in enumerate(secs))
     return ("<!DOCTYPE html><html lang=\"zh-Hant\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            "<title>📋 任務看板 TASKS Board</title><style>%s</style></head><body>"
+            "<title>📋 任務看板 TASKS Board</title><style>%s%s</style></head><body>"
+            "%s"
             "<div class=\"wrap\"><h1>📋 任務看板 TASKS Board</h1>"
             "<div class=\"meta\">%s</div>"
             "<div class=\"kpis\">%s</div>"
             "<div class=\"board\">%s</div>"
             "<div class=\"foot\">auto-generated from TASKS.md · %s · %s</div>"
-            "</div></body></html>"
-            % (CSS, " · ".join(meta_bits), kpi_html, cards, now_str, GEN))
+            "</div>"
+            "<script>%s</script></body></html>"
+            % (CSS, NAV_CSS, NAV_HTML_BOARD, " · ".join(meta_bits), kpi_html, cards, now_str, GEN, NAV_JS))
 
 
 def main():
