@@ -10,6 +10,13 @@ topnav 三條 1955）都係加密頁內 link——CI L21（tests/link_check.py�
   - 本層（L26，本檔）：加密 6 頁解密掃——scripts/encrypt_admin_pages.sh 尾段
     自動調用（帶病頁唔准出門），亦可手動 / 每鐘巡檢調用
 
+2026-11-04 增補（OpenClaw 回批「搬檔唔搬引用」第三次：quotePath、admin/ccy_power
+掃描盲區、首頁 CCY fetch）：加 JS fetch() 路徑斷言——解密明文掃 fetch('...')
+第一參字面量（含雙引號／反引號；template literal、外鏈 scheme、拼接表達式
+由 normalize()／正則天然排除），逐個用 L21 同一套 resolve_check 對 docs 實檔
+驗證，缺檔即 FAIL。修復前首頁 4 條 fetch 中 admin/ccy_power/data.json 會
+DEAD（正中該回歸），實測成立。
+
 密碼來源：$TSA_PW_FILE / $TSA_OWNER_PW_FILE，缺省 fallback
 /home/z/my-project/.keys/。密碼永遠唔入 repo、唔入 CI。
 
@@ -21,6 +28,7 @@ Exit 0 = 綠；Exit 1 = 有死 link。
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -34,6 +42,11 @@ from link_check import ATTR_RE, build_real_files, normalize, resolve_check  # no
 # tests/encryption_check.py CORE_PAGES 同步維護）
 GENERAL = ['docs/admin/index.html', 'docs/index.html', 'docs/signal_ranking.html']
 OWNER = ['docs/admin/db-browser.html', 'docs/admin/tasks_board.html', 'docs/admin/mt5_mcp_tools.html']
+
+# 2026-11-04（OpenClaw 回批附帶請求）：JS fetch() 第一參字面量——單/雙引號/反引號。
+# fetch( 後必須緊接引號先命中，`fetch(base + '/x.json')` 拼接表達式天然唔掃；
+# 含 ${ 的 template literal 由 normalize() 排除（runtime 拼接）。
+FETCH_RE = re.compile(r"fetch\(\s*(['\"`])((?:\\.|(?!\1).)+?)\1", re.I)
 
 
 def pw_for(tier: str) -> str:
@@ -71,6 +84,21 @@ def scan_text(rel: str, text: str, real_files: set[str]) -> tuple[int, list]:
     return checked, dead
 
 
+def scan_fetch(rel: str, text: str, real_files: set[str]) -> tuple[int, list]:
+    """2026-11-04：JS fetch() 路徑斷言——href/src 之外嘅第二盲區（搬檔唔搬引用）。"""
+    rel_dir = Path(rel).parent.relative_to('docs').as_posix()
+    checked, dead = 0, []
+    for m in FETCH_RE.finditer(text):
+        tgt = normalize(m.group(2))
+        if tgt is None:
+            continue
+        checked += 1
+        reason = resolve_check(rel_dir, tgt, real_files)
+        if reason is not None:
+            dead.append((rel, 'fetch(' + m.group(2) + ')', reason))
+    return checked, dead
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--file', help='掃單一檔（本機路徑）')
@@ -94,19 +122,24 @@ def main() -> int:
             label = f'all encrypted pages ({len(pages)})'
 
         total = 0
+        total_fetch = 0
         dead_all = []
+        dead_fetch = []
         for rel, text, tier in pages:
             c, d = scan_text(rel, text, real_files)
+            fc, fd = scan_fetch(rel, text, real_files)
             total += c
+            total_fetch += fc
             dead_all.extend(d)
-            print(f'[enc-link-check] {rel} ({tier}): {c} links, dead {len(d)}')
-        print(f'[enc-link-check] scope: {label}  internal links: {total}  dead: {len(dead_all)}')
-        for rel, raw, res in dead_all[:30]:
+            dead_fetch.extend(fd)
+            print(f'[enc-link-check] {rel} ({tier}): {c} links + {fc} fetch, dead {len(d) + len(fd)}')
+        print(f'[enc-link-check] scope: {label}  internal links: {total} + fetch {total_fetch}  dead: {len(dead_all) + len(dead_fetch)}')
+        for rel, raw, res in (dead_all + dead_fetch)[:30]:
             print(f'[enc-link-check] DEAD  {rel}  ->  {raw}  ({res})')
-        if dead_all:
-            print('[enc-link-check] FAIL: dead links in encrypted layer')
+        if dead_all or dead_fetch:
+            print('[enc-link-check] FAIL: dead links / dead fetch targets in encrypted layer')
             return 1
-        print('[enc-link-check] PASS: encrypted layer 0 dead links')
+        print('[enc-link-check] PASS: encrypted layer 0 dead links, 0 dead fetch targets')
         return 0
 
 
