@@ -11,9 +11,9 @@ from collections import defaultdict
 
 CSV_PATH = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/forex_data.csv"
 READER_CSV_PATH = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files/ccy_power_reader.csv"
-DATA_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/data.json"
-TIMELINE_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/timeline.json"
-PAIRS_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/pairs.json"
+DATA_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/ccy_power/data.json"
+TIMELINE_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/ccy_power/timeline.json"
+PAIRS_JSON = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/ccy_power/pairs.json"
 DB_PATH = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/data/ccy_power_history.db"
 
 def is_market_closed():
@@ -405,7 +405,7 @@ if __name__ == "__main__":
         update_pairs_json(pair_rows)
     
     # Inject inline data into HTML
-    HTML_PATH = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/admin/ccy_power/index.html"
+    HTML_PATH = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs/ccy_power/index.html"
     import re
     if os.path.exists(HTML_PATH):
         with open(HTML_PATH, 'r') as f: html = f.read()

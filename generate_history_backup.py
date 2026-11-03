@@ -19,7 +19,7 @@ OUTPUT_DIR = BASE_DIR / 'output'
 DOCS_DIR = BASE_DIR / 'docs'
 REPORTS_DIR = BASE_DIR / 'reports'
 
-for d in [OUTPUT_DIR, DOCS_DIR, REPORTS_DIR, DOCS_DIR / 'admin', HISTORY_DIR]:
+for d in [OUTPUT_DIR, DOCS_DIR, REPORTS_DIR, HISTORY_DIR]:  # P5 11-04：admin 停寫（閘外路徑，BLOCKED_PAGES 攔）
     d.mkdir(parents=True, exist_ok=True)
 
 # Import EA configuration from centralized config
@@ -290,7 +290,7 @@ def main():
     # 2. Generate HTML page
     html = generate_html(backups)
     
-    for out_dir in [OUTPUT_DIR, REPORTS_DIR, DOCS_DIR / 'admin']:
+    for out_dir in [OUTPUT_DIR, REPORTS_DIR]:  # P5 11-04：admin 停寫
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / 'history.html'
         with open(out_path, 'w', encoding='utf-8') as f:

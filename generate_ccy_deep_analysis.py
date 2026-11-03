@@ -13,7 +13,7 @@ from collections import defaultdict
 from datetime import datetime
 
 SAMPLES_DIR = Path(__file__).parent / 'samples'
-OUTPUT_DIR = Path(__file__).parent / 'docs' / 'admin' / 'ccy'
+OUTPUT_DIR = Path(__file__).parent / 'docs' / 'ccy'  # P5 11-04：admin/ccy 停寫（閘外路徑）→ root docs/ccy/（落點已保險：BLOCKED_PAGES 攔 admin/ccy）
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_all_trades():

@@ -320,7 +320,7 @@
             }
             if (window.__CCY_POWER_DATA__ && window.__CCY_POWER_DATA__.success) { updateData(_buildPayload(window.__CCY_POWER_DATA__)); return; }
             const base = new URL('.',window.location.href).href;
-            fetch(base+'data.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.data){updateData(_buildPayload(r));}}).catch(()=>{fetch('http://localhost:8788/api/ccy_power/current').then(r=>r.json()).then(r=>{if(r.success&&r.data){updateData(_buildPayload(r));}}).catch(()=>{});});
+            fetch(base+'data.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.data){updateData(_buildPayload(r));}}).catch(()=>{/* 2026-11-04 P5：本機 API 依賴移除——資料源＝同目錄 data.json（root 公開層單一來源） */});
         }
         function refreshData() { if(ws&&ws.readyState===WebSocket.OPEN) ws.send('{"type":"request_update"}'); else connectWebSocket(); }
 
@@ -334,7 +334,7 @@
             fetch(base+'timeline.json?t='+Date.now()).then(r=>r.json()).then(r=>{if(r.success&&r.timeline) _procTL(r,range); else _tlFallback(range);}).catch(()=>_tlFallback(range));
         }
         function _procTL(result,range) { try { const entries=(result.timeline['H1']||[]); timelineData=entries.map(e=>({timestamp:e.timestamp,currencies:e.currencies,hour:parseInt(e.timestamp.split(' ')[1].split(':')[0])})); if(timelineData.length>0) renderTimelineGrid(timelineData,range); else _demoTL(range); } catch(e){_demoTL(range);} }
-        function _tlFallback(range) { fetch('http://localhost:8788/api/ccy_power/timeline?hours='+getHoursFromRange(range)).then(r=>r.json()).then(r=>{if(r.success&&r.timeline) _procTL(r,range); else _demoTL(range);}).catch(()=>_demoTL(range)); }
+        function _tlFallback(range) { /* 2026-11-04 P5：本機 API 依賴移除——timeline 拉唔到行 _demoTL demo 模式 */ _demoTL(range); }
         function _demoTL(range) { const hrs=getHoursFromRange(range),ccys=['XAU','CAD','JPY','AUD','EUR','CHF','GBP','NZD','USD'],now=new Date(); timelineData=[]; for(let h=hrs-1;h>=0;h--){const ts=new Date(now-h*3600000),hr=ts.getHours(),bv={XAU:9.2,CAD:8.5,JPY:7.15,AUD:6.25,EUR:5.8,CHF:4.35,GBP:3.9,NZD:2.25,USD:1.8},v=Math.sin(hr/24*Math.PI*2)*1.5,vals={};ccys.forEach(c=>vals[c]=Math.max(0.5,Math.min(9.5,bv[c]+v+(Math.random()-0.5)*0.5)));timelineData.push({timestamp:ts,currencies:vals,hour:hr});} renderTimelineGrid(timelineData,range); }
 
         function getSession(h) { if(h>=7&&h<16) return 'asia'; if(h>=14&&h<23) return 'europe'; if(h>=20||h<5) return 'us'; return ''; }

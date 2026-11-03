@@ -14,7 +14,7 @@ DOWNLOADS_DIR = BASE_DIR / 'downloads'
 OUTPUT_DIR = BASE_DIR / 'output'
 DOCS_DIR = BASE_DIR / 'docs'
 REPORTS_DIR = BASE_DIR / 'reports'
-for d in [OUTPUT_DIR, DOCS_DIR, REPORTS_DIR, DOCS_DIR / 'admin']:
+for d in [OUTPUT_DIR, DOCS_DIR, REPORTS_DIR]:  # P5 11-04：admin 停寫
     d.mkdir(parents=True, exist_ok=True)
 
 from config import EA_MAP
@@ -470,7 +470,7 @@ def main():
     
     html = generate_html(all_trades, signal_ids, symbols)
     
-    for out_dir in [OUTPUT_DIR, REPORTS_DIR, DOCS_DIR / 'admin']:
+    for out_dir in [OUTPUT_DIR, REPORTS_DIR]:  # P5 11-04：admin 停寫
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / 'pivot_table.html'
         with open(out_path, 'w', encoding='utf-8') as f:
