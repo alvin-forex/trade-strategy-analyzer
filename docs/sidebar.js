@@ -137,11 +137,11 @@
   var links = sidebar.querySelectorAll('.sidebar-link');
   links.forEach(function(link){
     var dp = link.getAttribute('data-page');
-    if(dp==='index' && (filename==='index' || filename==='dashboard')) link.classList.add('active');
+    if(dp==='index' && (filename==='index' || filename==='dashboard') && !path.includes('/ccy_power/')) link.classList.add('active');
     else if(dp==='signal_ranking' && filename==='signal_ranking') link.classList.add('active');
     else if(dp==='ccy_ranking' && filename==='ccy_ranking') link.classList.add('active');
     else if(dp==='volatility' && (filename==='volatility' || filename==='ccy_timeframe_volatility')) link.classList.add('active');
-    else if(dp==='ccy_power' && (path.includes('/admin/ccy_power/') || filename==='ccy_power')) link.classList.add('active');
+    else if(dp==='ccy_power' && (path.includes('/ccy_power/') || filename==='ccy_power')) link.classList.add('active');
     else if(dp==='portfolios' && path.includes('/admin/portfolios/')) link.classList.add('active');
     else if(dp==='reviews' && path.includes('/admin/reviews/')) link.classList.add('active');
     else if(dp==='review_filter' && filename==='review_filter') link.classList.add('active');
