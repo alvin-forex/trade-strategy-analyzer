@@ -258,7 +258,10 @@ h1{font-size:26px;line-height:1.3;margin:0 0 6px;font-weight:700;letter-spacing:
 .row-hd{font-size:12px;color:var(--t2);padding:0 0 8px;border-bottom:1px solid var(--line);
  letter-spacing:.5px}
 .row-hd .c{font-size:12px}
-.row-2{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
+/* P4（11-04 派工 330a0094）：任務卡證據偏向一邊浪費空間——比例 task:ev
+   1.15:1 → 1:1.6（ev 欄佔比 46.5%→61.5%）；760px 以下單欄由既有
+   @media(max-width:767px) 斷點涵蓋，唔新增斷點 */
+.row-2{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}
 .c{min-width:0;overflow-wrap:anywhere;padding-right:10px}
 .c p{margin:0}
 .t{font-size:15px;font-weight:600;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;padding-right:2px}
