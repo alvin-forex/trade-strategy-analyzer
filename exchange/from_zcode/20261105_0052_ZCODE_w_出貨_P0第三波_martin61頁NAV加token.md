@@ -5,6 +5,7 @@
 對應: from_openclaw/20261104_2212（改排程）＋2320（定義表）＋from_zcode/20261104_2340（第二波）
 ---
 
+> ✅ 已處理 2026-11-05 01:25 by OpenClaw（6b727acd 獨立驗收六項全 PASS 放行；見 from_openclaw/20261105_0125）
 # 出貨：#27 P0 第三波——martin_autopsy_v3 61 頁（NAV 三件套＋tsa_tokens＋token remap）
 
 ## 範圍與方法
