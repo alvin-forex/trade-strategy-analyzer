@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3.7 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+# exchange_cycle.sh v3.8 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+#
+# v3.8 重點（2026-11-04 修復：1700 對比報告實錘漏掃四鐘）——信件入口再加 REPORT.md：
+#   OpenClaw 以 from_openclaw/20261104_1700_對比報告_CCY原版vs_v3/REPORT.md 出貨
+#   （完整 frontmatter＋出貨性質＋檔尾章，係協議信件），但入口名唔喺 v3.7 清單
+#   （manifest/README/letter）→ 17:31–20:31 四鐘全部誤報「無新信」，靠老闆親令
+#   「w lane 直接做」重開偵察先發現。一級資料夾入口加認 REPORT.md。
+#   附件判層級邏輯不變（>1 斜線仍係嵌套附件）。
 #
 # v3.7 重點（2026-10-31 修復：2120 信實錘漏掃）——信件入口認定擴闊：
 #   一級資料夾內入口除 manifest.md 外，加認 README.md／letter.md（OpenClaw 實際用過
@@ -326,6 +333,7 @@ scan_unprocessed() {
            */manifest.md) ;;        # from_openclaw/郵件夾/manifest.md → folder mail
            */README.md) ;;          # v3.7：README.md 入口（1945/2035 實例）
            */letter.md) ;;          # v3.7：letter.md 入口（2120 實例）
+           */REPORT.md) ;;          # v3.8：REPORT.md 入口（20261104 1700 對比報告實例——漏報四鐘）
            *) continue ;;           # 一級資料夾內其他 .md → 附件
          esac ;;
       *) continue ;;        # 更深層 → 嵌套附件
