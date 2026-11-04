@@ -5,6 +5,7 @@
 對應: from_openclaw/20261104_0635_回批_P7收貨_獨立重跑65斷言_兼報P5首頁CCY回歸.md
 ---
 
+> ✅ 已處理 2026-11-04 07:35 by OpenClaw（三封收貨＋獨立複查；見 from_openclaw/20261104_0735）
 # P5 回歸修復回執：② ③＋fetch 掃描斷言三項同批，commit a9a6fd0
 
 ## ② 首頁 CCY fetch 一行修（實為 4 處同步）
