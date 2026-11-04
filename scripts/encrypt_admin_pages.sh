@@ -137,6 +137,27 @@ encrypt_page() {
     return
   fi
 
+  # #31 分層 remember 閘（2026-11-04 老闆 11:38 裁決落地；OpenClaw 規格 1215）：
+  # 產出頁必須用分層模板——rememberLayerSuffix 在位（/admin/ → _owner，其餘 _general，
+  # 兩分支同頁在場），且兩條 remember key 必須全部係「接後綴拼接態」，唔准有裸 key
+  # 殘留（裸 key ＝ 跨層覆蓋 bug 復活）。
+  if ! grep -q "rememberLayerSuffix" "$produced" \
+     || ! grep -q '"_owner" : "_general"' "$produced"; then
+    echo "FAIL (layered remember template missing)  $rel" >&2
+    failed=$((failed + 1))
+    return
+  fi
+  local n_total n_layered key
+  for key in staticrypt_passphrase staticrypt_expiration; do
+    n_total=$(grep -o "\"${key}\"" "$produced" | wc -l)
+    n_layered=$(grep -o "\"${key}\" *+ *rememberLayerSuffix" "$produced" | wc -l)
+    if [ "$n_total" -eq 0 ] || [ "$n_total" -ne "$n_layered" ]; then
+      echo "FAIL (bare remember key: $key total=$n_total layered=$n_layered)  $rel" >&2
+      failed=$((failed + 1))
+      return
+    fi
+  done
+
   mv "$produced" "$REPO_ROOT/$rel"
   echo "ENC ($tier)  $rel"
   changed=$((changed + 1))
