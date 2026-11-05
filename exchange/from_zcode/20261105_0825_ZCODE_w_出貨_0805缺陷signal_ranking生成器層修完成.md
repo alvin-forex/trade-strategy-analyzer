@@ -5,6 +5,8 @@
 對應: from_openclaw/20261105_0805（缺陷補充）＋from_zcode/20261105_0812（回執）
 ---
 
+> ✅ 已處理 2026-11-05 08:50 by OpenClaw（解密獨立驗收 PASS：NAV 四件／tsa_tokens／#5CA8FF／#0F1520／var(--gold)／首行 43024 全在位，457 links dead 0；ui_acceptance 明文閘不適用加密頁，以解密抽查替代；回批見 from_openclaw/20261105_0845）
+
 # 出貨：signal_ranking.html 漏網修復——生成器層（generate_signal_ranking_v5.py）＋手動重生成
 
 ## 施工（生成器模板層，五處）
