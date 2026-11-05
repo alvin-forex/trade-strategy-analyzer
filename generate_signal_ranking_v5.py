@@ -258,8 +258,8 @@ def generate_html(all_results: List[Dict[str, Any]], link_prefix: str = '../repo
 <style>
 /* === Unified Theme System === */
 :root{{--font-main:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;--radius:8px;--shadow:0 2px 8px rgba(0,0,0,0.12)}}
-[data-theme="dark"]{{--bg:#0a0e17;--bg-card:#111520;--bg-hover:#1a1f2e;--text:#d0d0d0;--text2:#888;--primary:#FFD700;--accent:#64b5f6;--green:#4CAF50;--red:#FF5722;--yellow:#FFC107;--orange:#fd7e14;--border:#1e2433;--th-bg:#111520;--nav-bg:transparent;--grade-a:#4CAF50;--grade-b:#FFC107;--grade-c:#fd7e14;--grade-d:#FF5722;--header-from:#1a1f2e;--header-to:#0a0e17}}
-[data-theme="light"]{{--bg:#f5f7fa;--bg-card:#ffffff;--bg-hover:#eef2f7;--text:#333;--text2:#666;--primary:#0f3460;--accent:#e94560;--green:#28a745;--red:#dc3545;--yellow:#ffc107;--orange:#fd7e14;--border:#ddd;--th-bg:#eef2f7;--nav-bg:rgba(0,0,0,0.03);--grade-a:#28a745;--grade-b:#ffc107;--grade-c:#fd7e14;--grade-d:#dc3545;--header-from:#0f3460;--header-to:#16213e}}
+[data-theme="dark"]{{--bg:#0F1520;--bg-card:#161E2E;--bg-hover:#1C2638;--text:#E6EDF5;--text2:#A8B4C4;--primary:#5CA8FF;--accent:#38BDF8;--green:#22C55E;--red:#EF4444;--yellow:#EAB308;--orange:#F97316;--border:#2A3650;--th-bg:#161E2E;--nav-bg:transparent;--grade-a:#22C55E;--grade-b:#EAB308;--grade-c:#F97316;--grade-d:#EF4444;--header-from:#1C2638;--header-to:#0F1520}}
+[data-theme="light"]{{--bg:#F1F5F9;--bg-card:#ffffff;--bg-hover:#E2E8F0;--text:#1E293B;--text2:#64748B;--primary:#2563EB;--accent:#0EA5E9;--green:#16A34A;--red:#DC2626;--yellow:#CA8A04;--orange:#EA580C;--border:#CBD5E1;--th-bg:#E2E8F0;--nav-bg:rgba(0,0,0,0.03);--grade-a:#16A34A;--grade-b:#CA8A04;--grade-c:#EA580C;--grade-d:#DC2626;--header-from:#E2E8F0;--header-to:#F1F5F9}}
 *{{transition:background-color .25s ease,color .25s ease,border-color .25s ease}}
 .theme-toggle{{width:36px;height:36px;border:1px solid var(--border);border-radius:50%;background:var(--bg-card);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);line-height:1;padding:0;flex-shrink:0}}.theme-toggle:hover{{background:var(--bg-hover);transform:scale(1.1)}}
 .topnav{{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border);margin-bottom:16px;position:sticky;top:0;z-index:100}}
@@ -273,7 +273,7 @@ body{{font-family:var(--font-main);background:var(--bg);color:var(--text);paddin
 h1{{font-size:1.3em;margin-bottom:4px;color:var(--primary)}}
 .info-tip:hover .info-tip-text{{display:block}}
 .sum{{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:20px}}
-.sum .v{{font-size:1.3em;font-weight:bold;color:var(--primary)}}
+.sum .v{{font-size:1.3em;font-weight:bold;color:var(--gold)}}
 .sum .l{{font-size:0.7em;color:var(--text2)}}
 table{{width:100%;border-collapse:collapse;min-width:800px}}
 th{{background:var(--th-bg);padding:8px 10px;text-align:left;border-bottom:2px solid var(--primary);color:var(--primary);font-size:0.8em;white-space:nowrap;cursor:pointer;user-select:none}}
@@ -299,6 +299,8 @@ label{{color:var(--text2);font-size:0.9em;margin-left:12px}}
 @media(max-width:768px){{body{{font-size:11px}}th,td{{padding:3px 5px}}}}
 </style>
 <link rel="stylesheet" href="{sidebar_prefix}sidebar.css">
+<!-- 0805 缺陷補充（W2 併入）：P0 四件套第 4 件 tsa_tokens.css——單一色源（頁內主題塊已同步 canonical 值） -->
+<link rel="stylesheet" href="{sidebar_prefix}tsa_tokens.css">
 <script>
 (function(){{
   const saved=localStorage.getItem('tsa-theme');
@@ -320,6 +322,8 @@ function toggleTheme(){{
 </script>
 </head>
 <body>
+<!-- 0805 缺陷補充（W2 併入）：NAV 四件之 #sidebar-container（sidebar.css/js 已在，此前缺 container 令 sidebar 永遠唔現） -->
+<div id="sidebar-container"></div>
 <div class="topnav">
 <a href="./index.html" class="topnav-logo">🦀 TSA</a>
 <div class="topnav-links">
