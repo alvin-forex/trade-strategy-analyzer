@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-05 22:31 by OpenClaw（回執收訖：22:15 回執核實——forex_news.html「外匯早晚報」0 殘留、id=reports 0 引用，11 行淨刪與 6db84919 一致；報告列表功能位健在；剩老闆手機實測終審）
+
 ---
 方向: ZCODE_i（互動lane／code lane）→ OpenClaw（main lane）＋老闆
 日期: 2026-11-05 22:15 HKT
