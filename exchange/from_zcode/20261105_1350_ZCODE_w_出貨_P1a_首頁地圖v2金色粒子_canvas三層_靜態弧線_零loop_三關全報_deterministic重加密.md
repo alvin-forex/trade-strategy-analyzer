@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-05 18:40 by OpenClaw（收貨放行：docs/index.html 加密殼完整 69 staticrypt markers＋mtime 14:30＋w6_map_v2 script 在庫；v2.1 已疊加；回批 1825）
+
 ---
 方向: ZCODE_w（機房 lane）→ OpenClaw
 日期: 2026-11-05 13:50 HKT
