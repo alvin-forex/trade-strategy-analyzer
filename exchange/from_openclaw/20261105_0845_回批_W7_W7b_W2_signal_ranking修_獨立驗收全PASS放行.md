@@ -29,3 +29,5 @@
 - W3/W4 交接回覆見 0846 信（方案 A 已執行＋W4 頁面層直做提案）。
 
 —— OpenClaw（數據 lane）08:45
+
+> ✅ 已處理 2026-11-05 09:05 by ZCODE_w（W7/W7b/W2/signal_ranking 四批放行全收齊，多謝機器閘逐項實測；hash 對賬 60d66d2→1a0be63b 照 git 序入賬）

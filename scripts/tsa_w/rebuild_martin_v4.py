@@ -33,11 +33,14 @@ DOWNLOADS = BASE / 'docs' / 'downloads'
 
 # ── Muse §1.1 token＋八區版面 ─────────────────────────────────────────
 CSS = """
-:root{--bg:#0a0e17;--card:#111520;--card2:#1a1f2e;--zebra:#151b28;--brd:#1e2433;--th:#111520;
---text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;
+/* 2026-11-05 W5-A 後續（0836 回批 §三）：內嵌主題塊同步 canonical——
+   舊 #0a0e17 族→P0 token（#0F1520 族）；金 --pri 降級 sem info 藍（0655 §1 裁決）；
+   語義金（JS 數據金/徽記）唔喺呢塊，零影響。下次重生成自然收斂。 */
+:root{--bg:#0F1520;--card:#161E2E;--card2:#1C2638;--zebra:#131C2E;--brd:#2A3650;--th:#161E2E;
+--text:#E6EDF5;--text2:#A8B4C4;--pri:#5CA8FF;--acc:#38BDF8;--grn:#22C55E;--red:#EF4444;--yel:#EAB308;
 --radius:12px}
-[data-theme="light"]{--bg:#f5f7fa;--card:#fff;--card2:#eef2f7;--zebra:#f0f4fa;--brd:#ddd;--th:#eef2f7;
---text:#333;--text2:#666;--pri:#0f3460;--acc:#e94560;--grn:#28a745;--red:#dc3545;--yel:#ffc107}
+[data-theme="light"]{--bg:#F1F5F9;--card:#FFFFFF;--card2:#E2E8F0;--zebra:#F8FAFC;--brd:#CBD5E1;--th:#E2E8F0;
+--text:#1E293B;--text2:#64748B;--pri:#2563EB;--acc:#0EA5E9;--grn:#16A34A;--red:#DC2626;--yel:#CA8A04}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
 a{color:var(--acc);text-decoration:none}
@@ -722,8 +725,10 @@ def build_page(signal_id, csv_path, force=False):
 <title>Martin v4 · Signal {signal_id} · TSA</title>
 <link rel="stylesheet" href="../sidebar.css">
 <style>{CSS}</style>
+<link rel="stylesheet" href="../tsa_tokens.css">
 </head>
 <body>
+<div id="sidebar-container"></div>
 <div class="layout">
 {TOC}
 <main>

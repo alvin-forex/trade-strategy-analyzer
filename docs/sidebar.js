@@ -10,10 +10,15 @@
      forex_reports/forex_hub/ccy/downloads/data/home/prd），舊清單只識 admin
      舊路徑 → root 子目錄頁 depth='' 全部 link 死。改：admin/=../，
      root 一層子目錄=../，其餘（root 頁）=''。 */
-  var rootSub = /^\/(ccy|ccy_power|portfolios|reviews|reports|4h_reports|forex_reports|forex_hub|downloads|data|home|prd)\//.test(path);
+  /* 2026-11-05 W4：深度通用化——rootSub 白名單只識一層子目錄，reviews/monthly｜
+     weekly 兩層頁會出 ../ 死鏈（sidebar nav 半數 404）。改按路徑段數計：
+     admin=../；root 內以 path 段數（減檔名）推深度，N 段目錄=N-1 個 ../；
+     root 頁=''。對現有 0/1 層頁行為逐頁等價（admin 舊路徑分支照顧）。 */
   if(path.indexOf('/admin/') >= 0) cssDepth='../';
-  else if(rootSub) cssDepth='../';
-  else cssDepth='';
+  else {
+    var segN = path.split('/').length - 2; /* ['',a,b,file]→2；['',file]→0；['',a,file]→1 */
+    cssDepth = segN > 0 ? new Array(segN + 1).join('../') : '';
+  }
 
   // Check if sidebar.css already loaded
   var cssLoaded = false;
