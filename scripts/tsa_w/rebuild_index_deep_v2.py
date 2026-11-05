@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """rebuild_index_deep_v2.py — index_* deep 頁 Template A 重寫（Muse 規格 2026-11-02）
 
-鐵律（Muse §2）：
-  - 零 JS（零 <script>、零 on* 屬性）；摺疊只准 <details>
+鐵律（Muse §2；2026-11-05 0836 Q1(a) 裁決修訂）：
+  - Template A v2 嘅零 JS 純度讓位全站導航統一——NAV 四件
+    （sidebar.css＋tsa_tokens.css＋#sidebar-container＋sidebar.js）照注入；
+    摺疊仍只准 <details>，頁面自身零互動 JS（on* 屬性照剝）
   - 單頁縱向敘事「結論→證據→深挖」＋純 anchor 錨點目錄
   - 六種降級零空殼軍規（§2.2 表）：空表殼/NaN/死行/死掣唔准出街
-  - 深色 token §1.1（#0a0e17/#FFD700/#4CAF50/#FF5722）
+  - 深色 token＝P0 canonical（W5-D 2026-11-05：#0F1520 族＋金 --pri 降級
+    sem info 藍 #5CA8FF＋狀態色 #22C55E/#EF4444/#EAB308/#F97316＋
+    [data-theme="light"] 塊，同 w5d_index_nav_20261105.py 頁層產物同構）
 
 做法：轉換器——由現有 index_*.html 收割 panels＋頂部三卡，重排入新殼。
   舊頁 content 引用 var(--green)/--red/--text 等，新殼 root 以深色值重定義同名變數。
@@ -19,13 +23,15 @@ from bs4 import BeautifulSoup
 BASE = Path(__file__).resolve().parents[2]          # repo root
 REPORTS = BASE / 'docs' / 'reports'
 
-# Muse §1.1 深色 token＋舊變數別名
+# P0 canonical（#23 簽核 token；W5-D 2026-11-05 remap）＋舊變數別名＋light 塊
 CSS = """
-:root{--bg:#0a0e17;--card:#111520;--card2:#1a1f2e;--zebra:#151b28;--brd:#1e2433;--th:#111520;
---text:#d0d0d0;--text2:#777;--pri:#FFD700;--acc:#64b5f6;--grn:#4CAF50;--red:#FF5722;--yel:#FFC107;
---green:var(--grn);--yellow:var(--yel);--orange:#fd7e14;--primary:var(--pri);--accent:var(--acc);
---grade-a:#4CAF50;--grade-b:#FFC107;--grade-c:#fd7e14;--grade-d:#FF5722;
+:root{--bg:#0F1520;--card:#161E2E;--card2:#1C2638;--zebra:#131C2E;--brd:#2A3650;--th:#161E2E;
+--text:#E6EDF5;--text2:#A8B4C4;--pri:#5CA8FF;--acc:#38BDF8;--grn:#22C55E;--red:#EF4444;--yel:#EAB308;
+--green:var(--grn);--yellow:var(--yel);--orange:#F97316;--primary:var(--pri);--accent:var(--acc);
+--grade-a:#22C55E;--grade-b:#EAB308;--grade-c:#F97316;--grade-d:#EF4444;
 --radius:12px;--shadow:0 4px 16px rgba(0,0,0,.4)}
+[data-theme="light"]{--bg:#F1F5F9;--card:#FFFFFF;--card2:#E2E8F0;--zebra:#F8FAFC;--brd:#CBD5E1;--th:#E2E8F0;
+--text:#1E293B;--text2:#64748B;--pri:#2563EB;--acc:#0EA5E9;--grn:#16A34A;--red:#DC2626;--yel:#CA8A04}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
 a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
@@ -280,7 +286,13 @@ def render_page_v2panels(sid, raw, gen_date):
     return ('<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>Signal {sid} — Trade Strategy Analysis Report</title>'
-            f'<style>{CSS}</style></head><body>{body_html}</body></html>')
+            f'<style>{CSS}</style>'
+            '<!-- W5-D（2026-11-05）：NAV 四件 1+2——sidebar.css＋tsa_tokens.css -->\n'
+            '<link rel="stylesheet" href="../sidebar.css">\n'
+            '<link rel="stylesheet" href="../tsa_tokens.css">\n'
+            '</head><body><div id="sidebar-container"></div>'
+            f'{body_html}'
+            '<script src="../sidebar.js"></script></body></html>')
 
 
 def render_page(sid, src_path, gen_date):
@@ -414,7 +426,13 @@ def render_page(sid, src_path, gen_date):
     return ('<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>Signal {sid} — Trade Strategy Analysis Report</title>'
-            f'<style>{CSS}</style></head><body>{body_html}</body></html>')
+            f'<style>{CSS}</style>'
+            '<!-- W5-D（2026-11-05）：NAV 四件 1+2——sidebar.css＋tsa_tokens.css -->\n'
+            '<link rel="stylesheet" href="../sidebar.css">\n'
+            '<link rel="stylesheet" href="../tsa_tokens.css">\n'
+            '</head><body><div id="sidebar-container"></div>'
+            f'{body_html}'
+            '<script src="../sidebar.js"></script></body></html>')
 
 
 def _martin_risk(martin_p):
@@ -448,7 +466,10 @@ def _central_card(sid, gen_date):
     return ('<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>Signal {sid} — Trade Strategy Analysis Report</title>'
-            f'<style>{CSS}</style></head><body><div class="layout"><main>'
+            f'<style>{CSS}</style>'
+            '<link rel="stylesheet" href="../sidebar.css">\n'
+            '<link rel="stylesheet" href="../tsa_tokens.css">\n'
+            '</head><body><div id="sidebar-container"></div><div class="layout"><main>'
             f'<a class="back" href="../index.html">← 返回報告索引</a>'
             f'<div class="card" style="text-align:center;padding:48px 24px">'
             '<div style="font-size:2.4em">🗂️</div>'
@@ -456,7 +477,8 @@ def _central_card(sid, gen_date):
             '<div class="note">可能原因：追蹤期太短／訊號已除名／數據層補全中。</div>'
             f'<div class="note">最後數據更新：{gen_date} · 數據補全後本頁將自動補滿。</div>'
             '<p style="margin-top:14px"><a href="../signal_ranking.html">返排名頁 →</a></p>'
-            '</div></main></div></body></html>')
+            '</div></main></div>'
+            '<script src="../sidebar.js"></script></body></html>')
 
 
 def main():
