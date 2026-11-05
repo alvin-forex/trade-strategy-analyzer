@@ -1,0 +1,77 @@
+--- a/CurrencyPower_v3.mq5
++++ b/CurrencyPower_v3.mq5
+@@ -51,6 +51,7 @@
+ input int    Lookback_Bars  = 300;
+ input bool   Alert_On       = true;
+ input ENUM_TIMEFRAMES PairTF = PERIOD_H1;
++ENUM_TIMEFRAMES gPairTF = PERIOD_H1;  // Fix-B: resolved pair TF (PERIOD_CURRENT -> chart period)
+ input int    TickStyle      = 0;   // 0=[x]/[  ] 1=+ / x  2=● / ○
+ input bool   Show_Panel     = true;
+ input bool   InpEqualWeight = false;  // true = equal-weight (original CCY Power parity, each pair 1 vote); false = ATR% weighted (v3 default)
+@@ -144,13 +145,13 @@
+       if(s==""){ hR[p]=-1; hA[p]=-1; continue; }
+       SymbolSelect(s,true);
+       gS[p]=s; gN++;
+-      hR[p]=iRSI(s,PairTF,RSI_Period,PRICE_CLOSE);
+-      hA[p]=iATR(s,PairTF,ATR_Period);
++      hR[p]=iRSI(s,gPairTF,RSI_Period,PRICE_CLOSE);
++      hA[p]=iATR(s,gPairTF,ATR_Period);
+    }
+    // XAUUSD
+    string xu=FindSym("XAU","USD");
+    if(xu!=""){ SymbolSelect(xu,true); gS[28]=xu; gN++;
+-      hR[28]=iRSI(xu,PairTF,RSI_Period,PRICE_CLOSE); hA[28]=iATR(xu,PairTF,ATR_Period); }
++      hR[28]=iRSI(xu,gPairTF,RSI_Period,PRICE_CLOSE); hA[28]=iATR(xu,gPairTF,ATR_Period); }
+    else { hR[28]=-1; hA[28]=-1; }
+    // gold crosses direct
+    for(int g=0;g<7;g++)
+@@ -159,10 +160,12 @@
+       string s=FindSym("XAU",GoldQ[g]);
+       if(s==""){ hR[k]=-1; hA[k]=-1; continue; }
+       SymbolSelect(s,true); gS[k]=s; gGoldN++;
+-      hR[k]=iRSI(s,PairTF,RSI_Period,PRICE_CLOSE);
+-      hA[k]=iATR(s,PairTF,ATR_Period);
+-   }
+-   PrintFormat("CP v3: majors=%d/28 goldcross=%d/7 XAUUSD=%s sub=%d",gN-1-gGoldN,gGoldN,gS[28],gSub);
++      hR[k]=iRSI(s,gPairTF,RSI_Period,PRICE_CLOSE);
++      hA[k]=iATR(s,gPairTF,ATR_Period);
++   }
++   gPairTF = (PairTF==PERIOD_CURRENT) ? (ENUM_TIMEFRAMES)_Period : PairTF;  // Fix-B
++   PrintFormat("CP v3: majors=%d/28 goldcross=%d/7 XAUUSD=%s sub=%d PairTF=%s -> %s",
++               gN-1-gGoldN,gGoldN,gS[28],gSub,EnumToString(PairTF),EnumToString(gPairTF));
+    EventSetTimer(5);
+    return(INIT_SUCCEEDED);
+ }
+@@ -179,7 +182,7 @@
+ {
+    if(hA[p]<0) return 1.0;
+    double a[]; if(CopyBuffer(hA[p],0,sh,1,a)<1) return 1.0;
+-   double px=iClose(gS[p],PairTF,sh); if(px<=0) return 1.0;
++   double px=iClose(gS[p],gPairTF,sh); if(px<=0) return 1.0;
+    return a[0]/px*100.0;    // raw ATR% (normalized later)
+ }
+ 
+@@ -404,6 +407,23 @@
+ {
+    if(rt<10) return(0);
+    int limit=rt-pc; if(limit<=0) limit=1; if(limit>Lookback_Bars) limit=Lookback_Bars;
++   /* Fix-A: handles async — until every RSI/ATR handle has calculated at least once,
++      CopyBuffer<1 writes w=0 -> cnt=0 -> flat 50 (2305 gun 2); and limit stays 1
++      afterwards so those bars never backfill (2305 gun 3). Gate one full recalc
++      on first readiness of all 36 handles. */
++   static bool g_readyOnce=false;
++   if(!g_readyOnce)
++   {
++      bool ready=true;
++      for(int p=0;p<36;p++)
++         if(hR[p]>=0 && BarsCalculated(hR[p])<=0){ ready=false; break; }
++      if(ready)
++      {
++         g_readyOnce=true;
++         limit=Lookback_Bars;
++         PrintFormat("CP v3: all handles ready -> full recalc %d bars",Lookback_Bars);
++      }
++   }
+ 
+    double pw[9];
+    for(int i=limit-1;i>=0;i--)
