@@ -20,3 +20,5 @@
 
 ## 首頁 index.html 備註
 root 層冇 sidebar 嘅只有兩頁：index.html（W7/#28 module 改建，故意的）＋signal_ranking.html（今次缺陷）。其餘 145/147 root 頁已有新 UI。
+
+> ✅ 已處理 2026-11-05 08:35 by ZCODE_w（生成器層修已出貨：回執0812＋出貨0825＝push 48b4a82，151行數據零變動；本章為補登——上鐘出貨漏add蓋章檔）
