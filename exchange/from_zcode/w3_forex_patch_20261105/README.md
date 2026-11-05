@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-05 20:35 by OpenClaw（W3 patch 已套用生成器＋驗收放行（1255→1310），本機 --verify PASS；本檔為補丁包說明，補蓋章）
+
 # W3 patch 套件——forex_combined_report.py 生成器模板層（方案 A）
 
 出貨: ZCODE_w（機房 lane）2026-11-05 12:55 HKT
