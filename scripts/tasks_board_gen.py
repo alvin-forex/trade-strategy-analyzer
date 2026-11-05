@@ -23,6 +23,9 @@ Lane 分界（§6.1）：
 checklist 落點：1.1 emoji 配狀態｜1.2 降級｜1.3 fallback 25/25｜1.4 固定次序
 active>owner>todo>sched>done｜2.1-2.10 照 prototype CSS＋minmax(0,…)／:not(.row-2)
 中段斷點／code 12.5px／--neutral 標籤／reduced-motion fade 保留｜3.1 plaintext 出檔。
+W5-I（2026-11-05）：站點 sidebar NAV 三件（../sidebar.css＋#sidebar-container＋
+../sidebar.js，tokens 豁免——自帶 --l0 canonical 族）入本檔模板層——TASKS.md
+重生成唔會沖走站點 NAV。
 
 用法：
   python3 scripts/tasks_board_gen.py --tasks TASKS.md \
@@ -44,7 +47,7 @@ STATUS = {  # emoji → (status key, badge 符號, KPI 標籤)
 }
 ORDER = ["active", "owner", "todo", "sched", "done"]
 OTHER = ("other", "◇", "其他")  # 未知 emoji fallback（§6.1）
-GEN = "ZCODE tasks_board_gen v3（2026-11-04 P3：＋NAV 方案 C，沿用首頁；A10 零 script 範圍=任務內容渲染，NAV UI script 自包含唔掂任務數據）"
+GEN = "ZCODE tasks_board_gen v3.1（2026-11-05 W5-I：＋站點 sidebar NAV 三件注入（../sidebar.css＋#sidebar-container＋../sidebar.js），tokens 豁免自帶 --l0 族；11-04 P3 NAV 方案 C 保留；A10 零 script 範圍=任務內容渲染，NAV UI script 自包含唔掂任務數據）"
 
 # ---- NAV BAR 方案 C（2026-11-04 P3 派工）----------------------------------
 # 沿用首頁 docs/index.html 方案 C：sticky 48px、手機漢堡 drawer、aria-current。
@@ -444,7 +447,11 @@ def render_html(page, now_str):
     cards = "\n".join(_render_section(s, i) for i, s in enumerate(secs))
     return ("<!DOCTYPE html><html lang=\"zh-Hant\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            "<title>📋 任務看板 TASKS Board</title><style>%s%s</style></head><body>"
+            "<title>📋 任務看板 TASKS Board</title><style>%s%s</style>"
+            "<!-- W5-I（2026-11-05）：NAV 三件 1+2——sidebar.css；tokens 豁免（自帶 --l0 canonical 族照 W5-H 先例；本檔模板層同步，TASKS.md 重生成唔沖走） -->\n"
+            "<link rel=\"stylesheet\" href=\"../sidebar.css\">\n"
+            "</head><body><!-- W5-I：NAV 之 #sidebar-container -->\n"
+            "<div id=\"sidebar-container\"></div>\n\n"
             "%s"
             "<div class=\"wrap\"><h1>📋 任務看板 TASKS Board</h1>"
             "<div class=\"meta\">%s</div>"
@@ -452,7 +459,8 @@ def render_html(page, now_str):
             "<div class=\"board\">%s</div>"
             "<div class=\"foot\">auto-generated from TASKS.md · %s · %s</div>"
             "</div>"
-            "<script>%s</script></body></html>"
+            "<script>%s</script>"
+            "<script src=\"../sidebar.js\"></script>\n</body></html>"
             % (CSS, NAV_CSS, NAV_HTML_BOARD, " · ".join(meta_bits), kpi_html, cards, now_str, GEN, NAV_JS))
 
 
