@@ -54,10 +54,10 @@ WRAPPER="scripts/staticrypt/encrypt_pages_deterministic.mjs"
 
 PAGES=(
   "docs/admin/index.html"
-  "docs/admin/projection.html"
   "docs/index.html"
   "docs/signal_ranking.html"
 )
+# 2026-11-05 老闆首頁意見（W7b）：projection.html 唔需要入 admin 層——移 docs/projection.html root 公開明文，此行刪除。
 
 # 兩層制 owner 頁（老闆裁決 2026-10-28）：只有主人看，獨立密碼。
 OWNER_PAGES=(

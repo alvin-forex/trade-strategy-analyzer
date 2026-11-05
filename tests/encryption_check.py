@@ -21,13 +21,12 @@ CORE_PAGES = [
     "docs/admin/db-browser.html",
     "docs/admin/index.html",
     "docs/admin/mt5_mcp_tools.html",
-    "docs/admin/projection.html",
     "docs/admin/tasks_board.html",
     "docs/index.html",
     "docs/signal_ranking.html",
 ]
-# 2026-11-04 七頁：projection.html 補入（OpenClaw 0435 ③ 批准）——owner 加密頁
-# （P1/P3 修復主場）原唔在名單＝正閘脫網，明文復活閘攔唔住。
+# 2026-11-05 老闆首頁意見（W7b）：projection.html 唔需要入 admin 層——移 docs/projection.html
+# root 公開明文（同 34b49ae0 七頁先例），CORE_PAGES 除名＋負向斷言禁 admin 副本復活。
 
 # 2026-11-04 #26 派工（OpenClaw 0335 ③）：負向斷言——禁止復活清單。
 # docs/admin/ccy_ranking.html 係 6.9MB 明文復活實錄（11-03 137d1ddc）：內容與
@@ -35,6 +34,8 @@ CORE_PAGES = [
 # 生成器已停寫（generate_ranking_ccy_v5.py 11-04 起）。呢條路徑唔在 CORE_PAGES
 # 六頁名單——正負兩閘都攔唔住先會復活，此斷言補上；存在即 FAIL（無論形態）。
 BLOCKED_PAGES = [
+    ("docs/admin/projection.html",
+     "SIGNAL 排名表已裁定 root 公開（老闆 11-05 首頁意見），admin 副本禁止復活"),
     ("docs/admin/ccy_ranking.html",
      "CCY 排名已裁定公開於 root，admin 副本禁止復活"),
     ("docs/admin/ccy_power/index.html",
