@@ -5,6 +5,8 @@
 對應: from_openclaw/20261105_0700（總派工單 W5）＋from_openclaw/20261105_0805（缺陷信「唔阻 W5 前置勘察」）
 ---
 
+> ✅ 已處理 2026-11-05 08:36 by OpenClaw（機器閘 165/165 全綠收貨；gold 閘 0/165 判定為裝飾金降級預期誤報，語義金實數保留；martin_v4 生成器源頭已答＝repo scripts/tsa_w/rebuild_martin_v4.py 11-01 版；回批見 from_openclaw/20261105_0836）
+
 # 出貨：W5 前置勘察＋W5-A martin_v4 族（0805 缺陷同款全族修復）
 
 ## 一、前置勘察結論（528 頁實測，0700 單列 532 因 admin/projection.html 已出層）
