@@ -1,6 +1,10 @@
 # TradeDashboard 功能規格書（v1.44 統一版 · MT4 + MT5）
 > FF48 Alvin · 2026-10-17 · 白皮書 + 完整功能列表
 > **v1.44（2026-10-17）**：UI/參數整理版 — Label 參數移到最前、Title1 去除版本號、NewsGuard/DDGuard 預設關（有需要先開）、Telegram 參數獨立分組。功能對等，雙平台同一版本號。
+>
+> **v1.48（2026-10-29）**：①DDGuard tab 加 runtime 開關掣（Master／Acc／Sym 三粒，MT4 input 喺 runtime 唯讀，故用影子變數＋GlobalVariable 持久化；Master 關閉需 10 秒內再撳一次確認）②H/D 視圖零單時段改為顯示 0 單行（舊版整行跳過，令今日／本週無平倉時表幾乎全空白，睇落似壞機）。
+>
+> **v1.50（2026-11-05）**：切 TAB 重影修復 — DDG tab 嘅物件 family 有六個漏出兩個清理清單（DDP/DDM 行、TPC2-5 欄頭、DDGT_* 按鈕、DDRESET*、DDF 行），`DDC$` 亦被 exact-match 漏刪；`HideMainTable` 改用 10 條 prefix `ObjectsDeleteAll` 分族清理（動態行數免疫），`TD_ClearTabContent` 補齊 6 條 prefix sweep，另清 `HISTW` 殘留。POS→DDG→POS 鬼影根治，面板功能零改動。
 
 ## 一、產品定位
 MT4/MT5 圖表面板 EA：本地時序快照 + 四視圖統計 + 三層風控（NewsGuard / DDGuard / SymbolGuard），一個 panel 睇晒實倉狀態與歷史表現。
@@ -25,6 +29,8 @@ Day(時段) | Trades | B/S | WR% | Gain$ | Gain% | WPips | Lot | TotalLot | Bala
 > - CSV 輸出 header 順序：`MaxP → MaxDD$ → MaxDD% → PF → AvgP&L → Best → Worst`（v1.43 刪走重複欄位名）
 
 ### 2.3 四視圖分桶
+
+> **v1.48 零單時段顯示**：H/D/W/M 四個視圖，時段內無已平倉交易時**仍然出一行**（Trades=0、Gain=$0.00、Balance 顯示當時結餘），時間軸連續。舊版 v1.47 及之前會整行跳過，所以帳戶今日／本週未平過倉時，H/D 頁近乎全空白，容易被誤認為面板壞。
 H=逐小時、D=日曆日、W=ISO週、M=月份；ReportStart 起算日過濾；翻頁睇舊桶。
 
 **v1.43 分桶修復（cross-day merge guard）**：MT5 以 posId 合併 partial close 時，若同一 posId 相隔 > 48 小時，視為獨立交易（改用 deal ticket 做 key）— 根治「9月到10月全部交易堆埋最新一日」嘅歷史堆疊 bug。
@@ -44,6 +50,11 @@ H=逐小時、D=日曆日、W=ISO週、M=月份；ReportStart 起算日過濾；
 
 ### 2.5 DDGuard（回撤保護，v1.43 大改）
 > **v1.44：預設 OFF（DDG_Enable=false）**，有需要先開；開啟後參數如下。
+> **v1.48：面板可直接開關**——DDGuard tab 新增三粒 runtime 掣：`DDG: ON/OFF`（總開關）、`Acc: ON/OFF`（帳戶級）、`Sym: ON/OFF`（逐商品）。唔使再入 EA 屬性改 input。
+> - 持久化：寫入 GlobalVariable `TD_{Account}_DDG_ON / DDG_ACC / DDG_SYM`，重啟終端照記住；首次運行（無 GV）就用 input 預設值。
+> - 防誤觸：**關閉總開關要 10 秒內撳第二次**（第一下變橙色「DDG: ON -> OFF?」），開返只需一下；Acc/Sym 一撳即切。
+> - 總開關 OFF 時面板顯示紅色「! guards inactive (master OFF)」。
+> - 注意：**面板只改 runtime 狀態，唔會改 .set／EA input 檔**——重掛 EA 而 GV 被清（例如清 GlobalVariables）會回落到 input 值。
 - **帳戶級**：DD% = (Peak−Equity)/Peak，≥20%（`DDG_MaxDDPct`）全平 + 停 AutoTrading（`DDG_AccStopAT=true` 先停全局 AT）
 - **Symbol 級**：單一商品浮虧 ÷ 結餘 ≥12%（`DDG_SymMaxDDPct`）平該 symbol；`DDG_SymStopAT=false` 預設**唔鎖全局 AT**（只鎖該 symbol）
 - **T2 平倉重試歸零**：`DDG_CloseRetry=4` — 先刪 pending 再平倉，重試直至零殘留；殘留數 TG 緊急警告
@@ -154,3 +165,4 @@ MT4 ObjectsDeleteAll(0, prefix) 批次刪取代硬編碼清單 — tab 切換疊
 | TD5 v1.12 | 老闆設定 20%/12% |
 | TD5 v1.13 | TG 直推通知（MT5 版 wininet） |
 | **v1.43（MT5）** | **MT5 port of v1.43（8 tasks + 分桶修復 + POSITION 欄位修正，0 errors / 0 warnings）— 2026-10-17 起版本號同 MT4 統一為 1.43** |
+| **v1.50（MT4）** | **切 TAB 重影修復：HideMainTable DD 固定枚舉→10 條 prefix ObjectsDeleteAll＋ids[]+HISTW；TD_ClearTabContent 補 6 條 sweep（DDF/DDP/DDM/TPC/DDGT/DDRESET）— POS→DDG→POS 鬼影根治，DDG 按鈕零改動 — 2026-11-05，編譯 0 err** |

@@ -5,9 +5,9 @@
 //|                                    Broker summary-proof engine   |
 //+------------------------------------------------------------------+
 #property copyright "FF48 Alvin"
-#property version   "1.44"
+#property version   "1.50"
 #property strict
-#property description "TradeDashboard v1.44"
+#property description "TradeDashboard v1.50"
 
 #import "shell32.dll"
    int ShellExecuteW(int hWnd, string Operation, string File, string Parameters, string Directory, int ShowCmd);
@@ -22,13 +22,7 @@
    int GetMenuStringW(int hMenu, int uIDItem, ushort &lpString[], int nMaxCount, int uFlag);
    int PostMessageW(int hWnd, int Msg, int wParam, int lParam);
    int MessageBoxW(int hWnd, string text, string caption, int type);
-#import "wininet.dll"
-   int InternetOpenW(string agent, int access, string proxy, string bypass, int flags);
-   int InternetConnectW(int hInet, string server, int port, string user, string pass, int service, int flags, int ctx);
-   int HttpOpenRequestW(int hConn, string verb, string obj, string ver, string ref, string &accept[], int flags, int ctx);
-   int HttpSendRequestW(int hReq, string headers, int hlen, char &data[], int dlen);
-   int InternetCloseHandle(int h);
-   int InternetSetOptionW(int hInet, int option, int buf, int buflen);
+#import
 #import
 #import
 
@@ -88,7 +82,7 @@ input string BackupTime      = "05:30";  // Daily check time, server time HH:MM
 input string BackupFolder    = "";      // Custom backup root (empty=auto: UserProfile\Downloads\MT4\Profiles)
 
 input string ___NEWSGUARD___  = "=== NewsGuard ===";
-input int    NG_Mode          = 0;      // 0=OFF(default) 1=ALERT 2=GUARD(close) - enable when needed
+input int    NG_Mode          = 0;      // v1.47 Q8: 0=OFF(default) 1=ALERT 2=BLOCK(new only) 3=CLOSE(new+old)
 input int    NG_BeforeMin     = 30;
 input int    NG_AfterMin      = 15;
 input bool   NG_HighOnly      = true;
@@ -98,7 +92,8 @@ input int    NG_ServerOffsetHours = -5; // news CSV(HKT+8) -> broker server hour
 input string ___DDGUARD___    = "=== DD Guard ===";
 input bool   DDG_Enable       = false;  // default OFF - enable when needed
 input double DDG_MaxDDPct     = 20.0;   // account max drawdown % (peak-to-equity)
-input int    DDG_Scope        = 1;      // 0=per-symbol 1=whole account
+input bool   DDG_AccOn        = true;   // v1.46 Q5: account-level DD guard (independent switch)
+input bool   DDG_SymOn        = false;  // v1.46 Q5: per-symbol DD guard (independent switch)
 input string DDG_Symbols      = "";
 input double DDG_SymMaxDDPct  = 12.0;   // per-symbol max drawdown %
 input bool   DDG_CloseOnHit   = true;   // close positions on trigger
@@ -117,7 +112,7 @@ input int    TG_MinGapMin    = 10;      // min minutes between notifications per
 
 input string ___SYMGUARD___  = "=== Symbol Guard ===";
 input bool   SG_Enable       = true;     // Symbol Guard: monitor per-symbol trading
-input int    SG_DefaultMode  = 0;        // New symbol default: 0=ON 1=ALERT 2=CLOSE
+input int    SG_DefaultMode  = 0;        // v1.47 Q7: new symbol default 0=ON 1=ALERT 2=BLOCK 3=CLOSE
 
 
 //=== GLOBALS ===
@@ -131,9 +126,18 @@ string  g_ddgLastAlert = "";
 int     __ng_init_done = 0;
 datetime g_ddgLockUntil = 0;
 bool     g_tdStoppedAT = false;
-bool     g_ddgAccountArmed = false;   // v1.43: account-level lock engaged awaiting manual reset
-bool     g_ddgSymLocked[64];          // v1.43: per-symbol lockout flags (parallel to g_ddSym[])
+bool     g_ddgAccountArmed = false;   // v1.43: account-level lock engaged awaiting manual reset (persisted v1.47 Q9)
+// v1.49: runtime switches (boss 2026-10-29: "DDGUARD的開關可以在他的頁的介面做一粒開關制嗎?")
+// Inputs are read-only at runtime in MT4, so the panel toggles these shadows;
+// they are seeded from the input values in OnInit and persisted in GlobalVariables.
+bool     g_ddgeOn   = false;          // master enable (shadow of DDG_Enable)
+bool     g_ddgAccOn = true;           // account-level guard (shadow of DDG_AccOn)
+bool     g_ddgSymOn = false;          // per-symbol guard (shadow of DDG_SymOn)
+datetime g_ddgOffPendT = 0;           // v1.49: first press time when asking to disarm master
+bool     g_ddgSymLocked[64];          // v1.43: per-symbol lockout flags (mirror of account-scoped GV, v1.47 Q9)
 bool     g_sgForcedClose[64];         // v1.43: symbols force-locked CLOSE by SymbolGuard linkage
+string   g_sgPendSym[64];             // v1.47 Q7: symbols awaiting second-press CLOSE confirmation
+datetime g_sgPendT[64];               // v1.47 Q7: first press time (confirm window 20s)
 string   g_tgToken = "";
 datetime g_tgLast[8];
 string   g_tgKey[8];
@@ -520,10 +524,10 @@ bool DoProfileBackup()
    else
       Print("[Backup] WARN: flush failed, copying last-saved state only");
 
-   // v1.19: "Save As" -> 伺服器_帳號 snapshot profile, then keep Default in sync
+   // v1.19: "Save As" -> <server>_<account> snapshot profile, then keep Default in sync
    string activeProfile = ReadActiveProfile();
    string activeDir = profilesSrc + "\\" + activeProfile;
-   string snapName = serverName + "_" + acctNum;   // 伺服器_帳號
+   string snapName = serverName + "_" + acctNum;   // <server>_<account>
    string snapDir = profilesSrc + "\\" + snapName;
 
    if(activeProfile != snapName)
@@ -619,7 +623,7 @@ datetime g_discStart = 0;
 
 int OnInit()
 {
-   EventSetTimer(60);   // v1.20: monitor connection even without ticks
+   EventSetTimer(1);   // v1.46 Q4: 1s timer so risk guards run without ticks
    // Clean up objects from previous version
    for(int oi = ObjectsTotal() - 1; oi >= 0; oi--)
    {
@@ -693,7 +697,7 @@ int OnInit()
    // Save initial fingerprint on startup
    SaveFingerprint(CalcInputFingerprint());
    
-   Print("=== TradeDashboard v1.44 STARTED === Trades: ", t_tradeCount,
+   Print("=== TradeDashboard v1.50 STARTED === Trades: ", t_tradeCount,
          " | Records: ", r_count,
          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
@@ -726,7 +730,7 @@ int g_tab=0;   // v1.28: 0=Positions 1=Alerts(news+symbols) 2=DDGuard 3=Settings
 datetime g_tabCmdLast=0;
 void CheckTabCmd()
 {
-   if(TimeCurrent()-g_tabCmdLast < 2) return;
+   if(TimeLocal()-g_tabCmdLast < 2) return;   // v1.49: TimeLocal（周末不凍結）
    g_tabCmdLast=TimeCurrent();
    int h=FileOpen("TD_tabcmd.txt",FILE_READ|FILE_TXT|FILE_ANSI);
    if(h==INVALID_HANDLE) return;
@@ -750,15 +754,105 @@ void CheckTabCmd()
 }
 string  g_sgSym[64]; int g_sgSymN=0;
 datetime g_sgAlertT[64];   // v1.26: last alert flash time per symbol
+
+//--- v1.47 Q7: 4 states: 0=ON 1=ALERT 2=BLOCK(new only) 3=CLOSE(old+new)
+string SG_ModeName(int m)
+{
+   if(m == 0) return("ON");
+   if(m == 1) return("ALERT");
+   if(m == 2) return("BLOCK");
+   return("CLOSE");
+}
+//--- v1.47 Q8: temporary mode set by NewsGuard, auto-expires at window end.
+//---           The user's base mode is kept in SG_ModeKey and never overwritten.
+void SG_SetAuto(string sym,int m,datetime until)
+{
+   if(sym == "" || until <= TimeCurrent()) return;
+   GlobalVariableSet(SG_AutoKey(sym), (double)(long)until);
+   GlobalVariableSet(SG_AutoModeKey(sym), m);
+}
+void SG_ClearAuto(string sym)
+{
+   if(GlobalVariableCheck(SG_AutoKey(sym))) GlobalVariableDel(SG_AutoKey(sym));
+   if(GlobalVariableCheck(SG_AutoModeKey(sym))) GlobalVariableDel(SG_AutoModeKey(sym));
+}
+//--- v1.47 Q8: effective mode = base mode raised by an active news window.
+//---           Catches symbols opened AFTER the 30s NewsGuard scan.
+int SG_EffMode(string sym)
+{
+   int m = SG_Mode(sym);
+   if(NG_Mode >= 2 && NG_SymbolHot(sym))
+   {
+      int nm = (NG_Mode == 2) ? 2 : 3;
+      if(nm > m) m = nm;
+   }
+   return(m);
+}
 int SG_Mode(string sym)
 {
-   string gv="TD_SG_"+sym;
-   if(!GlobalVariableCheck(gv)) return SG_DefaultMode;
-   return (int)GlobalVariableGet(gv);
+   if(GlobalVariableCheck(SG_AutoKey(sym)))            // v1.47 Q8: auto-expiry
+   {
+      datetime until = (datetime)(long)GlobalVariableGet(SG_AutoKey(sym));
+      if(until > TimeCurrent()) return((int)GlobalVariableGet(SG_AutoModeKey(sym)));
+      SG_ClearAuto(sym);
+   }
+   if(!GlobalVariableCheck(SG_ModeKey(sym))) return SG_DefaultMode;
+   return((int)GlobalVariableGet(SG_ModeKey(sym)));
 }
 void SG_SetMode(string sym,int m)
 {
-   GlobalVariableSet("TD_SG_"+sym, m);
+   GlobalVariableSet(SG_ModeKey(sym), m);
+}
+//--- v1.47 Q7: CLOSE needs a second press within 20s before it is armed
+bool SG_Pending(string sym)
+{
+   for(int i = 0; i < 64; i++)
+   {
+      if(g_sgPendSym[i] != sym) continue;
+      if(TimeCurrent() - g_sgPendT[i] <= 20) return(true);
+      g_sgPendSym[i] = ""; g_sgPendT[i] = 0;
+      return(false);
+   }
+   return(false);
+}
+void SG_SetPending(string sym)
+{
+   int slot = -1;
+   for(int i = 0; i < 64; i++)
+   {
+      if(g_sgPendSym[i] == sym) { slot = i; break; }
+      if(g_sgPendSym[i] == "" && slot < 0) slot = i;
+   }
+   if(slot < 0) slot = 0;
+   g_sgPendSym[slot] = sym;
+   g_sgPendT[slot]  = TimeCurrent();
+}
+void SG_ClearPending(string sym)
+{
+   for(int i = 0; i < 64; i++)
+      if(g_sgPendSym[i] == sym) { g_sgPendSym[i] = ""; g_sgPendT[i] = 0; }
+}
+//--- v1.47 Q7: cycle ON->ALERT->BLOCK->CLOSE->ON with confirmation on CLOSE
+void SG_CycleMode(string sym)
+{
+   int m = (SG_Mode(sym) + 1) % 4;
+   if(m == 3 && !SG_Pending(sym))
+   {
+      SG_SetPending(sym);
+      Print("SG: ", sym, " CLOSE needs confirmation - press again within 20s");
+      SendNotification("SG[" + sym + "] CLOSE pending - press again within 20s");
+      return;
+   }
+   SG_ClearPending(sym);
+   SG_SetMode(sym, m);
+   Print("SG: ", sym, " -> ", SG_ModeName(m));
+   if(m == 3)
+   {
+      int residual = DDG_CloseSymbolWithRetry(sym);
+      TG_Notify("SG_CLOSE_"+sym, "🔒 SymbolGuard CLOSE — " + sym + "\n▪ Closed old + new positions" + (residual>0?"\n⚠ Residual "+IntegerToString(residual)+" still open!":" ✅") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES));
+   }
+   if(m == 2)
+      TG_Notify("SG_BLOCK_"+sym, "⛔ SymbolGuard BLOCK — " + sym + "\n▪ New positions closed on sight, old ones kept");
 }
 void SG_CollectSymbols()
 {
@@ -772,6 +866,18 @@ void SG_CollectSymbols()
       for(int j=0;j<g_sgSymN;j++) if(g_sgSym[j]==s){found=true;break;}
       if(!found){ g_sgSym[g_sgSymN]=s; g_sgSymN++; }
    }
+   // v1.47 Q9: keep explicit per-symbol modes visible after positions are gone
+   string pfx = TD_AcctPfx()+"SG_";
+   for(int v = GlobalVariablesTotal()-1; v >= 0 && g_sgSymN < 64; v--)
+   {
+      string n = GlobalVariableName(v);
+      if(StringFind(n, pfx) != 0) continue;
+      string s2 = StringSubstr(n, StringLen(pfx));
+      if(s2 == "" || StringFind(s2, "AUTO") == 0) continue;
+      bool have=false;
+      for(int j2=0;j2<g_sgSymN;j2++) if(g_sgSym[j2]==s2){have=true;break;}
+      if(!have){ g_sgSym[g_sgSymN]=s2; g_sgSymN++; }
+   }
 }
 void SymbolGuard()
 {
@@ -779,6 +885,25 @@ void SymbolGuard()
    static datetime lastScan=0;
    if(TimeCurrent()-lastScan < 3) return;
    lastScan=TimeCurrent();
+
+   //--- v1.47 Q7: CLOSE mode liquidates old positions of that symbol
+   for(int c = 0; c < g_sgSymN; c++)
+   {
+      string cs = g_sgSym[c];
+      if(SG_EffMode(cs) != 3) continue;
+      int open = 0;
+      for(int oc = OrdersTotal()-1; oc >= 0; oc--)
+      {
+         if(!OrderSelect(oc, SELECT_BY_POS, MODE_TRADES)) continue;
+         if(OrderSymbol() != cs || OrderType() > OP_SELL) continue;
+         open++;
+      }
+      if(open == 0) continue;
+      int resid = DDG_CloseSymbolWithRetry(cs);
+      Print("SG[", cs, "] CLOSE mode: closed old positions, residual=", resid);
+      TG_Notify("SG_CLOSE_LOOP_"+cs, "🔒 SymbolGuard CLOSE — " + cs + "\n▪ Re-closed " + IntegerToString(open) + " position(s) (old/new)" + (resid>0?"\n⚠ Residual "+IntegerToString(resid):" ✅"));
+   }
+
    static int knownTickets[4096]; static int knownN=0;
    for(int i=0;i<OrdersTotal();i++)
    {
@@ -790,7 +915,7 @@ void SymbolGuard()
       if(known) continue;
       if(knownN<4096){knownTickets[knownN]=tk;knownN++;}
       if(TimeCurrent()-OrderOpenTime()>120) continue;
-      int mode=SG_Mode(OrderSymbol());
+      int mode=SG_EffMode(OrderSymbol());
       if(mode==0) continue;
       string msg;
       if(mode==1)
@@ -798,8 +923,8 @@ void SymbolGuard()
                 OrderSymbol(), (OrderType()==OP_BUY?"BUY":"SELL"), tk, OrderLots());
       else
       {
-         msg=StringFormat("SG[%s] CLOSE: %s #%d %.2f lots closed by guard",
-                OrderSymbol(), (OrderType()==OP_BUY?"BUY":"SELL"), tk, OrderLots());
+         msg=StringFormat("SG[%s] %s: %s #%d %.2f lots closed by guard",
+                OrderSymbol(), (mode==2?"BLOCK":"CLOSE"), (OrderType()==OP_BUY?"BUY":"SELL"), tk, OrderLots());
          double px=(OrderType()==OP_BUY)?MarketInfo(OrderSymbol(),MODE_BID):MarketInfo(OrderSymbol(),MODE_ASK);
          if(!OrderClose(tk,OrderLots(),px,30,clrRed))
             msg=msg+" [close FAILED err "+IntegerToString(GetLastError())+"]";
@@ -807,7 +932,7 @@ void SymbolGuard()
       Print(msg);
       SendNotification(msg);
       for(int fi=0; fi<g_sgSymN; fi++) if(g_sgSym[fi]==OrderSymbol()) { g_sgAlertT[fi]=TimeCurrent(); break; }
-      if(mode==2){ for(int k2=0;k2<knownN;k2++) if(knownTickets[k2]==tk){knownTickets[k2]=knownTickets[knownN-1];knownN--;break;} }
+      if(mode>=2){ for(int k2=0;k2<knownN;k2++) if(knownTickets[k2]==tk){knownTickets[k2]=knownTickets[knownN-1];knownN--;break;} }
    }
 }
 void SG_Render(int x,int y,int scale)
@@ -817,9 +942,9 @@ void SG_Render(int x,int y,int scale)
    for(int i=0;i<g_sgSymN && i<10;i++)
    {
       string s=g_sgSym[i];
-      int m=SG_Mode(s);
-      string lbl=(m==0)?s+" [ON]":(m==1)?s+" [AL]":s+" [CL]";
-      color  bg =(m==0)?C'20,90,40':(m==1)?C'160,110,20':C'150,30,30';
+      int m=SG_EffMode(s);   // v1.47 Q8: reflects news-window override too
+      string lbl=(m==0)?s+" [ON]":(m==1)?s+" [AL]":(m==2)?s+" [BL]":s+" [CL]";
+      color  bg =(m==0)?C'20,90,40':(m==1)?C'160,110,20':(m==2)?C'110,60,150':C'150,30,30';
       color  fg =(m==0)?clrLime:(m==1)?clrYellow:clrWhite;
       // v1.28: red blink also while symbol is inside a news warning window
       if(!(i<64 && g_sgAlertT[i]>0 && TimeCurrent()-g_sgAlertT[i] < 60) && NG_SymbolHot(s))
@@ -851,7 +976,7 @@ void SG_Render(int x,int y,int scale)
 void HideMainTable()
 {
    string ids[] = {"TTL","SUB","AC1","AC2","S_P","S_R","FLBL","FS_EDIT","CLBL2","FC_EDIT","SAVELBL",
-                   "CLBL","CZERO","SGT","SGN","FT","TABCZ"};
+                   "CLBL","CZERO","SGT","SGN","FT","TABCZ","HISTW"};   // v1.50 FIX-TD: +HISTW
    for(int i2=0;i2<ArraySize(ids);i2++) ObjectDelete(0,PFX+ids[i2]);
    for(int c2=0;c2<NC;c2++) { ObjectDelete(0,PFX+"H"+IntegerToString(c2)); ObjectDelete(0,PFX+"V_"+(c2==0?"H":c2==1?"D":c2==2?"W":"M")); }
    for(int r2=0;r2<10;r2++)
@@ -863,8 +988,15 @@ void HideMainTable()
    for(int g2=0;g2<10;g2++) ObjectDelete(0,PFX+"SG_"+IntegerToString(g2));
    for(int g3=0;g3<8;g3++) { ObjectDelete(0,PFX+"TSG_"+IntegerToString(g3)); ObjectDelete(0,PFX+"TSY"+IntegerToString(g3)); }
    for(int g4=0;g4<14;g4++) ObjectDelete(0,PFX+"TN"+IntegerToString(g4));
-   for(int g6=0;g6<14;g6++){ ObjectDelete(0,PFX+"DDC"+IntegerToString(g6)); ObjectDelete(0,PFX+"DDN"+IntegerToString(g6)); ObjectDelete(0,PFX+"DDB"+IntegerToString(g6)); ObjectDelete(0,PFX+"DDF"+IntegerToString(g6)); }
-   ObjectDelete(0,PFX+"TPH");
+   // v1.50 FIX-TD (ghost fix, boss 2026-11-05): prefix sweeps instead of fixed
+   // enums - dynamic row counts and $-suffixed names (DDC$k) leaked; adds the
+   // DDG families never listed before: DDP/DDM rows, TPC2-5 headers, DDGT_*,
+   // DDRESET(+LBL). Prefix match is ObjectsDeleteAll, not exact ObjectDelete.
+   ObjectsDeleteAll(0, PFX+"DDC"); ObjectsDeleteAll(0, PFX+"DDN");
+   ObjectsDeleteAll(0, PFX+"DDB"); ObjectsDeleteAll(0, PFX+"DDF");
+   ObjectsDeleteAll(0, PFX+"DDP"); ObjectsDeleteAll(0, PFX+"DDM");
+   ObjectsDeleteAll(0, PFX+"TPH"); ObjectsDeleteAll(0, PFX+"TPC");
+   ObjectsDeleteAll(0, PFX+"DDGT"); ObjectsDeleteAll(0, PFX+"DDRESET");
    string tids[]={"TNX","TA0","TAX","TAM","TD0","TD1","TD2","TD3","TD4","TDB","TDF","TS0","TS1","TS2","TS3","TS4"};
    for(int g5=0;g5<ArraySize(tids);g5++) ObjectDelete(0,PFX+tids[g5]);
 }
@@ -892,16 +1024,16 @@ void TabRender_Alerts(int x,int y,int scale,int w)
    }
    if(ln==1) UpdTxt("TNX","(no upcoming events loaded)",x,y+12*scale,clrKhaki,9*scale);
    int sy=y+ln*14*scale+6;
-   UpdTxtBold("TA0","SYMBOL STATUS  (red = news window | click = ON/ALERT/CLOSE)",x,sy,clrDeepSkyBlue,10*scale);
+   UpdTxtBold("TA0","SYMBOL STATUS  (red = news window | click = ON/ALERT/BLOCK/CLOSE)",x,sy,clrDeepSkyBlue,10*scale);
    for(int k=0;k<g_sgSymN && k<8;k++)
    {
       string s2=g_sgSym[k];
       bool hot2=NG_SymbolHot(s2);
-      int m2=SG_Mode(s2);
+      int m2=SG_EffMode(s2);
       color stc=hot2?clrRed:clrLime;
       UpdTxt("TSY"+IntegerToString(k), StringFormat("%s  %s",s2,(hot2?"NEWS RISK":"clear")), x, sy+14*scale+k*16*scale, stc, 9*scale);
-      string lbl=(m2==0)?"[ON]":(m2==1)?"[ALERT]":"[CLOSE]";
-      color  bg=(m2==0)?C'20,90,40':(m2==1)?C'160,110,20':C'150,30,30';
+      string lbl=(m2==0)?"[ON]":(m2==1)?"[ALERT]":(m2==2)?"[BLOCK]":"[CLOSE]";
+      color  bg=(m2==0)?C'20,90,40':(m2==1)?C'160,110,20':(m2==2)?C'110,60,150':C'150,30,30';
       color  fg=(m2==0)?clrLime:(m2==1)?clrYellow:clrWhite;
       int bw=40*MathMax(1,scale/2)+52;
       UpdBtn("TSG_"+IntegerToString(k), lbl, x+w-bw-10, sy+12*scale+k*16*scale, bw, 13*scale, false);
@@ -909,7 +1041,7 @@ void TabRender_Alerts(int x,int y,int scale,int w)
       ObjectSetInteger(0,PFX+"TSG_"+IntegerToString(k),OBJPROP_COLOR,fg);
    }
    if(g_sgSymN==0) UpdTxt("TAX","(no open symbols)",x,sy+14*scale,clrKhaki,9*scale);
-   UpdTxt("TAM",StringFormat("NG mode=%s | window %dm/%dm | push on entry",(NG_Mode==0?"OFF":NG_Mode==1?"ALERT":"GUARD"),NG_BeforeMin,NG_AfterMin), x, sy+15*scale+MathMax(MathMin(g_sgSymN,8),1)*15*scale, clrWhite, 9*scale);
+   UpdTxt("TAM",StringFormat("NG mode=%s | window %dm/%dm | push on entry",(NG_Mode==0?"OFF":NG_Mode==1?"ALERT":NG_Mode==2?"BLOCK":"CLOSE"),NG_BeforeMin,NG_AfterMin), x, sy+15*scale+MathMax(MathMin(g_sgSymN,8),1)*15*scale, clrWhite, 9*scale);
 }// v1.29: per-symbol DD from closed-trade history (t_ arrays)
 string g_ddSyms[32]; bool g_ddSel[32]; int g_ddSymN=0;
 double g_ddSymDD[32];      // max DD in $
@@ -974,20 +1106,36 @@ void TD_MarkConsumed(string sym,int i,int j){ g_ddUsed[i]=true; }
 void TabRender_DDG(int x,int y,int scale,int w)
 {
    double eq=AccountEquity();
-   double dd=(g_ddgPeakEquity>0)?(g_ddgPeakEquity-eq)/g_ddgPeakEquity*100:0;
+   double base=DDG_Base();     // v1.47 Q6: same Balance denominator as the guards
+   double dd=(g_ddgPeakEquity>0)?(g_ddgPeakEquity-eq)/base*100:0;
    color dc=(dd>=DDG_MaxDDPct)?clrRed:(dd>=DDG_MaxDDPct*0.7?clrYellow:clrLime);
    UpdTxtBold("TD0","DDGuard - Account Drawdown",x,y,clrDeepSkyBlue,10*scale);
-   UpdTxt("TD1",StringFormat("Peak $%.2f | Now $%.2f | DD %.2f%% (limit %.1f%%)",g_ddgPeakEquity,eq,dd,DDG_MaxDDPct),x,y+16*scale,clrWhite,9*scale);
-   UpdTxt("TD4",StringFormat("Scope: %s | SymMaxDD: %.1f%% | Lock: %dmin",(DDG_Scope==0?"per-symbol":"account"),DDG_SymMaxDDPct,DDG_LockMinutes),x,y+31*scale,clrKhaki,9*scale);
+   UpdTxt("TD1",StringFormat("Peak $%.2f | Eq $%.2f | DD %.2f%% of bal $%.2f (limit %.1f%%)",g_ddgPeakEquity,eq,dd,base,DDG_MaxDDPct),x,y+16*scale,clrWhite,9*scale);
+   UpdTxt("TD4",StringFormat("SymMaxDD: %.1f%% | Lock: %dmin | base = balance",DDG_SymMaxDDPct,DDG_LockMinutes),x,y+31*scale,clrKhaki,9*scale);
+
+   //--- v1.48: runtime switches (boss 2026-10-29). MT4 inputs are read-only at
+   //--- runtime, so the panel toggles the g_ddg* shadows, persisted via
+   //--- GlobalVariables in DDG_SaveState(). Disarming the master needs a second
+   //--- press within 10s so a mis-click cannot silently disable the risk guard.
+   int swY = y + 46*scale;
+   bool offPend = (g_ddgOffPendT > 0 && TimeCurrent() - g_ddgOffPendT <= 10);
+   string mastTxt = g_ddgeOn ? "DDG: ON" : (offPend ? "DDG: ON -> OFF?" : "DDG: OFF");
+   UpdBtn("DDGT_ON", mastTxt, x, swY, 92*scale, 16*scale, g_ddgeOn);
+   if(!g_ddgeOn) ObjectSetInteger(0,PFX+"DDGT_ON",OBJPROP_BGCOLOR, offPend?clrOrangeRed:C'90,40,40');
+   UpdBtn("DDGT_ACC", g_ddgAccOn ? "Acc: ON" : "Acc: OFF", x+96*scale, swY, 62*scale, 16*scale, (g_ddgeOn && g_ddgAccOn));
+   UpdBtn("DDGT_SYM", g_ddgSymOn ? "Sym: ON" : "Sym: OFF", x+162*scale, swY, 62*scale, 16*scale, (g_ddgeOn && g_ddgSymOn));
+   if(!g_ddgeOn) UpdTxt("TAM6","! guards inactive (master OFF)",x+228*scale,swY+4*scale,clrOrangeRed,9*scale);
+   else HideObj("TAM6");
+
    int bw=w-20;
-   UpdRect("TDB", x, y+44*scale, bw, 10*scale, C'40,50,80', C'40,50,80');
+   UpdRect("TDB", x, y+66*scale, bw, 10*scale, C'40,50,80', C'40,50,80');
    double pct=MathMin(1.0, dd/DDG_MaxDDPct);
    color bc=(pct>=1.0)?clrRed:(pct>=0.7?clrYellow:clrLime);
-   UpdRect("TDF", x, y+44*scale, (int)(bw*pct), 10*scale, bc, bc);
+   UpdRect("TDF", x, y+66*scale, (int)(bw*pct), 10*scale, bc, bc);
 
    //--- v1.37: aligned column table, one row per traded symbol ---
-   int ty = y + 64*scale;
-   double bal = AccountBalance(); if(bal <= 0) bal = 1;
+   int ty = y + 86*scale;
+   double bal = DDG_Base();   // v1.47 Q6: explicit balance base
    int c1 = x + 8*scale;          // symbol
    int c2 = x + 100*scale;        // Float $
    int c3 = x + 175*scale;        // DD now %
@@ -1021,14 +1169,14 @@ void TabRender_DDG(int x,int y,int scale,int w)
       UpdTxt("DDC$"+IntegerToString(k), StringFormat("%.2f", g_ddSymDD[k]), c5, ry2, cMx, 9*scale);
    }
    if(g_ddSymN==0) UpdTxt("TAX2","(no traded symbols yet)",x+8*scale,ty+16*scale,clrKhaki,9*scale);
-   UpdTxt("TAM2","DD now = live floating loss / balance | MaxDD = historical peak decline", x, ty+18*scale+MathMin(g_ddSymN,12)*15*scale, clrKhaki, 8*scale);
+   UpdTxt("TAM2","DD now = live floating loss / balance | MaxDD = historical peak decline | base = balance", x, ty+18*scale+MathMin(g_ddSymN,12)*15*scale, clrKhaki, 8*scale);
    // v1.43 T3: manual confirm / reset-peak button (shows when lock engaged or AT stopped)
    int by = y + MathMax(ty+18*scale+MathMin(g_ddSymN,12)*15*scale, y+64*scale+220*scale);
    bool needConfirm = (g_ddgAccountArmed || g_tdStoppedAT || TimeCurrent() < g_ddgLockUntil);
    if(needConfirm)
    {
-      UpdTxtBold("DDRESETLBL","⚠️ 風控鎖定中 — 人手檢查後按 [確認恢復/重置 Peak] 解除",x,by,clrOrangeRed,9*scale);
-      UpdBtn("DDRESET","[ 確認恢復 / Reset Peak ]",x+w-230*scale,by+16*scale,220*scale,16*scale,true);
+      UpdTxtBold("DDRESETLBL","⚠️ RISK LOCKED — verify manually, then press [Confirm / Reset Peak]",x,by,clrOrangeRed,9*scale);
+      UpdBtn("DDRESET","[ Confirm / Reset Peak ]",x+w-230*scale,by+16*scale,220*scale,16*scale,true);
    }
    else UpdBtn("DDRESET","[ Reset Peak ]",x+w-230*scale,by+16*scale,220*scale,16*scale,false);
    // v1.37: tickbox/bar chart removed (was confusing, no info value)
@@ -1037,9 +1185,9 @@ void TabRender_Set(int x,int y,int scale,int w)
 {
    UpdTxtBold("TS0","Settings Quick View (change via EA inputs)",x,y,clrDeepSkyBlue,10*scale);
    UpdTxt("TS1",StringFormat("Refresh: %ds   Record: %ds   Scale: %d   Chart: %s",RefreshSec,RecordSec,Scale,(ChartEnable?"ON":"OFF")),x,y+16*scale,clrWhite,9*scale);
-   UpdTxt("TS2",StringFormat("SymbolGuard: %s   DefaultMode: %d",(SG_Enable?"ON":"OFF"),SG_DefaultMode),x,y+30*scale,clrWhite,9*scale);
+   UpdTxt("TS2",StringFormat("SymbolGuard: %s   DefaultMode: %s",(SG_Enable?"ON":"OFF"),SG_ModeName(SG_DefaultMode)),x,y+30*scale,clrWhite,9*scale);
    UpdTxt("TS3",StringFormat("Snapshot: %s   AutoBackup: %s @ %s",(SnapEnable?"ON":"OFF"),(AutoBackup?"ON":"OFF"),BackupTime),x,y+44*scale,clrWhite,9*scale);
-   UpdTxt("TS4","Tip: click tabs to switch. Guard tab = per-symbol ON/ALERT/CLOSE.",x,y+59*scale,clrWhite,9*scale);
+   UpdTxt("TS4","Tip: click tabs to switch. Guard tab = per-symbol ON/ALERT/BLOCK/CLOSE (CLOSE needs 2nd press).",x,y+59*scale,clrWhite,9*scale);
 }
 
 void OnTick()
@@ -1129,6 +1277,19 @@ void TriggerTerminalRestart()
 void OnTimer()
 {
    CheckTabCmd();   // v1.35: agent self-test hook (also when no ticks)
+
+   //--- v1.46 Q4: risk guards every 1s, independent of market ticks
+   NGDDG_Init();
+   NG_Guard();
+   DDG_Guard();
+   DDG_ATStatusCheck();
+   SymbolGuard();
+   NG_WindowPush();
+   GlobalVariableSet(DDG_PeakKey(), g_ddgPeakEquity);
+   RecordSnapshot();
+   SG_CollectSymbols();
+   CheckAndBackupProfile();
+
    if(!AutoReconnect) return;
 
    if(IsConnected())
@@ -1195,13 +1356,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       {
          int ai = (int)StringToInteger(StringSubstr(s, StringLen(PFX)+4));
          if(ai >= 0 && ai < g_sgSymN && ai < 8)
-         {
-            string asym = g_sgSym[ai];
-            int am = SG_Mode(asym);
-            am = (am + 1) % 3;
-            SG_SetMode(asym, am);
-            Print("SG: ", asym, " -> ", (am==0?"ON":am==1?"ALERT":"CLOSE"));
-         }
+            SG_CycleMode(g_sgSym[ai]);   // v1.47 Q7: 4 states + CLOSE confirm
          changed = true;
       }
       else if(StringFind(s, PFX+"TAB") == 0)
@@ -1217,6 +1372,36 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(s == PFX+"NAV_L"){ g_offset--; changed=true; }
       else if(s == PFX+"NAV_R"){ if(g_offset<0) g_offset++; changed=true; }
       else if(s == PFX+"DDRESET") { DDG_ResetPeakConfirm(); changed=true; }
+      //--- v1.48: DDGuard runtime switches (panel toggles, persisted via GV) ---
+      else if(s == PFX+"DDGT_ON")
+      {
+         if(g_ddgeOn)
+         {
+            // arming is safe, disarming is not -> require a second press in 10s
+            if(g_ddgOffPendT > 0 && TimeCurrent() - g_ddgOffPendT <= 10)
+            {
+               g_ddgeOn = false; g_ddgOffPendT = 0;
+               Print("DDGuard v1.48: MASTER OFF (panel)");
+            }
+            else g_ddgOffPendT = TimeCurrent();
+         }
+         else { g_ddgeOn = true; g_ddgOffPendT = 0; Print("DDGuard v1.48: MASTER ON (panel)"); }
+         DDG_SaveState(); changed = true;
+      }
+      else if(s == PFX+"DDGT_ACC")
+      {
+         g_ddgAccOn = !g_ddgAccOn;
+         if(!g_ddgeOn && g_ddgAccOn) g_ddgeOn = true;
+         Print("DDGuard v1.48: account guard ", (g_ddgAccOn?"ON":"OFF"), " (panel)");
+         DDG_SaveState(); changed = true;
+      }
+      else if(s == PFX+"DDGT_SYM")
+      {
+         g_ddgSymOn = !g_ddgSymOn;
+         if(!g_ddgeOn && g_ddgSymOn) g_ddgeOn = true;
+         Print("DDGuard v1.48: symbol guard ", (g_ddgSymOn?"ON":"OFF"), " (panel)");
+         DDG_SaveState(); changed = true;
+      }
       else if(s == PFX+"SAVE") { ManualBackupNow(); changed=false; }
       else if(StringFind(s, PFX+"SG_") == 0)
       {
@@ -1224,11 +1409,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          if(gi >= 0 && gi < g_sgSymN && gi < 10)
          {
             string sym2 = g_sgSym[gi];
-            int m2 = SG_Mode(sym2);
-            m2 = (m2 + 1) % 3;
-            SG_SetMode(sym2, m2);
+            SG_CycleMode(sym2);   // v1.47 Q7: 4 states + CLOSE confirm
             if(gi<64) g_sgAlertT[gi]=0;   // pressing acknowledges alert
-            Print("SG: ", sym2, " -> ", (m2==0?"ON":m2==1?"ALERT":"CLOSE"));
          }
          changed = true;
       }
@@ -2146,7 +2328,11 @@ void CollectData()
          bpips += pips;
       }
 
-      if(bn > 0 || (g_offset==0 && b==nB-1))
+      // v1.48: always materialise the bucket. Previously a zero-trade hour/day
+      // was skipped entirely, so the H/D tabs showed an almost empty table and
+      // looked broken (boss 2026-10-29). A zero row is information: "no closed
+      // trades in this window", and it keeps the time axis continuous.
+      if(true)
       {
          g_cDt[g_cNumB]    = bS;
          g_cN[g_cNumB]     = bn;
@@ -2321,7 +2507,7 @@ void RenderOnly()
    {
       tabNeedH = (14 + 17) + 8;                 // header block above content
       if(g_tab == 2)      // DDGuard: 64*scale block + col header 16 + rows 15 each + footer 26
-         tabNeedH = tabNeedH + 64*scale + 16*scale + MathMin(g_ddSymN,12)*15*scale + 30*scale + 12;
+         tabNeedH = tabNeedH + 86*scale + 16*scale + MathMin(g_ddSymN,12)*15*scale + 30*scale + 12;
       else if(g_tab == 1) // Alerts: news up to 8 lines *14 + symbol block 8 rows *16 + footer
          tabNeedH = tabNeedH + 8*14*scale + 8*16*scale + 40*scale + 12;
       else                // Set: 4 lines
@@ -2657,6 +2843,12 @@ void NGDDG_Init()
    // restore DDG peak equity
    if(GlobalVariableCheck(DDG_PeakKey()))
       g_ddgPeakEquity = GlobalVariableGet(DDG_PeakKey());
+   DDG_LoadState();   // v1.47 Q9: restore armed / lock-until / AT-stopped
+   // v1.48: seed the runtime switches from the chart inputs; LoadState above
+   // already overrode them when a saved GV exists (panel toggle survives restart).
+   if(!GlobalVariableCheck(DDG_OnKey()))    g_ddgeOn   = DDG_Enable;    // default OFF
+   if(!GlobalVariableCheck(DDG_AccKey()))   g_ddgAccOn = DDG_AccOn;
+   if(!GlobalVariableCheck(DDG_SymOnKey())) g_ddgSymOn = DDG_SymOn;
 }
 
 
@@ -2727,18 +2919,70 @@ void NGDDG_Init()
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-//=== v1.15 新增 GLOBALS ===
+//=== v1.15 GLOBALS ===
 
 //+------------------------------------------------------------------+
-//| NewsGuard: 讀新聞檔                                               |
-//| 格式：YYYY.MM.DD HH:MM,CCY,NAME,IMPACT(HIGH/MED/LOW)             |
-//| v1.43 T7: CSV 時間係 HKT(+8)，熱窗判斷一律用 TimeGMT()+8h       |
-//| 對比，唔再依賴 broker server offset，根治 DST 偏移。             |
+//| NewsGuard: news CSV loader                                      |
+//| Format: YYYY.MM.DD HH:MM,CCY,NAME,IMPACT(HIGH/MED/LOW)           |
+//| v1.43 T7: CSV time is HKT(+8); hot-window tests always use       |
+//| TimeGMT()+8h and never the broker server offset (DST-safe).       |
 //+------------------------------------------------------------------+
-datetime NG_EvTime(string t){ return(StringToTime(t) + NG_ServerOffsetHours*3600); }   // 僅作顯示/fallback
-datetime NG_EvTimeHKT(string t){ return(StringToTime(t)); }                             // CSV 原時間即 HKT
-datetime NG_NowHKT(){ return(TimeGMT() + 8*3600); }                                     // 現在時間轉 HKT
-string   DDG_PeakKey(){ return("TD_"+IntegerToString(AccountNumber())+"_DDG_PEAK"); }
+datetime NG_EvTime(string t){ return(StringToTime(t) + NG_ServerOffsetHours*3600); }   // display/fallback only
+datetime NG_EvTimeHKT(string t){ return(StringToTime(t)); }                             // CSV raw time is HKT
+datetime NG_NowHKT(){ return(TimeGMT() + 8*3600); }                                     // now in HKT
+//--- v1.47 Q9: every persistent key is account-scoped so two accounts sharing
+//---           one terminal never inherit each other's risk locks or SG modes.
+string   TD_AcctPfx(){ return("TD_"+IntegerToString(AccountNumber())+"_"); }
+string   DDG_PeakKey(){ return(TD_AcctPfx()+"DDG_PEAK"); }
+string   DDG_OnKey(){ return(TD_AcctPfx()+"DDG_ON"); }
+string   DDG_AccKey(){ return(TD_AcctPfx()+"DDG_ACC"); }
+string   DDG_SymOnKey(){ return(TD_AcctPfx()+"DDG_SYM"); }
+string   DDG_ArmedKey(){ return(TD_AcctPfx()+"DDG_ARMED"); }
+string   DDG_LockKey(){ return(TD_AcctPfx()+"DDG_LOCKUNTIL"); }
+string   DDG_ATKey(){ return(TD_AcctPfx()+"DDG_ATSTOP"); }
+string   DDG_SymLockKey(string s){ return(TD_AcctPfx()+"DDG_SYMLOCK_"+s); }
+string   SG_ModeKey(string s){ return(TD_AcctPfx()+"SG_"+s); }
+string   SG_AutoKey(string s){ return(TD_AcctPfx()+"SG_AUTO_"+s); }
+string   SG_AutoModeKey(string s){ return(TD_AcctPfx()+"SG_AUTOMODE_"+s); }
+
+//--- v1.47 Q6: single DD denominator. Balance is used by the account guard,
+//--- the per-symbol guard and the DDGuard tab so all three agree. Balance is
+//--- not inflated by floating profit (an equity base would widen the limit).
+double   DDG_Base(){ double b = AccountBalance(); if(b <= 0) b = AccountEquity(); if(b <= 0) b = 1.0; return(b); }
+
+//--- v1.47 Q9: risk-lock state survives a terminal restart (GlobalVariables)
+void     DDG_SaveState()
+{
+   GlobalVariableSet(DDG_ArmedKey(), g_ddgAccountArmed ? 1 : 0);
+   GlobalVariableSet(DDG_LockKey(), (double)(long)g_ddgLockUntil);
+   GlobalVariableSet(DDG_ATKey(), g_tdStoppedAT ? 1 : 0);
+   GlobalVariableSet(DDG_OnKey(), g_ddgeOn ? 1 : 0);        // v1.48
+   GlobalVariableSet(DDG_AccKey(), g_ddgAccOn ? 1 : 0);     // v1.48
+   GlobalVariableSet(DDG_SymOnKey(), g_ddgSymOn ? 1 : 0);   // v1.48
+}
+void     DDG_LoadState()
+{
+   if(GlobalVariableCheck(DDG_ArmedKey())) g_ddgAccountArmed = (GlobalVariableGet(DDG_ArmedKey()) > 0.5);
+   if(GlobalVariableCheck(DDG_LockKey()))  g_ddgLockUntil   = (datetime)(long)GlobalVariableGet(DDG_LockKey());
+   if(GlobalVariableCheck(DDG_ATKey()))    g_tdStoppedAT    = (GlobalVariableGet(DDG_ATKey()) > 0.5);
+   // v1.48: restored switches win over the input defaults, so a panel toggle
+   // survives a terminal restart. No GV yet = first run, keep the input values.
+   if(GlobalVariableCheck(DDG_OnKey()))    g_ddgeOn   = (GlobalVariableGet(DDG_OnKey()) > 0.5);
+   if(GlobalVariableCheck(DDG_AccKey()))   g_ddgAccOn = (GlobalVariableGet(DDG_AccKey()) > 0.5);
+   if(GlobalVariableCheck(DDG_SymOnKey())) g_ddgSymOn = (GlobalVariableGet(DDG_SymOnKey()) > 0.5);
+   if(g_ddgLockUntil > 0 && TimeCurrent() > g_ddgLockUntil) g_ddgLockUntil = 0;
+}
+bool     DDG_SymLocked(string s)
+{
+   if(s == "") return(false);
+   if(!GlobalVariableCheck(DDG_SymLockKey(s))) return(false);
+   return(GlobalVariableGet(DDG_SymLockKey(s)) > 0.5);
+}
+void     DDG_SetSymLock(string s, bool on)
+{
+   if(s == "") return;
+   GlobalVariableSet(DDG_SymLockKey(s), on ? 1 : 0);
+}
 void     TD_CheckHistoryDepth()
 {
    g_histTruncated = false;
@@ -2769,6 +3013,13 @@ void     TD_ClearTabContent()
    ObjectsDeleteAll(0, PFX+"TDB"); ObjectsDeleteAll(0, PFX+"TDF");
    ObjectsDeleteAll(0, PFX+"TPH"); ObjectsDeleteAll(0, PFX+"DDC");
    ObjectsDeleteAll(0, PFX+"DDN"); ObjectsDeleteAll(0, PFX+"DDB");
+   // v1.50 FIX-TD (ghost fix, boss 2026-11-05): complete the families - DDG row
+   // columns DDF/DDP/DDM, column headers TPC2-5, buttons DDGT_*, reset DDRESET*.
+   // Without these, redrawing Positions after visiting DDGuard stacks old DD
+   // text over the position table (exact boss repro: POS -> DDG -> POS).
+   ObjectsDeleteAll(0, PFX+"DDF"); ObjectsDeleteAll(0, PFX+"DDP");
+   ObjectsDeleteAll(0, PFX+"DDM"); ObjectsDeleteAll(0, PFX+"TPC");
+   ObjectsDeleteAll(0, PFX+"DDGT"); ObjectsDeleteAll(0, PFX+"DDRESET");
 }
 
 void NG_LoadNews()
@@ -2824,7 +3075,7 @@ void NG_WindowPush()
          string syms="";
          for(int j=0;j<g_sgSymN;j++)
             if(NG_SymbolAffected(g_sgSym[j], g_ngEvents[i][1]))
-               syms=syms+g_sgSym[j]+(SG_Mode(g_sgSym[j])==2?"[CL]":SG_Mode(g_sgSym[j])==1?"[AL]":"[ON]")+" ";
+               syms=syms+g_sgSym[j]+(SG_Mode(g_sgSym[j])==3?"[CL]":SG_Mode(g_sgSym[j])==2?"[BL]":SG_Mode(g_sgSym[j])==1?"[AL]":"[ON]")+" ";
          string msg=StringFormat("ALERT: %s %s in %d min | affected: %s",
             g_ngEvents[i][1], g_ngEvents[i][2], (int)((ev-now)/60), (syms==""?"(no open symbols)":syms));
          Print(msg); SendNotification(msg);
@@ -2836,11 +3087,11 @@ bool NG_SymbolAffected(string sym, string ccy)
 {
    string s = sym;
    StringToUpper(s);
-   return (StringFind(s, ccy) >= 0);   // 6字母對直接 substring 命中
+   return (StringFind(s, ccy) >= 0);   // direct substring match on the 6-letter pair
 }
 
 //+------------------------------------------------------------------+
-//| NewsGuard 主迴圈（由 OnTick 呼叫，每 30 秒掃一次）                |
+//| NewsGuard main loop (called from OnTick/OnTimer, 30s scan)        |
 //+------------------------------------------------------------------+
 void NG_Guard()
 {
@@ -2854,11 +3105,12 @@ void NG_Guard()
       datetime evT = NG_EvTimeHKT(g_ngEvents[i][0]);
       string   ccy = g_ngEvents[i][1];
       datetime now = NG_NowHKT();
-      if(now <  evT - NG_BeforeMin*60) continue;   // 未到窗口
-      if(now >  evT + NG_AfterMin*60)  continue;   // 過咗窗口
+      if(now <  evT - NG_BeforeMin*60) continue;   // before the window
+      if(now >  evT + NG_AfterMin*60)  continue;   // after the window
 
-      string msg = StringFormat("🛡 NewsGuard: %s %s @ %s (前%d分/後%d分)",
-                   ccy, g_ngEvents[i][2], TimeToString(evT, TIME_MINUTES), NG_BeforeMin, NG_AfterMin);
+      string msg = StringFormat("🛡 NewsGuard: %s %s @ %s (-%dm/+%dm) mode=%s",
+                   ccy, g_ngEvents[i][2], TimeToString(evT, TIME_MINUTES), NG_BeforeMin, NG_AfterMin,
+                   (NG_Mode==1?"ALERT":NG_Mode==2?"BLOCK":"CLOSE"));
       if(msg != g_ngLastAlert)
       {
          Print(msg);
@@ -2866,24 +3118,39 @@ void NG_Guard()
          g_ngLastAlert = msg;
       }
       GlobalVariableSet("NEWSGUARD_" + ccy, 1);
-      TG_Notify("NG_"+ccy, "🛡 NewsGuard 熱窗開啟\n━━━━━━━━━━━━━━\n📢 " + g_ngEvents[i][2] + "\n💵 " + ccy + "\n⏳ 窗口: " + TimeToString(NG_EvTimeHKT(g_ngEvents[i][0])-NG_BeforeMin*60, TIME_MINUTES) + "–" + TimeToString(NG_EvTimeHKT(g_ngEvents[i][0])+NG_AfterMin*60, TIME_MINUTES) + " HKT\n⚡ 模式: " + (NG_Mode==2?"GUARD（擋新倉）":"ALERT") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+      TG_Notify("NG_"+ccy, "🛡 NewsGuard WINDOW OPEN\n━━━━━━━━━━━━━━\n📢 " + g_ngEvents[i][2] + "\n💵 " + ccy + "\n⏳ Window: " + TimeToString(NG_EvTimeHKT(g_ngEvents[i][0])-NG_BeforeMin*60, TIME_MINUTES) + "–" + TimeToString(NG_EvTimeHKT(g_ngEvents[i][0])+NG_AfterMin*60, TIME_MINUTES) + " HKT\n⚡ Mode: " + (NG_Mode==3?"CLOSE (old+new)":NG_Mode==2?"BLOCK (new only)":"ALERT") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
 
-      if(NG_Mode == 2)
+      //--- v1.47 Q8: 2=BLOCK and 3=CLOSE arm SymbolGuard for the window.
+      //--- BLOCK closes new entries only; CLOSE also liquidates old positions.
+      //--- Auto-expiry at window end restores the user's per-symbol base mode,
+      //--- so a grid EA cannot reopen -> get closed -> reopen forever.
+      if(NG_Mode >= 2)
       {
-         for(int p = OrdersTotal() - 1; p >= 0; p--)
+         int autoMode = (NG_Mode == 2) ? 2 : 3;
+         datetime until = evT + NG_AfterMin*60;
+         for(int a = 0; a < g_sgSymN; a++)
+            if(NG_SymbolAffected(g_sgSym[a], ccy))
+               SG_SetAuto(g_sgSym[a], autoMode, until);
+         if(NG_SymbolAffected(Symbol(), ccy))
+            SG_SetAuto(Symbol(), autoMode, until);
+         //--- fallback when SymbolGuard itself is disabled: CLOSE mode closes here
+         if(!SG_Enable && NG_Mode == 3)
          {
-            if(!OrderSelect(p, SELECT_BY_POS, MODE_TRADES)) continue;
-            if(OrderType() > OP_SELL) continue;               // 只管市價倉
-            if(!NG_SymbolAffected(OrderSymbol(), ccy)) continue;
-            if(IsTradeContextBusy()) continue;
-            double px = (OrderType()==OP_BUY) ? MarketInfo(OrderSymbol(), MODE_BID)
-                                              : MarketInfo(OrderSymbol(), MODE_ASK);
-            bool ok = OrderClose(OrderTicket(), OrderLots(), px, 30, clrRed);
-            if(!ok) Print("NewsGuard close fail #", OrderTicket(), " err=", GetLastError());
+            for(int p = OrdersTotal() - 1; p >= 0; p--)
+            {
+               if(!OrderSelect(p, SELECT_BY_POS, MODE_TRADES)) continue;
+               if(OrderType() > OP_SELL) continue;
+               if(!NG_SymbolAffected(OrderSymbol(), ccy)) continue;
+               if(IsTradeContextBusy()) continue;
+               double px = (OrderType()==OP_BUY) ? MarketInfo(OrderSymbol(), MODE_BID)
+                                                 : MarketInfo(OrderSymbol(), MODE_ASK);
+               if(!OrderClose(OrderTicket(), OrderLots(), px, 30, clrRed))
+                  Print("NewsGuard close fail #", OrderTicket(), " err=", GetLastError());
+            }
          }
       }
    }
-   // 清過期旗標
+   // clear expired flags
    for(int i2 = 0; i2 < g_ngEventCount; i2++)
    {
       datetime evT2 = NG_EvTimeHKT(g_ngEvents[i2][0]);
@@ -2894,7 +3161,7 @@ void NG_Guard()
 }
 
 //+------------------------------------------------------------------+
-//| NewsGuard panel 行（喺 RenderOnly() 尾部呼叫，畫喺 dashboard 底）|
+//| NewsGuard panel row (called at the end of RenderOnly)             |
 //+------------------------------------------------------------------+
 void NG_RenderFooter(int x, int y)
 {
@@ -2902,7 +3169,7 @@ void NG_RenderFooter(int x, int y)
    if(ObjectFind(0,o) < 0) ObjectCreate(0,o,OBJ_LABEL,0,0,0);
    ObjectSetInteger(0,o,OBJPROP_XDISTANCE,x);
    ObjectSetInteger(0,o,OBJPROP_YDISTANCE,y);
-   string mode = (NG_Mode==2 ? "GUARD" : NG_Mode==1 ? "ALERT" : "OFF");
+   string mode = (NG_Mode==3 ? "CLOSE" : NG_Mode==2 ? "BLOCK" : NG_Mode==1 ? "ALERT" : "OFF");
    string next = "";
    int best = 24*3600;
    for(int i=0;i<g_ngEventCount;i++)
@@ -2911,19 +3178,21 @@ void NG_RenderFooter(int x, int y)
       if(dl > 0 && dl < best){ best = dl; next = g_ngEvents[i][1]+" "+g_ngEvents[i][2]; }
    }
    string txt = StringFormat("🛡 News[%s] ", mode);
-   if(next != "") txt += StringFormat("下一件: %s (%dh%02dm)  %s",
+   if(next != "") txt += StringFormat("Next: %s (%dh%02dm)  %s",
        next, best/3600, (best%3600)/60, g_ngEventCount);
-   else txt += "48h 內冇高影響事件";
+   else txt += "No high-impact events in 48h";
    ObjectSetString(0,o,OBJPROP_TEXT, txt);
-   ObjectSetInteger(0,o,OBJPROP_COLOR, NG_Mode==2 ? clrOrangeRed : clrWhite);
+   ObjectSetInteger(0,o,OBJPROP_COLOR, NG_Mode>=2 ? clrOrangeRed : clrWhite);
    ObjectSetInteger(0,o,OBJPROP_FONTSIZE, 9);
    ObjectSetString(0,o,OBJPROP_FONT,"Arial");
 }
 
 //+------------------------------------------------------------------+
-//| DD Guard：帳戶 / 單商品 回撤保護                                  |
+//| DD Guard: account / per-symbol drawdown protection                |
 //+------------------------------------------------------------------+
-//--- v1.42 Telegram via wininet (no whitelist needed) ---
+//--- v1.45 Q2: Telegram via MT4 built-in WebRequest (no wininet DLL) ---
+//---            NOTE: add https://api.telegram.org to WebRequest whitelist
+//---            (Tools -> Options -> Expert Advisors -> Allow WebRequest)
 string TG_URLEncode(string s)
 {
    char b[]; int n = StringToCharArray(s, b, 0, WHOLE_ARRAY, CP_UTF8);
@@ -2939,35 +3208,29 @@ string TG_URLEncode(string s)
 }
 bool TG_SendRaw(string text)
 {
-   // v1.43 T1: if DLL imports not allowed, NEVER touch wininet — straight native fallback
-   if(!TerminalInfoInteger(TERMINAL_DLLS_ALLOWED)) { SendNotification(StringSubstr(text,0,200)); return(false); }
+   // v1.45 Q2: MT4 built-in WebRequest - no wininet DLL needed
+   // NOTE: add https://api.telegram.org to WebRequest whitelist first
    if(!TG_Enable || g_tgToken == "") { SendNotification(StringSubstr(text,0,200)); return(false); }
-   int hInet = InternetOpenW("TD", 1, "", "", 0);
-   if(hInet == 0) return(false);
-   // v1.43 T5: force 3s connect/send/receive timeouts so a dead network never hangs the EA thread
-   int to = 3000;
-   InternetSetOptionW(hInet, 2, to, sizeof(to));   // INTERNET_OPTION_CONNECT_TIMEOUT
-   InternetSetOptionW(hInet, 5, to, sizeof(to));   // INTERNET_OPTION_SEND_TIMEOUT
-   InternetSetOptionW(hInet, 6, to, sizeof(to));   // INTERNET_OPTION_RECEIVE_TIMEOUT
-   int hConn = InternetConnectW(hInet, "api.telegram.org", 443, "", "", 3, 0, 0);   // INTERNET_SERVICE_HTTP
-   if(hConn == 0){ InternetCloseHandle(hInet); return(false); }
-   string acc[]; ArrayResize(acc,1); acc[0] = "*/*";
-   int hReq = HttpOpenRequestW(hConn, "POST", "/bot" + g_tgToken + "/sendMessage", "HTTP/1.1", "", acc, 0x00800000, 0); // INTERNET_FLAG_SECURE
-   if(hReq == 0){ InternetCloseHandle(hConn); InternetCloseHandle(hInet); return(false); }
-   // v1.43 T5: JSON payload — never breaks on %, +, & inside message
-   string esc = text;
-   StringReplace(esc, "\\", "\\\\");
-   StringReplace(esc, "\"", "\\\"");
-   StringReplace(esc, "\r\n", "\\n");
-   StringReplace(esc, "\n", "\\n");
-   StringReplace(esc, "\r", "\\n");
-   string body = "{\"chat_id\":\"" + TG_ChatID + "\",\"text\":\"" + esc + "\"}";
-   char d[]; int dn = StringToCharArray(body, d, 0, WHOLE_ARRAY, CP_UTF8); dn--;
-   string hdr = "Content-Type: application/json; charset=utf-8\r\n";
-   bool ok = HttpSendRequestW(hReq, hdr, StringLen(hdr), d, dn);
-   InternetCloseHandle(hReq); InternetCloseHandle(hConn); InternetCloseHandle(hInet);
-   if(!ok) SendNotification(StringSubstr(text,0,200));
-   return(ok);
+   string url = "https://api.telegram.org/bot" + g_tgToken + "/sendMessage";
+   // form-encoded body: chat_id + UTF-8 URL-encoded text
+   string data = "chat_id=" + TG_URLEncode(TG_ChatID) + "&text=" + TG_URLEncode(text);
+   char post[]; int plen = StringToCharArray(data, post, 0, WHOLE_ARRAY, CP_UTF8); plen--;
+   string hdr = "Content-Type: application/x-www-form-urlencoded\r\n";
+   char resp[]; string respHdr;
+   ResetLastError();
+   int code = WebRequest("POST", url, hdr, 3000, post, resp, respHdr);
+   if(code == -1)
+   {
+      // v1.45 Q2: WebRequest failed (whitelist missing / no network) -> fallback phone push
+      Print("TD: WebRequest failed err=", GetLastError(),
+            " - add api.telegram.org to MT4 WebRequest whitelist (Tools->Options->EA)");
+      SendNotification(StringSubstr(text,0,200));
+      return(false);
+   }
+   if(code != 200) { Print("TD: Telegram HTTP ", code); return(false); }
+   string body = CharArrayToString(resp, 0, WHOLE_ARRAY, CP_UTF8);
+   // v1.45 Q2: verify Telegram responded with ok:true
+   return(StringFind(body, "\"ok\":true") >= 0);
 }
 void TG_Notify(string key, string text)
 {
@@ -2999,7 +3262,7 @@ datetime g_lastBalScan = 0;
 double   g_balBase     = 0;
 void DDG_ScanBalanceOps()
 {
-   if(!DDG_Enable) return;
+   if(!g_ddgeOn) return;
    datetime now = TimeCurrent();
    if(now - g_lastBalScan < 60) return;
    g_lastBalScan = now;
@@ -3111,10 +3374,10 @@ void DDG_StopAT()
 {
    if(!TerminalInfoInteger(TERMINAL_DLLS_ALLOWED)) { Print("TD: DLL not allowed — cannot toggle AutoTrading"); return; }
    bool atOn = (TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) != 0);
-   if(!atOn) { g_tdStoppedAT = true; return; }
+   if(!atOn) { g_tdStoppedAT = true; DDG_SaveState(); return; }
    TD_ToggleAutoTrade();
    Sleep(250);
-   if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) == 0) g_tdStoppedAT = true;
+   if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) == 0) { g_tdStoppedAT = true; DDG_SaveState(); }
 }
 
 //+------------------------------------------------------------------+
@@ -3127,7 +3390,7 @@ void DDG_RestoreAT()
    if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) != 0) { g_tdStoppedAT = false; return; }
    TD_ToggleAutoTrade();
    Sleep(250);
-   if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) != 0) g_tdStoppedAT = false;
+   if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) != 0) { g_tdStoppedAT = false; DDG_SaveState(); }
 }
 
 //+------------------------------------------------------------------+
@@ -3139,7 +3402,10 @@ void DDG_ATStatusCheck()
 {
    bool atOn = (TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) != 0);
    if(atOn && g_tdStoppedAT)
+   {
       g_tdStoppedAT = false;   // user (or something) already reopened — release our ownership
+      DDG_SaveState();
+   }
    // if not DLL-allowed we can't verify via button, rely on TERMINAL_TRADE_ALLOWED only
 }
 
@@ -3153,9 +3419,14 @@ void DDG_ResetPeakConfirm()
    g_ddgLockUntil = 0;
    g_ddgAccountArmed = false;
    for(int k = 0; k < 64; k++) { g_ddgSymLocked[k] = false; g_sgForcedClose[k] = false; }
+   // v1.47 Q9: clear every persisted per-symbol lock for this account
+   string pfx = TD_AcctPfx()+"DDG_SYMLOCK_";
+   for(int v = GlobalVariablesTotal()-1; v >= 0; v--)
+      if(StringFind(GlobalVariableName(v), pfx) == 0) GlobalVariableDel(GlobalVariableName(v));
    DDG_RestoreAT();
-   TG_Notify("DDG_RESET", "✅ 風控已手動確認解除：Peak 已重置為 $" + DoubleToString(g_ddgPeakEquity,2) + "，AlgoTrading 已恢復（" + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server）");
-   Print("TD v1.43: manual reset peak -> ", DoubleToString(g_ddgPeakEquity,2));
+   DDG_SaveState();   // v1.47 Q9: persist the cleared state too
+   TG_Notify("DDG_RESET", "✅ Risk lock cleared manually: Peak reset to $" + DoubleToString(g_ddgPeakEquity,2) + ", AlgoTrading restored (" + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server)");
+   Print("TD v1.47: manual reset peak -> ", DoubleToString(g_ddgPeakEquity,2));
 }
 
 //+------------------------------------------------------------------+
@@ -3165,7 +3436,7 @@ void SG_ForceClose(string sym)
 {
    for(int k = 0; k < g_sgSymN; k++)
       if(g_sgSym[k] == sym) { g_sgForcedClose[k] = true; }
-   GlobalVariableSet("TD_SG_" + sym, 2);
+   GlobalVariableSet(SG_ModeKey(sym), 3);   // v1.47: account-scoped CLOSE
 }
 
 //+------------------------------------------------------------------+
@@ -3173,19 +3444,20 @@ void SG_ForceClose(string sym)
 //+------------------------------------------------------------------+
 void DDG_Guard()
 {
-   if(!DDG_Enable) return;
+   if(!g_ddgeOn) return;
    DDG_ScanBalanceOps();
    double eq  = AccountEquity();
+   double base = DDG_Base();                 // v1.47 Q6: single balance denominator
    if(eq > g_ddgPeakEquity) g_ddgPeakEquity = eq;
    if(g_ddgPeakEquity <= 0) return;
    if(TimeCurrent() < g_ddgLockUntil) return;
    if(g_ddgAccountArmed) return;
 
-   double ddPct = (g_ddgPeakEquity - eq) / g_ddgPeakEquity * 100.0;
-   if(DDG_Scope == 1 && ddPct >= DDG_MaxDDPct)
+   double ddPct = (g_ddgPeakEquity - eq) / base * 100.0;   // v1.47 Q6: was /g_ddgPeakEquity
+   if(g_ddgAccOn && ddPct >= DDG_MaxDDPct)
    {
-      string msg = StringFormat("🚨 DDGuard: 帳戶 DD %.1f%% ≥ %.1f%% — %s",
-                   ddPct, DDG_MaxDDPct, DDG_CloseOnHit ? "全倉平倉！" : "停新倉");
+      string msg = StringFormat("🚨 DDGuard: ACCOUNT DD %.1f%% >= %.1f%% — %s",
+                   ddPct, DDG_MaxDDPct, DDG_CloseOnHit ? "CLOSE ALL!" : "block new entries");
       if(msg != g_ddgLastAlert)
       {
          Print(msg); SendNotification(msg); g_ddgLastAlert = msg;
@@ -3196,15 +3468,16 @@ void DDG_Guard()
          g_ddgLockUntil = TimeCurrent() + DDG_LockMinutes*60;
          g_ddgAccountArmed = true;
          if(DDG_AccStopAT) DDG_StopAT();
+         DDG_SaveState();                       // v1.47 Q9: survive terminal restart
          if(residual > 0)
-            TG_Notify("DDG_ACC_RESID", "🚨 【緊急警告】平倉未完全成功！場上仍殘留 " + IntegerToString(residual) + " 張單，請立即人手介入處理！");
-         TG_Notify("DDG_ACC", "🚨 DDGuard 觸發 — 帳戶級\n━━━━━━━━━━━━━━\n🏦 AC: " + IntegerToString(AccountNumber()) + "\n📉 DD: " + DoubleToString(ddPct,2) + "% ≥ 限 " + DoubleToString(DDG_MaxDDPct,1) + "%\n💰 Peak: $" + DoubleToString(g_ddgPeakEquity,2) + "\n💸 Equity: $" + DoubleToString(AccountEquity(),2) + "\n⚡ 動作: 全倉平倉" + (residual>0?"（殘留 "+IntegerToString(residual)+" 單！）":" ✅") + " + AutoTrade " + (DDG_AccStopAT?"已停":"未停") + "\n⏱ 等待人手確認 [Reset Peak/確認恢復]\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+            TG_Notify("DDG_ACC_RESID", "🚨 [URGENT] Close incomplete! " + IntegerToString(residual) + " position(s) still open — manual intervention required!");
+         TG_Notify("DDG_ACC", "🚨 DDGuard TRIGGERED — ACCOUNT LEVEL\n━━━━━━━━━━━━━━\n🏦 AC: " + IntegerToString(AccountNumber()) + "\n📉 DD: " + DoubleToString(ddPct,2) + "% >= limit " + DoubleToString(DDG_MaxDDPct,1) + "%\n💰 Peak: $" + DoubleToString(g_ddgPeakEquity,2) + "\n💸 Equity: $" + DoubleToString(AccountEquity(),2) + "\n⚡ Action: close all" + (residual>0?" (residual "+IntegerToString(residual)+" open!)":" ✅") + " + AutoTrade " + (DDG_AccStopAT?"STOPPED":"not stopped") + "\n⏱ Awaiting manual confirm [Reset Peak]\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
          if(DDG_Popup){ int rh; if(TD_TerminalHandle(rh)) MessageBoxW(rh, msg, "DDGuard", 0x30); }
       }
       return;
    }
 
-   if(DDG_Scope == 0 && DDG_SymMaxDDPct > 0)
+   if(g_ddgSymOn && DDG_SymMaxDDPct > 0)
    {
       string syms = DDG_Symbols;
       if(syms == "") syms = Symbol();
@@ -3214,9 +3487,7 @@ void DDG_Guard()
          string sym = parts[s];
          StringTrimLeft(sym); StringTrimRight(sym);
          if(sym == "") continue;
-         bool symLocked = false;
-         for(int lk = 0; lk < g_ddSymN && lk < 32; lk++)
-            if(g_ddSyms[lk] == sym && g_ddgSymLocked[lk]) { symLocked = true; break; }
+         bool symLocked = DDG_SymLocked(sym);        // v1.47 Q9: persisted per-symbol lock
          if(symLocked) continue;
          double floating = 0;
          for(int p2 = OrdersTotal()-1; p2 >= 0; p2--)
@@ -3226,22 +3497,22 @@ void DDG_Guard()
             if(OrderSymbol() != sym) continue;
             floating += OrderProfit() + OrderSwap() + OrderCommission();
          }
-         if(-floating >= AccountEquity() * DDG_SymMaxDDPct / 100.0)
+         if(-floating >= base * DDG_SymMaxDDPct / 100.0)   // v1.47 Q6: was AcctEquity-based
          {
-            string m2 = StringFormat("🚨 DDGuard: %s 浮虧 %.0f 觸發 %.1f%% — %s",
-                        sym, floating, DDG_SymMaxDDPct, DDG_CloseOnHit?"平倉":"停新倉");
+            string m2 = StringFormat("🚨 DDGuard: %s floating %.0f triggered %.1f%% — %s",
+                        sym, floating, DDG_SymMaxDDPct, DDG_CloseOnHit?"close":"block new entries");
             Print(m2); SendNotification(m2);
             if(DDG_CloseOnHit)
             {
                int residual2 = DDG_CloseSymbolWithRetry(sym);
                SG_ForceClose(sym);
-               for(int lk2 = 0; lk2 < g_ddSymN && lk2 < 32; lk2++)
-                  if(g_ddSyms[lk2] == sym) g_ddgSymLocked[lk2] = true;
+               DDG_SetSymLock(sym, true);                  // v1.47 Q9: persist lock
                g_ddgLockUntil = TimeCurrent() + DDG_LockMinutes*60;
+               DDG_SaveState();
                if(DDG_SymStopAT) DDG_StopAT();
                if(residual2 > 0)
-                  TG_Notify("DDG_SYM_RESID_" + sym, "🚨 【緊急警告】" + sym + " 平倉未完全成功！仍殘留 " + IntegerToString(residual2) + " 張單，請立即人手介入處理！");
-               TG_Notify("DDG_"+sym, "⚠️ DDGuard 觸發 — 單一商品\n━━━━━━━━━━━━━━\n.Symbol: " + sym + "\n📉 浮虧: $" + DoubleToString(floating,2) + "（觸發 " + DoubleToString(DDG_SymMaxDDPct,1) + "% 限）\n⚡ 動作: 該 symbol 平倉" + (residual2>0?"（殘留 "+IntegerToString(residual2)+" 單！）":" ✅") + " + SymbolGuard 已鎖 CLOSE" + (DDG_SymStopAT?" + AutoTrade 已停":"") + "\n⏱ 等待人手確認\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+                  TG_Notify("DDG_SYM_RESID_" + sym, "🚨 [URGENT] " + sym + " close incomplete! " + IntegerToString(residual2) + " position(s) still open — manual intervention required!");
+               TG_Notify("DDG_"+sym, "⚠️ DDGuard TRIGGERED — SYMBOL LEVEL\n━━━━━━━━━━━━━━\n.Symbol: " + sym + "\n📉 Floating: $" + DoubleToString(floating,2) + " (triggered " + DoubleToString(DDG_SymMaxDDPct,1) + "% limit)\n⚡ Action: close symbol" + (residual2>0?" (residual "+IntegerToString(residual2)+" open!)":" ✅") + " + SymbolGuard CLOSE locked" + (DDG_SymStopAT?" + AutoTrade STOPPED":"") + "\n⏱ Awaiting manual confirm\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
                if(DDG_Popup){ int rh2; if(TD_TerminalHandle(rh2)) MessageBoxW(rh2, m2, "DDGuard", 0x30); }
             }
          }
