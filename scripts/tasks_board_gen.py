@@ -26,6 +26,11 @@ active>owner>todo>sched>done｜2.1-2.10 照 prototype CSS＋minmax(0,…)／:not
 W5-I（2026-11-05）：站點 sidebar NAV 三件（../sidebar.css＋#sidebar-container＋
 ../sidebar.js，tokens 豁免——自帶 --l0 canonical 族）入本檔模板層——TASKS.md
 重生成唔會沖走站點 NAV。
+P-1b（2026-11-05 1255 插隊令）：旗艦級金調 treatment——:root 擴 --gold/--gold2
+canonical（board 零變量依賴慣例，主題 toggle 免疫）；h1 金漸層（@supports guard）；
+active KPI 金＋金 glow；body 頂部金 radial 微光＋深藍黑底維持；卡影/hover 微升
+（reduced-motion 守衛）；::selection/::focus-visible/scrollbar/footer 金點。
+純 CSS 層改動——render_html 結構零改（A10 零 script 範圍照守）。
 
 用法：
   python3 scripts/tasks_board_gen.py --tasks TASKS.md \
@@ -47,7 +52,7 @@ STATUS = {  # emoji → (status key, badge 符號, KPI 標籤)
 }
 ORDER = ["active", "owner", "todo", "sched", "done"]
 OTHER = ("other", "◇", "其他")  # 未知 emoji fallback（§6.1）
-GEN = "ZCODE tasks_board_gen v3.1（2026-11-05 W5-I：＋站點 sidebar NAV 三件注入（../sidebar.css＋#sidebar-container＋../sidebar.js），tokens 豁免自帶 --l0 族；11-04 P3 NAV 方案 C 保留；A10 零 script 範圍=任務內容渲染，NAV UI script 自包含唔掂任務數據）"
+GEN = "ZCODE tasks_board_gen v3.2（2026-11-05 P-1b 旗艦金調：h1 金漸層＋active KPI 金＋卡影 hover 微升＋::selection/焦點/滾動條金調；NAV 方案 C＋W5-I 三件保留；A10 零 script 範圍=任務內容渲染，NAV UI script 自包含唔掂任務數據）"
 
 # ---- NAV BAR 方案 C（2026-11-04 P3 派工）----------------------------------
 # 沿用首頁 docs/index.html 方案 C：sticky 48px、手機漢堡 drawer、aria-current。
@@ -206,21 +211,31 @@ CSS = """
  --l0:#0F1520;--l1:#161E2E;--l2:#1C2638;--line:#2A3650;--line2:#3A4760;
  --t1:#E6EDF5;--t2:#A8B4C4;--t3:#7A8698;
  --ok:#3DDC84;--warn:#FFB454;--danger:#FF6B6B;--info:#5CA8FF;--neutral:#8B95A5;
+ --gold:#FFD700;--gold2:#EAB308;
  --r:14px;
 }
 *{box-sizing:border-box}
-body{margin:0;padding:24px 16px 48px;background:var(--l0);color:var(--t1);
+body{margin:0;padding:24px 16px 48px;color:var(--t1);
+ background:radial-gradient(1100px 420px at 50% -120px,rgba(255,215,0,.05),transparent 62%),var(--l0);
  font:15px/1.65 -apple-system,"PingFang TC","Noto Sans CJK TC","Microsoft JhengHei",sans-serif;
  -webkit-text-size-adjust:100%}
 .wrap{max-width:1240px;margin:0 auto}
-h1{font-size:26px;line-height:1.3;margin:0 0 6px;font-weight:700;letter-spacing:-.2px}
-.meta{color:var(--t2);font-size:13px;line-height:1.7;margin:0 0 16px}
+h1{font-size:28px;line-height:1.3;margin:0 0 8px;font-weight:800;letter-spacing:-.3px;color:var(--gold)}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+ h1{background:linear-gradient(115deg,#FFE566 0%,#FFD700 45%,#EAB308 100%);
+   -webkit-background-clip:text;background-clip:text;color:transparent}
+}
+.meta{color:var(--t2);font-size:13px;line-height:1.7;margin:0 0 18px;padding-bottom:12px;
+ border-bottom:1px solid rgba(255,215,0,.22)}
 .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:20px}
-.kpi{background:var(--l1);border:1px solid var(--line);border-radius:12px;padding:10px 12px;
- display:flex;flex-direction:column;gap:2px;border-left-width:3px;min-width:0}
-.kpi-n{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi{background:linear-gradient(180deg,var(--l2) 0%,var(--l1) 58%);border:1px solid var(--line);
+ border-radius:12px;padding:10px 12px;
+ display:flex;flex-direction:column;gap:2px;border-left-width:3px;min-width:0;
+ box-shadow:0 6px 18px rgba(3,7,15,.35)}
+.kpi-n{font-size:23px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
 .kpi-l{font-size:12px;color:var(--t2);white-space:nowrap}
-.kpi--active{border-left-color:var(--info)}.kpi--active .kpi-n{color:var(--info)}
+.kpi--active{border-left-color:var(--gold)}
+.kpi--active .kpi-n{color:var(--gold);text-shadow:0 0 16px rgba(255,215,0,.32)}
 .kpi--owner{border-left-color:var(--warn)}.kpi--owner .kpi-n{color:var(--warn)}
 .kpi--todo{border-left-color:var(--neutral)}.kpi--todo .kpi-n{color:var(--t1)}
 .kpi--sched{border-left-color:var(--line2)}.kpi--sched .kpi-n{color:var(--t2)}
@@ -229,13 +244,21 @@ h1{font-size:26px;line-height:1.3;margin:0 0 6px;font-weight:700;letter-spacing:
 
 .board{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;align-items:start}
 .card{background:var(--l1);border:1px solid var(--line);border-radius:var(--r);
- padding:16px 18px 18px;min-width:0;border-top-width:3px}
+ padding:16px 18px 18px;min-width:0;border-top-width:3px;
+ box-shadow:0 10px 28px rgba(3,7,15,.42)}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){
+ .card{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+ .card:hover{transform:translateY(-2px);border-color:var(--line2);
+  box-shadow:0 14px 34px rgba(3,7,15,.50)}
+}
 .card--active{grid-column:span 7;border-top-color:var(--info)}
 .card--owner{grid-column:span 5;border-top-color:var(--warn)}
 .card--todo{grid-column:span 5;border-top-color:var(--neutral)}
 .card--sched{grid-column:span 7;border-top-color:var(--line2)}
 .card--done{grid-column:span 12;border-top-color:rgba(61,220,132,.45)}
 .card--other{grid-column:span 12;border-top-color:var(--line2)}
+/* P-1b 旗艦金調：active 卡計數徽章金色點綴（數據強調） */
+.card--active .cnt{color:var(--gold);border-color:rgba(255,215,0,.38)}
 
 .card-hd{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .card-hd h2{font-size:17px;font-weight:700;margin:0;line-height:1.4;letter-spacing:-.1px}
@@ -256,6 +279,8 @@ h1{font-size:26px;line-height:1.3;margin:0 0 6px;font-weight:700;letter-spacing:
 .row{display:grid;grid-template-columns:26px minmax(0,205px) minmax(0,1fr) 82px;
  gap:12px;padding:10px 0;border-bottom:1px solid rgba(42,54,80,.75);align-items:start}
 .row:last-child{border-bottom:0;padding-bottom:2px}
+/* P-1b：列 hover 掃讀底色（懸停裝置限定） */
+@media(hover:hover){.row:not(.row-hd):hover{background:rgba(28,38,56,.32)}}
 /* 1945 notes②：表頭 meta neutral(#8B95A5)≈5.5:1 偏淺→t2(#A8B4C4)≈8.7:1；
    「偏密」→padding 6→8px＋letter-spacing .4→.5px */
 .row-hd{font-size:12px;color:var(--t2);padding:0 0 8px;border-bottom:1px solid var(--line);
@@ -307,6 +332,17 @@ details.card--done[open] .rows{margin-top:14px}
 details.card--done .rows{margin-top:0}
 /* 1945 notes③：footer 12px t3(#7A8698)≈4.95:1 偏細偏淺→13px t2≈8.7:1 */
 .foot{text-align:center;color:var(--t2);font-size:13px;margin-top:24px;line-height:1.7}
+/* P-1b 旗艦金調：選取色／焦點環／滾動條／footer 金點 */
+::selection{background:rgba(255,215,0,.30);color:var(--t1)}
+details.fd>summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+.fold-sum:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+@media(pointer:fine){
+ ::-webkit-scrollbar{width:10px;height:10px}
+ ::-webkit-scrollbar-thumb{background:var(--l2);border-radius:6px;border:2px solid var(--l0)}
+ ::-webkit-scrollbar-thumb:hover{background:var(--line2)}
+ ::-webkit-scrollbar-track{background:transparent}
+}
+.foot::before{content:"◆";color:var(--gold);font-size:9px;margin-right:7px;vertical-align:1px}
 
 @media (min-width:768px) and (max-width:1199px){
  .row:not(.row-2){grid-template-columns:24px minmax(0,180px) minmax(0,1fr) 76px;gap:10px}
@@ -317,7 +353,7 @@ details.card--done .rows{margin-top:0}
 }
 @media (max-width:767px){
  body{padding:16px 12px 40px;font-size:15px}
- h1{font-size:21px}
+ h1{font-size:22px}
  .kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
  .kpi{padding:8px 6px;border-radius:10px}
  .kpi-n{font-size:18px}
