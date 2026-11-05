@@ -1,0 +1,55 @@
+--- a/TradeDashboard.mq4	2026-11-05 11:45:45.456287528 +0000
++++ b/TradeDashboard.mq4	2026-11-05 11:45:45.456287528 +0000
+@@ -5,9 +5,9 @@
+ //|                                    Broker summary-proof engine   |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.49"
++#property version   "1.50"
+ #property strict
+-#property description "TradeDashboard v1.49"
++#property description "TradeDashboard v1.50"
+ 
+ #import "shell32.dll"
+    int ShellExecuteW(int hWnd, string Operation, string File, string Parameters, string Directory, int ShowCmd);
+@@ -976,7 +976,7 @@
+ void HideMainTable()
+ {
+    string ids[] = {"TTL","SUB","AC1","AC2","S_P","S_R","FLBL","FS_EDIT","CLBL2","FC_EDIT","SAVELBL",
+-                   "CLBL","CZERO","SGT","SGN","FT","TABCZ"};
++                   "CLBL","CZERO","SGT","SGN","FT","TABCZ","HISTW"};   // v1.50 FIX-TD: +HISTW
+    for(int i2=0;i2<ArraySize(ids);i2++) ObjectDelete(0,PFX+ids[i2]);
+    for(int c2=0;c2<NC;c2++) { ObjectDelete(0,PFX+"H"+IntegerToString(c2)); ObjectDelete(0,PFX+"V_"+(c2==0?"H":c2==1?"D":c2==2?"W":"M")); }
+    for(int r2=0;r2<10;r2++)
+@@ -988,8 +988,15 @@
+    for(int g2=0;g2<10;g2++) ObjectDelete(0,PFX+"SG_"+IntegerToString(g2));
+    for(int g3=0;g3<8;g3++) { ObjectDelete(0,PFX+"TSG_"+IntegerToString(g3)); ObjectDelete(0,PFX+"TSY"+IntegerToString(g3)); }
+    for(int g4=0;g4<14;g4++) ObjectDelete(0,PFX+"TN"+IntegerToString(g4));
+-   for(int g6=0;g6<14;g6++){ ObjectDelete(0,PFX+"DDC"+IntegerToString(g6)); ObjectDelete(0,PFX+"DDN"+IntegerToString(g6)); ObjectDelete(0,PFX+"DDB"+IntegerToString(g6)); ObjectDelete(0,PFX+"DDF"+IntegerToString(g6)); }
+-   ObjectDelete(0,PFX+"TPH");
++   // v1.50 FIX-TD (ghost fix, boss 2026-11-05): prefix sweeps instead of fixed
++   // enums - dynamic row counts and $-suffixed names (DDC$k) leaked; adds the
++   // DDG families never listed before: DDP/DDM rows, TPC2-5 headers, DDGT_*,
++   // DDRESET(+LBL). Prefix match is ObjectsDeleteAll, not exact ObjectDelete.
++   ObjectsDeleteAll(0, PFX+"DDC"); ObjectsDeleteAll(0, PFX+"DDN");
++   ObjectsDeleteAll(0, PFX+"DDB"); ObjectsDeleteAll(0, PFX+"DDF");
++   ObjectsDeleteAll(0, PFX+"DDP"); ObjectsDeleteAll(0, PFX+"DDM");
++   ObjectsDeleteAll(0, PFX+"TPH"); ObjectsDeleteAll(0, PFX+"TPC");
++   ObjectsDeleteAll(0, PFX+"DDGT"); ObjectsDeleteAll(0, PFX+"DDRESET");
+    string tids[]={"TNX","TA0","TAX","TAM","TD0","TD1","TD2","TD3","TD4","TDB","TDF","TS0","TS1","TS2","TS3","TS4"};
+    for(int g5=0;g5<ArraySize(tids);g5++) ObjectDelete(0,PFX+tids[g5]);
+ }
+@@ -3006,6 +3013,13 @@
+    ObjectsDeleteAll(0, PFX+"TDB"); ObjectsDeleteAll(0, PFX+"TDF");
+    ObjectsDeleteAll(0, PFX+"TPH"); ObjectsDeleteAll(0, PFX+"DDC");
+    ObjectsDeleteAll(0, PFX+"DDN"); ObjectsDeleteAll(0, PFX+"DDB");
++   // v1.50 FIX-TD (ghost fix, boss 2026-11-05): complete the families - DDG row
++   // columns DDF/DDP/DDM, column headers TPC2-5, buttons DDGT_*, reset DDRESET*.
++   // Without these, redrawing Positions after visiting DDGuard stacks old DD
++   // text over the position table (exact boss repro: POS -> DDG -> POS).
++   ObjectsDeleteAll(0, PFX+"DDF"); ObjectsDeleteAll(0, PFX+"DDP");
++   ObjectsDeleteAll(0, PFX+"DDM"); ObjectsDeleteAll(0, PFX+"TPC");
++   ObjectsDeleteAll(0, PFX+"DDGT"); ObjectsDeleteAll(0, PFX+"DDRESET");
+ }
+ 
+ void NG_LoadNews()
