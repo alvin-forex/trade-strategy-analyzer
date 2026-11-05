@@ -93,7 +93,7 @@ NEW_CSS = """/* ============ 事件地理層（W6 v2 金色粒子：深黑底＋
 #mapCanvas{position:absolute;z-index:0;pointer-events:none}
 /* W6 v2：path 只做幾何源（粒子喺 canvas）；fill 隱形唔攔互動 */
 #world-map path{fill:none;stroke:none;pointer-events:none}
-.map-lbl{fill:#D9BC55;font-weight:700;pointer-events:none;letter-spacing:.5px}
+.map-lbl{fill:#F2EAD3;font-weight:700;pointer-events:none;letter-spacing:.5px;paint-order:stroke;stroke:rgba(5,7,12,.9);stroke-width:.1em;stroke-linejoin:round}
 .map-cap{
   display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;
   font-size:12px;color:var(--txt-2);
@@ -111,8 +111,8 @@ NEW_CSS = """/* ============ 事件地理層（W6 v2 金色粒子：深黑底＋
 .ev-ring{pointer-events:none}
 .ev-ring .ev-hit{pointer-events:stroke;cursor:pointer}
 .ev-ring:hover .ev-line{stroke-width:9}
-.ev-marker{font-size:44px;font-weight:700;text-anchor:middle;pointer-events:none}
-.ev-high-txt{font-size:52px;font-weight:700;text-anchor:middle;pointer-events:none}
+.ev-marker{font-size:44px;font-weight:700;text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:rgba(5,7,12,.9);stroke-width:.1em;stroke-linejoin:round}
+.ev-high-txt{font-size:52px;font-weight:700;text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:rgba(5,7,12,.9);stroke-width:.1em;stroke-linejoin:round}
 .ev-tip{
   position:fixed;z-index:9;max-width:300px;pointer-events:none;display:none;
   background:rgba(22,30,46,.95);border:1px solid #2A3650;border-radius:8px;
