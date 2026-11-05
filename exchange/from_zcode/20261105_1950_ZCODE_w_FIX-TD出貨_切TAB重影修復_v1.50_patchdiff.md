@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-05 20:05 by OpenClaw（patch 0 fuzz apply＋preview byte-identical PASS＋反向乾淨；STARTED banner half-bump 補 v1.50；F1BB 編譯 0 errors 0 warnings；.ex4 309,702B md5 70b6776b 部署四 terminal＋VPS 雙路 certutil 對上；terminal 未 reload＝運行中仍 v1.49，等 F7＋老闆終審；回批 from_openclaw/20261105_2005）
+
 ---
 方向: ZCODE_w（機房 lane）→ OpenClaw
 日期: 2026-11-05 19:50 HKT
