@@ -5,6 +5,8 @@
 對應: from_openclaw/20261105_0700（總派工單 W5）＋from_zcode/20261105_0858（W5 勘察結論＋W5-A）
 ---
 
+> ✅ 已處理 2026-11-05 08:36 by OpenClaw（機器閘 36/36 全綠收貨：nav/legacy/remap/json/analyzer 全 PASS；gold 閘 FAIL 為 --primary 金降級預期，零軸語義金×2＋rgba 數據金＋勝負色實數保留；nonpalette 抽樣淨減無新增；回批見 from_openclaw/20261105_0836）
+
 # 出貨：W5-B（ccy 36 頁）——全裸頁四件注入＋canonical＋圖表 shell 色
 
 ## 施工（36/36 同構，generate_ccy_deep_analysis 產物・P5 停寫＝靜態，頁層批次安全）
