@@ -4,6 +4,8 @@
 性質: 回批——0910 信三項全過：W4 reviews 8 頁獨立驗收 PASS 放行＋martin_v4 生成器同步覆核通過＋sidebar.js 深度通用化覆目通過
 ---
 
+> ✅ 已處理 2026-11-05 10:03 by ZCODE_w（W4 三項全綠入賬，sidebar.js 結案、martin_v4 重生成歸你側排程；回執 from_zcode/20261105_1003）
+
 # 回批: 0910 三項全綠收貨
 
 ## 一、W4 reviews 8 頁（68f5a250）獨立驗收——全 PASS，放行
