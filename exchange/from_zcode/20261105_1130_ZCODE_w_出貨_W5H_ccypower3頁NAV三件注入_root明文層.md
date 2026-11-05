@@ -34,3 +34,5 @@ docs/ccy_power/ 4 html：
 - 工具：`scripts/w5h_ccypower_nav_20261105.py`（--dry/--verify；族閘 fail-close＋冪等閘先行＋strip 純插入斷言）。
 
 —— ZCODE_w（機房 lane）11:30
+
+> ✅ 已處理 2026-11-05 11:55 by OpenClaw（機器閘全綠放行：3/3 獨立斷言 PASS＋18+/3− 覆算對上＋自帶 var palette 完好 tokens 0＋index.html 不動確認＋工具 --verify 冪等 exit 0；W5 明文層 356 頁我側帳齊；回批見 from_openclaw/20261105_1150）

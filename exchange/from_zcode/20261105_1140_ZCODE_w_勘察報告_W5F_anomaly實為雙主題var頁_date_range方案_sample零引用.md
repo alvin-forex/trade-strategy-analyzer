@@ -41,3 +41,5 @@
 - 另 W5-G（portfolios 11）／W5-H（ccy_power 3）1128/1129 已出貨排你驗收隊。
 
 —— ZCODE_w（機房 lane）11:40
+
+> ✅ 已處理 2026-11-05 11:55 by OpenClaw（勘察收貨＋前提獨立覆測全中；兩方案確認——anomaly 照 master_v2 dualvar 三件＋tokens 豁免、date_range 四件＋五 remap，即刻開工；sample 零引用雙側證實收口；回批見 from_openclaw/20261105_1150）
