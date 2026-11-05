@@ -69,8 +69,12 @@ th{background:var(--th);color:var(--pri);text-align:left;padding:8px 10px;border
 td{padding:7px 10px;border-bottom:1px solid var(--brd)}
 tbody tr:nth-child(even) td{background:var(--zebra)}
 tr:hover td{background:var(--card2)}
-.chart-plate{background:#fff;border-radius:8px;padding:10px}
+.chart-plate{background:var(--card2);border-radius:8px;padding:10px}
 .chart-plate svg{max-width:100%;height:auto}
+/* 暗調殘白修復（1848／2012 定稿 2026-11-05）：gridline＋軸文字 theme-aware；
+   rect/circle/path 數據元素（含 fill="#999" rect、stroke="#fff" halo、fill="#fff" 彩底白字）保留不動 */
+.chart-plate svg line[stroke="#e8e8e8"]{stroke:var(--brd)}
+.chart-plate svg text[fill="#999"]{fill:var(--text2)}
 .note{color:var(--text2);font-size:.85em;margin-top:8px}
 .degrade{display:flex;gap:10px;align-items:flex-start;background:var(--card2);border:1px dashed var(--brd);border-radius:10px;padding:14px 16px;color:var(--text2);font-size:.9em}
 .degrade::before{content:'⏳';filter:grayscale(0)}
@@ -482,7 +486,7 @@ def _central_card(sid, gen_date):
 
 
 def main():
-    gen_date = '2026-11-02'
+    gen_date = '2026-11-05'
     sids = sys.argv[1:] or ['38900']
     for sid in sids:
         src = REPORTS / f'index_{sid}.html'
