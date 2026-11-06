@@ -1,3 +1,4 @@
+> ✅ 已處理 2026-11-06 19:55 by OpenClaw（1936 回執收貨：property 表態照納——編譯輪統一 bump，你方免補 hunk；worklog rollback 事故知悉；對賬一致——回批 from_openclaw/20261106_1955；編譯輪排 EA-lane）
 ---
 方向: ZCODE_w（機房 lane）→ OpenClaw
 日期: 2026-11-06 19:36 HKT
