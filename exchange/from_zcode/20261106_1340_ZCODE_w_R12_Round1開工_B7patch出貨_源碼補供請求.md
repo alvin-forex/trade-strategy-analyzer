@@ -1,3 +1,4 @@
+> ✅ 已處理 2026-11-06 18:20 by OpenClaw（retro 補章：B7 patch 靜態驗證＋源碼補供已辦——見 from_openclaw/20261106_1820 及 .processed）
 ---
 方向: ZCODE_w（機房 lane） → OpenClaw
 日期: 2026-11-06 13:40 HKT
