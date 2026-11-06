@@ -1,0 +1,200 @@
+--- ../20261107_0240_FIX-TD3_patch_TDv152/TradeDashboard_v1.52_full_preview.mq4	2026-11-06 22:32:49.314733775 +0000
++++ TradeDashboard_v1.53_full_preview.mq4	2026-11-06 22:42:08.618920784 +0000
+@@ -5,9 +5,9 @@
+ //|                                    Broker summary-proof engine   |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.52"
++#property version   "1.53"
+ #property strict
+-#property description "TradeDashboard v1.52"
++#property description "TradeDashboard v1.53"
+ 
+ #import "shell32.dll"
+    int ShellExecuteW(int hWnd, string Operation, string File, string Parameters, string Directory, int ShowCmd);
+@@ -175,6 +175,9 @@
+ datetime g_reportStart = 0;
+ 
+ //--- Recording (equity snapshots)
++//--- v1.53 FIX-TD5: pre-v1.53 shared file names (kept only as legacy names for
++//---   one-time migration below). Root cause of ghost SYMBOLs: shared files let
++//---   a previous account's closed-trade rows leak into the next account's panel.
+ string REC_FILE = "TD_records.csv";
+ datetime g_lastRec = 0;
+ 
+@@ -194,7 +197,38 @@
+ int      r_head  = 0;
+ 
+ //--- Local Trade Snapshot
+-string TRADES_FILE = "TD_trades.csv";
++string TRADES_FILE = "TD_trades.csv";   // legacy shared name (pre-v1.53)
++
++//--- v1.53 FIX-TD5: account-scoped file names (resolved at call time so an
++//---   account switch mid-session binds to the right files instantly)
++//---   TD_trades.csv  -> TD_<acct>_trades.csv   (2345 spec item 1)
++//---   td4_snap.bin   -> TD_<acct>_snap.bin
++//---   TD_records.csv -> TD_<acct>_records.csv
++//---   TD_summary.csv -> TD_<acct>_summary.csv
++string TD_F_trades()  { return(TD_AcctPfx()+"trades.csv");  }
++string TD_F_snap()    { return(TD_AcctPfx()+"snap.bin");    }
++string TD_F_records() { return(TD_AcctPfx()+"records.csv"); }
++string TD_F_summary() { return(TD_AcctPfx()+"summary.csv"); }
++
++int g_acct = 0;   // v1.53 FIX-TD5: account-change watchdog seed
++
++//--- v1.53 FIX-TD5 (2345 spec item 4): one-time migration — pre-v1.53 shared
++//---   files carry no account column, so rows cannot be attributed to any
++//---   account: the whole file is parked as *.legacy and never auto-loaded.
++void MigrateLegacyTDFiles()
++{
++   string src3[3]; src3[0]=TRADES_FILE; src3[1]=REC_FILE; src3[2]=SNAP_BIN;
++   string dst3[3]; dst3[0]="TD_trades.csv.legacy"; dst3[1]="TD_records.csv.legacy"; dst3[2]="td4_snap.bin.legacy";
++   for(int m=0; m<3; m++)
++   {
++      if(!FileIsExist(src3[m])) continue;
++      if(FileIsExist(dst3[m])) FileDelete(dst3[m]);   // keep the latest legacy copy only
++      if(FileMove(src3[m], 0, dst3[m], 0))
++         Print("TD v1.53 FIX-TD5: legacy shared file '", src3[m], "' parked as '", dst3[m], "' (unattributable, not auto-loaded)");
++      else
++         Print("TD v1.53 FIX-TD5: WARN could not park '", src3[m], "' err=", GetLastError());
++   }
++}
+ 
+ #define MAX_TRADES 5000
+ int      t_ticket[MAX_TRADES];
+@@ -682,6 +716,11 @@
+    g_vis[15]=ShowAvgP;       g_vis[16]=ShowBest;       g_vis[17]=ShowWorst;
+    g_vis[18]=ShowMaxDD;      g_vis[19]=ShowMaxDDPct;   g_vis[20]=false;
+ 
++   // v1.53 FIX-TD5 (2345 spec items 3+4): seed account watchdog, then one-time
++   //   migration of pre-v1.53 shared files BEFORE any load touches them.
++   g_acct = AccountNumber();
++   MigrateLegacyTDFiles();
++
+    LoadRecordsBin();   // v1.43 T6: hydrate from bin first
+    if(r_count == 0) LoadRecords();   // fallback: legacy CSV
+    LoadTrades();
+@@ -1284,6 +1323,22 @@
+ //+------------------------------------------------------------------+
+ void OnTimer()
+ {
++   // v1.53 FIX-TD5 (2345 spec item 3): account switch mid-session — wipe
++   //   in-memory state and reload everything from THIS account's files.
++   if(AccountNumber() != g_acct && AccountNumber() > 0)
++   {
++      g_acct = AccountNumber();
++      t_tradeCount = 0;
++      r_count = 0;
++      r_head = 0;
++      LoadRecordsBin();                 // hydrate from TD_<acct>_snap.bin
++      if(r_count == 0) LoadRecords();   // fallback legacy per-account CSV
++      LoadTrades();                     // TD_<acct>_trades.csv
++      DDG_LoadState();                  // account-scoped risk state (v1.47 Q9 keys)
++      LogEvent("ACCT SWITCH: reloaded TD files for account " + IntegerToString(g_acct));
++      Print("TD v1.53 FIX-TD5: account switch -> ", g_acct, ", state reloaded");
++   }
++
+    CheckTabCmd();   // v1.35: agent self-test hook (also when no ticks)
+ 
+    //--- v1.46 Q4: risk guards every 1s, independent of market ticks
+@@ -1604,10 +1659,10 @@
+ 
+ void SaveTrades()
+ {
+-   int fh = FileOpen(TRADES_FILE, FILE_WRITE|FILE_CSV|FILE_ANSI, ',');
++   int fh = FileOpen(TD_F_trades(), FILE_WRITE|FILE_CSV|FILE_ANSI, ',');   // v1.53 FIX-TD5: TD_<acct>_trades.csv
+    if(fh == INVALID_HANDLE) return;
+ 
+-   FileWrite(fh, "Ticket", "Symbol", "Type", "OpenTime", "CloseTime",
++   FileWrite(fh, "Ticket", "Account", "Symbol", "Type", "OpenTime", "CloseTime",
+              "OpenPrice", "ClosePrice", "Volume", "Profit", "Swap",
+              "Commission", "CalcPnl", "Comment");
+ 
+@@ -1615,6 +1670,7 @@
+    {
+       FileWrite(fh,
+          t_ticket[i],
++         IntegerToString(AccountNumber()),   // v1.53 FIX-TD5: per-row account (2nd line of defense)
+          t_symbol[i],
+          (t_type[i]==OP_BUY ? "BUY" : "SELL"),
+          (int)t_opentime[i],
+@@ -1636,10 +1692,10 @@
+ {
+    t_tradeCount = 0;
+ 
+-   int fh = FileOpen(TRADES_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   int fh = FileOpen(TD_F_trades(), FILE_READ|FILE_CSV|FILE_ANSI, ',');   // v1.53 FIX-TD5: TD_<acct>_trades.csv
+    if(fh == INVALID_HANDLE) return;
+ 
+-   for(int h = 0; h < 13; h++) FileReadString(fh);
++   for(int h = 0; h < 14; h++) FileReadString(fh);   // v1.53 FIX-TD5: header now 14 cols (Ticket,Account,...)
+ 
+    while(!FileIsEnding(fh) && t_tradeCount < MAX_TRADES)
+    {
+@@ -1647,6 +1703,7 @@
+       if(sTicket == "") break;
+ 
+       int tkt        = (int)StringToInteger(sTicket);
++      string sAcct   = FileReadString(fh);   // v1.53 FIX-TD5: per-row account
+       string sym     = FileReadString(fh);
+       string sType   = FileReadString(fh);
+       datetime ot    = (datetime)StringToInteger(FileReadString(fh));
+@@ -1660,6 +1717,13 @@
+       double calcP   = StringToDouble(FileReadString(fh));
+       string cmt     = FileReadString(fh);
+ 
++      // v1.53 FIX-TD5 (2345 spec item 2): 2nd line of defense — rows whose
++      //   Account column mismatches this account are skipped, never rendered.
++      //   Empty value tolerated (manually crafted file); a 13-col legacy row
++      //   would shift sAcct onto the Symbol value, which also fails the match
++      //   and is skipped — safe by construction.
++      if(sAcct != "" && sAcct != IntegerToString(AccountNumber())) continue;
++
+       // Apply ReportStart filter when loading
+       if(g_reportStart > 0 && ct < g_reportStart) continue;
+ 
+@@ -1727,7 +1791,7 @@
+    if(r_head >= MAX_REC) r_head = 0;
+    if(r_count < MAX_REC) r_count++;
+ 
+-   int fh = FileOpen(REC_FILE, FILE_WRITE|FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   int fh = FileOpen(TD_F_records(), FILE_WRITE|FILE_READ|FILE_CSV|FILE_ANSI, ',');   // v1.53 FIX-TD5
+    if(fh != INVALID_HANDLE)
+    {
+       FileSeek(fh, 0, SEEK_END);
+@@ -1752,7 +1816,7 @@
+ //+------------------------------------------------------------------+
+ void SaveRecordsBin()
+ {
+-   int fh = FileOpen(SNAP_BIN, FILE_WRITE|FILE_BIN);
++   int fh = FileOpen(TD_F_snap(), FILE_WRITE|FILE_BIN);   // v1.53 FIX-TD5: TD_<acct>_snap.bin
+    if(fh == INVALID_HANDLE) return;
+    FileWriteInteger(fh, SNAP_MAGIC, INT_VALUE);
+    FileWriteInteger(fh, r_count, INT_VALUE);
+@@ -1774,7 +1838,7 @@
+ //+------------------------------------------------------------------+
+ void LoadRecordsBin()
+ {
+-   int fh = FileOpen(SNAP_BIN, FILE_READ|FILE_BIN);
++   int fh = FileOpen(TD_F_snap(), FILE_READ|FILE_BIN);   // v1.53 FIX-TD5: TD_<acct>_snap.bin
+    if(fh == INVALID_HANDLE) return;
+ 
+    int magic = FileReadInteger(fh, INT_VALUE);
+@@ -1819,7 +1883,7 @@
+    r_count = 0;
+    r_head = 0;
+ 
+-   int fh = FileOpen(REC_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   int fh = FileOpen(TD_F_records(), FILE_READ|FILE_CSV|FILE_ANSI, ',');   // v1.53 FIX-TD5
+    if(fh == INVALID_HANDLE) return;
+ 
+    int cap = MathMin(MaxRecords, MAX_REC);
+@@ -1978,7 +2042,7 @@
+ //+------------------------------------------------------------------+
+ void DumpSummaryCSV()
+ {
+-   int fh = FileOpen("TD_summary.csv", FILE_WRITE|FILE_CSV|FILE_ANSI, ',');
++   int fh = FileOpen(TD_F_summary(), FILE_WRITE|FILE_CSV|FILE_ANSI, ',');   // v1.53 FIX-TD5: TD_<acct>_summary.csv
+    if(fh == INVALID_HANDLE) return;
+ 
+    FileWrite(fh, "View","Period","Trades","Buy","Sell","WR%","Gain$","Gain%",
