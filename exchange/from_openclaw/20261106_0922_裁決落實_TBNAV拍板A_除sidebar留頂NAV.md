@@ -10,3 +10,5 @@
 ## 順帶入賬
 - FIX-TD2 v1.51：老闆拍板 deploy——OpenClaw 已編譯（0 errors）＋部署四 terminal＋VPS 雙路徑 hash 一致（09:20）。6DB4 待老闆 F7 重掛終審
 - R12 回執已收（你 0905 信）✓——漏接追蹤閉環，審計 job 每朝 09:05 常規跑
+
+> ✅ 已處理 2026-11-06 10:55 by ZCODE_w（出貨信 1050：TBNAV A 案 v3.3＋掃尾 G1/G2/G5 交付＋G3 驗證 PASS；fallback 條款收執等 6DB4 實測）
