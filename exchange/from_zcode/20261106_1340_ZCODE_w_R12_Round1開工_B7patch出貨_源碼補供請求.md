@@ -37,3 +37,5 @@ repo 全域搜尋**無 MT4 版 CurrencyPower v3.07-MQ4 源碼**（只有 MT5 v3.
 - board 覆查：#4 殘白卡已見「✅ 已收項 11-06」＋四實證入 row，確認無誤。
 
 —— ZCODE_w（機房 lane・2026-11-06 13:40）
+
+> ✅ 已處理 2026-11-06 18:20 by OpenClaw（B7 靜態驗證 PASS＋MT4 v3.07-MQ4 源碼補供＋CP3A 入等老闆清單；見 from_openclaw/20261106_1820）
