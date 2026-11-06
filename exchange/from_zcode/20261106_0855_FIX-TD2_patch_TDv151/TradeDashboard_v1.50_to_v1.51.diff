@@ -1,0 +1,75 @@
+--- a/TradeDashboard.mq4
++++ b/TradeDashboard.mq4
+@@ -5,9 +5,9 @@
+ //|                                    Broker summary-proof engine   |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.50"
++#property version   "1.51"
+ #property strict
+-#property description "TradeDashboard v1.50"
++#property description "TradeDashboard v1.51"
+ 
+ #import "shell32.dll"
+    int ShellExecuteW(int hWnd, string Operation, string File, string Parameters, string Directory, int ShowCmd);
+@@ -143,6 +143,7 @@
+ string   g_tgKey[8];
+ int      g_tgN = 0;   // v1.40: TD toggled AutoTrading off itself
+ bool     g_histTruncated = false;
++bool     g_histEmpty = false;   // v1.51 FIX-TD2 BugB: OrdersHistoryTotal()==0
+ 
+ string PFX = "TD116_";
+ int    g_view = 0;
+@@ -697,7 +698,7 @@
+    // Save initial fingerprint on startup
+    SaveFingerprint(CalcInputFingerprint());
+    
+-   Print("=== TradeDashboard v1.50 STARTED === Trades: ", t_tradeCount,
++   Print("=== TradeDashboard v1.51 STARTED === Trades: ", t_tradeCount,
+          " | Records: ", r_count,
+          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
+          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
+@@ -736,7 +737,14 @@
+    if(h==INVALID_HANDLE) return;
+    string cmd=FileReadString(h);
+    FileClose(h);
+-   int ti=(int)StringToInteger(StringSubstr(cmd,StringFind(cmd,"tab=")+4));
++   // v1.51 FIX-TD2 (boss 2026-11-06): read-once semantics - the hook file is
++   // agent-written and MUST be consumed once. A stale file (any content) used
++   // to re-trigger every 2s forever: boss symptom "any TAB click bounces back
++   // to DDGuard" = stale "tab=2" re-parsed on every tick/timer after throttle.
++   FileDelete("TD_tabcmd.txt");
++   int tp=StringFind(cmd,"tab=");
++   if(tp<0) return;               // v1.51 FIX-TD2: only well-formed commands act
++   int ti=(int)StringToInteger(StringSubstr(cmd,tp+4));
+    string snap="";
+    int sp=StringFind(cmd,"snap=");
+    if(sp>=0) snap=StringSubstr(cmd,sp+5);
+@@ -2556,7 +2564,8 @@
+    int lh = 16*scale;
+    int ttlY=py+2+14*scale+4;
+    UpdTxtBold("TTL", Title1, px+4, ttlY, clrLime, 13*scale);
+-   if(g_histTruncated) UpdTxt("HISTW", "HIST truncated! Switch to All History", px+170*scale, ttlY, clrOrangeRed, 8*scale); else ObjectDelete(0,PFX+"HISTW");
++   if(g_histEmpty) UpdTxt("HISTW", "!! ACCOUNT HISTORY EMPTY - right-click History tab and choose All History !!", px+170*scale, ttlY, clrOrangeRed, 8*scale);   // v1.51 FIX-TD2 BugB
++   else if(g_histTruncated) UpdTxt("HISTW", "HIST truncated! Switch to All History", px+170*scale, ttlY, clrOrangeRed, 8*scale); else ObjectDelete(0,PFX+"HISTW");
+    UpdTxtBold("SUB", Title2, px+4, ttlY+lh, clrLime, 10*scale);
+    int acY = ttlY+lh*2;
+    UpdTxt("AC1", StringFormat("AC: %d  |  Balance: $%.2f  |  Equity: $%.2f",
+@@ -2986,6 +2995,17 @@
+ void     TD_CheckHistoryDepth()
+ {
+    g_histTruncated = false;
++   g_histEmpty = false;   // v1.51 FIX-TD2 BugB
++   if(OrdersHistoryTotal() == 0)
++   {
++      // v1.51 FIX-TD2 BugB (boss 2026-11-06): stats all-zero while
++      // TD_summary.csv has real numbers = panel reads terminal history
++      // tab, which is EMPTY (MT4 has no API to change the history-tab
++      // filter). Loud warning instead of silent zeros.
++      g_histEmpty = true;
++      Print("TD: ACCOUNT HISTORY EMPTY (OrdersHistoryTotal==0) - right-click Account History tab and choose All History");
++      return;
++   }
+    if(ReportStart == "") return;
+    datetime rs = StringToTime(ReportStart);
+    if(rs <= 0) return;
