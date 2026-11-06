@@ -1,0 +1,44 @@
+--- a/CurrencyPower_v3.mq5	2026-11-06 05:41:18.613482751 +0000
++++ b/CurrencyPower_v3.mq5	2026-11-06 05:41:18.614482755 +0000
+@@ -78,6 +78,7 @@
+ double g_diff = 0;
+ double g_prevDiff = 0;
+ double g_lastPw[9];
++double g_lastTrend[9];  // B7 fix: cached slope t-values (cached redraw shows real arrows, not dash)
+ double g_prevPw[9];     // previous power values (Alert_On crossing detection)
+ int    g_expand = -1;   // expanded currency row index (CCY idx), -1 = none
+ bool   g_panelOn = true;
+@@ -380,14 +381,14 @@
+             ChartRedraw();
+             return;
+          }
+-      if(sn=="CP3BADGE"){ g_panelOn=!g_panelOn; if(!g_panelOn) ObjectsDeleteAll(0,"CP3"); else { double pw9[9]; for(int q=0;q<9;q++) pw9[q]=g_lastPw[q]; double t9b[9]; ArrayInitialize(t9b,0.0); UI(pw9,t9b); } ChartRedraw(); return; }
++      if(sn=="CP3BADGE"){ g_panelOn=!g_panelOn; if(!g_panelOn) ObjectsDeleteAll(0,"CP3"); else { double pw9[9]; for(int q=0;q<9;q++) pw9[q]=g_lastPw[q]; double t9b[9]; for(int q=0;q<9;q++) t9b[q]=g_lastTrend[q]; UI(pw9,t9b); } ChartRedraw(); return; }
+       for(int k=0;k<9;k++)
+          if(sn=="CP3R_"+CCY[k])
+          {
+             g_expand = (g_expand==k)?-1:k;
+             // trigger UI redraw via lightweight refresh
+             double pw[9]; for(int q=0;q<9;q++) pw[q]=g_lastPw[q];
+-            double t9[9]; ArrayInitialize(t9,0.0);
++            double t9[9]; for(int q=0;q<9;q++) t9[q]=g_lastTrend[q];
+             UI(pw,t9);
+             ChartRedraw();
+             return;
+@@ -447,6 +448,7 @@
+    for(int k=1;k<9;k++){ if(last[k]>mx)mx=last[k]; if(last[k]<mn)mn=last[k]; }
+    g_diff = mx-mn;
+    for(int q3=0;q3<9;q3++) g_lastPw[q3]=last[q3];
++   for(int q3=0;q3<9;q3++) g_lastTrend[q3]=t[q3];  // B7 fix: cache real trend values
+    UI(last,t);
+    // slope arrows at right edge of each line's last value
+    string an[9];
+@@ -479,7 +481,7 @@
+    if(TimeLocal()-lk<5) return;
+    lk=TimeLocal();
+    double pw[9]; for(int q=0;q<9;q++) pw[q]=g_lastPw[q];
+-   double t9[9]; ArrayInitialize(t9,0.0);
++   double t9[9]; for(int q=0;q<9;q++) t9[q]=g_lastTrend[q];
+    UI(pw,t9);
+    ChartRedraw();
+ }
