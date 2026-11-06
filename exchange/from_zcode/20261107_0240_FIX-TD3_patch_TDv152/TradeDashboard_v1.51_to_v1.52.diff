@@ -1,0 +1,152 @@
+--- a/TradeDashboard.mq4
++++ b/TradeDashboard.mq4
+@@ -5,9 +5,9 @@
+ //|                                    Broker summary-proof engine   |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.51"
++#property version   "1.52"
+ #property strict
+-#property description "TradeDashboard v1.51"
++#property description "TradeDashboard v1.52"
+ 
+ #import "shell32.dll"
+    int ShellExecuteW(int hWnd, string Operation, string File, string Parameters, string Directory, int ShowCmd);
+@@ -35,7 +35,7 @@
+ input string ___SCALE___     = "=== Panel Scale ===";
+ input int    Scale           = 1;
+ input string ___VIEW___      = "=== Default View ===";
+-input int    View            = 0;       // 0=Hour, 1=Day, 2=Week, 3=Month
++input int    View            = 1;       // 0=Hour, 1=Day (v1.52 default, FIX-TD3), 2=Week, 3=Month
+ input string ___REFRESH___   = "=== Refresh ===";
+ input int    RefreshSec      = 10;
+ input string ___RECORD___    = "=== Recording ===";
+@@ -698,7 +698,7 @@
+    // Save initial fingerprint on startup
+    SaveFingerprint(CalcInputFingerprint());
+    
+-   Print("=== TradeDashboard v1.51 STARTED === Trades: ", t_tradeCount,
++   Print("=== TradeDashboard v1.52 STARTED === Trades: ", t_tradeCount,
+          " | Records: ", r_count,
+          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
+          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
+@@ -984,7 +984,7 @@
+ void HideMainTable()
+ {
+    string ids[] = {"TTL","SUB","AC1","AC2","S_P","S_R","FLBL","FS_EDIT","CLBL2","FC_EDIT","SAVELBL",
+-                   "CLBL","CZERO","SGT","SGN","FT","TABCZ","HISTW"};   // v1.50 FIX-TD: +HISTW
++                   "CLBL","CZERO","SGT","SGN","FT","TABCZ","HISTW","S_ALL","EMPTYW"};   // v1.50 FIX-TD: +HISTW; v1.52 FIX-TD3: +S_ALL/EMPTYW
+    for(int i2=0;i2<ArraySize(ids);i2++) ObjectDelete(0,PFX+ids[i2]);
+    for(int c2=0;c2<NC;c2++) { ObjectDelete(0,PFX+"H"+IntegerToString(c2)); ObjectDelete(0,PFX+"V_"+(c2==0?"H":c2==1?"D":c2==2?"W":"M")); }
+    for(int r2=0;r2<10;r2++)
+@@ -2468,6 +2468,8 @@
+ //+------------------------------------------------------------------+
+ //| RenderOnly                                                       |
+ //+------------------------------------------------------------------+
++double TD_NZ0(double x) { return (MathAbs(x)<0.005) ? 0.0 : x; }   // v1.52 FIX-TD3: -0.00 display fix
++
+ void RenderOnly()
+ {
+    int scale = MathMax(1, MathMin(3, Scale));
+@@ -2478,15 +2480,29 @@
+    string vn[4]; vn[0]="Hour"; vn[1]="Day"; vn[2]="Week"; vn[3]="Month";
+    string viewLabel = (g_offset==0) ? vn[g_view]+" (Latest)" : StringFormat("%s %+d", vn[g_view], g_offset);
+ 
+-   double tPnl=0, tPips=0, tLots=0;
+-   int tN=0, tW=0, tBuy=0, tSell=0;
++   double tPnl=0;
++   int tN=0, tW=0;
+    for(int i=0; i<g_cNumB; i++)
+    {
+-      tPnl+=g_cPnl[i]; tPips+=g_cPips[i]; tLots+=g_cLots[i];
+-      tN+=g_cN[i]; tW+=g_cW[i]; tBuy+=g_cBuy[i]; tSell+=g_cSell[i];
++      tPnl+=g_cPnl[i];
++      tN+=g_cN[i]; tW+=g_cW[i];
+    }
+    double tWR=(tN>0) ? 100.0*tW/tN : 0;
+ 
++   // v1.52 FIX-TD3: all-time stats from local snapshot (view/filter independent,
++   // same accounting as buckets: pnl = t_calcPnl, win = calcPnl > 0; matches CSV audit gate)
++   int aN=0, aBuy=0, aSell=0, aW=0;
++   double aPnl=0;
++   datetime aLast=0;
++   for(int ai=0; ai<t_tradeCount; ai++)
++   {
++      aN++; aPnl+=t_calcPnl[ai];
++      if(t_type[ai]==OP_BUY) aBuy++; else aSell++;
++      if(t_calcPnl[ai]>0) aW++;
++      if(t_closetime[ai]>aLast) aLast=t_closetime[ai];
++   }
++   double aWR=(aN>0) ? 100.0*aW/aN : 0;
++
+    int colX[NC];
+    ArrayInitialize(colX, 0);
+    int curX=px+10;
+@@ -2564,22 +2580,29 @@
+    int lh = 16*scale;
+    int ttlY=py+2+14*scale+4;
+    UpdTxtBold("TTL", Title1, px+4, ttlY, clrLime, 13*scale);
+-   if(g_histEmpty) UpdTxt("HISTW", "!! ACCOUNT HISTORY EMPTY - right-click History tab and choose All History !!", px+170*scale, ttlY, clrOrangeRed, 8*scale);   // v1.51 FIX-TD2 BugB
++   if(g_histEmpty) UpdTxt("HISTW", StringFormat("!! TERMINAL HISTORY EMPTY (0 orders) - right-click History -> All History; panel on local snapshot %d trades, last close %s",
++      t_tradeCount, (aLast>0 ? TimeToString(aLast, TIME_DATE|TIME_MINUTES) : "n/a")),
++      px+170*scale, ttlY, clrOrangeRed, 8*scale);   // v1.52 FIX-TD3: snapshot vs terminal timestamps visible
+    else if(g_histTruncated) UpdTxt("HISTW", "HIST truncated! Switch to All History", px+170*scale, ttlY, clrOrangeRed, 8*scale); else ObjectDelete(0,PFX+"HISTW");
+    UpdTxtBold("SUB", Title2, px+4, ttlY+lh, clrLime, 10*scale);
+    int acY = ttlY+lh*2;
+    UpdTxt("AC1", StringFormat("AC: %d  |  Balance: $%.2f  |  Equity: $%.2f",
+-      AccountNumber(), AccountBalance(), AccountEquity()),
++      AccountNumber(), TD_NZ0(AccountBalance()), AccountEquity()),
+       px+4, acY, clrWhite, fNorm);
+    UpdTxt("AC2", StringFormat("Free Margin: $%.2f  |  Margin: $%.2f  |  Snap: %d trades",
+       AccountFreeMargin(), AccountMargin(), t_tradeCount),
+       px+4, acY+lh, clrWhite, fNorm);
+    int spY = acY+lh*2;
+    color pClr=(tPnl>=0) ? clrLimeGreen : clrTomato;
+-   UpdTxt("S_P", StringFormat("P&L: $%+.2f", tPnl), px+4, spY, pClr, fNorm);
+-   UpdTxt("S_R", StringFormat("  WR: %.1f%%  Buy: %d  Sell: %d  WPips: %.0f  Lots: %.2f  [%s]",
+-      tWR, tBuy, tSell, tPips, tLots, viewLabel),
+-      px+150*scale, spY, clrWhite, fNorm);
++   // v1.52 FIX-TD3: row 1 = current view window (WR shows n/a when window has no closed trades)
++   UpdTxt("S_P", StringFormat("VIEW: %s | %d %s | P&L: $%+.2f | WR: %s",
++      viewLabel, tN, (tN==1 ? "trade" : "trades"), tPnl, (tN>0 ? DoubleToStr(tWR,1)+"%" : "n/a")),
++      px+4, spY, pClr, fNorm);
++   // v1.52 FIX-TD3: row 2 = all-time snapshot line, kills the "Snap 70 but P&L 0.00" contradiction
++   color aClr=(aPnl>=0) ? clrLimeGreen : clrTomato;
++   UpdTxt("S_ALL", StringFormat("ALL: %d trades | P&L: $%+.2f | WR: %.1f%% | B%d/S%d | Last close: %s",
++      aN, aPnl, aWR, aBuy, aSell, (aLast>0 ? TimeToString(aLast, TIME_DATE|TIME_MINUTES) : "n/a")),
++      px+4, spY+lh, aClr, fNorm);
+ 
+    //--- Right side: H/D/W/M buttons + Symbol/Comment filter
+    int btnY=acY;
+@@ -2634,6 +2657,16 @@
+    }
+    yPos+=16*scale;
+ 
++   // v1.52 FIX-TD3: explicit empty-window notice (boss 2026-11-06 A06E: silent all-zero grid reads as wrong math)
++   if(tN==0)
++   {
++      UpdTxt("EMPTYW", StringFormat("(no closed trades in this window - last close %s)",
++         (aLast>0 ? TimeToString(aLast, TIME_DATE|TIME_MINUTES) : "n/a")),
++         colX[0], yPos, clrKhaki, fSm);
++      yPos+=rowH;
++   }
++   else HideObj("EMPTYW");
++
+    // Data rows
+    for(int r=0; r<10; r++)
+    {
+@@ -2678,12 +2711,12 @@
+       UpdCell(pp+"_1",  IntegerToString(g_cN[idx]), colX[1], ry, clrWhite, fSm, g_vis[1]);
+       UpdCell(pp+"_2",  bsStr, colX[2], ry, clrDeepSkyBlue, fSm, g_vis[2]);
+       UpdCell(pp+"_3",  DoubleToStr(bwr,0)+"%", colX[3], ry, cWR, fSm, g_vis[3]);
+-      UpdCell(pp+"_4",  "$"+DoubleToStr(g_cPnl[idx],2), colX[4], ry, cPnl, fSm, g_vis[4]);
++      UpdCell(pp+"_4",  "$"+DoubleToStr(TD_NZ0(g_cPnl[idx]),2), colX[4], ry, cPnl, fSm, g_vis[4]);
+       UpdCell(pp+"_5",  StringFormat("%.2f%%",g_cGPct[idx]), colX[5], ry, cGP, fSm, g_vis[5]);
+       UpdCell(pp+"_6",  DoubleToStr(g_cPips[idx],0), colX[6], ry, clrWhite, fSm, g_vis[6]);
+       UpdCell(pp+"_7",  DoubleToStr(g_cLots[idx],2), colX[7], ry, clrWhite, fSm, g_vis[7]);
+       UpdCell(pp+"_8",  DoubleToStr(g_cTLots[idx],2), colX[8], ry, clrWhite, fSm, g_vis[8]);
+-      UpdCell(pp+"_9",  "$"+DoubleToStr(g_cBal[idx],2), colX[9], ry, clrWhite, fSm, g_vis[9]);
++      UpdCell(pp+"_9",  "$"+DoubleToStr(TD_NZ0(g_cBal[idx]),2), colX[9], ry, clrWhite, fSm, g_vis[9]);
+       UpdCell(pp+"_10", (g_cMarg[idx]>0?"$"+DoubleToStr(g_cMarg[idx],2):"-"), colX[10], ry, clrWhite, fSm, g_vis[10]);
+       UpdCell(pp+"_11", (g_cFMarg[idx]>0?"$"+DoubleToStr(g_cFMarg[idx],2):"-"), colX[11], ry, clrWhite, fSm, g_vis[11]);
+       UpdCell(pp+"_12", (g_cFMaxPos[idx]>0?"$"+DoubleToStr(g_cFMaxPos[idx],2):"-"), colX[12], ry, cFMP, fSm, g_vis[12]);
