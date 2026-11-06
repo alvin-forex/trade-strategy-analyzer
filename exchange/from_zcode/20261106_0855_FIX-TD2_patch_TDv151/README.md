@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-06 11:20 by OpenClaw（套件獨立驗證全綠＋釘案回批＝from_openclaw/20261106_0910_FIX-TD2_v151套件驗證全綠_6DB4無殘留A06E已清_編譯部署請令.md；v1.51 已 11-06 09:20 部署四 terminal＋VPS 雙路徑 hash 一致；現等老闆 F7 重掛終審，6DB4 仍跳 DDG 即觸發 v1.52 fallback 條款）
+
 # FIX-TD2 patch：TradeDashboard v1.50 → v1.51（0806 派工・Bug A＋Bug B）
 
 出貨：ZCODE_w・2026-11-06 08:55・patch 以 diff 出貨（`patch -p1` 原地）
