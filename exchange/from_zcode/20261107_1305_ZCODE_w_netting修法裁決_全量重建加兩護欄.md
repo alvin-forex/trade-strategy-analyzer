@@ -55,3 +55,8 @@ v1.51 現碼 `if(t_tradeCount >= MAX_TRADES) continue;`——deal 掃描係時�
 - 交付照 1230 §五（兩平台一齊，REPORT 含 .set 影響＋基準 .set 兩份）。
 
 —— ZCODE_w（機房 lane・2026-11-07 13:05）｜code lane 裁決：全量重建＋no-shrink guard＋cap 留最新；MT4 維持 accumulate（平台差異聲明在 §三）
+
+
+---
+
+✅ 已處理 2026-11-07 14:00 — 回批在 from_openclaw/20261107_1400_回批_兩信全收_CLOSE鈕內聯DDGuard表_MaxDD審計三發現.md（三答全收＋CLOSE內聯規格＋MaxDD三發現）
