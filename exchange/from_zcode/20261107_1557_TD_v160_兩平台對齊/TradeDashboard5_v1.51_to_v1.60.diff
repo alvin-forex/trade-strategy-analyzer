@@ -1,0 +1,1441 @@
+--- "exchange-repo/exchange/from_openclaw/20261107_1215_MT5_v150_to_v151_\344\272\244ZCODE\345\257\251\346\237\245/TradeDashboard5_v1.51_openclaw.mq5"	2026-11-07 06:14:51.624830368 +0000
++++ scripts/v160/TradeDashboard5_v1.60_final.mq5	2026-11-07 07:49:01.590092068 +0000
+@@ -5,98 +5,127 @@
+ //|               NewsGuard / DDGuard / SymbolGuard, snap bin        |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.51"
+-#property description "TradeDashboard v1.51 (MT5 build)"
++#property version   "1.60"
++#property description "TradeDashboard v1.60 (MT5 build, two-platform aligned)"
+ 
+ #include <Trade/Trade.mqh>
+ 
+ //--- v1.11 DLL imports (require Allow DLL imports)
+ //--- v1.15 Q2: wininet removed - Telegram now via MT5 built-in WebRequest()
+ //---            DLL kept only for AlgoTrading toggle (user32.dll)
++#import "shell32.dll"
++   int ShellExecuteW(long hWnd, string lpOperation, string lpFile, string lpParameters, string lpDirectory, int nShowCmd);
++#import
+ #import "user32.dll"
+    int PostMessageW(long hWnd, uint Msg, long wParam, long lParam);
+    long GetAncestor(long hWnd, uint gaFlags);
+    int MessageBoxW(long hWnd, string text, string caption, uint type);
++   int GetMenu(long hWnd);
++   int GetSubMenu(int hMenu, int nPos);
++   int GetMenuItemCount(int hMenu);
++   int GetMenuItemID(int hMenu, int uItem);
++   int GetMenuStringW(int hMenu, int uItem, ushort &lpString[], int nMaxCount, int uFlag);
+ #import
+ CTrade trade;
+ 
+ //=== INPUTS ===
+ //--- v1.44: Panel Label first; NewsGuard/DDGuard default OFF (enable when needed)
+-input string ___LABEL___     = "=== Label ===";
+-input string Title1          = "TradeDashboard";        // Line 1 (max 30 chars) - no version in panel
+-input string Title2          = "Flying to the moon";    // Line 2 Subtitle
+-
+-input string ___SCALE___     = "=== Panel Scale ===";
+-input int    Scale           = 1;
+-input string ___VIEW___      = "=== Default View ===";
+-input int    View            = 0;       // 0=Hour, 1=Day, 2=Week, 3=Month
+-input string ___REFRESH___   = "=== Refresh ===";
+-input int    RefreshSec      = 10;
+-input string ___RECORD___    = "=== Recording ===";
+-input int    RecordSec       = 1;       // Min seconds between records (1=every tick)
+-input int    MaxRecords      = 12000;   // Records in ring buffer (max 20000)
+-input string ___SNAP___      = "=== Trade Snapshot ===";
+-input bool   SnapEnable      = true;    // Enable local trade snapshots
+-input int    SnapHours       = 72;      // Snapshot lookback hours
+-input string ___FILTER___    = "=== Data Filter ===";
+-input string ReportStart     = "";      // Report start date YYYY.MM.DD (empty=no filter)
+-input string FilterSymbol    = "";      // Filter by symbol (empty=all)
+-input string FilterComment   = "";      // Filter by comment (empty=all)
+-input string ___COLS___      = "=== Column Visibility ===";
+-input bool   ShowDay         = true;
+-input bool   ShowTrades      = true;
+-input bool   ShowBuySell     = true;    // Buy/Sell count
+-input bool   ShowWR          = true;
+-input bool   ShowGain        = true;
+-input bool   ShowGainPct     = true;
+-input bool   ShowWPips       = true;
+-input bool   ShowLot         = true;
+-input bool   ShowTotalLot    = true;
+-input bool   ShowBalance     = true;
+-input bool   ShowMargin      = true;
+-input bool   ShowFreeMarg    = true;
+-input bool   ShowFMaxPos     = true;    // Max floating profit (peak)
+-input bool   ShowFMaxNeg     = true;    // Max floating loss = intraday MaxDD
+-input bool   ShowPF          = true;
+-input bool   ShowAvgP        = true;
+-input bool   ShowBest        = true;
+-input bool   ShowWorst       = true;
+-input bool   ShowMaxDD       = true;    // Max drawdown $
+-input bool   ShowMaxDDPct    = true;    // Max drawdown %
+-input string ___CHART___     = "=== Chart ===";
+-input bool   ChartEnable     = false;   // Show cumulative P&L chart
+-input string ___NEWSGUARD___  = "=== NewsGuard ===";
+-input int    NG_Mode          = 0;      // v1.47 Q8: 0=OFF(default) 1=ALERT 2=BLOCK(new only) 3=CLOSE(new+old)
+-input int    NG_BeforeMin     = 30;
+-input int    NG_AfterMin      = 15;
+-input bool   NG_HighOnly      = true;
+-input string NG_NewsFile      = "news_guard.csv";
+-input int    NG_ServerOffsetHours = -5;  // news CSV(HKT+8) -> broker server hours
+-
+-input string ___DDGUARD___    = "=== DD Guard ===";
+-input bool   DDG_Enable       = false;  // default OFF - enable when needed
+-input double DDG_MaxDDPct     = 20.0;   // account max drawdown % (peak-to-equity)
+-input bool   DDG_AccOn        = true;   // v1.46 Q5: account-level DD guard (independent switch)
+-input bool   DDG_SymOn        = false;  // v1.46 Q5: per-symbol DD guard (independent switch)
+-input string DDG_Symbols      = "";
+-input double DDG_SymMaxDDPct  = 12.0;   // per-symbol max drawdown %
+-input bool   DDG_CloseOnHit   = true;   // close positions on trigger
+-input int    DDG_LockMinutes  = 60;     // lockout minutes after DD trigger (peak NOT lowered)
+-input bool   DDG_StopAutoTrade = true;  // toggle terminal AutoTrading OFF on trigger (DLL)
+-input bool   DDG_Popup        = false;
+-input bool   DDG_AccStopAT    = true;   // account-level DD stops global AutoTrading
+-input bool   DDG_SymStopAT    = false;  // per-symbol DD stops global AutoTrading (default OFF)
+-input int    DDG_CloseRetry   = 4;      // close retry attempts before giving up
+-
+-input string ___TELEGRAM___   = "=== Telegram ===";
+-input string TG_ChatID        = "920593269";
+-input string TG_TokenFile     = "tg_token.txt";
+-input bool   TG_Enable       = true;
+-input int    TG_MinGapMin    = 10;      // min minutes between notifications per key
+-
+-input string ___SYMGUARD___  = "=== Symbol Guard ===";
+-input bool   SG_Enable       = true;    // Symbol Guard: monitor per-symbol trading
+-input int    SG_DefaultMode  = 0;       // v1.47 Q7: new symbol default 0=ON 1=ALERT 2=BLOCK 3=CLOSE
++//=== INPUTS (v1.60: 12 groups / 68 params, two-platform aligned) ===
++//--- v1.44: NewsGuard/DDGuard default OFF (enable when needed)
++//--- v1.60 FIX-TD10: rename per 1230 letter 66-row table; 2 new DD-money params
++
++input group "General"
++input string InpTitleLine1              = "TradeDashboard";                          // Line 1 (max 30 chars) - no version in panel
++input string InpTitleLine2              = "Flying to the moon";                      // Line 2 Subtitle
++input int    InpPanelScale              = 1;                                         // Panel size multiplier (1, 2 or 3)
++input int    InpDefaultView             = 0;                                         // 0=Hour, 1=Day, 2=Week, 3=Month
++
++input group "Display"
++input bool   InpShowDay                 = true;                                      // Show Day column in stats table
++input bool   InpShowTrades              = true;                                      // Show trade count column
++input bool   InpShowBuySell             = true;                                      // Buy/Sell count
++input bool   InpShowWinRate             = true;                                      // Show win rate column
++input bool   InpShowGainMoney           = true;                                      // Show gain in money column
++input bool   InpShowGainPercent         = true;                                      // Show gain in percent column
++input bool   InpShowPips                = true;                                      // Show net pips column
++input bool   InpShowLots                = true;                                      // Show lots column
++input bool   InpShowTotalLots           = true;                                      // Show total lots row
++input bool   InpShowBalance             = true;                                      // Show balance row
++input bool   InpShowMargin              = true;                                      // Show margin row
++input bool   InpShowFreeMargin          = true;                                      // Show free margin row
++input bool   InpShowFloatPeakProfit     = true;                                      // Max floating profit (peak)
++input bool   InpShowFloatPeakLoss       = true;                                      // Max floating loss = intraday MaxDD
++input bool   InpShowProfitFactor        = true;                                      // Show profit factor row
++input bool   InpShowAvgPnl              = true;                                      // Show average P/L row
++input bool   InpShowBestTrade           = true;                                      // Show best trade row
++input bool   InpShowWorstTrade          = true;                                      // Show worst trade row
++input bool   InpShowMaxDdMoney          = true;                                      // Max drawdown $
++input bool   InpShowMaxDdPercent        = true;                                      // Max drawdown %
++input bool   InpShowPnlChart            = false;                                     // Show cumulative P&L chart
++
++input group "Refresh & Recording"
++input int    InpRefreshSeconds          = 10;                                        // Panel refresh interval in seconds
++input int    InpRecordSeconds           = 1;                                         // Min seconds between records (1=every tick)
++input int    InpMaxRecords              = 12000;                                     // Records in ring buffer (max 20000)
++
++input group "Data Filter"
++input string InpReportStart             = "";                                        // Report start date YYYY.MM.DD (empty=no filter)
++input string InpFilterSymbol            = "";                                        // Filter by symbol (empty=all)
++input string InpFilterComment           = "";                                        // Filter by comment (empty=all)
++
++input group "Trade Snapshot"
++input bool   InpSnapshotEnable          = true;                                      // Enable local trade snapshots
++input int    InpSnapshotHours           = 72;                                        // Snapshot lookback hours
++input bool   InpSnapshotBackfillOnce    = false;                                     // One-shot full-history backfill, flip back after run
++
++input group "DD Guard - Account"
++input bool   InpDdgEnable               = false;                                     // default OFF - enable when needed
++input double InpDdgAccountMaxPercent    = 20.0;                                      // account max drawdown % (peak-to-equity)
++input double InpDdgAccountMaxMoney      = 0.0;                                       // Account max drawdown in money (0 = off)
++input bool   InpDdgAccountEnable        = true;                                      // v1.46 Q5: account-level DD guard (independent switch)
++input bool   InpDdgCloseOnHit           = true;                                      // close positions on trigger
++input int    InpDdgLockMinutes          = 60;                                        // lockout minutes after DD trigger (peak NOT lowered)
++input bool   InpDdgStopAutoTrade        = true;                                      // toggle terminal AutoTrading OFF on trigger (DLL)
++input bool   InpDdgAlertPopup           = false;                                     // Show alert popup on trigger
++input bool   InpDdgAccountStopAutotrade = true;                                      // account-level DD stops global AutoTrading
++input int    InpDdgCloseRetry           = 4;                                         // close retry attempts before giving up
++
++input group "DD Guard - Per Symbol"
++input bool   InpDdgSymbolEnable         = false;                                     // v1.46 Q5: per-symbol DD guard (independent switch)
++input string InpDdgSymbolList           = "";                                        // Guarded symbols, comma-separated (empty=all)
++input double InpDdgSymbolMaxPercent     = 12.0;                                      // per-symbol max drawdown %
++input double InpDdgSymbolMaxMoney       = 0.0;                                       // Per-symbol max drawdown in money (0 = off)
++input bool   InpDdgSymbolStopAutotrade  = false;                                     // per-symbol DD stops global AutoTrading (default OFF)
++
++input group "Symbol Guard"
++input bool   InpSymbolGuardEnable       = true;                                      // Symbol Guard: monitor per-symbol trading
++input int    InpSymbolGuardMode         = 0;                                         // v1.47 Q7: new symbol default 0=ON 1=ALERT 2=BLOCK 3=CLOSE
++
++input group "News Guard"
++input int    InpNewsGuardMode           = 0;                                         // v1.47 Q8: 0=OFF(default) 1=ALERT 2=BLOCK(new only) 3=CLOSE(new+old)
++input int    InpNewsBeforeMinutes       = 30;                                        // Minutes before news event to guard
++input int    InpNewsAfterMinutes        = 15;                                        // Minutes after news event to guard
++input bool   InpNewsHighImpactOnly      = true;                                      // Guard high-impact news only
++input string InpNewsFile                = "news_guard.csv";                          // News calendar CSV file name
++input int    InpNewsServerOffsetHours   = -5;                                        // news CSV(HKT+8) -> broker server hours
++
++input group "Telegram"
++input string InpTelegramChatId          = "920593269";                               // Telegram chat ID
++input string InpTelegramTokenFile       = "tg_token.txt";                            // File name holding the bot token
++input bool   InpTelegramEnable          = true;                                      // Enable Telegram notifications
++input int    InpTelegramMinGapMinutes   = 10;                                        // min minutes between notifications per key
++
++input group "Backup & Recovery"
++input bool   InpAutoBackup              = true;                                      // Enable daily auto backup on change
++input bool   InpAutoReconnect           = true;                                      // Auto-restart terminal on stuck disconnect
++input int    InpReconnectAfterMinutes   = 10;                                        // Sustained disconnect minutes before restart
++input int    InpRestartCooldownHours    = 2;                                         // Min hours between restarts
++input int    InpMaxRestartAttempts      = 3;                                         // Give up after N consecutive failed restarts
++input string InpBackupTime              = "05:30";                                   // Daily check time, server time HH:MM
++input string InpBackupFolder            = "";                                        // Custom backup root (empty=auto data path)
++
++input group "Diagnostics"
++//--- (reserved: no diagnostics inputs yet)
+ 
+ //=== GLOBALS ===
+ double  g_ngPeakEquity = 0;
+@@ -129,6 +158,11 @@
+ datetime g_lastFull = 0;
+ datetime g_lastSnap = 0;
+ datetime g_saveBtnFlashUntil = 0; // SAVE button green-flash deadline
++//--- v1.60 (1230 §3.2): auto-backup / auto-reconnect support (MT4 parity)
++int      g_backupMinute    = 330;  // parsed from InpBackupTime at OnInit
++datetime g_lastBackupCheck = 0;
++datetime g_discStart       = 0;    // v1.20: disconnect tracker for auto-reconnect
++string   BACKUP_HASH_FILE  = "TD_backup_hash.txt";
+ 
+ //--- Runtime filter (from inputs, editable via chart)
+ string   g_filterSymbol = "";
+@@ -263,7 +297,7 @@
+    GlobalVariableSet(DDG_SymLockKey(s), on ? 1 : 0);
+ }
+ // v1.14 T7: CSV time is HKT(+8); hot-window checks use TimeGMT()+8h
+-datetime NG_EvTime(string t){ return(StringToTime(t) + (datetime)(NG_ServerOffsetHours*3600)); }   // display/fallback only
++datetime NG_EvTime(string t){ return(StringToTime(t) + (datetime)(InpNewsServerOffsetHours*3600)); }   // display/fallback only
+ datetime NG_EvTimeHKT(string t){ return(StringToTime(t)); }   // CSV raw time == HKT
+ datetime NG_NowHKT(){ return(TimeGMT() + 8*3600); }
+ 
+@@ -289,22 +323,9 @@
+    return (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+ }
+ 
+-double CalcTradePnl(string symbol, int type, double openPrice, double closePrice,
+-                    double volume, double swap, double commission)
+-{
+-   double pt = SymPoint(symbol);
+-   double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+-   double tickSize  = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+-   double contractSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
+-   if(contractSize < 1) contractSize = 100000;
+-   double priceDiff = (type == 0) ? (closePrice - openPrice) : (openPrice - closePrice);
+-   double pureProfit;
+-   if(tickValue > 0 && tickSize > 0)
+-      pureProfit = (priceDiff / tickSize) * tickValue * volume;
+-   else
+-      pureProfit = priceDiff * contractSize * volume;
+-   return pureProfit + swap + commission;
+-}
++//--- v1.60 (1230 §3.4): CalcTradePnl() removed - it had ZERO callers in
++//---   the MT5 build (dead code). Gain keeps using the broker-true
++//---   DEAL_PROFIT + DEAL_SWAP + DEAL_COMMISSION recorded at sync time.
+ 
+ //+------------------------------------------------------------------+
+ //| OnInit                                                           |
+@@ -318,18 +339,18 @@
+    // Clean up objects from previous version
+    ObjectsDeleteAll(0, PFX);
+ 
+-   g_view = MathMax(0, MathMin(3, View));
++   g_view = MathMax(0, MathMin(3, InpDefaultView));
+    g_tab = 0;
+    g_offset = 0;
+ 
+    // Initialize runtime filters from inputs
+-   g_filterSymbol = FilterSymbol;
+-   g_filterComment = FilterComment;
++   g_filterSymbol = InpFilterSymbol;
++   g_filterComment = InpFilterComment;
+ 
+    // Parse ReportStart
+-   if(ReportStart != "")
++   if(InpReportStart != "")
+    {
+-      g_reportStart = StringToTime(ReportStart + " 00:00:00");
++      g_reportStart = StringToTime(InpReportStart + " 00:00:00");
+       if(g_reportStart < D'2020.01.01') g_reportStart = 0;
+    }
+ 
+@@ -357,13 +378,13 @@
+    g_name[20]="Events";    g_wid[20]=42;
+ 
+    // Column visibility
+-   g_vis[0]=ShowDay;         g_vis[1]=ShowTrades;      g_vis[2]=ShowBuySell;
+-   g_vis[3]=ShowWR;          g_vis[4]=ShowGain;        g_vis[5]=ShowGainPct;
+-   g_vis[6]=ShowWPips;       g_vis[7]=ShowLot;         g_vis[8]=ShowTotalLot;
+-   g_vis[9]=ShowBalance;     g_vis[10]=ShowMargin;     g_vis[11]=ShowFreeMarg;
+-   g_vis[12]=ShowFMaxPos;    g_vis[13]=ShowFMaxNeg;    g_vis[14]=ShowPF;
+-   g_vis[15]=ShowAvgP;       g_vis[16]=ShowBest;       g_vis[17]=ShowWorst;
+-   g_vis[18]=ShowMaxDD;      g_vis[19]=ShowMaxDDPct;   g_vis[20]=false;
++   g_vis[0]=InpShowDay;         g_vis[1]=InpShowTrades;      g_vis[2]=InpShowBuySell;
++   g_vis[3]=InpShowWinRate;          g_vis[4]=InpShowGainMoney;        g_vis[5]=InpShowGainPercent;
++   g_vis[6]=InpShowPips;       g_vis[7]=InpShowLots;         g_vis[8]=InpShowTotalLots;
++   g_vis[9]=InpShowBalance;     g_vis[10]=InpShowMargin;     g_vis[11]=InpShowFreeMargin;
++   g_vis[12]=InpShowFloatPeakProfit;    g_vis[13]=InpShowFloatPeakLoss;    g_vis[14]=InpShowProfitFactor;
++   g_vis[15]=InpShowAvgPnl;       g_vis[16]=InpShowBestTrade;       g_vis[17]=InpShowWorstTrade;
++   g_vis[18]=InpShowMaxDdMoney;      g_vis[19]=InpShowMaxDdPercent;   g_vis[20]=false;
+ 
+    //--- v1.51 TD6: park pre-1.51 shared files BEFORE any load touches them
+    MigrateLegacySharedFiles();
+@@ -371,15 +392,56 @@
+ 
+    LoadRecords();       // hydrate binary snapshot ring buffer
+    LoadTrades();        // hydrate local trade snapshot CSV
++   g_backupMinute = ParseHM(InpBackupTime, 330);   // v1.60 (1230 §3.2)
+ 
+-   if(SnapEnable) SyncTradesFromHistory();
++   //--- v1.60 FIX (1245 review): pre-v1.60 stores were built with the
++   //---   OVERWRITE upsert and no deal dedup, so merging the new `+=`
++   //---   aggregation on top of them would double-count every historical
++   //---   OUT deal. First v1.60 run with no seen-set file = one-shot
++   //---   rebuild from full history; the seen set is then persisted so
++   //---   the migration never repeats.
++   LoadSeenSet();
++   int legacyCount = t_tradeCount;
++   bool migrating  = (!g_seenLoaded && legacyCount > 0);
++   if(migrating)
++   {
++      t_tradeCount = 0;   // fresh rebuild from history
++      LogEvent("V1.60 MIGRATION: rebuilding store from full history (netting aggregation fix)");
++   }
++
++   //--- v1.60 (1230 §3.2): BackfillOnce runs the (always full-history)
++   //---   sync at init even when snapshots are off; flip the input back
++   //---   after the run, as on MT4.
++   if(InpSnapshotEnable || InpSnapshotBackfillOnce)
++      SyncTradesFromHistory();
++   if(InpSnapshotBackfillOnce)
++      LogEvent(StringFormat("BACKFILL DONE n=%d", t_tradeCount));
++
++   if(migrating)
++   {
++      if(t_tradeCount == 0)
++      {
++         // history unavailable - keep the legacy store (SaveTrades
++         // no-shrink guard already skipped the overwrite), retry next init
++         LoadTrades();
++         g_seenDealN = 0; g_seenDirty = false; g_seenLoaded = false;
++         LogEvent("V1.60 MIGRATION DEFERRED: empty history scan, legacy store kept");
++      }
++      else
++      {
++         LogEvent(StringFormat("V1.60 MIGRATION DONE: %d trades rebuilt (was %d)",
++                  t_tradeCount, legacyCount));
++         g_seenDirty = true;   // belt-and-braces; the sync tail already saved
++         SaveSeenSet();
++      }
++   }
+ 
+    RecordSnapshot();
+ 
+    CollectData();
+    RenderOnly();
+ 
+-   Print("=== TradeDashboard v1.51 (MT5) STARTED === Trades: ", t_tradeCount,
++   Print("=== TradeDashboard v1.60 (MT5) STARTED === Trades: ", t_tradeCount,
+          " | Records: ", r_count,
+          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
+          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
+@@ -387,11 +449,380 @@
+ }
+ 
+ //+------------------------------------------------------------------+
++//| v1.60 (1230 §3.2): MT4-parity profile backup & auto-restart       |
++//| Ported from TradeDashboard_v1.60_final.mq4 (MT4 :344-708, :529-   |
++//| 580, :1538-1580). hwnd types are `long` per the MT5 import block, |
++//| chart hwnd comes from CHART_WINDOW_HANDLE, cmd temp files live in |
++//| MQL5\Files, and the restart launches terminal64.exe (TERMINAL_PATH|
++//| already points at it on MT5).                                     |
++//+------------------------------------------------------------------+
++int CalcInputFingerprint()
++{
++   string s = IntegerToString(InpPanelScale) + "_" +
++              IntegerToString(InpDefaultView) + "_" +
++              IntegerToString(InpRefreshSeconds) + "_" +
++              IntegerToString(InpRecordSeconds) + "_" +
++              IntegerToString(InpMaxRecords) + "_" +
++              IntegerToString((int)InpSnapshotEnable) + "_" +
++              IntegerToString(InpSnapshotHours) + "_" +
++              IntegerToString((int)InpSnapshotBackfillOnce) + "_" +
++              InpReportStart + "_" +
++              InpFilterSymbol + "_" +
++              InpFilterComment + "_" +
++              IntegerToString((int)InpShowDay) + "_" +
++              IntegerToString((int)InpShowTrades) + "_" +
++              IntegerToString((int)InpShowBuySell) + "_" +
++              IntegerToString((int)InpShowWinRate) + "_" +
++              IntegerToString((int)InpShowGainMoney) + "_" +
++              IntegerToString((int)InpShowGainPercent) + "_" +
++              IntegerToString((int)InpShowPips) + "_" +
++              IntegerToString((int)InpShowLots) + "_" +
++              IntegerToString((int)InpShowTotalLots) + "_" +
++              IntegerToString((int)InpShowBalance) + "_" +
++              IntegerToString((int)InpShowMargin) + "_" +
++              IntegerToString((int)InpShowFreeMargin) + "_" +
++              IntegerToString((int)InpShowFloatPeakProfit) + "_" +
++              IntegerToString((int)InpShowFloatPeakLoss) + "_" +
++              IntegerToString((int)InpShowProfitFactor) + "_" +
++              IntegerToString((int)InpShowAvgPnl) + "_" +
++              IntegerToString((int)InpShowBestTrade) + "_" +
++              IntegerToString((int)InpShowWorstTrade) + "_" +
++              IntegerToString((int)InpShowMaxDdMoney) + "_" +
++              IntegerToString((int)InpShowMaxDdPercent) + "_" +
++              InpTitleLine1 + "_" + InpTitleLine2 + "_" +
++              IntegerToString((int)InpShowPnlChart) + "_" +
++              IntegerToString((int)InpAutoBackup) + "_" +
++              InpBackupTime + "_" + InpBackupFolder;
++
++   int hash = 0;
++   int len = StringLen(s);
++   for(int i = 0; i < len; i++)
++      hash += (int)StringGetCharacter(s, i);
++   return hash;
++}
++
++void SaveFingerprint(int hash)
++{
++   int h = FileOpen(BACKUP_HASH_FILE, FILE_WRITE | FILE_TXT | FILE_ANSI);
++   if(h != INVALID_HANDLE)
++   {
++      FileWriteString(h, IntegerToString(hash));
++      FileClose(h);
++   }
++}
++
++int LoadFingerprint()
++{
++   int h = FileOpen(BACKUP_HASH_FILE, FILE_READ | FILE_TXT | FILE_ANSI);
++   if(h != INVALID_HANDLE)
++   {
++      if(!FileIsEnding(h))
++      {
++         string s = FileReadString(h);
++         FileClose(h);
++         StringTrimLeft(s);
++         StringTrimRight(s);
++         return (int)StringToInteger(s);
++      }
++      FileClose(h);
++   }
++   return -1;  // No previous hash
++}
++
++string GetEnvVarEA(string varName)
++{
++   // v1.17 (MT4): derive USERPROFILE from terminal data path first (no cmd race)
++   if(varName == "USERPROFILE")
++   {
++      string dp = TerminalInfoString(TERMINAL_DATA_PATH);
++      StringReplace(dp, "/", "\\");
++      for(int i = 0; i < 5; i++)
++      {
++         int p = StringLen(dp) - 1;
++         while(p > 0 && StringGetCharacter(dp, p) != '\\') p--;
++         if(p > 0) dp = StringSubstr(dp, 0, p);
++      }
++      if(StringFind(dp, ":\\") == 1 && StringLen(dp) >= 8)
++         return dp;
++   }
++
++   string result = "";
++   string tempPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\_env_tmp.txt";
++   StringReplace(tempPath, "/", "\\");
++
++   // no space before '>' - classic cmd echo trap writes the space into the file
++   string cmd = "/C echo %" + varName + "%> \"" + tempPath + "\"";
++   ShellExecuteW(0, "open", "cmd.exe", cmd, NULL, 0);
++   Sleep(500);
++
++   int h = FileOpen("_env_tmp.txt", FILE_READ | FILE_TXT | FILE_ANSI);
++   if(h != INVALID_HANDLE)
++   {
++      if(!FileIsEnding(h))
++         result = FileReadString(h);
++      FileClose(h);
++      FileDelete("_env_tmp.txt");
++   }
++
++   StringTrimLeft(result);
++   StringTrimRight(result);
++   if(StringLen(result) < 3)
++   {
++      string dp2 = TerminalInfoString(TERMINAL_DATA_PATH);
++      StringReplace(dp2, "/", "\\");
++      for(int j = 0; j < 5; j++)
++      {
++         int q = StringLen(dp2) - 1;
++         while(q > 0 && StringGetCharacter(dp2, q) != '\\') q--;
++         if(q > 0) dp2 = StringSubstr(dp2, 0, q);
++      }
++      result = dp2;
++   }
++   return result;
++}
++
++string ReadActiveProfile()
++{
++   string dp = TerminalInfoString(TERMINAL_DATA_PATH);
++   StringReplace(dp, "/", "\\");
++   string src = dp + "\\profiles\\lastprofile.ini";
++   string tempPath = dp + "\\MQL5\\Files\\_prof_tmp.txt";
++
++   // no space before '>' - same cmd echo trap as v1.17
++   string cmd = "/C type \"" + src + "\"> \"" + tempPath + "\"";
++   ShellExecuteW(0, "open", "cmd.exe", cmd, NULL, 0);
++   Sleep(500);
++
++   string prof = "Default";
++   int h = FileOpen("_prof_tmp.txt", FILE_READ | FILE_TXT | FILE_ANSI);
++   if(h != INVALID_HANDLE)
++   {
++      if(!FileIsEnding(h))
++      {
++         string s = FileReadString(h);
++         StringTrimLeft(s);
++         StringTrimRight(s);
++         if(StringLen(s) > 0) prof = s;
++      }
++      FileClose(h);
++      FileDelete("_prof_tmp.txt");
++   }
++   return prof;
++}
++
++bool TriggerTerminalSaveProfile()
++{
++   long hChart = ChartGetInteger(0, CHART_WINDOW_HANDLE);
++   if(hChart == 0) { Print("[Backup] no chart hwnd"); return false; }
++
++   long hMain = GetAncestor(hChart, 2);   // GA_ROOT = terminal main window
++   if(hMain == 0) { Print("[Backup] no main hwnd"); return false; }
++
++   int hMenu = GetMenu(hMain);
++   if(hMenu == 0) { Print("[Backup] GetMenu failed"); return false; }
++
++   int hFile = GetSubMenu(hMenu, 0);     // File menu (first item)
++   if(hFile == 0) { Print("[Backup] File menu not found"); return false; }
++
++   // find "Profiles" submenu inside File menu
++   int hProf = 0;
++   int nFile = GetMenuItemCount(hFile);
++   for(int i = 0; i < nFile && hProf == 0; i++)
++   {
++      ushort buf[64];
++      for(int z = 0; z < 64; z++) buf[z] = 0;
++      GetMenuStringW(hFile, i, buf, 64, 0x400);        // MF_BYPOSITION
++      string s = ShortArrayToString(buf);
++      if(StringFind(s, "Profiles") >= 0)
++         hProf = GetSubMenu(hFile, i);
++   }
++   if(hProf == 0) { Print("[Backup] Profiles submenu not found"); return false; }
++
++   // find "Save" item (exact match first; skip "Save As...")
++   int cmdSave = -1;
++   int nProf = GetMenuItemCount(hProf);
++   for(int k = 0; k < nProf; k++)
++   {
++      ushort b2[64];
++      for(int z2 = 0; z2 < 64; z2++) b2[z2] = 0;
++      GetMenuStringW(hProf, k, b2, 64, 0x400);
++      string t2 = ShortArrayToString(b2);
++      if(t2 == "Save") { cmdSave = GetMenuItemID(hProf, k); break; }
++      if(StringFind(t2, "Save") == 0 && StringFind(t2, "As") < 0)
++         cmdSave = GetMenuItemID(hProf, k);
++   }
++   if(cmdSave <= 0) { Print("[Backup] Save menu item not found"); return false; }
++
++   // WM_COMMAND = 0x0111, fires same as clicking File>Profiles>Save
++   PostMessageW(hMain, 0x0111, cmdSave, 0);
++   Print("[Backup] Profile flush triggered (menu cmd ", cmdSave, ")");
++   return true;
++}
++
++bool DoProfileBackup()
++{
++   string dataPath = TerminalInfoString(TERMINAL_DATA_PATH);
++   StringReplace(dataPath, "/", "\\");
++   string profilesSrc = dataPath + "\\profiles";
++
++   datetime now = TimeCurrent();
++   MqlDateTime mdt;
++   TimeToStruct(now, mdt);
++   string dateStr = StringFormat("%04d%02d%02d", mdt.year, mdt.mon, mdt.day);
++
++   string acctNum = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
++   string serverName = AccountInfoString(ACCOUNT_SERVER);
++   // Clean server name for filename
++   StringReplace(serverName, "\\", "_");
++   StringReplace(serverName, "/", "_");
++   StringReplace(serverName, ":", "_");
++   StringReplace(serverName, "*", "_");
++   StringReplace(serverName, "?", "_");
++   StringReplace(serverName, "\"", "_");
++   StringReplace(serverName, "<", "_");
++   StringReplace(serverName, ">", "_");
++   StringReplace(serverName, "|", "_");
++
++   string destFolder;
++   if(StringLen(InpBackupFolder) > 0)
++      destFolder = InpBackupFolder + "\\" + acctNum + "_" + serverName + "_" + dateStr;
++   else
++   {
++      string userProfile = GetEnvVarEA("USERPROFILE");
++      destFolder = userProfile + "\\Downloads\\MT5\\Profiles\\" + acctNum + "_" + serverName + "_" + dateStr;
++   }
++
++   // v1.19 (MT4): flush live chart state to disk BEFORE copying
++   if(TriggerTerminalSaveProfile())
++      Sleep(1500);   // give terminal UI thread time to write .chr files
++   else
++      Print("[Backup] WARN: flush failed, copying last-saved state only");
++
++   // v1.19 (MT4): "Save As" -> <server>_<account> snapshot profile, keep Default in sync
++   string activeProfile = ReadActiveProfile();
++   string activeDir = profilesSrc + "\\" + activeProfile;
++   string snapName = serverName + "_" + acctNum;
++   string snapDir = profilesSrc + "\\" + snapName;
++
++   if(activeProfile != snapName)
++   {
++      string cmdSnap = "/C robocopy \"" + activeDir + "\" \"" + snapDir + "\" /MIR /NFL /NDL /NJH /NJS /NP";
++      Print("[Backup] Save As profile: ", snapName);
++      ShellExecuteW(0, "open", "cmd.exe", cmdSnap, NULL, 0);
++      Sleep(1000);
++   }
++   if(activeProfile != "Default")
++   {
++      string defDir = profilesSrc + "\\Default";
++      string cmdDef = "/C robocopy \"" + activeDir + "\" \"" + defDir + "\" /MIR /NFL /NDL /NJH /NJS /NP";
++      Print("[Backup] Save As Default - sync from ", activeProfile);
++      ShellExecuteW(0, "open", "cmd.exe", cmdDef, NULL, 0);
++      Sleep(1000);
++   }
++
++   string cmd = "/C robocopy \"" + profilesSrc + "\" \"" + destFolder + "\" /E /NFL /NDL /NJH /NJS /NP";
++
++   Print("[Backup] Backing up to ", destFolder);
++   int result = ShellExecuteW(0, "open", "cmd.exe", cmd, NULL, 0);
++
++   if(result > 32)
++   {
++      Print("[Backup] Backup initiated successfully.");
++      return true;
++   }
++   Print("[Backup] ShellExecute failed! Error: ", result);
++   return false;
++}
++
++void CheckAndBackupProfile()
++{
++   if(!InpAutoBackup) return;
++
++   // Check once per day after BackupTime (minutes-of-day, server time)
++   datetime now = TimeCurrent();
++   MqlDateTime mdt2;
++   TimeToStruct(now, mdt2);
++   int nowMinute = mdt2.hour*60 + mdt2.min;
++   int today = (int)(now / 86400);
++   int lastDay = 0;
++   if(g_lastBackupCheck > 0)
++      lastDay = (int)(g_lastBackupCheck / 86400);
++
++   if(today == lastDay) return;  // Already checked today
++   if(nowMinute < g_backupMinute) return;  // Not yet time
++
++   g_lastBackupCheck = now;
++
++   // Compare fingerprints
++   int currentHash = CalcInputFingerprint();
++   int savedHash = LoadFingerprint();
++
++   if(currentHash == savedHash)
++   {
++      Print("[Backup] No parameter changes detected, skipping backup.");
++      return;
++   }
++
++   // Parameters changed - do backup
++   Print("[Backup] Parameter changes detected!");
++   if(DoProfileBackup())
++      SaveFingerprint(currentHash);
++}
++
++//+------------------------------------------------------------------+
++//| v1.20 (MT4): FX market should be open? (PC clock, HKT timezone)   |
++//+------------------------------------------------------------------+
++bool MarketShouldBeOpenLocal(datetime t)
++{
++   MqlDateTime dt;
++   TimeToStruct(t, dt);
++   int w = dt.day_of_week;          // 0=Sun 1=Mon ... 6=Sat
++   if(w == 0) return false;         // Sunday: closed (buffer)
++   if(w == 1) return dt.hour >= 6;  // Monday: from 06:00 HKT
++   if(w >= 2 && w <= 5) return true;// Tue-Fri full day
++   if(w == 6) return dt.hour < 4;   // Saturday: before 04:00
++   return false;
++}
++
++//+------------------------------------------------------------------+
++//| v1.20 (MT4): restart script - kills own terminal, relaunches exe  |
++//| (MT5: TERMINAL_PATH is terminal64.exe; re-login uses saved creds) |
++//+------------------------------------------------------------------+
++void TriggerTerminalRestart()
++{
++   string exe = TerminalInfoString(TERMINAL_PATH);
++   StringReplace(exe, "/", "\\");
++   if(StringLen(exe) < 5) { Print("[RC] no terminal path"); return; }
++
++   int h = FileOpen("TD_restart.cmd", FILE_WRITE | FILE_TXT | FILE_ANSI);
++   if(h == INVALID_HANDLE) { Print("[RC] cannot write TD_restart.cmd"); return; }
++   FileWriteString(h, "@echo off\r\n");
++   FileWriteString(h, "setlocal\r\n");
++   FileWriteString(h, "set \"EXE=" + exe + "\"\r\n");
++   FileWriteString(h, "set \"PIDF=%TEMP%\\td_pid.txt\"\r\n");
++   FileWriteString(h, "wmic process where \"ExecutablePath='%EXE%'\" get ProcessId /value > \"%PIDF%\" 2>nul\r\n");
++   FileWriteString(h, "set PID=\r\n");
++   FileWriteString(h, "for /f \"tokens=2 delims==\" %%P in ('findstr /b \"ProcessId\" \"%PIDF%\"') do set PID=%%P\r\n");
++   FileWriteString(h, "if defined PID taskkill /F /PID %PID% >nul 2>&1\r\n");
++   FileWriteString(h, "ping -n 4 127.0.0.1 >nul\r\n");
++   FileWriteString(h, "start \"\" \"%EXE%\"\r\n");
++   FileWriteString(h, "del \"%PIDF%\" >nul 2>&1\r\n");
++   FileClose(h);
++
++   string dp = TerminalInfoString(TERMINAL_DATA_PATH);
++   StringReplace(dp, "/", "\\");
++   string full = dp + "\\MQL5\\Files\\TD_restart.cmd";
++   ShellExecuteW(0, "open", "cmd.exe", "/C \"" + full + "\"", NULL, 0);
++   Print("[RC] terminal restart triggered: ", exe);
++}
++
++//+------------------------------------------------------------------+
+ //| OnDeinit                                                         |
+ //+------------------------------------------------------------------+
+ void OnDeinit(const int reason)
+ {
+    EventKillTimer();
++   SaveSeenSet();      // v1.60 FIX (1245): flush seen-deal tickets before shutdown
+    SaveRecordsBin();
+    GlobalVariableSet(DDG_PeakKey(), g_ddgPeakEquity);
+    ObjectsDeleteAll(0, PFX);
+@@ -412,13 +843,13 @@
+    RecordSnapshot();
+    SG_CollectSymbols();
+ 
+-   if(SnapEnable && TimeCurrent() - g_lastSnap >= 300)
++   if(InpSnapshotEnable && TimeCurrent() - g_lastSnap >= 300)
+    {
+       SyncTradesFromHistory();
+       g_lastSnap = TimeCurrent();
+    }
+ 
+-   if(TimeCurrent() - g_lastFull >= RefreshSec)
++   if(TimeCurrent() - g_lastFull >= InpRefreshSeconds)
+    {
+       CollectData();
+       DD_BuildSymbols();
+@@ -442,13 +873,28 @@
+       r_head = 0;
+       LoadRecords();
+       LoadTrades();
++      LoadSeenSet();   // v1.60 FIX (1245): per-account seen set follows the switch
++      // v1.60 FIX (1245): same first-run rule as OnInit - a populated store
++      //   without a seen-set file must be REBUILT, never merged into.
++      if(!g_seenLoaded && t_tradeCount > 0)
++      {
++         LogEvent("V1.60 MIGRATION (account switch): rebuilding store from full history");
++         t_tradeCount = 0;
++         SyncTradesFromHistory();
++         if(t_tradeCount == 0)
++         {
++            LoadTrades();
++            g_seenDealN = 0; g_seenDirty = false; g_seenLoaded = false;
++            LogEvent("V1.60 MIGRATION DEFERRED (account switch): legacy store kept");
++         }
++      }
+       LogEvent("ACCT SWITCH: reloaded TD files for account " + IntegerToString(acctNow));
+-      Print("TD5 v1.51: account switch -> ", acctNow, ", state reloaded");
++      Print("TD5 v1.60: account switch -> ", acctNow, ", state reloaded");
+    }
+ 
+    //--- v1.51 TD6: sync here too. OnTick never fires on a closed market, so the
+    //---   MT5 build used to stop syncing every weekend while the MT4 build did not.
+-   if(SnapEnable && TimeCurrent() - g_lastSnap >= 300)
++   if(InpSnapshotEnable && TimeCurrent() - g_lastSnap >= 300)
+    {
+       SyncTradesFromHistory();
+       g_lastSnap = TimeCurrent();
+@@ -464,13 +910,64 @@
+    GlobalVariableSet(DDG_PeakKey(), g_ddgPeakEquity);
+    SG_CollectSymbols();
+    RecordSnapshot();
+-   if(TimeCurrent() - g_lastFull >= RefreshSec)
++   if(TimeCurrent() - g_lastFull >= InpRefreshSeconds)
+    {
+       CollectData();
+       DD_BuildSymbols();
+       RenderOnly();
+       g_lastFull = TimeCurrent();
+    }
++
++   //--- v1.60 (1230 §3.2, MT4 parity): daily profile backup on input change
++   CheckAndBackupProfile();
++
++   //--- v1.60 (1230 §3.2, MT4 parity): auto-reconnect watchdog - sustained
++   //---   disconnect restarts terminal64.exe; cooldown + give-up live in
++   //---   terminal Global Variables so they survive the restart itself.
++   if(!InpAutoReconnect) return;
++
++   if((bool)TerminalInfoInteger(TERMINAL_CONNECTED))
++   {
++      double okCnt = GlobalVariableGet("TD_RC_count");
++      if(okCnt >= 1)
++      {
++         LogEvent("RECONNECT OK: restored after " + IntegerToString((int)okCnt) + " restart attempt(s)");
++         GlobalVariableSet("TD_RC_count", 0);
++         GlobalVariableSet("TD_RC_gaveup", 0);
++      }
++      g_discStart = 0;
++      return;
++   }
++
++   datetime nowL = TimeLocal();
++   if(g_discStart == 0) { g_discStart = nowL; return; }
++   if(nowL - g_discStart < InpReconnectAfterMinutes * 60) return;   // not sustained yet
++   if(!MarketShouldBeOpenLocal(nowL)) return;                // weekend/overnight
++
++   // v1.21 (MT4): give up after N consecutive failed restarts
++   // (password changed / account locked - manual intervention needed)
++   double cnt = GlobalVariableGet("TD_RC_count");
++   if(cnt >= InpMaxRestartAttempts)
++   {
++      if(GlobalVariableGet("TD_RC_gaveup") < 1)
++      {
++         GlobalVariableSet("TD_RC_gaveup", 1);
++         LogEvent("RECONNECT GAVE UP: " + IntegerToString((int)cnt) +
++                  " restarts failed - MANUAL LOGIN REQUIRED (check password/account)");
++      }
++      return;
++   }
++
++   // cooldown across restarts via terminal Global Variables
++   double gv = GlobalVariableGet("TD_RC_last");
++   if(gv > 0 && nowL - (datetime)gv < InpRestartCooldownHours * 3600) return;
++   GlobalVariableSet("TD_RC_last", (double)nowL);
++   GlobalVariableSet("TD_RC_count", cnt + 1);
++
++   LogEvent("RECONNECT RESTART #" + IntegerToString((int)cnt + 1) + "/" +
++            IntegerToString(InpMaxRestartAttempts) + ": disconnected " +
++            IntegerToString((int)((nowL - g_discStart) / 60)) + " min, restarting terminal");
++   TriggerTerminalRestart();
+ }
+ 
+ //+------------------------------------------------------------------+
+@@ -589,6 +1086,69 @@
+ }
+ 
+ //+------------------------------------------------------------------+
++//| v1.60 FIX (1245 review): seen OUT-deal ticket set                |
++//| Persisted per account (TD_<acct>_seen.bin) so restarts and       |
++//| re-syncs never double-add the `+=` netting aggregation below.    |
++//| Deals arrive in (roughly) ascending order, so the sorted insert  |
++//| is append-mostly and binary search keeps lookups cheap.          |
++//+------------------------------------------------------------------+
++ulong  g_seenDeal[];
++int    g_seenDealN  = 0;
++bool   g_seenDirty  = false;
++bool   g_seenLoaded = false;
++
++string SeenFile() { return(AccountTag() + "seen.bin"); }
++
++bool DealSeen(ulong ticket)
++{
++   int lo = 0, hi = g_seenDealN - 1;          // ascending binary search
++   while(lo <= hi)
++   {
++      int mid = (lo + hi) / 2;
++      if(g_seenDeal[mid] == ticket) return true;
++      if(g_seenDeal[mid] < ticket) lo = mid + 1; else hi = mid - 1;
++   }
++   return false;
++}
++
++void MarkDealSeen(ulong ticket)
++{
++   if(DealSeen(ticket)) return;
++   int n = ArraySize(g_seenDeal);
++   if(g_seenDealN >= n) ArrayResize(g_seenDeal, MathMax(256, n * 2));
++   int pos = 0;
++   while(pos < g_seenDealN && g_seenDeal[pos] < ticket) pos++;
++   for(int i = g_seenDealN; i > pos; i--) g_seenDeal[i] = g_seenDeal[i - 1];
++   g_seenDeal[pos] = ticket;
++   g_seenDealN++;
++   g_seenDirty = true;
++}
++
++void LoadSeenSet()
++{
++   g_seenDealN = 0; g_seenDirty = false; g_seenLoaded = false;
++   ArrayResize(g_seenDeal, 0);
++   if(!FileIsExist(SeenFile())) return;   // first run / pre-v1.60 store
++   int fh = FileOpen(SeenFile(), FILE_READ|FILE_BIN);
++   if(fh == INVALID_HANDLE) return;
++   int rd = FileReadArray(fh, g_seenDeal, 0, WHOLE_ARRAY);
++   FileClose(fh);
++   if(rd > 0) g_seenDealN = rd;
++   g_seenLoaded = true;
++}
++
++void SaveSeenSet()
++{
++   if(!g_seenDirty || g_seenDealN == 0) return;
++   int fh = FileOpen(SeenFile(), FILE_WRITE|FILE_BIN);
++   if(fh == INVALID_HANDLE) return;
++   FileWriteArray(fh, g_seenDeal, 0, g_seenDealN);
++   FileClose(fh);
++   g_seenDirty = false;
++   g_seenLoaded = true;
++}
++
++//+------------------------------------------------------------------+
+ //| Local Trade Snapshot System                                      |
+ //+------------------------------------------------------------------+
+ int FindTrade(long ticket)
+@@ -632,6 +1192,12 @@
+       datetime ct = (datetime)HistoryDealGetInteger(dt, DEAL_TIME);
+       if(ct == 0) continue;
+ 
++      //--- v1.60 FIX (1245 review, netting): one OUT deal counts exactly
++      //---   once, EVER. Without this the `+=` aggregation below would
++      //---   re-add every historical deal on each restart/re-sync.
++      if(DealSeen(dt)) continue;
++      MarkDealSeen(dt);
++
+       long posId = HistoryDealGetInteger(dt, DEAL_POSITION_ID);
+       if(posId <= 0) posId = (long)dt;
+       int idx = FindTrade(posId);
+@@ -650,15 +1216,20 @@
+ 
+       if(idx >= 0)
+       {
+-         // partial closes (netting) aggregate into the same record;
+-         // re-syncs are idempotent because the delta is recomputed below.
+-         t_lots[idx]       = dVol;
+-         t_profit[idx]     = dProfit;
+-         t_swap[idx]       = dSwap;
+-         t_commission[idx] = dComm;
+-         t_closeprice[idx] = dClosePr;
+-         t_closetime[idx]  = ct;
+-         t_calcPnl[idx]    = dProfit + dSwap + dComm;
++         //--- v1.60 FIX (1245 review, netting): partial closes AGGREGATE
++         //---   into the same record (baseline :625-631 semantics). The
++         //---   v1.51 `=` overwrite kept only the LAST partial close, so a
++         //---   netting position closed in 3 OUT deals retained just deal
++         //---   #3 - Week/Month/MaxDD silently understated. Idempotency is
++         //---   NOT "delta recompute" (only true for a single OUT deal);
++         //---   it is the deal-ticket dedup set above.
++         t_lots[idx]       += dVol;
++         t_profit[idx]     += dProfit;
++         t_swap[idx]       += dSwap;
++         t_commission[idx] += dComm;
++         t_closeprice[idx]  = dClosePr;
++         t_closetime[idx]   = ct;
++         t_calcPnl[idx]     = t_profit[idx] + t_swap[idx] + t_commission[idx];
+          updCount++;
+          continue;
+       }
+@@ -707,7 +1278,12 @@
+                newCount, updCount, t_tradeCount, nd));
+    }
+ 
++   // v1.60 FIX (1245): seen set AFTER the store - a crash in between
++   //   double-counts once (visible in SYNC log, fixable by deleting the
++   //   seen file to re-migrate); the reverse order would permanently
++   //   SKIP deals whose store rows were lost. Recoverable > silent loss.
+    SaveTrades();
++   SaveSeenSet();
+ }
+ 
+ //--- keep the store ordered oldest -> newest so LoadTrades and the
+@@ -893,7 +1469,7 @@
+ void RecordSnapshot()
+ {
+    datetime now = TimeCurrent();
+-   if(now - g_lastRec < MathMax(1, RecordSec)) return;
++   if(now - g_lastRec < MathMax(1, InpRecordSeconds)) return;
+    // v1.50: monotonic time guard - TimeCurrent() can briefly report a stale
+    // value (weekend/rollover tick); writing it poisons the ring buffer with
+    // an old timestamp + current balance, corrupting Week/Month baselines
+@@ -968,7 +1544,7 @@
+    int cnt = FileReadInteger(fh, INT_VALUE);
+    if(cnt < 0 || cnt > MAX_REC) { FileClose(fh); return; }
+ 
+-   int cap = MathMin(cnt, MathMin(MaxRecords, MAX_REC));
++   int cap = MathMin(cnt, MathMin(InpMaxRecords, MAX_REC));
+    int skip = cnt - cap;   // if file has more than we keep, drop oldest
+ 
+    for(int i = 0; i < cnt && !FileIsEnding(fh); i++)
+@@ -1596,8 +2172,8 @@
+    for(int i=0;i<g_ngEventCount && ln<9;i++)
+    {
+       datetime ev=NG_EvTime(g_ngEvents[i][0]);
+-      if(ev+NG_AfterMin*60 < now) continue;
+-      bool hot=(now >= ev-NG_BeforeMin*60 && now <= ev+NG_AfterMin*60);
++      if(ev+InpNewsAfterMinutes*60 < now) continue;
++      bool hot=(now >= ev-InpNewsBeforeMinutes*60 && now <= ev+InpNewsAfterMinutes*60);
+       string syms="";
+       for(int j=0;j<g_sgSymN;j++)
+          if(NG_SymbolAffected(g_sgSym[j], g_ngEvents[i][1])) syms=syms+g_sgSym[j]+" ";
+@@ -1626,7 +2202,7 @@
+       ObjectSetInteger(0,PFX+"TSG_"+IntegerToString(k),OBJPROP_COLOR,fg);
+    }
+    if(g_sgSymN==0) UpdTxt("TAX","(no open symbols)",x,sy+14*scale,clrKhaki,9*scale);
+-   UpdTxt("TAM",StringFormat("NG mode=%s | window %dm/%dm | push on entry | tzOff %dh",(NG_Mode==0?"OFF":NG_Mode==1?"ALERT":NG_Mode==2?"BLOCK":"CLOSE"),NG_BeforeMin,NG_AfterMin,NG_ServerOffsetHours), x, sy+15*scale+MathMax(MathMin(g_sgSymN,8),1)*15*scale, clrWhite, 9*scale);
++   UpdTxt("TAM",StringFormat("NG mode=%s | window %dm/%dm | push on entry | tzOff %dh",(InpNewsGuardMode==0?"OFF":InpNewsGuardMode==1?"ALERT":InpNewsGuardMode==2?"BLOCK":"CLOSE"),InpNewsBeforeMinutes,InpNewsAfterMinutes,InpNewsServerOffsetHours), x, sy+15*scale+MathMax(MathMin(g_sgSymN,8),1)*15*scale, clrWhite, 9*scale);
+ }
+ 
+ // v1.29: per-symbol DD from closed-trade history (t_ arrays)
+@@ -1681,7 +2257,11 @@
+          if(peak-cum>maxdd) maxdd=peak-cum;
+       }
+       g_ddSymCum[j]=cum; g_ddSymDD[j]=maxdd;
+-      g_ddSymDDPct[j]=(peak>0)?maxdd/peak*100:(maxdd>0?100:0);
++      // v1.60 FIX (1425 §三-1): % denominator is DDG_Base() balance - the same
++      //   base as the DD-now column, NOT the realized-P/L curve peak (tiny on
++      //   losing symbols -> absurd percentages). peak=0 branch gone too.
++      double mbase = DDG_Base();
++      g_ddSymDDPct[j]=(mbase>0)?maxdd/mbase*100:0.0;
+    }
+ }
+ 
+@@ -1689,13 +2269,13 @@
+ {
+    double eq=AcctEquity();
+    double base=DDG_Base();     // v1.47 Q6: same Balance denominator as the guards
+-   double dd=(g_ddgPeakEquity>0)?(g_ddgPeakEquity-eq)/base*100:0;
++   double dd=MathMax(0.0,(g_ddgPeakEquity>0)?(g_ddgPeakEquity-eq)/base*100:0);   // v1.60 (1425 §三-2): clamp, never negative
+    UpdTxtBold("TD0","DDGuard - Account Drawdown",x,y,clrDeepSkyBlue,10*scale);
+-   UpdTxt("TD1",StringFormat("Peak $%.2f | Eq $%.2f | DD %.2f%% of bal $%.2f (limit %.1f%%)",g_ddgPeakEquity,eq,dd,base,DDG_MaxDDPct),x,y+16*scale,clrWhite,9*scale);
+-   UpdTxt("TD4",StringFormat("Acc: %s | Sym: %s | SymMaxDD: %.1f%% | Lock: %dmin",(DDG_AccOn?"ON":"OFF"),(DDG_SymOn?"ON":"OFF"),DDG_SymMaxDDPct,DDG_LockMinutes),x,y+31*scale,clrKhaki,9*scale);
++   UpdTxt("TD1",StringFormat("Peak $%.2f | Eq $%.2f | DD %.2f%% (limit %.1f%% / $%.2f)",g_ddgPeakEquity,eq,dd,InpDdgAccountMaxPercent,InpDdgAccountMaxMoney),x,y+16*scale,clrWhite,9*scale);   // v1.60 §3.3: both limits
++   UpdTxt("TD4",StringFormat("Acc: %s | Sym: %s | SymMaxDD: %.1f%% / $%.2f | Lock: %dmin",(InpDdgAccountEnable?"ON":"OFF"),(InpDdgSymbolEnable?"ON":"OFF"),InpDdgSymbolMaxPercent,InpDdgSymbolMaxMoney,InpDdgLockMinutes),x,y+31*scale,clrKhaki,9*scale);   // v1.60 §3.3
+    int bw=w-20;
+    UpdRect("TDB", x, y+44*scale, bw, 10*scale, C'40,50,80', C'40,50,80');
+-   double pct=MathMin(1.0, dd/DDG_MaxDDPct);
++   double pct=MathMin(1.0, dd/InpDdgAccountMaxPercent);
+    color bc=(pct>=1.0)?clrRed:(pct>=0.7?clrYellow:clrLime);
+    UpdRect("TDF", x, y+44*scale, (int)(bw*pct), 10*scale, bc, bc);
+ 
+@@ -1723,10 +2303,10 @@
+          if(PositionGetString(POSITION_SYMBOL)!=g_ddSyms[k]) continue;
+          fl += PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+       }
+-      double ddNow = -fl/bal*100.0;
++      double ddNow = MathMax(0.0, -fl/bal*100.0);   // v1.60 (1425 §三-2): clamp display
+       color cFl  = (fl>=0)?clrLime:clrTomato;
+-      color cDn  = (ddNow>=DDG_SymMaxDDPct)?clrRed:(ddNow>=DDG_SymMaxDDPct*0.7?clrYellow:clrWhite);
+-      color cMx  = (g_ddSymDDPct[k]>=DDG_SymMaxDDPct)?clrRed:(g_ddSymDDPct[k]>=DDG_SymMaxDDPct*0.7?clrYellow:clrKhaki);
++      color cDn  = (ddNow>=InpDdgSymbolMaxPercent)?clrRed:(ddNow>=InpDdgSymbolMaxPercent*0.7?clrYellow:clrWhite);
++      color cMx  = (g_ddSymDDPct[k]>=InpDdgSymbolMaxPercent)?clrRed:(g_ddSymDDPct[k]>=InpDdgSymbolMaxPercent*0.7?clrYellow:clrKhaki);
+       UpdTxt("DDN"+IntegerToString(k), g_ddSyms[k], c1, ry2, clrWhite, 9*scale);
+       UpdTxt("DDF"+IntegerToString(k), StringFormat("%+.2f", fl), c2, ry2, cFl, 9*scale);
+       UpdTxt("DDP"+IntegerToString(k), StringFormat("%.2f%%", ddNow), c3, ry2, cDn, 9*scale);
+@@ -1734,7 +2314,9 @@
+       UpdTxt("DDC"+IntegerToString(k), StringFormat("%.2f", g_ddSymDD[k]), c5, ry2, cMx, 9*scale);
+    }
+    if(g_ddSymN==0) UpdTxt("TAX2","(no traded symbols yet)",x+8*scale,ty+16*scale,clrKhaki,9*scale);
+-   UpdTxt("TAM2","DD now = live floating loss / balance | MaxDD = historical peak decline | base = balance", x, ty+18*scale+MathMin(g_ddSymN,12)*15*scale, clrKhaki, 8*scale);
++   // v1.60 (1230 §3.4): Gain definition note - MT5 Gain is broker-true
++   //   DEAL_PROFIT+SWAP+COMMISSION (MT4 recomputes from prices).
++   UpdTxt("TAM2","DD now = live floating loss / balance | MaxDD = historical peak decline | base = balance | Gain = broker-true P/L (profit+swap+comm)", x, ty+18*scale+MathMin(g_ddSymN,12)*15*scale, clrKhaki, 8*scale);
+    // v1.14 T3: manual confirm / reset-peak button
+    int by = y + 58*scale;   // v1.49: FIXED below progress bar (was floating y+284*scale, fell outside panel)
+    bool needConfirm = (g_ddgAccountArmed || g_tdStoppedAT || TimeCurrent() < g_ddgLockUntil);
+@@ -1749,9 +2331,9 @@
+ void TabRender_Set(int x,int y,int scale,int w)
+ {
+    UpdTxtBold("TS0","Settings Quick View (change via EA inputs)",x,y,clrDeepSkyBlue,10*scale);
+-   UpdTxt("TS1",StringFormat("Refresh: %ds   Record: %ds   Scale: %d   Chart: %s",RefreshSec,RecordSec,Scale,(ChartEnable?"ON":"OFF")),x,y+16*scale,clrWhite,9*scale);
+-   UpdTxt("TS2",StringFormat("SymbolGuard: %s   DefaultMode: %s   NG tzOff: %dh",(SG_Enable?"ON":"OFF"),SG_ModeName(SG_DefaultMode),NG_ServerOffsetHours),x,y+30*scale,clrWhite,9*scale);
+-   UpdTxt("TS3",StringFormat("Snapshot: %s   Records: %d / %d",(SnapEnable?"ON":"OFF"),r_count,MaxRecords),x,y+44*scale,clrWhite,9*scale);
++   UpdTxt("TS1",StringFormat("Refresh: %ds   Record: %ds   Scale: %d   Chart: %s",InpRefreshSeconds,InpRecordSeconds,InpPanelScale,(InpShowPnlChart?"ON":"OFF")),x,y+16*scale,clrWhite,9*scale);
++   UpdTxt("TS2",StringFormat("SymbolGuard: %s   DefaultMode: %s   NG tzOff: %dh",(InpSymbolGuardEnable?"ON":"OFF"),SG_ModeName(InpSymbolGuardMode),InpNewsServerOffsetHours),x,y+30*scale,clrWhite,9*scale);
++   UpdTxt("TS3",StringFormat("Snapshot: %s   Records: %d / %d",(InpSnapshotEnable?"ON":"OFF"),r_count,InpMaxRecords),x,y+44*scale,clrWhite,9*scale);
+    UpdTxt("TS4","Tip: click tabs to switch. Guard tab = per-symbol ON/ALERT/BLOCK/CLOSE (CLOSE needs 2nd press).",x,y+59*scale,clrWhite,9*scale);
+ }
+ 
+@@ -1760,7 +2342,7 @@
+ //+------------------------------------------------------------------+
+ void RenderOnly()
+ {
+-   int scale = MathMax(1, MathMin(3, Scale));
++   int scale = MathMax(1, MathMin(3, InpPanelScale));
+    int px = 10;
+    int py = 18;
+    int padR = 15;
+@@ -1796,7 +2378,7 @@
+    int maxRows=MathMin(10, g_cNumB);
+    if(maxRows<1) maxRows=1;
+ 
+-   int chartH=ChartEnable ? 60*scale : 0;
++   int chartH=InpShowPnlChart ? 60*scale : 0;
+    int panelH=headerH+chartH+18+maxRows*rowH+40;
+    // v1.39: non-Positions tabs need their own height
+    int tabNeedH = 0;
+@@ -1843,9 +2425,9 @@
+    //--- Left side header
+    int lh = 16*scale;
+    int ttlY=py+2+14*scale+4;
+-   UpdTxtBold("TTL", Title1, px+4, ttlY, clrLime, 13*scale);
++   UpdTxtBold("TTL", InpTitleLine1, px+4, ttlY, clrLime, 13*scale);
+    if(g_histTruncated) UpdTxt("HISTW", "HIST truncated! Check history range", px+170*scale, ttlY, clrOrangeRed, 8*scale); else ObjectDelete(0,PFX+"HISTW");
+-   UpdTxtBold("SUB", Title2, px+4, ttlY+lh, clrLime, 10*scale);
++   UpdTxtBold("SUB", InpTitleLine2, px+4, ttlY+lh, clrLime, 10*scale);
+    int acY = ttlY+lh*2;
+    UpdTxt("AC1", StringFormat("AC: %I64d  |  Balance: $%.2f  |  Equity: $%.2f",
+       AccountInfoInteger(ACCOUNT_LOGIN), AcctBalance(), AcctEquity()),
+@@ -1891,7 +2473,7 @@
+    int yPos=py+headerH;
+ 
+    // Chart area
+-   if(ChartEnable)
++   if(InpShowPnlChart)
+    {
+       DrawChartArea(px+10, yPos, panelW-20, chartH, scale);
+       yPos+=chartH;
+@@ -1985,8 +2567,8 @@
+       filterInfo += "  |  From: " + TimeToString(g_reportStart, TIME_DATE);
+ 
+    UpdTxt("FT", "Updated: "+TimeToString(TimeCurrent(),TIME_DATE|TIME_SECONDS)+
+-      "  |  Refresh: "+IntegerToString(RefreshSec)+"s"+
+-      "  |  Rec: "+IntegerToString(RecordSec)+"s ("+IntegerToString(r_count)+" recs)"+
++      "  |  Refresh: "+IntegerToString(InpRefreshSeconds)+"s"+
++      "  |  Rec: "+IntegerToString(InpRecordSeconds)+"s ("+IntegerToString(r_count)+" recs)"+
+       "  |  Trades: "+IntegerToString(t_tradeCount)+filterInfo,
+       px+10, yPos, clrWhite, 7*scale);
+ 
+@@ -2144,9 +2726,9 @@
+ int SG_EffMode(string sym)
+ {
+    int m = SG_Mode(sym);
+-   if(NG_Mode >= 2 && NG_SymbolHot(sym))
++   if(InpNewsGuardMode >= 2 && NG_SymbolHot(sym))
+    {
+-      int nm = (NG_Mode == 2) ? 2 : 3;
++      int nm = (InpNewsGuardMode == 2) ? 2 : 3;
+       if(nm > m) m = nm;
+    }
+    return(m);
+@@ -2159,7 +2741,7 @@
+       if(until > TimeCurrent()) return((int)GlobalVariableGet(SG_AutoModeKey(sym)));
+       SG_ClearAuto(sym);
+    }
+-   if(!GlobalVariableCheck(SG_ModeKey(sym))) return SG_DefaultMode;
++   if(!GlobalVariableCheck(SG_ModeKey(sym))) return InpSymbolGuardMode;
+    return((int)GlobalVariableGet(SG_ModeKey(sym)));
+ }
+ void SG_SetMode(string sym,int m)
+@@ -2244,7 +2826,7 @@
+ }
+ void SymbolGuard()
+ {
+-   if(!SG_Enable) return;
++   if(!InpSymbolGuardEnable) return;
+    static datetime lastScan=0;
+    if(TimeCurrent()-lastScan < 3) return;
+    lastScan=TimeCurrent();
+@@ -2353,8 +2935,8 @@
+ void TD_CheckHistoryDepth()
+ {
+    g_histTruncated = false;
+-   if(ReportStart == "") return;
+-   datetime rs = StringToTime(ReportStart);
++   if(InpReportStart == "") return;
++   datetime rs = StringToTime(InpReportStart);
+    if(rs <= 0) return;
+    // MT5: check earliest deal in selectable history
+    HistorySelect(rs, TimeCurrent()+86400);
+@@ -2370,14 +2952,14 @@
+    if(nd == 0 || earliest == 0 || earliest > rs + 86400)
+    {
+       g_histTruncated = true;
+-      Print("TD5: history may be truncated vs ReportStart=", ReportStart);
++      Print("TD5: history may be truncated vs ReportStart=", InpReportStart);
+    }
+ }
+ 
+ void NG_LoadNews()
+ {
+    g_ngEventCount = 0;
+-   int h = FileOpen(NG_NewsFile, FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   int h = FileOpen(InpNewsFile, FILE_READ|FILE_CSV|FILE_ANSI, ',');
+    if(h == INVALID_HANDLE) return;
+    while(!FileIsEnding(h) && g_ngEventCount < 64)
+    {
+@@ -2388,7 +2970,7 @@
+       if(t == "" || c == "") continue;
+       datetime dt = StringToTime(t);
+       if(dt <= 0) continue;
+-      if(NG_HighOnly && im != "HIGH") continue;
++      if(InpNewsHighImpactOnly && im != "HIGH") continue;
+       g_ngEvents[g_ngEventCount][0] = t;
+       g_ngEvents[g_ngEventCount][1] = c;
+       g_ngEvents[g_ngEventCount][2] = n;
+@@ -2406,7 +2988,7 @@
+    {
+       datetime ev=NG_EvTimeHKT(g_ngEvents[i][0]);
+       if(ev==0) continue;
+-      if(now >= ev-NG_BeforeMin*60 && now <= ev+NG_AfterMin*60)
++      if(now >= ev-InpNewsBeforeMinutes*60 && now <= ev+InpNewsAfterMinutes*60)
+          if(NG_SymbolAffected(sym, g_ngEvents[i][1])) return true;
+    }
+    return false;
+@@ -2421,7 +3003,7 @@
+    {
+       datetime ev=NG_EvTimeHKT(g_ngEvents[i][0]);
+       if(ev==0) continue;
+-      if(now >= ev-NG_BeforeMin*60 && now <= ev+NG_AfterMin*60 && !g_ngFired[i])
++      if(now >= ev-InpNewsBeforeMinutes*60 && now <= ev+InpNewsAfterMinutes*60 && !g_ngFired[i])
+       {
+          g_ngFired[i]=true;
+          string syms="";
+@@ -2449,7 +3031,7 @@
+ //+------------------------------------------------------------------+
+ void NG_Guard()
+ {
+-   if(NG_Mode == 0) return;
++   if(InpNewsGuardMode == 0) return;
+    if(TimeCurrent() - g_ngLastScan < 30) return;
+    g_ngLastScan = TimeCurrent();
+    NG_LoadNews();
+@@ -2460,12 +3042,12 @@
+       datetime evT = NG_EvTimeHKT(g_ngEvents[i][0]);
+       string   ccy = g_ngEvents[i][1];
+       datetime now = NG_NowHKT();
+-      if(now <  evT - NG_BeforeMin*60) continue;
+-      if(now >  evT + NG_AfterMin*60)  continue;
++      if(now <  evT - InpNewsBeforeMinutes*60) continue;
++      if(now >  evT + InpNewsAfterMinutes*60)  continue;
+ 
+       string msg = StringFormat("NewsGuard: %s %s @ %s (-%dm/+%dm) mode=%s",
+-                   ccy, g_ngEvents[i][2], TimeToString(evT, TIME_MINUTES), NG_BeforeMin, NG_AfterMin,
+-                   (NG_Mode==1?"ALERT":NG_Mode==2?"BLOCK":"CLOSE"));
++                   ccy, g_ngEvents[i][2], TimeToString(evT, TIME_MINUTES), InpNewsBeforeMinutes, InpNewsAfterMinutes,
++                   (InpNewsGuardMode==1?"ALERT":InpNewsGuardMode==2?"BLOCK":"CLOSE"));
+       if(msg != g_ngLastAlert)
+       {
+          Print(msg);
+@@ -2478,17 +3060,17 @@
+       //--- BLOCK closes new entries only; CLOSE also liquidates old positions.
+       //--- Auto-expiry at window end restores the user's per-symbol base mode,
+       //--- so a grid EA cannot reopen -> get closed -> reopen forever.
+-      if(NG_Mode >= 2)
++      if(InpNewsGuardMode >= 2)
+       {
+-         int autoMode = (NG_Mode == 2) ? 2 : 3;
+-         datetime until = evT + NG_AfterMin*60;
++         int autoMode = (InpNewsGuardMode == 2) ? 2 : 3;
++         datetime until = evT + InpNewsAfterMinutes*60;
+          for(int a = 0; a < g_sgSymN; a++)
+             if(NG_SymbolAffected(g_sgSym[a], ccy))
+                SG_SetAuto(g_sgSym[a], autoMode, until);
+          if(NG_SymbolAffected(Symbol(), ccy))
+             SG_SetAuto(Symbol(), autoMode, until);
+          //--- fallback when SymbolGuard itself is disabled: CLOSE mode closes here
+-         if(!SG_Enable && NG_Mode == 3)
++         if(!InpSymbolGuardEnable && InpNewsGuardMode == 3)
+          {
+             for(int p = PositionsTotal() - 1; p >= 0; p--)
+             {
+@@ -2505,7 +3087,7 @@
+    {
+       datetime evT2 = NG_EvTimeHKT(g_ngEvents[i2][0]);
+       string   c2   = g_ngEvents[i2][1];
+-      if(NG_NowHKT() > evT2 + NG_AfterMin*60)
++      if(NG_NowHKT() > evT2 + InpNewsAfterMinutes*60)
+          GlobalVariableSet("TD5_NEWSGUARD_" + c2, 0);
+    }
+ }
+@@ -2518,7 +3100,7 @@
+ //---            (Tools -> Options -> Expert Advisors -> Allow WebRequest)
+ void TG_LoadToken()
+ {
+-   int th = FileOpen(TG_TokenFile, FILE_READ|FILE_TXT|FILE_ANSI);
++   int th = FileOpen(InpTelegramTokenFile, FILE_READ|FILE_TXT|FILE_ANSI);
+    if(th != INVALID_HANDLE)
+    {
+       g_tgToken = FileReadString(th);
+@@ -2546,10 +3128,10 @@
+ {
+    // v1.15 Q2: MT5 built-in WebRequest - no wininet DLL needed
+    // NOTE: add https://api.telegram.org to WebRequest whitelist first
+-   if(!TG_Enable || g_tgToken == "") { SendNotification(StringSubstr(text,0,200)); return(false); }
++   if(!InpTelegramEnable || g_tgToken == "") { SendNotification(StringSubstr(text,0,200)); return(false); }
+    string url = "https://api.telegram.org/bot" + g_tgToken + "/sendMessage";
+    // form-encoded body: chat_id + UTF-8 URL-encoded text
+-   string data = "chat_id=" + TG_URLEncode(TG_ChatID) + "&text=" + TG_URLEncode(text);
++   string data = "chat_id=" + TG_URLEncode(InpTelegramChatId) + "&text=" + TG_URLEncode(text);
+    char post[]; int plen = StringToCharArray(data, post, 0, WHOLE_ARRAY, CP_UTF8); plen--;
+    string hdr = "Content-Type: application/x-www-form-urlencoded\r\n";
+    char resp[]; string respHdr;
+@@ -2572,7 +3154,7 @@
+ {
+    datetime now = TimeCurrent();
+    for(int i=0;i<g_tgN;i++)
+-      if(g_tgKey[i]==key){ if(now - g_tgLast[i] < TG_MinGapMin*60) return; g_tgLast[i]=now; TG_SendRaw(text); return; }
++      if(g_tgKey[i]==key){ if(now - g_tgLast[i] < InpTelegramMinGapMinutes*60) return; g_tgLast[i]=now; TG_SendRaw(text); return; }
+    if(g_tgN < 8){ g_tgKey[g_tgN]=key; g_tgLast[g_tgN]=now; g_tgN++; }
+    TG_SendRaw(text);
+ }
+@@ -2644,7 +3226,7 @@
+ // v1.14 T8: deposit/withdrawal-aware peak adjustment
+ int DDG_CloseAllWithRetry()
+ {
+-   int retries = MathMax(1, DDG_CloseRetry);
++   int retries = MathMax(1, InpDdgCloseRetry);
+    int residual = 9999;
+    for(int r = 0; r < retries; r++)
+    {
+@@ -2669,7 +3251,7 @@
+ 
+ int DDG_CloseSymbolWithRetry(string sym)
+ {
+-   int retries = MathMax(1, DDG_CloseRetry);
++   int retries = MathMax(1, InpDdgCloseRetry);
+    int residual = 9999;
+    for(int r = 0; r < retries; r++)
+    {
+@@ -2699,7 +3281,7 @@
+ //+------------------------------------------------------------------+
+ void DDG_ScanBalanceOps()
+ {
+-   if(!DDG_Enable) return;
++   if(!InpDdgEnable) return;
+    datetime now = TimeCurrent();
+    if(now - g_lastBalScan < 60) return;
+    g_lastBalScan = now;
+@@ -2730,44 +3312,54 @@
+ 
+ void DDG_Guard()
+ {
+-   if(!DDG_Enable) return;
++   //--- v1.60 (1425 §三-2): the ratchet is UNCONDITIONAL. It used to sit
++   //---   behind the master gate, so a disabled DDGuard froze the peak
++   //---   and the panel showed phantom negative DD (6DB4 -97.51%
++   //---   symptom). The high-water mark tracks even when DDGuard is off.
++   double eqP = AcctEquity();
++   if(eqP > g_ddgPeakEquity) g_ddgPeakEquity = eqP;   // never lowered
++   if(!InpDdgEnable) return;
+    DDG_ScanBalanceOps();
+    double eq  = AcctEquity();
+    double base = DDG_Base();                 // v1.47 Q6: single balance denominator
+-   if(eq > g_ddgPeakEquity) g_ddgPeakEquity = eq;   // high-water mark
+    if(g_ddgPeakEquity <= 0) return;
+    if(TimeCurrent() < g_ddgLockUntil) return;   // v1.35: lockout window
+    if(g_ddgAccountArmed) return;               // v1.14 T3: manual-confirm lock
+ 
+-   // ---- account check ----
+-   double ddPct = (g_ddgPeakEquity - eq) / base * 100.0;   // v1.47 Q6: was /g_ddgPeakEquity
+-   if(DDG_AccOn && ddPct >= DDG_MaxDDPct)
+-   {
+-      string msg = StringFormat("DDGuard5: account DD %.1f%% >= %.1f%% - %s",
+-                   ddPct, DDG_MaxDDPct, DDG_CloseOnHit ? "CLOSE ALL" : "no new trades");
++   // ---- account check (v1.60 §3.3: pct OR money, spec 1230) ----
++   double ddPct   = MathMax(0.0, (g_ddgPeakEquity - eq) / base * 100.0);   // v1.47 Q6 denominator
++   double ddMoney = MathMax(0.0, g_ddgPeakEquity - eq);
++   bool hitPct   = (InpDdgAccountMaxPercent > 0 && ddPct   >= InpDdgAccountMaxPercent);
++   bool hitMoney = (InpDdgAccountMaxMoney   > 0 && ddMoney >= InpDdgAccountMaxMoney);
++   if(InpDdgAccountEnable && (hitPct || hitMoney))
++   {
++      string trig = hitPct ? StringFormat("DD %.2f%% >= limit %.1f%%", ddPct, InpDdgAccountMaxPercent)
++                           : StringFormat("DD $%.2f >= limit $%.2f", ddMoney, InpDdgAccountMaxMoney);
++      string msg = StringFormat("DDGuard5: account %s - %s",
++                   trig, InpDdgCloseOnHit ? "CLOSE ALL" : "no new trades");
+       if(msg != g_ddgLastAlert)
+       {
+          Print(msg); SendNotification(msg); g_ddgLastAlert = msg;
+       }
+-      if(DDG_CloseOnHit)
++      if(InpDdgCloseOnHit)
+       {
+          int residual = DDG_CloseAllWithRetry();
+-         g_ddgLockUntil = TimeCurrent() + DDG_LockMinutes*60;
++         g_ddgLockUntil = TimeCurrent() + InpDdgLockMinutes*60;
+          g_ddgAccountArmed = true;
+-         if(DDG_AccStopAT) DDG_StopAT();
++         if(InpDdgAccountStopAutotrade) DDG_StopAT();
+          DDG_SaveState();                       // v1.47 Q9: survive terminal restart
+          if(residual > 0)
+             TG_Notify("DDG_ACC_RESID", "🚨 [URGENT] Close incomplete! " + IntegerToString(residual) + " position(s) still open — manual intervention required!");
+-         TG_Notify("DDG_ACC", "🚨 DDGuard TRIGGERED — ACCOUNT LEVEL\n━━━━━━━━━━━━━━\n🏦 AC: " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\n📉 DD: " + DoubleToString(ddPct,2) + "% >= limit " + DoubleToString(DDG_MaxDDPct,1) + "%\n💰 Peak: $" + DoubleToString(g_ddgPeakEquity,2) + "\n💸 Equity: $" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),2) + "\n⚡ Action: close all" + (residual>0?" (residual "+IntegerToString(residual)+" open!)":" ✅") + " + AlgoTrading " + (DDG_AccStopAT?"STOPPED":"not stopped") + "\n⏱ Awaiting manual confirm [Reset Peak]\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");   // anti-ratchet: peak NOT lowered
+-         if(DDG_Popup){ long rh; if(TD_TerminalHandle(rh)) MessageBoxW(rh, msg, "DDGuard5", 0x30); }
++         TG_Notify("DDG_ACC", "🚨 DDGuard TRIGGERED — ACCOUNT LEVEL\n━━━━━━━━━━━━━━\n🏦 AC: " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\n📉 DD: " + trig + " (limits " + DoubleToString(InpDdgAccountMaxPercent,1) + "% / $" + DoubleToString(InpDdgAccountMaxMoney,2) + ")\n💰 Peak: $" + DoubleToString(g_ddgPeakEquity,2) + "\n💸 Equity: $" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),2) + "\n⚡ Action: close all" + (residual>0?" (residual "+IntegerToString(residual)+" open!)":" ✅") + " + AlgoTrading " + (InpDdgAccountStopAutotrade?"STOPPED":"not stopped") + "\n⏱ Awaiting manual confirm [Reset Peak]\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");   // anti-ratchet: peak NOT lowered
++         if(InpDdgAlertPopup){ long rh; if(TD_TerminalHandle(rh)) MessageBoxW(rh, msg, "DDGuard5", 0x30); }
+       }
+       return;
+    }
+ 
+    // ---- per-symbol check (Scope=0) ----
+-   if(DDG_SymOn && DDG_SymMaxDDPct > 0)
++   if(InpDdgSymbolEnable && (InpDdgSymbolMaxPercent > 0 || InpDdgSymbolMaxMoney > 0))   // v1.60 §3.3: OR money limit
+    {
+-      string syms = DDG_Symbols;
++      string syms = InpDdgSymbolList;
+       if(syms == "") syms = Symbol();
+       string parts[]; int n = StringSplit(syms, ',', parts);
+       for(int s = 0; s < n; s++)
+@@ -2785,23 +3377,27 @@
+             if(PositionGetString(POSITION_SYMBOL) != sym) continue;
+             floating += PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+          }
+-         if(-floating >= base * DDG_SymMaxDDPct / 100.0)   // v1.47 Q6: was AcctEquity-based
++         bool symHitPct   = (InpDdgSymbolMaxPercent > 0 && -floating >= base * InpDdgSymbolMaxPercent / 100.0);   // v1.47 Q6: was AcctEquity-based
++         bool symHitMoney = (InpDdgSymbolMaxMoney   > 0 && -floating >= InpDdgSymbolMaxMoney);
++         if(symHitPct || symHitMoney)   // v1.60 §3.3: OR money limit
+          {
+-            string m2 = StringFormat("DDGuard5: %s floating %.0f hit %.1f%% - %s",
+-                        sym, floating, DDG_SymMaxDDPct, DDG_CloseOnHit?"CLOSE":"no new");
++            string trig2 = symHitPct ? StringFormat("%.1f%% limit", InpDdgSymbolMaxPercent)
++                                     : StringFormat("$%.2f limit", InpDdgSymbolMaxMoney);
++            string m2 = StringFormat("DDGuard5: %s floating %.0f hit %s - %s",
++                        sym, floating, trig2, InpDdgCloseOnHit?"CLOSE":"no new");
+             Print(m2); SendNotification(m2);
+-            if(DDG_CloseOnHit)
++            if(InpDdgCloseOnHit)
+             {
+                int residual2 = DDG_CloseSymbolWithRetry(sym);
+                SG_ForceClose(sym);
+                DDG_SetSymLock(sym, true);                  // v1.47 Q9: persist lock
+-               g_ddgLockUntil = TimeCurrent() + DDG_LockMinutes*60;
++               g_ddgLockUntil = TimeCurrent() + InpDdgLockMinutes*60;
+                DDG_SaveState();
+-               if(DDG_SymStopAT) DDG_StopAT();
++               if(InpDdgSymbolStopAutotrade) DDG_StopAT();
+                if(residual2 > 0)
+                   TG_Notify("DDG_SYM_RESID_" + sym, "🚨 [URGENT] " + sym + " close incomplete! " + IntegerToString(residual2) + " position(s) still open — manual intervention required!");
+-               TG_Notify("DDG_"+sym, "⚠️ DDGuard TRIGGERED — SYMBOL LEVEL\n━━━━━━━━━━━━━━\n.Symbol: " + sym + "\n📉 Floating: $" + DoubleToString(floating,2) + " (triggered " + DoubleToString(DDG_SymMaxDDPct,1) + "% limit)\n⚡ Action: close symbol" + (residual2>0?" (residual "+IntegerToString(residual2)+" open!)":" ✅") + " + SymbolGuard CLOSE locked" + (DDG_SymStopAT?" + AlgoTrading STOPPED":"") + "\n⏱ Awaiting manual confirm\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+-               if(DDG_Popup){ long rh2; if(TD_TerminalHandle(rh2)) MessageBoxW(rh2, m2, "DDGuard5", 0x30); }
++               TG_Notify("DDG_"+sym, "⚠️ DDGuard TRIGGERED — SYMBOL LEVEL\n━━━━━━━━━━━━━━\n.Symbol: " + sym + "\n📉 Floating: $" + DoubleToString(floating,2) + " (hit " + trig2 + ")\n⚡ Action: close symbol" + (residual2>0?" (residual "+IntegerToString(residual2)+" open!)":" ✅") + " + SymbolGuard CLOSE locked" + (InpDdgSymbolStopAutotrade?" + AlgoTrading STOPPED":"") + "\n⏱ Awaiting manual confirm\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
++               if(InpDdgAlertPopup){ long rh2; if(TD_TerminalHandle(rh2)) MessageBoxW(rh2, m2, "DDGuard5", 0x30); }
+             }
+          }
+       }

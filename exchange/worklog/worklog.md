@@ -2195,3 +2195,26 @@ Stage Summary:
 - 下一鐘：MT4 手術（PANELBG L3045→OnTimer 5-min sync→DD money×2→CLOSE 內聯表→MaxDD 三修→版號 1.60）。
 - **MT4 手術完成（本鐘超額，原排下一鐘）**：scripts/v160/mt4_surgery.py 16 項錨定替換全過→`TradeDashboard_v1.60_final.mq4`（4,147 行，21/21 自檢 PASS）。落地：①版號 1.60×4 處 ②PANELBG L3045 一行 ③OnTimer 5-min sync＋refresh（MT5 對齊，g_lastSnap/g_lastFull 共享戳冪等）④MaxDD①分母→DDG_Base()（peak=0 分支消失）⑤MaxDD②ratchet 出閘＋GV 持久化＋顯示 clamp≥0 ⑥DD money×2 帳戶 OR 觸發（trig 文案標明觸發源＋TG 雙限額）⑦symbol 層 OR 觸發＋strig 文案 ⑧狀態行 `(limit 20.0% / $2,000.00)` ⑨CLOSE 內聯表（BGB_ 行內 5 鈕 bx0=x+340、ARM+pager 表頭、LAST+BGC 表尾、BGP 分頁 12 行/頁 g_ddSymN 上限 32、舊板 BGBOARD/BGH/BGR_/BGN_/BGF_/BGD_ 全刪、BINGO_RowsPerPage/BINGO_Collect/BINGO_Render 三函數刪、g_bingoPerPg 刪、殘行 HideObj、RESID 落 LAST 行保 0745 硬約束、BINGO_Press 改 g_ddSyms[page*12+row] 對行）⑩guard tab panelW≥620*scale ⑪panelH 公式去板高。diff 1,327 行（+384/−369）→ scripts/v160/TradeDashboard_v1.55_to_v1.60.diff。
 - 下一鐘：MT5 手術（v1.51 基準：全量重建＋兩護欄＋8 參數實作＋CalcTradePnl 死碼刪＋DD money×2＋MaxDD 三修＋版號）→ TD10 #2/#3 → verify_v160.py＋REPORT＋.set×2 → 兩平台一齊交。
+
+## Task 262：15:01 巡查＋三信處理＋worklog鏡像生效＋MT5手術完成（2026-11-07 15:01–15:40）
+- 巡查：pull f961099，新信 3 封＝1435 W-FINAL批1重發（頁面lane→⏳不重複交付）＋1450 裁定（17236574落c收檔、1425全收、MT4-only先行照辦）＋1500 兩裁定（MT5內聯CLOSE「加，同步」要評估＋worklog鏡像「批」）。
+- 1505 回執（9341a40，隨 worklog sync 1505 一齊push）：①1450收執＋MT4手術已完成（21/21自檢）②**MT5內聯CLOSE評估＝v1.61緊接11-08交唔併入v1.60**（BGB_/BINGO在MT5 stage計0次＝全新建造~500行新碼；範圍凍結+netting必修貼線+無終端實測三理由；BINGO引擎Order→Position移植+板面直譯+雙按冷卻+verify_v161擴充）③worklog鏡像生效：位置exchange/worklog/worklog.md（避開scanner頂層loose .md入口）、seed全文2,197行、commit「worklog: sync 1505」、兩條件照守（唔commit code／每鐘最多一個sync commit綁:31輪）、回滾自癒=本地短過鏡像即還原 ④1435收貨+歸屬頁面lane+優先序一句 ⑤v1.60進度速報。
+- Board 解密：66,070B無變，無ZCODE_w現行卡可動。
+- **MT5 手術完成**：mt5_surgery.py 20項錨定替換→`TradeDashboard5_v1.60_final.mq5`（3,406行，+575）**31/31自檢PASS**。落地：①版號1.60×4 ②netting `+=`聚合+calcPnl重算+**DealSeen/MarkDealSeen去重集合**（排序ulong陣列二元搜尋、TD_<acct>_seen.bin持久化、sync尾SaveTrades後SaveSeenSet可復原優先於永久漏計）③**v1.60遷移**：無seen檔+有舊store=置零重建（空掃描DEFERRED保舊檔重試；帳號切換同規則防雙計）④8參數實作全port（CalcInputFingerprint/指紋存取/GetEnvVarEA/ReadActiveProfile/TriggerTerminalSaveProfile選單動態查ID/DoProfileBackup robocopy/CheckAndBackupProfile/MarketShouldBeOpenLocal/TriggerTerminalRestart terminal64.cmd；shell32+menu APIs入import、hwnd long型）⑤BackfillOnce=init時全量sync+BACKFILL DONE日誌 ⑥DD money×2 OR觸發（帳戶hitPct||hitMoney+trig文案、品種symHitPct||symHitMoney+gate擴錢額）⑦TG文案標觸發源（limits %/$雙額）⑧MaxDD三修（ratchet出閘eqP無條件、:3329分母、clamp×2）⑨狀態行+TD4雙限額 ⑩CalcTradePnl死碼刪 ⑪Gain面板註解（broker-true）。12 group/68 input回歸PASS、brace平衡。
+- MT4 補：TAM2 Gain註解一行（formula-recomputed）+diff重生成1,329行。
+- 修參：S6c/S6f錨點兩輪（emoji實體字元+\n引號邊界）＋自檢字串兩處過時（TG格式/死碼撞註釋）。
+- 下一鐘16:31：TD10 #2/#3（check_input_standard.py/check_param_parity.py）→ verify_v160.py（含netting靜態檢查）→ 2個baseline .set（risk OFF）→ REPORT.md（13驗收項對照+Gain定義差異+netting修法）→ 兩平台一齊交。
+
+## Task 263：15:31 巡查＋TD10 #2/#3＋verify_v160＋baseline .set×2＋REPORT——v1.60 兩平台一齊交（2026-11-07 15:31–15:57）
+- 巡查：pull b59fe32（health.json refresh），無新信。Board 66,070B 無變、無 ZCODE_w 新卡。尾三 Task 260/261/262 續辦＝v1.60 剩鏈（TD10 #2/#3→verify→.set→REPORT→一齊交），本鐘全清。
+- **TD10 #2 check_input_standard.py**：13 閘（命名 InpPascalCase/舊名殘留/comment/假分隔/分號終結/group 12 固定序/覆蓋/純度/唯一/型別白名單/code 段括號平衡/L1 lexer 三態衛生）。雙平台 13/13、12/12 PASS。
+- **TD10 #3 check_param_parity.py**：逐名逐序逐組逐型別＋default（帶 documented exception 名單）。PASS 68=68。
+- **捉獲並修復三個真編譯殺手**（全部機器閘進化，教訓＝一切修改落管道源頭）：
+  ①MT4 S6c TG 字串缺 ` + "`（OR 三元改寫食咗原開引號，`\n⚡` 落 code 段；brace balance 捉唔到）→ lexer L1 閘（code 段禁 \、string 段禁裸換行、終態禁 str/chr）；
+  ②兩平台新增 10 參數缺分號（block builder 寫 `= false // cmt`；MAP66 舊參數因源碼 default 帶 `;` 僥倖合規）→ default 規範化統一重發 `;`＋S1 閘；
+  ③MT4 TAM2 Gain 註解上輪手改 final 未入 surgery 源頭、重跑即失 → 入 mt4_surgery.py S8c＋自檢行。
+- 全鏈重跑：rename（9+9 PASS）→ surgery（MT4 ALL PASS＋TAM2 自檢、MT5 31/31）→ diff×2 重生成（MT4 1,327 行／MT5 1,441 行首交）→ 三閘全綠。
+- **verify_v160.py**（13 驗收項＋X1 netting＋X2 Gain＋.set 對名，自帶 lexer）：機器行全 PASS，exit 0；#1/#2 STATIC-PASS（0-err 編譯留 OpenClaw）、#9/#10 OPENCLAW-SIDE（部署截圖）。
+- **baseline .set×2**（make_baseline_sets.py，由 final input block 機器生成）：68 行全參數、風險 10 開關全 0（NG/DDG 全家/SG/AutoReconnect）、**TG chat ID 清空**（源碼 default 帶真 ID，憑證鐵律；token 檔名非秘密保留）。
+- **交付**：`from_zcode/20261107_1557_TD_v160_兩平台對齊/`（四源碼 diff/全檔＋REPORT.md＋verify+輸出＋.set×2＋tools/ 三件＋rename_report）＋回信 1557（13 項備證＋三殺手速報＋InpDefaultView default 分叉請裁＋TG default 憑證清空提議）→ precise add＋push。
+- 已知等態：OpenClaw 側編譯 0-err 實證＋部署＋#9/#10 截圖＋入 ea-repo；v1.61（MT5 內聯 CLOSE＋default 對齊候選）11-08。

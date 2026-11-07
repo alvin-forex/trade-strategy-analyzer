@@ -1,0 +1,1327 @@
+--- exchange-repo/exchange/from_zcode/20261107_0945_FIX-TD6_patch_TDv155/TradeDashboard_v1.55_full_preview.mq4	2026-11-07 06:14:51.633830413 +0000
++++ scripts/v160/TradeDashboard_v1.60_final.mq4	2026-11-07 07:56:27.963398092 +0000
+@@ -5,9 +5,9 @@
+ //|                                    Broker summary-proof engine   |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.55"
++#property version   "1.60"
+ #property strict
+-#property description "TradeDashboard v1.55"
++#property description "TradeDashboard v1.60 (two-platform aligned)"
+ 
+ #import "shell32.dll"
+    int ShellExecuteW(int hWnd, string Operation, string File, string Parameters, string Directory, int ShowCmd);
+@@ -28,92 +28,102 @@
+ 
+ //=== INPUTS ===
+ //--- v1.44: Panel Label first; NewsGuard/DDGuard default OFF (enable when needed)
+-input string ___LABEL___     = "=== Label ===";
+-input string Title1          = "TradeDashboard";        // Line 1 (max 30 chars) - no version in panel
+-input string Title2          = "Flying to the moon";    // Line 2 Subtitle (max 50 chars)
+-
+-input string ___SCALE___     = "=== Panel Scale ===";
+-input int    Scale           = 1;
+-input string ___VIEW___      = "=== Default View ===";
+-input int    View            = 1;       // 0=Hour, 1=Day (v1.52 default, FIX-TD3), 2=Week, 3=Month
+-input string ___REFRESH___   = "=== Refresh ===";
+-input int    RefreshSec      = 10;
+-input string ___RECORD___    = "=== Recording ===";
+-input int    RecordSec       = 1;       // Min seconds between records (1=every tick)
+-input int    MaxRecords      = 12000;   // Records in ring buffer (max 20000)
+-input string ___SNAP___      = "=== Trade Snapshot ===";
+-input bool   SnapEnable      = true;    // Enable local trade snapshots
+-input int    SnapHours       = 72;      // Snapshot lookback hours
+-input bool   BackfillOnce    = false;   // v1.55 FIX-TD6 addendum 608dbe5: one-shot full-history backfill, ignores SnapHours; flip back to false after the run
+-input string ___FILTER___    = "=== Data Filter ===";
+-input string ReportStart     = "";      // Report start date YYYY.MM.DD (empty=no filter)
+-input string FilterSymbol    = "";      // Filter by symbol (empty=all)
+-input string FilterComment   = "";      // Filter by comment (empty=all)
+-input string ___COLS___      = "=== Column Visibility ===";
+-input bool   ShowDay         = true;
+-input bool   ShowTrades      = true;
+-input bool   ShowBuySell     = true;    // Buy/Sell count
+-input bool   ShowWR          = true;
+-input bool   ShowGain        = true;
+-input bool   ShowGainPct     = true;
+-input bool   ShowWPips       = true;
+-input bool   ShowLot         = true;
+-input bool   ShowTotalLot    = true;
+-input bool   ShowBalance     = true;
+-input bool   ShowMargin      = true;
+-input bool   ShowFreeMarg    = true;
+-input bool   ShowFMaxPos     = true;    // Max floating profit (peak)
+-input bool   ShowFMaxNeg     = true;    // Max floating loss = intraday MaxDD
+-input bool   ShowPF          = true;
+-input bool   ShowAvgP        = true;
+-input bool   ShowBest        = true;
+-input bool   ShowWorst       = true;
+-input bool   ShowMaxDD       = true;    // Max drawdown $
+-input bool   ShowMaxDDPct    = true;    // Max drawdown %
+-input string ___CHART___     = "=== Chart ===";
+-input bool   ChartEnable     = false;   // Show cumulative P&L chart
+-input string ___BACKUP___    = "=== Auto Profile Backup ===";
+-input bool   AutoBackup      = true;    // Enable daily auto backup on change
+-input string ___RECONNECT___ = "=== Auto Reconnect ===";
+-input bool   AutoReconnect     = true;   // Auto-restart terminal on stuck disconnect
+-input int    ReconnectAfterMin  = 10;     // Sustained disconnect minutes before restart
+-input int    RestartCooldownHrs = 2;      // Min hours between restarts
+-input int    MaxRestartAttempts = 3;      // Give up after N consecutive failed restarts
+-input string BackupTime      = "05:30";  // Daily check time, server time HH:MM
+-input string BackupFolder    = "";      // Custom backup root (empty=auto: UserProfile\Downloads\MT4\Profiles)
+-
+-input string ___NEWSGUARD___  = "=== NewsGuard ===";
+-input int    NG_Mode          = 0;      // v1.47 Q8: 0=OFF(default) 1=ALERT 2=BLOCK(new only) 3=CLOSE(new+old)
+-input int    NG_BeforeMin     = 30;
+-input int    NG_AfterMin      = 15;
+-input bool   NG_HighOnly      = true;
+-input string NG_NewsFile      = "news_guard.csv";
+-input int    NG_ServerOffsetHours = -5; // news CSV(HKT+8) -> broker server hours (Vantage=HK-5)
+-
+-input string ___DDGUARD___    = "=== DD Guard ===";
+-input bool   DDG_Enable       = false;  // default OFF - enable when needed
+-input double DDG_MaxDDPct     = 20.0;   // account max drawdown % (peak-to-equity)
+-input bool   DDG_AccOn        = true;   // v1.46 Q5: account-level DD guard (independent switch)
+-input bool   DDG_SymOn        = false;  // v1.46 Q5: per-symbol DD guard (independent switch)
+-input string DDG_Symbols      = "";
+-input double DDG_SymMaxDDPct  = 12.0;   // per-symbol max drawdown %
+-input bool   DDG_CloseOnHit   = true;   // close positions on trigger
+-input int    DDG_LockMinutes  = 60;     // lockout minutes after DD trigger (peak NOT lowered)
+-input bool   DDG_StopAutoTrade = true;  // toggle terminal AutoTrading OFF on trigger (DLL)
+-input bool   DDG_Popup        = false;
+-input bool   DDG_AccStopAT    = true;   // account-level DD stops global AutoTrading
+-input bool   DDG_SymStopAT    = false;  // per-symbol DD stops global AutoTrading (default OFF)
+-input int    DDG_CloseRetry   = 4;      // close retry attempts before giving up
+-
+-input string ___TELEGRAM___   = "=== Telegram ===";
+-input string TG_ChatID        = "920593269";
+-input string TG_TokenFile     = "tg_token.txt";
+-input bool   TG_Enable       = true;
+-input int    TG_MinGapMin    = 10;      // min minutes between notifications per key
+-
+-input string ___SYMGUARD___  = "=== Symbol Guard ===";
+-input bool   SG_Enable       = true;     // Symbol Guard: monitor per-symbol trading
+-input int    SG_DefaultMode  = 0;        // v1.47 Q7: new symbol default 0=ON 1=ALERT 2=BLOCK 3=CLOSE
++//=== INPUTS (v1.60: 12 groups / 68 params, two-platform aligned) ===
++//--- v1.44: NewsGuard/DDGuard default OFF (enable when needed)
++//--- v1.60 FIX-TD10: rename per 1230 letter 66-row table; 2 new DD-money params
++
++input group "General"
++input string InpTitleLine1              = "TradeDashboard";                          // Line 1 (max 30 chars) - no version in panel
++input string InpTitleLine2              = "Flying to the moon";                      // Line 2 Subtitle (max 50 chars)
++input int    InpPanelScale              = 1;                                         // Panel size multiplier (1, 2 or 3)
++input int    InpDefaultView             = 1;                                         // 0=Hour, 1=Day (v1.52 default, FIX-TD3), 2=Week, 3=Month
++
++input group "Display"
++input bool   InpShowDay                 = true;                                      // Show Day column in stats table
++input bool   InpShowTrades              = true;                                      // Show trade count column
++input bool   InpShowBuySell             = true;                                      // Buy/Sell count
++input bool   InpShowWinRate             = true;                                      // Show win rate column
++input bool   InpShowGainMoney           = true;                                      // Show gain in money column
++input bool   InpShowGainPercent         = true;                                      // Show gain in percent column
++input bool   InpShowPips                = true;                                      // Show net pips column
++input bool   InpShowLots                = true;                                      // Show lots column
++input bool   InpShowTotalLots           = true;                                      // Show total lots row
++input bool   InpShowBalance             = true;                                      // Show balance row
++input bool   InpShowMargin              = true;                                      // Show margin row
++input bool   InpShowFreeMargin          = true;                                      // Show free margin row
++input bool   InpShowFloatPeakProfit     = true;                                      // Max floating profit (peak)
++input bool   InpShowFloatPeakLoss       = true;                                      // Max floating loss = intraday MaxDD
++input bool   InpShowProfitFactor        = true;                                      // Show profit factor row
++input bool   InpShowAvgPnl              = true;                                      // Show average P/L row
++input bool   InpShowBestTrade           = true;                                      // Show best trade row
++input bool   InpShowWorstTrade          = true;                                      // Show worst trade row
++input bool   InpShowMaxDdMoney          = true;                                      // Max drawdown $
++input bool   InpShowMaxDdPercent        = true;                                      // Max drawdown %
++input bool   InpShowPnlChart            = false;                                     // Show cumulative P&L chart
++
++input group "Refresh & Recording"
++input int    InpRefreshSeconds          = 10;                                        // Panel refresh interval in seconds
++input int    InpRecordSeconds           = 1;                                         // Min seconds between records (1=every tick)
++input int    InpMaxRecords              = 12000;                                     // Records in ring buffer (max 20000)
++
++input group "Data Filter"
++input string InpReportStart             = "";                                        // Report start date YYYY.MM.DD (empty=no filter)
++input string InpFilterSymbol            = "";                                        // Filter by symbol (empty=all)
++input string InpFilterComment           = "";                                        // Filter by comment (empty=all)
++
++input group "Trade Snapshot"
++input bool   InpSnapshotEnable          = true;                                      // Enable local trade snapshots
++input int    InpSnapshotHours           = 72;                                        // Snapshot lookback hours
++input bool   InpSnapshotBackfillOnce    = false;                                     // v1.55 FIX-TD6 addendum 608dbe5: one-shot full-history backfill, ignores SnapHours; flip back to false after the run
++
++input group "DD Guard - Account"
++input bool   InpDdgEnable               = false;                                     // default OFF - enable when needed
++input double InpDdgAccountMaxPercent    = 20.0;                                      // account max drawdown % (peak-to-equity)
++input double InpDdgAccountMaxMoney      = 0.0;                                       // Account max drawdown in money (0 = off)
++input bool   InpDdgAccountEnable        = true;                                      // v1.46 Q5: account-level DD guard (independent switch)
++input bool   InpDdgCloseOnHit           = true;                                      // close positions on trigger
++input int    InpDdgLockMinutes          = 60;                                        // lockout minutes after DD trigger (peak NOT lowered)
++input bool   InpDdgStopAutoTrade        = true;                                      // toggle terminal AutoTrading OFF on trigger (DLL)
++input bool   InpDdgAlertPopup           = false;                                     // Show alert popup on trigger
++input bool   InpDdgAccountStopAutotrade = true;                                      // account-level DD stops global AutoTrading
++input int    InpDdgCloseRetry           = 4;                                         // close retry attempts before giving up
++
++input group "DD Guard - Per Symbol"
++input bool   InpDdgSymbolEnable         = false;                                     // v1.46 Q5: per-symbol DD guard (independent switch)
++input string InpDdgSymbolList           = "";                                        // Guarded symbols, comma-separated (empty=all)
++input double InpDdgSymbolMaxPercent     = 12.0;                                      // per-symbol max drawdown %
++input double InpDdgSymbolMaxMoney       = 0.0;                                       // Per-symbol max drawdown in money (0 = off)
++input bool   InpDdgSymbolStopAutotrade  = false;                                     // per-symbol DD stops global AutoTrading (default OFF)
++
++input group "Symbol Guard"
++input bool   InpSymbolGuardEnable       = true;                                      // Symbol Guard: monitor per-symbol trading
++input int    InpSymbolGuardMode         = 0;                                         // v1.47 Q7: new symbol default 0=ON 1=ALERT 2=BLOCK 3=CLOSE
++
++input group "News Guard"
++input int    InpNewsGuardMode           = 0;                                         // v1.47 Q8: 0=OFF(default) 1=ALERT 2=BLOCK(new only) 3=CLOSE(new+old)
++input int    InpNewsBeforeMinutes       = 30;                                        // Minutes before news event to guard
++input int    InpNewsAfterMinutes        = 15;                                        // Minutes after news event to guard
++input bool   InpNewsHighImpactOnly      = true;                                      // Guard high-impact news only
++input string InpNewsFile                = "news_guard.csv";                          // News calendar CSV file name
++input int    InpNewsServerOffsetHours   = -5;                                        // news CSV(HKT+8) -> broker server hours (Vantage=HK-5)
++
++input group "Telegram"
++input string InpTelegramChatId          = "920593269";                               // Telegram chat ID
++input string InpTelegramTokenFile       = "tg_token.txt";                            // File name holding the bot token
++input bool   InpTelegramEnable          = true;                                      // Enable Telegram notifications
++input int    InpTelegramMinGapMinutes   = 10;                                        // min minutes between notifications per key
++
++input group "Backup & Recovery"
++input bool   InpAutoBackup              = true;                                      // Enable daily auto backup on change
++input bool   InpAutoReconnect           = true;                                      // Auto-restart terminal on stuck disconnect
++input int    InpReconnectAfterMinutes   = 10;                                        // Sustained disconnect minutes before restart
++input int    InpRestartCooldownHours    = 2;                                         // Min hours between restarts
++input int    InpMaxRestartAttempts      = 3;                                         // Give up after N consecutive failed restarts
++input string InpBackupTime              = "05:30";                                   // Daily check time, server time HH:MM
++input string InpBackupFolder            = "";                                        // Custom backup root (empty=auto: UserProfile\Downloads\MT4\Profiles)
++
++input group "Diagnostics"
++//--- (reserved: no diagnostics inputs yet)
+ 
+ 
+ //=== GLOBALS ===
+@@ -158,8 +168,7 @@
+ //--- v1.54 FIX-TD4 (0745 放行信): BINGO CLOSE BOARD state -------------------
+ //--- ARM is deliberately memory-only: EA reload / account switch / 60s expiry
+ //--- all reset it, so a stale ARM can never outlive a re-init.
+-int      g_bingoPage    = 0;     // BINGO pagination (1/2 [<][>])
+-int      g_bingoPerPg   = 6;     // rows per page, recomputed per render
++int      g_bingoPage    = 0;     // v1.60: DDGuard table page (12 rows/page over g_ddSymN)
+ datetime g_bingoCool[28][5];     // per-row per-button 30s cooldown
+ datetime g_bingoCoolAll = 0;     // [CLOSE 全倉] 30s cooldown
+ bool     g_bingoArmed   = false; // ARM gate - whole board disabled until armed
+@@ -334,41 +343,41 @@
+ //+------------------------------------------------------------------+
+ int CalcInputFingerprint()
+ {
+-   string s = IntegerToString(Scale) + "_" +
+-              IntegerToString(View) + "_" +
+-              IntegerToString(RefreshSec) + "_" +
+-              IntegerToString(RecordSec) + "_" +
+-              IntegerToString(MaxRecords) + "_" +
+-              IntegerToString((int)SnapEnable) + "_" +
+-              IntegerToString(SnapHours) + "_" +
+-              IntegerToString((int)BackfillOnce) + "_" +
+-              ReportStart + "_" +
+-              FilterSymbol + "_" +
+-              FilterComment + "_" +
+-              IntegerToString((int)ShowDay) + "_" +
+-              IntegerToString((int)ShowTrades) + "_" +
+-              IntegerToString((int)ShowBuySell) + "_" +
+-              IntegerToString((int)ShowWR) + "_" +
+-              IntegerToString((int)ShowGain) + "_" +
+-              IntegerToString((int)ShowGainPct) + "_" +
+-              IntegerToString((int)ShowWPips) + "_" +
+-              IntegerToString((int)ShowLot) + "_" +
+-              IntegerToString((int)ShowTotalLot) + "_" +
+-              IntegerToString((int)ShowBalance) + "_" +
+-              IntegerToString((int)ShowMargin) + "_" +
+-              IntegerToString((int)ShowFreeMarg) + "_" +
+-              IntegerToString((int)ShowFMaxPos) + "_" +
+-              IntegerToString((int)ShowFMaxNeg) + "_" +
+-              IntegerToString((int)ShowPF) + "_" +
+-              IntegerToString((int)ShowAvgP) + "_" +
+-              IntegerToString((int)ShowBest) + "_" +
+-              IntegerToString((int)ShowWorst) + "_" +
+-              IntegerToString((int)ShowMaxDD) + "_" +
+-              IntegerToString((int)ShowMaxDDPct) + "_" +
+-              Title1 + "_" + Title2 + "_" +
+-              IntegerToString((int)ChartEnable) + "_" +
+-              IntegerToString((int)AutoBackup) + "_" +
+-              BackupTime + "_" + BackupFolder;
++   string s = IntegerToString(InpPanelScale) + "_" +
++              IntegerToString(InpDefaultView) + "_" +
++              IntegerToString(InpRefreshSeconds) + "_" +
++              IntegerToString(InpRecordSeconds) + "_" +
++              IntegerToString(InpMaxRecords) + "_" +
++              IntegerToString((int)InpSnapshotEnable) + "_" +
++              IntegerToString(InpSnapshotHours) + "_" +
++              IntegerToString((int)InpSnapshotBackfillOnce) + "_" +
++              InpReportStart + "_" +
++              InpFilterSymbol + "_" +
++              InpFilterComment + "_" +
++              IntegerToString((int)InpShowDay) + "_" +
++              IntegerToString((int)InpShowTrades) + "_" +
++              IntegerToString((int)InpShowBuySell) + "_" +
++              IntegerToString((int)InpShowWinRate) + "_" +
++              IntegerToString((int)InpShowGainMoney) + "_" +
++              IntegerToString((int)InpShowGainPercent) + "_" +
++              IntegerToString((int)InpShowPips) + "_" +
++              IntegerToString((int)InpShowLots) + "_" +
++              IntegerToString((int)InpShowTotalLots) + "_" +
++              IntegerToString((int)InpShowBalance) + "_" +
++              IntegerToString((int)InpShowMargin) + "_" +
++              IntegerToString((int)InpShowFreeMargin) + "_" +
++              IntegerToString((int)InpShowFloatPeakProfit) + "_" +
++              IntegerToString((int)InpShowFloatPeakLoss) + "_" +
++              IntegerToString((int)InpShowProfitFactor) + "_" +
++              IntegerToString((int)InpShowAvgPnl) + "_" +
++              IntegerToString((int)InpShowBestTrade) + "_" +
++              IntegerToString((int)InpShowWorstTrade) + "_" +
++              IntegerToString((int)InpShowMaxDdMoney) + "_" +
++              IntegerToString((int)InpShowMaxDdPercent) + "_" +
++              InpTitleLine1 + "_" + InpTitleLine2 + "_" +
++              IntegerToString((int)InpShowPnlChart) + "_" +
++              IntegerToString((int)InpAutoBackup) + "_" +
++              InpBackupTime + "_" + InpBackupFolder;
+    
+    int hash = 0;
+    int len = StringLen(s);
+@@ -593,8 +602,8 @@
+    StringReplace(serverName, "|", "_");
+ 
+    string destFolder;
+-   if(StringLen(BackupFolder) > 0)
+-      destFolder = BackupFolder + "\\" + acctNum + "_" + serverName + "_" + dateStr;
++   if(StringLen(InpBackupFolder) > 0)
++      destFolder = InpBackupFolder + "\\" + acctNum + "_" + serverName + "_" + dateStr;
+    else
+    {
+       string userProfile = GetEnvVarEA("USERPROFILE");
+@@ -667,7 +676,7 @@
+ //+------------------------------------------------------------------+
+ void CheckAndBackupProfile()
+ {
+-   if(!AutoBackup) return;
++   if(!InpAutoBackup) return;
+ 
+    // Check once per day after BackupTime (minutes-of-day, server time)
+    datetime now = TimeCurrent();
+@@ -716,19 +725,19 @@
+    }
+ 
+    // Initialize view from input
+-   g_view = MathMax(0, MathMin(3, View));
++   g_view = MathMax(0, MathMin(3, InpDefaultView));
+ 
+    // Parse BackupTime "HH:MM" (server time) once at init; fallback 05:30
+-   g_backupMinute = ParseHM(BackupTime, 330);
++   g_backupMinute = ParseHM(InpBackupTime, 330);
+ 
+    // Initialize runtime filters from inputs
+-   g_filterSymbol = FilterSymbol;
+-   g_filterComment = FilterComment;
++   g_filterSymbol = InpFilterSymbol;
++   g_filterComment = InpFilterComment;
+ 
+    // Parse ReportStart
+-   if(ReportStart != "")
++   if(InpReportStart != "")
+    {
+-      g_reportStart = StringToTime(ReportStart + " 00:00:00");
++      g_reportStart = StringToTime(InpReportStart + " 00:00:00");
+       if(g_reportStart < D'2020.01.01') g_reportStart = 0;
+    }
+ 
+@@ -756,13 +765,13 @@
+    g_name[20]="Events";    g_wid[20]=42;
+ 
+    // Column visibility
+-   g_vis[0]=ShowDay;         g_vis[1]=ShowTrades;      g_vis[2]=ShowBuySell;
+-   g_vis[3]=ShowWR;          g_vis[4]=ShowGain;        g_vis[5]=ShowGainPct;
+-   g_vis[6]=ShowWPips;       g_vis[7]=ShowLot;         g_vis[8]=ShowTotalLot;
+-   g_vis[9]=ShowBalance;     g_vis[10]=ShowMargin;     g_vis[11]=ShowFreeMarg;
+-   g_vis[12]=ShowFMaxPos;    g_vis[13]=ShowFMaxNeg;    g_vis[14]=ShowPF;
+-   g_vis[15]=ShowAvgP;       g_vis[16]=ShowBest;       g_vis[17]=ShowWorst;
+-   g_vis[18]=ShowMaxDD;      g_vis[19]=ShowMaxDDPct;   g_vis[20]=false;
++   g_vis[0]=InpShowDay;         g_vis[1]=InpShowTrades;      g_vis[2]=InpShowBuySell;
++   g_vis[3]=InpShowWinRate;          g_vis[4]=InpShowGainMoney;        g_vis[5]=InpShowGainPercent;
++   g_vis[6]=InpShowPips;       g_vis[7]=InpShowLots;         g_vis[8]=InpShowTotalLots;
++   g_vis[9]=InpShowBalance;     g_vis[10]=InpShowMargin;     g_vis[11]=InpShowFreeMargin;
++   g_vis[12]=InpShowFloatPeakProfit;    g_vis[13]=InpShowFloatPeakLoss;    g_vis[14]=InpShowProfitFactor;
++   g_vis[15]=InpShowAvgPnl;       g_vis[16]=InpShowBestTrade;       g_vis[17]=InpShowWorstTrade;
++   g_vis[18]=InpShowMaxDdMoney;      g_vis[19]=InpShowMaxDdPercent;   g_vis[20]=false;
+ 
+    // v1.53 FIX-TD5 (2345 spec items 3+4): seed account watchdog, then one-time
+    //   migration of pre-v1.53 shared files BEFORE any load touches them.
+@@ -782,7 +791,7 @@
+    if(r_count == 0) LoadRecords();   // fallback: legacy CSV
+    LoadTrades();
+ 
+-   if(SnapEnable) SyncTradesFromHistory();
++   if(InpSnapshotEnable) SyncTradesFromHistory();
+ 
+    RecordSnapshot();
+ 
+@@ -794,7 +803,7 @@
+    // Save initial fingerprint on startup
+    SaveFingerprint(CalcInputFingerprint());
+    
+-   Print("=== TradeDashboard v1.55 STARTED === Trades: ", t_tradeCount,
++   Print("=== TradeDashboard v1.60 STARTED === Trades: ", t_tradeCount,
+          " | Records: ", r_count,
+          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
+          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
+@@ -886,9 +895,9 @@
+ int SG_EffMode(string sym)
+ {
+    int m = SG_Mode(sym);
+-   if(NG_Mode >= 2 && NG_SymbolHot(sym))
++   if(InpNewsGuardMode >= 2 && NG_SymbolHot(sym))
+    {
+-      int nm = (NG_Mode == 2) ? 2 : 3;
++      int nm = (InpNewsGuardMode == 2) ? 2 : 3;
+       if(nm > m) m = nm;
+    }
+    return(m);
+@@ -901,7 +910,7 @@
+       if(until > TimeCurrent()) return((int)GlobalVariableGet(SG_AutoModeKey(sym)));
+       SG_ClearAuto(sym);
+    }
+-   if(!GlobalVariableCheck(SG_ModeKey(sym))) return SG_DefaultMode;
++   if(!GlobalVariableCheck(SG_ModeKey(sym))) return InpSymbolGuardMode;
+    return((int)GlobalVariableGet(SG_ModeKey(sym)));
+ }
+ void SG_SetMode(string sym,int m)
+@@ -986,7 +995,7 @@
+ }
+ void SymbolGuard()
+ {
+-   if(!SG_Enable) return;
++   if(!InpSymbolGuardEnable) return;
+    static datetime lastScan=0;
+    if(TimeCurrent()-lastScan < 3) return;
+    lastScan=TimeCurrent();
+@@ -1119,8 +1128,8 @@
+    {
+       datetime ev=NG_EvTimeHKT(g_ngEvents[i][0]);
+       datetime nw=NG_NowHKT();
+-      if(ev+NG_AfterMin*60 < nw) continue;
+-      bool hot=(nw >= ev-NG_BeforeMin*60 && nw <= ev+NG_AfterMin*60);
++      if(ev+InpNewsAfterMinutes*60 < nw) continue;
++      bool hot=(nw >= ev-InpNewsBeforeMinutes*60 && nw <= ev+InpNewsAfterMinutes*60);
+       string syms="";
+       for(int j=0;j<g_sgSymN;j++)
+          if(NG_SymbolAffected(g_sgSym[j], g_ngEvents[i][1])) syms=syms+g_sgSym[j]+" ";
+@@ -1149,7 +1158,7 @@
+       ObjectSetInteger(0,PFX+"TSG_"+IntegerToString(k),OBJPROP_COLOR,fg);
+    }
+    if(g_sgSymN==0) UpdTxt("TAX","(no open symbols)",x,sy+14*scale,clrKhaki,9*scale);
+-   UpdTxt("TAM",StringFormat("NG mode=%s | window %dm/%dm | push on entry",(NG_Mode==0?"OFF":NG_Mode==1?"ALERT":NG_Mode==2?"BLOCK":"CLOSE"),NG_BeforeMin,NG_AfterMin), x, sy+15*scale+MathMax(MathMin(g_sgSymN,8),1)*15*scale, clrWhite, 9*scale);
++   UpdTxt("TAM",StringFormat("NG mode=%s | window %dm/%dm | push on entry",(InpNewsGuardMode==0?"OFF":InpNewsGuardMode==1?"ALERT":InpNewsGuardMode==2?"BLOCK":"CLOSE"),InpNewsBeforeMinutes,InpNewsAfterMinutes), x, sy+15*scale+MathMax(MathMin(g_sgSymN,8),1)*15*scale, clrWhite, 9*scale);
+ }// v1.29: per-symbol DD from closed-trade history (t_ arrays)
+ string g_ddSyms[32]; bool g_ddSel[32]; int g_ddSymN=0;
+ double g_ddSymDD[32];      // max DD in $
+@@ -1179,6 +1188,10 @@
+       if(!f2 && g_ddSymN<32){ g_ddSyms[g_ddSymN]=sym2; g_ddSymN++; }
+    }
+    // walk trades in close-time order per symbol, track cumulative peak/trough
++   // v1.60 FIX (1400 §四-1): % denominator is now DDG_Base() balance — the same
++   //   base as the DD-now column — NOT the realized-P/L curve peak, which is
++   //   tiny on losing symbols and produced 1080%/4819% absurdities.
++   double mbase = DDG_Base();
+    for(int j=0;j<g_ddSymN;j++)
+    {
+       string sym=g_ddSyms[j];
+@@ -1203,7 +1216,7 @@
+          if(peak-cum>maxdd) maxdd=peak-cum;
+       }
+       g_ddSymCum[j]=cum; g_ddSymDD[j]=maxdd;
+-      g_ddSymDDPct[j]=(peak>0)?maxdd/peak*100:(maxdd>0?100:0);
++      g_ddSymDDPct[j]=(mbase>0)?maxdd/mbase*100:0.0;   // v1.60: peak=0 branch gone too
+    }
+ }
+ // helper consumed-marks for the ordering pass (per symbol build)
+@@ -1215,11 +1228,12 @@
+ {
+    double eq=AccountEquity();
+    double base=DDG_Base();     // v1.47 Q6: same Balance denominator as the guards
+-   double dd=(g_ddgPeakEquity>0)?(g_ddgPeakEquity-eq)/base*100:0;
+-   color dc=(dd>=DDG_MaxDDPct)?clrRed:(dd>=DDG_MaxDDPct*0.7?clrYellow:clrLime);
++   double dd=MathMax(0.0,(g_ddgPeakEquity>0)?(g_ddgPeakEquity-eq)/base*100:0);   // v1.60 (1400 §四-2): clamp, never negative
++   color dc=(dd>=InpDdgAccountMaxPercent)?clrRed:(dd>=InpDdgAccountMaxPercent*0.7?clrYellow:clrLime);
+    UpdTxtBold("TD0","DDGuard - Account Drawdown",x,y,clrDeepSkyBlue,10*scale);
+-   UpdTxt("TD1",StringFormat("Peak $%.2f | Eq $%.2f | DD %.2f%% of bal $%.2f (limit %.1f%%)",g_ddgPeakEquity,eq,dd,base,DDG_MaxDDPct),x,y+16*scale,clrWhite,9*scale);
+-   UpdTxt("TD4",StringFormat("SymMaxDD: %.1f%% | Lock: %dmin | base = balance",DDG_SymMaxDDPct,DDG_LockMinutes),x,y+31*scale,clrKhaki,9*scale);
++   // v1.60 (1230 §3.3): both limits in the status line
++   UpdTxt("TD1",StringFormat("Peak $%.2f | Eq $%.2f | DD %.2f%% (limit %.1f%% / $%.2f)",g_ddgPeakEquity,eq,dd,InpDdgAccountMaxPercent,InpDdgAccountMaxMoney),x,y+16*scale,clrWhite,9*scale);
++   UpdTxt("TD4",StringFormat("SymMaxDD: %.1f%% | Lock: %dmin | base = balance",InpDdgSymbolMaxPercent,InpDdgLockMinutes),x,y+31*scale,clrKhaki,9*scale);
+ 
+    //--- v1.48: runtime switches (boss 2026-10-29). MT4 inputs are read-only at
+    //--- runtime, so the panel toggles the g_ddg* shadows, persisted via
+@@ -1237,11 +1251,15 @@
+ 
+    int bw=w-20;
+    UpdRect("TDB", x, y+66*scale, bw, 10*scale, C'40,50,80', C'40,50,80');
+-   double pct=MathMin(1.0, dd/DDG_MaxDDPct);
++   double pct=MathMin(1.0, dd/InpDdgAccountMaxPercent);
+    color bc=(pct>=1.0)?clrRed:(pct>=0.7?clrYellow:clrLime);
+    UpdRect("TDF", x, y+66*scale, (int)(bw*pct), 10*scale, bc, bc);
+ 
+    //--- v1.37: aligned column table, one row per traded symbol ---
++   //--- v1.60 (1400 §三, boss 13:29): CLOSE buttons INLINE — five buttons per
++   //--- row right of MaxDD$; the independent CLOSE BOARD block is gone (its
++   //--- 3 columns duplicated this table); ARM + pager live in the table
++   //--- header, LAST + [CLOSE 全倉] in the tail. BGB_ semantics unchanged.
+    int ty = y + 86*scale;
+    double bal = DDG_Base();   // v1.47 Q6: explicit balance base
+    int c1 = x + 8*scale;          // symbol
+@@ -1249,14 +1267,29 @@
+    int c3 = x + 175*scale;        // DD now %
+    int c4 = x + 250*scale;        // MaxDD %
+    int c5 = x + 320*scale;        // MaxDD $
++   int bx0 = x + 340*scale;       // v1.60: inline button column origin
++   int rows = 12;                 // v1.60: rows per page (was the k<12 cap)
++   int pages = (g_ddSymN + rows - 1) / rows;
++   if(pages < 1) pages = 1;
++   if(g_bingoPage >= pages) g_bingoPage = pages - 1;
++   if(g_bingoPage < 0) g_bingoPage = 0;
++   int row0 = g_bingoPage * rows;
+    UpdTxtBold("TPH", "SYMBOL",        c1, ty, clrDeepSkyBlue, 9*scale);
+    UpdTxtBold("TPC2","Float $",       c2, ty, clrDeepSkyBlue, 9*scale);
+    UpdTxtBold("TPC3","DD now %",      c3, ty, clrDeepSkyBlue, 9*scale);
+    UpdTxtBold("TPC4","MaxDD %",       c4, ty, clrDeepSkyBlue, 9*scale);
+    UpdTxtBold("TPC5","MaxDD $",       c5, ty, clrDeepSkyBlue, 9*scale);
+-   for(int k=0;k<g_ddSymN && k<12;k++)
++   // v1.60: ARM + pager in the table header row (from the old board header)
++   string armTxt = g_bingoArmed ? StringFormat("ARM %ds", 60 - (int)(TimeCurrent() - g_bingoArmT)) : "ARM";
++   UpdBtn("BGA", armTxt, bx0, ty - 2*scale, 64*scale, 13*scale, g_bingoArmed);
++   if(g_bingoArmed) ObjectSetInteger(0, PFX+"BGA", OBJPROP_BGCOLOR, clrOrange);
++   UpdTxt("BGP", StringFormat("%d/%d", g_bingoPage + 1, pages), x + w - 96*scale, ty, clrWhite, 9*scale);
++   UpdBtn("BGP_L", "[<]", x + w - 64*scale, ty - 2*scale, 28*scale, 13*scale, (g_bingoPage > 0));
++   UpdBtn("BGP_R", "[>]", x + w - 32*scale, ty - 2*scale, 28*scale, 13*scale, (g_bingoPage < pages - 1));
++   for(int k=row0; k<row0+rows && k<g_ddSymN; k++)
+    {
+-      int ry2=ty+16*scale+k*15*scale;
++      int i2 = k - row0;               // v1.60: visible row index (object suffix)
++      int ry2=ty+16*scale+i2*15*scale;
+       // live floating P/L for this symbol
+       double fl=0;
+       for(int p3=OrdersTotal()-1;p3>=0;p3--)
+@@ -1268,18 +1301,52 @@
+       }
+       double ddNow = -fl/bal*100.0;               // floating loss as % of balance
+       color cFl  = (fl>=0)?clrLime:clrTomato;
+-      color cDn  = (ddNow>=DDG_SymMaxDDPct)?clrRed:(ddNow>=DDG_SymMaxDDPct*0.7?clrYellow:clrWhite);
+-      color cMx  = (g_ddSymDDPct[k]>=DDG_SymMaxDDPct)?clrRed:(g_ddSymDDPct[k]>=DDG_SymMaxDDPct*0.7?clrYellow:clrKhaki);
+-      UpdTxt("DDN"+IntegerToString(k), g_ddSyms[k], c1, ry2, clrWhite, 9*scale);
+-      UpdTxt("DDF"+IntegerToString(k), StringFormat("%+.2f", fl), c2, ry2, cFl, 9*scale);
+-      UpdTxt("DDP"+IntegerToString(k), StringFormat("%.2f%%", ddNow), c3, ry2, cDn, 9*scale);
+-      UpdTxt("DDM"+IntegerToString(k), StringFormat("%.2f%%", g_ddSymDDPct[k]), c4, ry2, cMx, 9*scale);
+-      UpdTxt("DDC$"+IntegerToString(k), StringFormat("%.2f", g_ddSymDD[k]), c5, ry2, cMx, 9*scale);
++      color cDn  = (ddNow>=InpDdgSymbolMaxPercent)?clrRed:(ddNow>=InpDdgSymbolMaxPercent*0.7?clrYellow:clrWhite);
++      color cMx  = (g_ddSymDDPct[k]>=InpDdgSymbolMaxPercent)?clrRed:(g_ddSymDDPct[k]>=InpDdgSymbolMaxPercent*0.7?clrYellow:clrKhaki);
++      UpdTxt("DDN"+IntegerToString(i2), g_ddSyms[k], c1, ry2, clrWhite, 9*scale);
++      UpdTxt("DDF"+IntegerToString(i2), StringFormat("%+.2f", fl), c2, ry2, cFl, 9*scale);
++      UpdTxt("DDP"+IntegerToString(i2), StringFormat("%.2f%%", MathMax(0.0,ddNow)), c3, ry2, cDn, 9*scale);   // v1.60 clamp display
++      UpdTxt("DDM"+IntegerToString(i2), StringFormat("%.2f%%", g_ddSymDDPct[k]), c4, ry2, cMx, 9*scale);
++      UpdTxt("DDC$"+IntegerToString(i2), StringFormat("%.2f", g_ddSymDD[k]), c5, ry2, cMx, 9*scale);
++      // v1.60 (1400 §三): inline [BUY][SELL][WIN][LOSE][ALL] for this row's symbol.
++      // Identical semantics to the v1.54 board buttons — moved + narrowed only.
++      for(int b = 0; b < 5; b++)
++      {
++         bool cool = (TimeCurrent() - g_bingoCool[i2][b] < 30);
++         string bl = BINGO_BtnName(b);
++         if(cool) bl = StringFormat("%ds", 30 - (int)(TimeCurrent() - g_bingoCool[i2][b]));
++         string onm = PFX+"BGB_"+IntegerToString(i2)+"_"+IntegerToString(b);
++         UpdBtn("BGB_"+IntegerToString(i2)+"_"+IntegerToString(b), bl, bx0 + b*50*scale, ry2 - 1, 46*scale, 13*scale, (g_bingoArmed && !cool));
++         if(g_bingoArmed && !cool)
++         {
++            ObjectSetInteger(0, onm, OBJPROP_BGCOLOR, clrOrangeRed);   // 橙紅、即按即執行
++            ObjectSetInteger(0, onm, OBJPROP_COLOR, clrWhite);
++         }
++      }
++   }
++   // v1.60: hide stale row objects on shorter pages (page 2+ tails)
++   for(int i3=0; i3<rows; i3++)
++   {
++      if(row0 + i3 < g_ddSymN) continue;
++      HideObj("DDN"+IntegerToString(i3)); HideObj("DDF"+IntegerToString(i3)); HideObj("DDP"+IntegerToString(i3));
++      HideObj("DDM"+IntegerToString(i3)); HideObj("DDC$"+IntegerToString(i3));
++      for(int b3=0; b3<5; b3++) HideObj("BGB_"+IntegerToString(i3)+"_"+IntegerToString(b3));
+    }
++   int shown = MathMin(g_ddSymN - row0, rows); if(shown < 0) shown = 0;
+    if(g_ddSymN==0) UpdTxt("TAX2","(no traded symbols yet)",x+8*scale,ty+16*scale,clrKhaki,9*scale);
+-   UpdTxt("TAM2","DD now = live floating loss / balance | MaxDD = historical peak decline | base = balance", x, ty+18*scale+MathMin(g_ddSymN,12)*15*scale, clrKhaki, 8*scale);
++   // v1.60 (1400 §三): table tail — LAST + [CLOSE 全倉] (was the board footer)
++   int ly = ty + 18*scale + shown*15*scale;
++   UpdTxt("BGL", (g_bingoLast == "" ? "LAST: -" : g_bingoLast), x, ly, clrKhaki, 9*scale);
++   bool allOn = (g_bingoArmed && TimeCurrent() - g_bingoCoolAll >= 30);
++   UpdBtn("BGC", "[ CLOSE 全倉 ]", x + w - 122*scale, ly - 2*scale, 118*scale, 16*scale, allOn);
++   if(allOn)
++   {
++      ObjectSetInteger(0, PFX+"BGC", OBJPROP_BGCOLOR, clrOrangeRed);
++      ObjectSetInteger(0, PFX+"BGC", OBJPROP_COLOR, clrWhite);
++   }
++   UpdTxt("TAM2","DD now = live floating loss / balance | MaxDD = historical peak decline | base = balance | Gain = formula-recomputed from prices", x, ly + 16*scale, clrKhaki, 8*scale);
+    // v1.43 T3: manual confirm / reset-peak button (shows when lock engaged or AT stopped)
+-   int by = y + MathMax(ty+18*scale+MathMin(g_ddSymN,12)*15*scale, y+64*scale+220*scale);
++   int by = ly + 32*scale;
+    bool needConfirm = (g_ddgAccountArmed || g_tdStoppedAT || TimeCurrent() < g_ddgLockUntil);
+    if(needConfirm)
+    {
+@@ -1287,16 +1354,16 @@
+       UpdBtn("DDRESET","[ Confirm / Reset Peak ]",x+w-230*scale,by+16*scale,220*scale,16*scale,true);
+    }
+    else UpdBtn("DDRESET","[ Reset Peak ]",x+w-230*scale,by+16*scale,220*scale,16*scale,false);
+-   // v1.54 FIX-TD4 (0745): BINGO CLOSE BOARD below DDRESET
+-   BINGO_Render(x, by + 36*scale, w, scale);
++   // v1.60 (1400 §三): independent CLOSE BOARD removed — buttons inline above,
++   //   ARM/pager in the table header, LAST/[CLOSE 全倉] at the tail.
+    // v1.37: tickbox/bar chart removed (was confusing, no info value)
+ }
+ void TabRender_Set(int x,int y,int scale,int w)
+ {
+    UpdTxtBold("TS0","Settings Quick View (change via EA inputs)",x,y,clrDeepSkyBlue,10*scale);
+-   UpdTxt("TS1",StringFormat("Refresh: %ds   Record: %ds   Scale: %d   Chart: %s",RefreshSec,RecordSec,Scale,(ChartEnable?"ON":"OFF")),x,y+16*scale,clrWhite,9*scale);
+-   UpdTxt("TS2",StringFormat("SymbolGuard: %s   DefaultMode: %s",(SG_Enable?"ON":"OFF"),SG_ModeName(SG_DefaultMode)),x,y+30*scale,clrWhite,9*scale);
+-   UpdTxt("TS3",StringFormat("Snapshot: %s   AutoBackup: %s @ %s",(SnapEnable?"ON":"OFF"),(AutoBackup?"ON":"OFF"),BackupTime),x,y+44*scale,clrWhite,9*scale);
++   UpdTxt("TS1",StringFormat("Refresh: %ds   Record: %ds   Scale: %d   Chart: %s",InpRefreshSeconds,InpRecordSeconds,InpPanelScale,(InpShowPnlChart?"ON":"OFF")),x,y+16*scale,clrWhite,9*scale);
++   UpdTxt("TS2",StringFormat("SymbolGuard: %s   DefaultMode: %s",(InpSymbolGuardEnable?"ON":"OFF"),SG_ModeName(InpSymbolGuardMode)),x,y+30*scale,clrWhite,9*scale);
++   UpdTxt("TS3",StringFormat("Snapshot: %s   AutoBackup: %s @ %s",(InpSnapshotEnable?"ON":"OFF"),(InpAutoBackup?"ON":"OFF"),InpBackupTime),x,y+44*scale,clrWhite,9*scale);
+    UpdTxt("TS4","Tip: click tabs to switch. Guard tab = per-symbol ON/ALERT/BLOCK/CLOSE (CLOSE needs 2nd press).",x,y+59*scale,clrWhite,9*scale);
+ }
+ 
+@@ -1316,47 +1383,12 @@
+    return("ALL");
+ }
+ 
+-//--- rows per page from live chart height (0745: 高度自適應 + 分頁唔跌出圖底)
+-int BINGO_RowsPerPage(int boardTopY)
+-{
+-   int ch = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+-   int avail = ch - 30 - boardTopY - 18 - 18 - 10;
+-   int n = avail / 15;
+-   if(n < 3)  n = 3;
+-   if(n > 28) n = 28;
+-   return(n);
+-}
++//--- v1.60 (1400 §三): BINGO_RowsPerPage removed — the inline table uses a
++//--- fixed 12 rows/page over g_ddSymN (cap 32 => max 3 pages).
+ 
+-//--- live scan of OrdersTotal(): symbol / position count / lots / float P&L
+-//--- sorted worst floating loss on top (tie: more positions first)
+-int BINGO_Collect(string &syms[], int &cnt[], double &lots[], double &fl[], int maxN)
+-{
+-   for(int z = 0; z < maxN; z++) { syms[z] = ""; cnt[z] = 0; lots[z] = 0; fl[z] = 0; }
+-   int n = 0;
+-   for(int i = 0; i < OrdersTotal() && n < maxN; i++)
+-   {
+-      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+-      if(OrderType() > OP_SELL) continue;               // positions only, no pending
+-      string s = OrderSymbol();
+-      int k = -1;
+-      for(int j = 0; j < n; j++) if(syms[j] == s) { k = j; break; }
+-      if(k < 0) { k = n; n++; syms[k] = s; }
+-      cnt[k]++; lots[k] += OrderLots();
+-      fl[k] += OrderProfit() + OrderSwap() + OrderCommission();
+-   }
+-   for(int a = 1; a < n; a++)                           // insertion sort
+-   {
+-      string sA = syms[a]; int cA = cnt[a]; double lA = lots[a]; double fA = fl[a];
+-      int b2 = a - 1;
+-      while(b2 >= 0 && (fl[b2] > fA || (fl[b2] == fA && cnt[b2] < cA)))
+-      {
+-         syms[b2+1] = syms[b2]; cnt[b2+1] = cnt[b2]; lots[b2+1] = lots[b2]; fl[b2+1] = fl[b2];
+-         b2--;
+-      }
+-      syms[b2+1] = sA; cnt[b2+1] = cA; lots[b2+1] = lA; fl[b2+1] = fA;
+-   }
+-   return(n);
+-}
++//--- v1.60 (1400 §三): BINGO_Collect removed — the row list is the DDGuard
++//--- table itself (g_ddSyms); per-row floating is already the Float$ column;
++//--- the 0745 live-rescan rule still governs every close via BINGO_CountMatch.
+ 
+ //--- count open positions matching a BINGO mode (live rescan)
+ int BINGO_CountMatch(int mode, string sym)
+@@ -1377,70 +1409,8 @@
+    return(n);
+ }
+ 
+-//--- the board: header row (ARM + pager), symbol rows, LAST + [CLOSE 全倉]
+-void BINGO_Render(int x, int y, int w, int scale)
+-{
+-   int perPage = BINGO_RowsPerPage(y);
+-   g_bingoPerPg = perPage;
+-   string syms[28]; int cnt[28]; double lots[28]; double fl[28];
+-   int n = BINGO_Collect(syms, cnt, lots, fl, 28);
+-   int pages = (n + perPage - 1) / perPage;
+-   if(pages < 1) pages = 1;
+-   if(g_bingoPage >= pages) g_bingoPage = pages - 1;
+-   if(g_bingoPage < 0) g_bingoPage = 0;
+-   int row0 = g_bingoPage * perPage;
+-
+-   UpdRect("BGBOARD", x, y, w, 18*scale + perPage*15 + 18*scale + 10*scale, C'16,21,46', C'150,60,30');
+-   UpdTxtBold("BGH", "CLOSE BOARD", x + 6, y + 3*scale, clrOrange, 10*scale);
+-   string armTxt = g_bingoArmed ? StringFormat("ARM %ds", 60 - (int)(TimeCurrent() - g_bingoArmT)) : "ARM";
+-   UpdBtn("BGA", armTxt, x + 120*scale, y + 2*scale, 64*scale, 14*scale, g_bingoArmed);
+-   if(g_bingoArmed) ObjectSetInteger(0, PFX+"BGA", OBJPROP_BGCOLOR, clrOrange);
+-   UpdTxt("BGP", StringFormat("%d/%d", g_bingoPage + 1, pages), x + w - 96*scale, y + 4*scale, clrWhite, 9*scale);
+-   UpdBtn("BGP_L", "[<]", x + w - 64*scale, y + 2*scale, 28*scale, 13*scale, (g_bingoPage > 0));
+-   UpdBtn("BGP_R", "[>]", x + w - 32*scale, y + 2*scale, 28*scale, 13*scale, (g_bingoPage < pages - 1));
+-
+-   double bal = DDG_Base();
+-   for(int i = 0; i < perPage; i++)
+-   {
+-      int idx = row0 + i;
+-      int ry  = y + 18*scale + i*15;
+-      if(idx >= n) break;
+-      color flC = (fl[idx] < 0) ? clrTomato : clrLime;
+-      UpdTxt("BGR_"+IntegerToString(i), syms[idx], x, ry, clrWhite, 9*scale);
+-      UpdTxt("BGN_"+IntegerToString(i), StringFormat("%d張", cnt[idx]), x + 74*scale, ry, clrWhite, 9*scale);
+-      UpdTxt("BGF_"+IntegerToString(i), StringFormat("%+.2f", fl[idx]), x + 116*scale, ry, flC, 9*scale);
+-      bool resid = (syms[idx] == g_bingoResidSym && g_bingoResidN > 0 && TimeCurrent() - g_bingoResidT < 60);
+-      if(resid)
+-         UpdTxt("BGD_"+IntegerToString(i), StringFormat("RESID %d", g_bingoResidN), x + 186*scale, ry, clrRed, 9*scale);
+-      else
+-      {
+-         double pctP = (bal > 0) ? MathAbs(fl[idx]) / bal * 100.0 : 0;
+-         UpdTxt("BGD_"+IntegerToString(i), StringFormat("%.1f%%", pctP), x + 186*scale, ry, (fl[idx] < 0) ? clrOrange : clrKhaki, 9*scale);
+-      }
+-      for(int b = 0; b < 5; b++)
+-      {
+-         bool cool = (TimeCurrent() - g_bingoCool[i][b] < 30);
+-         string bl = BINGO_BtnName(b);
+-         if(cool) bl = StringFormat("%ds", 30 - (int)(TimeCurrent() - g_bingoCool[i][b]));
+-         string onm = PFX+"BGB_"+IntegerToString(i)+"_"+IntegerToString(b);
+-         UpdBtn("BGB_"+IntegerToString(i)+"_"+IntegerToString(b), bl, x + 236*scale + b*50*scale, ry - 1, 46*scale, 13*scale, (g_bingoArmed && !cool));
+-         if(g_bingoArmed && !cool)
+-         {
+-            ObjectSetInteger(0, onm, OBJPROP_BGCOLOR, clrOrangeRed);   // 橙紅、即按即執行
+-            ObjectSetInteger(0, onm, OBJPROP_COLOR, clrWhite);
+-         }
+-      }
+-   }
+-   int ly = y + 18*scale + perPage*15 + 3*scale;
+-   UpdTxt("BGL", (g_bingoLast == "" ? "LAST: -" : g_bingoLast), x, ly, clrKhaki, 9*scale);
+-   bool allOn = (g_bingoArmed && TimeCurrent() - g_bingoCoolAll >= 30);
+-   UpdBtn("BGC", "[ CLOSE 全倉 ]", x + w - 122*scale, ly - 2*scale, 118*scale, 16*scale, allOn);
+-   if(allOn)
+-   {
+-      ObjectSetInteger(0, PFX+"BGC", OBJPROP_BGCOLOR, clrOrangeRed);
+-      ObjectSetInteger(0, PFX+"BGC", OBJPROP_COLOR, clrWhite);
+-   }
+-}
++//--- v1.60 (1400 §三): BINGO_Render removed — the independent CLOSE BOARD is
++//--- gone; its ARM/pager/LAST/CLOSE-全倉 pieces render inside TabRender_DDG.
+ 
+ //--- ARM toggle: 60s window starts here; whole board gates on this flag
+ void BINGO_ArmToggle()
+@@ -1459,21 +1429,18 @@
+ }
+ 
+ //--- per-symbol row button: 0=BUY 1=SELL 2=WIN 3=LOSE 4=SYM-ALL(keeps pending)
++//--- v1.60 (1400 §三): row = DDGuard table visible row on the current page;
++//--- symbol comes from g_ddSyms[page*12+row] (that row's symbol). Close path
++//--- unchanged — 0745 hard rule: LIVE rescan at press time, never caches.
+ void BINGO_Press(int row, int b)
+ {
+-   if(row < 0 || row >= 28 || b < 0 || b >= 5) return;
++   if(row < 0 || row >= 12 || b < 0 || b >= 5) return;
+    if(!g_bingoArmed) return;                                            // 未 ARM 全板禁用
+    if(TimeCurrent() > g_bingoArmT + 60) { g_bingoArmed = false; return; } // 到期自動失效
+    if(TimeCurrent() - g_bingoCool[row][b] < 30) return;                 // 每按鈕獨立冷卻 30s
+-   // 0745 硬約束：即時重掃品種表，唔用 render 快取亦唔用 t_ 陣列
+-   string syms[28]; int cnt[28]; double lots[28]; double fl[28];
+-   int n = BINGO_Collect(syms, cnt, lots, fl, 28);
+-   int pages = (n + g_bingoPerPg - 1) / g_bingoPerPg;
+-   if(pages < 1) pages = 1;
+-   int pg = (g_bingoPage < pages) ? g_bingoPage : pages - 1;
+-   int idx = pg * g_bingoPerPg + row;
+-   if(idx >= n) return;
+-   string sym = syms[idx];
++   int idx = g_bingoPage * 12 + row;                                    // v1.60: table row
++   if(idx >= g_ddSymN || idx >= 32) return;
++   string sym = g_ddSyms[idx];
+    int closed = BINGO_CountMatch(b, sym);
+    if(closed == 0) return;                                              // 該範圍無單，唔燒冷卻
+    double balBefore = AccountBalance();
+@@ -1482,7 +1449,10 @@
+    g_bingoCool[row][b] = TimeCurrent();
+    if(residual > 0) { g_bingoResidSym = sym; g_bingoResidN = residual; g_bingoResidT = TimeCurrent(); }
+    else if(sym == g_bingoResidSym) { g_bingoResidSym = ""; g_bingoResidN = 0; }
+-   g_bingoLast = StringFormat("LAST: %s %s %d張 %+.2f @%s", BINGO_BtnName(b), sym, closed, realized, TimeToString(TimeCurrent(), TIME_MINUTES));
++   // v1.60 (1400 §三): RESID moved from the board row into the LAST line
++   //   (0745 hard rule: residual must be visible on the panel).
++   g_bingoLast = StringFormat("LAST: %s %s %d張 %+.2f @%s", BINGO_BtnName(b), sym, closed, realized, TimeToString(TimeCurrent(), TIME_MINUTES))
++             + (residual > 0 ? StringFormat(" ⚠RESID %d!", residual) : "");
+    LogEvent(StringFormat("BINGO %s %s: closed %d, residual %d, realized $%.2f", BINGO_BtnName(b), sym, closed, residual, realized));
+    TG_Notify("TD_BINGO_" + sym + "_" + IntegerToString(b), "🎯 BINGO " + BINGO_BtnName(b) + " — " + sym + "\n▪ Closed: " + IntegerToString(closed) + " position(s)\n▪ Realized: $" + DoubleToString(realized, 2) + (residual > 0 ? "\n⚠ Residual: " + IntegerToString(residual) + " still open!" : "\n▪ Residual: 0 ✅") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+    RenderOnly();
+@@ -1500,7 +1470,8 @@
+    int residual = DDG_CloseMatch(5, "");
+    double realized = AccountBalance() - balBefore;
+    g_bingoCoolAll = TimeCurrent();
+-   g_bingoLast = StringFormat("LAST: CLOSE全倉 %d張 %+.2f @%s", closed, realized, TimeToString(TimeCurrent(), TIME_MINUTES));
++   g_bingoLast = StringFormat("LAST: CLOSE全倉 %d張 %+.2f @%s", closed, realized, TimeToString(TimeCurrent(), TIME_MINUTES))
++             + (residual > 0 ? StringFormat(" ⚠RESID %d!", residual) : "");   // v1.60: RESID in LAST
+    LogEvent(StringFormat("BINGO CLOSEALL: closed %d, residual %d, realized $%.2f", closed, residual, realized));
+    TG_Notify("TD_CLOSEALL", "🎯 TD CLOSE ALL\n▪ Closed: " + IntegerToString(closed) + " position(s)\n▪ Realized: $" + DoubleToString(realized, 2) + (residual > 0 ? "\n⚠ Residual: " + IntegerToString(residual) + " still open — manual check!" : "\n▪ Residual: 0 ✅") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+    RenderOnly();
+@@ -1543,13 +1514,13 @@
+    // Daily auto backup check (runs once per day after BackupTime)
+    CheckAndBackupProfile();
+ 
+-   if(SnapEnable && TimeCurrent() - g_lastSnap >= 300)
++   if(InpSnapshotEnable && TimeCurrent() - g_lastSnap >= 300)
+    {
+       SyncTradesFromHistory();
+       g_lastSnap = TimeCurrent();
+    }
+ 
+-   if(TimeCurrent() - g_lastFull >= RefreshSec)
++   if(TimeCurrent() - g_lastFull >= InpRefreshSeconds)
+    {
+       CollectData();
+       DD_BuildSymbols();
+@@ -1633,6 +1604,23 @@
+    CheckTabCmd();   // v1.35: agent self-test hook (also when no ticks)
+    BINGO_Tick();    // v1.54 FIX-TD4: ARM countdown / cooldown expiry refresh
+ 
++   //--- v1.60 (1230 item 1, MT5 parity): 5-min history sync + refresh from the
++   //--- timer, so quiet sessions / weekends with ZERO ticks still keep the trade
++   //--- store and the panel fresh. OnTick does the same on ticks; the shared
++   //--- g_lastSnap / g_lastFull stamps make the two paths idempotent.
++   if(InpSnapshotEnable && TimeCurrent() - g_lastSnap >= 300)
++   {
++      SyncTradesFromHistory();
++      g_lastSnap = TimeCurrent();
++   }
++   if(TimeCurrent() - g_lastFull >= InpRefreshSeconds)
++   {
++      CollectData();
++      DD_BuildSymbols();
++      RenderOnly();
++      g_lastFull = TimeCurrent();
++   }
++
+    //--- v1.46 Q4: risk guards every 1s, independent of market ticks
+    NGDDG_Init();
+    NG_Guard();
+@@ -1645,7 +1633,7 @@
+    SG_CollectSymbols();
+    CheckAndBackupProfile();
+ 
+-   if(!AutoReconnect) return;
++   if(!InpAutoReconnect) return;
+ 
+    if(IsConnected())
+    {
+@@ -1662,13 +1650,13 @@
+ 
+    datetime nowL = TimeLocal();
+    if(g_discStart == 0) { g_discStart = nowL; return; }
+-   if(nowL - g_discStart < ReconnectAfterMin * 60) return;   // not sustained yet
++   if(nowL - g_discStart < InpReconnectAfterMinutes * 60) return;   // not sustained yet
+    if(!MarketShouldBeOpenLocal(nowL)) return;                // weekend/overnight
+ 
+    // v1.21: give up after N consecutive failed restarts
+    // (password changed / account locked - manual intervention needed)
+    double cnt = GlobalVariableGet("TD_RC_count");
+-   if(cnt >= MaxRestartAttempts)
++   if(cnt >= InpMaxRestartAttempts)
+    {
+       if(GlobalVariableGet("TD_RC_gaveup") < 1)
+       {
+@@ -1681,12 +1669,12 @@
+ 
+    // cooldown across restarts via terminal Global Variables
+    double gv = GlobalVariableGet("TD_RC_last");
+-   if(gv > 0 && nowL - (datetime)gv < RestartCooldownHrs * 3600) return;
++   if(gv > 0 && nowL - (datetime)gv < InpRestartCooldownHours * 3600) return;
+    GlobalVariableSet("TD_RC_last", (double)nowL);
+    GlobalVariableSet("TD_RC_count", cnt + 1);
+ 
+    LogEvent("RECONNECT RESTART #" + IntegerToString((int)cnt + 1) + "/" +
+-            IntegerToString(MaxRestartAttempts) + ": disconnected " +
++            IntegerToString(InpMaxRestartAttempts) + ": disconnected " +
+             IntegerToString((int)((nowL - g_discStart) / 60)) + " min, restarting terminal");
+    TriggerTerminalRestart();
+ }
+@@ -1891,8 +1879,8 @@
+    //---   scans the whole history once (since=0) - the frozen-window gap
+    //---   between freeze day and 72h ago would otherwise stay missing forever.
+    datetime since;
+-   if(BackfillOnce) since = 0;
+-   else since = TimeCurrent() - SnapHours * 3600;
++   if(InpSnapshotBackfillOnce) since = 0;
++   else since = TimeCurrent() - InpSnapshotHours * 3600;
+    int newCount = 0;
+    int lostCount = 0;
+ 
+@@ -1989,7 +1977,7 @@
+       LogEvent(StringFormat("SYNC CAP HIT | scanned %d of hist %d - raise MAX_HISTORY_SCAN", scanned, histTotal));
+ 
+    //--- v1.55 FIX-TD6 addendum (608dbe5): one-shot backfill result line
+-   if(BackfillOnce)
++   if(InpSnapshotBackfillOnce)
+       LogEvent(StringFormat("BACKFILL DONE n=%d", t_tradeCount));
+ 
+    SaveTrades();
+@@ -2004,7 +1992,7 @@
+    //---   file would have been wiped by the first tick after a reload.
+    if(t_tradeCount == 0 && PerAcctTradesHasData())
+    {
+-      LogEvent("SAVE SKIPPED: 0 trades in memory, file non-empty (v1.55 guard)");
++      LogEvent("SAVE SKIPPED: 0 trades in memory, file non-empty (v1.55 guard, kept in v1.60)");
+       Print("TD v1.55 FIX-TD6: SAVE SKIPPED - 0 trades in memory, non-empty ", TD_F_trades(), " left untouched");
+       return;
+    }
+@@ -2202,7 +2190,7 @@
+ void RecordSnapshot()
+ {
+    datetime now = TimeCurrent();
+-   if(now - g_lastRec < MathMax(1, RecordSec)) return;
++   if(now - g_lastRec < MathMax(1, InpRecordSeconds)) return;
+    g_lastRec = now;
+ 
+    double bal = AccountBalance();
+@@ -2277,7 +2265,7 @@
+    int cnt = FileReadInteger(fh, INT_VALUE);
+    if(cnt < 0 || cnt > MAX_REC) { FileClose(fh); return; }
+ 
+-   int cap = MathMin(cnt, MathMin(MaxRecords, MAX_REC));
++   int cap = MathMin(cnt, MathMin(InpMaxRecords, MAX_REC));
+    int skip = cnt - cap;   // drop oldest if file has more than we keep
+ 
+    r_count = 0;
+@@ -2316,7 +2304,7 @@
+    int fh = FileOpen(TD_F_records(), FILE_READ|FILE_CSV|FILE_ANSI, ',');   // v1.53 FIX-TD5
+    if(fh == INVALID_HANDLE) return;
+ 
+-   int cap = MathMin(MaxRecords, MAX_REC);
++   int cap = MathMin(InpMaxRecords, MAX_REC);
+ 
+    while(!FileIsEnding(fh) && r_count < cap)
+    {
+@@ -2966,7 +2954,7 @@
+ 
+ void RenderOnly()
+ {
+-   int scale = MathMax(1, MathMin(3, Scale));
++   int scale = MathMax(1, MathMin(3, InpPanelScale));
+    int px = 10;
+    int py = 18;
+    int padR = 15;
+@@ -3008,6 +2996,9 @@
+    int tableW=curX-px-10+padR;
+    int panelW=tableW+30;
+    if(panelW<380) panelW=380;
++   // v1.60 (1400 §三): Guard tab hosts the inline button column (5x50*scale
++   // right of MaxDD$ at x+320) — widen THIS tab only; other tabs unchanged.
++   if(g_tab == 2 && panelW < 620*scale) panelW = 620*scale;
+    int chartWpx=(int)ChartGetInteger(0,CHART_WIDTH_IN_PIXELS,0);
+    if(chartWpx>100 && panelW>chartWpx-20) panelW=chartWpx-20;   // v1.33 clamp
+ 
+@@ -3017,19 +3008,19 @@
+    int maxRows=MathMin(10, g_cNumB);
+    if(maxRows<1) maxRows=1;
+ 
+-   int chartH=ChartEnable ? 60*scale : 0;
++   int chartH=InpShowPnlChart ? 60*scale : 0;
+    int panelH=headerH+chartH+18+maxRows*rowH+40;
+    // v1.39: non-Positions tabs need their own height (symbol table can exceed main table rows)
+    int tabNeedH = 0;
+    if(g_tab != 0)
+    {
+       tabNeedH = (14 + 17) + 8;                 // header block above content
+-      if(g_tab == 2)      // DDGuard: 64*scale block + col header 16 + rows 15 each + footer 26
++      if(g_tab == 2)      // DDGuard: account block + col header + 12 rows + tail + DDRESET
+       {
+-         // v1.54 FIX-TD4 (0745 item 5): + CLOSE BOARD = 板頭 18 + 行數×15 + LAST 18 + 邊距 10
+-         int bgRows = BINGO_RowsPerPage(tabNeedH + 86*scale + 16*scale + MathMin(g_ddSymN,12)*15*scale + 30*scale + 33*scale);
+-         tabNeedH = tabNeedH + 86*scale + 16*scale + MathMin(g_ddSymN,12)*15*scale + 30*scale + 12
+-                  + 18 + bgRows*15 + 18 + 10;
++         // v1.60 (1400 §三): inline buttons — fixed 12 rows/page; tail = LAST 16
++         // + TAM2 note + DDRESET 16 + button 16; old CLOSE BOARD height removed.
++         tabNeedH = tabNeedH + 86*scale + 16*scale + 12*15*scale
++                  + 16 + 16 + 16 + 16 + 32*scale + 12;
+       }
+       else if(g_tab == 1) // Alerts: news up to 8 lines *14 + symbol block 8 rows *16 + footer
+          tabNeedH = tabNeedH + 8*14*scale + 8*16*scale + 40*scale + 12;
+@@ -3038,11 +3029,14 @@
+       if(tabNeedH > panelH) panelH = tabNeedH;
+    }
+    // v1.54 FIX-TD4 (0745 item 6): vertical clamp - panel must never fall off
+-   // the chart bottom; BINGO_RowsPerPage() already pages rows to fit.
++   // the chart bottom; the DDGuard table pages 12 rows/page to fit.
+    int chartHpxV = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+    if(chartHpxV > 100 && panelH > chartHpxV - 30) panelH = chartHpxV - 30;
+ 
+-   UpdRect("BG", px, py, panelW, panelH, C'16,21,46', C'40,50,80');
++   // v1.60 (1325): panel base renamed BG->PANELBG so the BG* prefix is
++   //   exclusively the CLOSE-board family; ObjectsDeleteAll(0,PFX+"BG")
++   //   in HideMainTable/tab-switch becomes the exact family cleanup.
++   UpdRect("PANELBG", px, py, panelW, panelH, C'16,21,46', C'40,50,80');
+ 
+    //--- v1.27: TAB bar ---
+    string tabNames[4]; tabNames[0]="Positions"; tabNames[1]="Alerts"; tabNames[2]="DDGuard"; tabNames[3]="Set";
+@@ -3082,7 +3076,7 @@
+    //--- Left side: 5 lines, uniform 16px spacing, all left-aligned at px+4
+    int lh = 16*scale;
+    int ttlY=py+2+14*scale+4;
+-   UpdTxtBold("TTL", Title1, px+4, ttlY, clrLime, 13*scale);
++   UpdTxtBold("TTL", InpTitleLine1, px+4, ttlY, clrLime, 13*scale);
+    if(g_histEmpty) UpdTxt("HISTW", StringFormat("!! TERMINAL HISTORY EMPTY (0 orders) - right-click History -> All History; panel on local snapshot %d trades, last close %s",
+       t_tradeCount, (aLast>0 ? TimeToString(aLast, TIME_DATE|TIME_MINUTES) : "n/a")),
+       px+170*scale, ttlY, clrOrangeRed, 8*scale);   // v1.52 FIX-TD3: snapshot vs terminal timestamps visible
+@@ -3097,7 +3091,7 @@
+          g_syncNew, g_syncHist, (g_syncCap ? " / CAP HIT" : "")),
+          px+170*scale, ttlY, (g_syncCap ? clrOrangeRed : clrSilver), 8*scale);
+    }
+-   UpdTxtBold("SUB", Title2, px+4, ttlY+lh, clrLime, 10*scale);
++   UpdTxtBold("SUB", InpTitleLine2, px+4, ttlY+lh, clrLime, 10*scale);
+    int acY = ttlY+lh*2;
+    UpdTxt("AC1", StringFormat("AC: %d  |  Balance: $%.2f  |  Equity: $%.2f",
+       AccountNumber(), TD_NZ0(AccountBalance()), AccountEquity()),
+@@ -3148,7 +3142,7 @@
+    int yPos=py+headerH;
+ 
+    // Chart area
+-   if(ChartEnable)
++   if(InpShowPnlChart)
+    {
+       DrawChartArea(px+10, yPos, panelW-20, chartH, scale);
+       yPos+=chartH;
+@@ -3252,8 +3246,8 @@
+       filterInfo += "  |  From: " + TimeToString(g_reportStart, TIME_DATE);
+ 
+    UpdTxt("FT", "Updated: "+TimeToString(TimeCurrent(),TIME_DATE|TIME_SECONDS)+
+-      "  |  Refresh: "+IntegerToString(RefreshSec)+"s"+
+-      "  |  Rec: "+IntegerToString(RecordSec)+"s ("+IntegerToString(r_count)+" recs)"+
++      "  |  Refresh: "+IntegerToString(InpRefreshSeconds)+"s"+
++      "  |  Rec: "+IntegerToString(InpRecordSeconds)+"s ("+IntegerToString(r_count)+" recs)"+
+       "  |  Trades: "+IntegerToString(t_tradeCount)+filterInfo,
+       px+10, yPos, clrWhite, fTiny);
+ 
+@@ -3384,7 +3378,7 @@
+    if(__ng_init_done) return;
+    __ng_init_done = 1;
+    TD_CheckHistoryDepth();
+-   int th = FileOpen(TG_TokenFile, FILE_READ|FILE_TXT|FILE_ANSI);
++   int th = FileOpen(InpTelegramTokenFile, FILE_READ|FILE_TXT|FILE_ANSI);
+    if(th != INVALID_HANDLE){ g_tgToken = FileReadString(th); StringTrimLeft(g_tgToken); StringTrimRight(g_tgToken); FileClose(th); }
+    // v1.43 T5: strip any stray CR/LF from token file (prevents HTTP 400 in URL)
+    StringReplace(g_tgToken, "\r", "");
+@@ -3401,9 +3395,9 @@
+    DDG_LoadState();   // v1.47 Q9: restore armed / lock-until / AT-stopped
+    // v1.48: seed the runtime switches from the chart inputs; LoadState above
+    // already overrode them when a saved GV exists (panel toggle survives restart).
+-   if(!GlobalVariableCheck(DDG_OnKey()))    g_ddgeOn   = DDG_Enable;    // default OFF
+-   if(!GlobalVariableCheck(DDG_AccKey()))   g_ddgAccOn = DDG_AccOn;
+-   if(!GlobalVariableCheck(DDG_SymOnKey())) g_ddgSymOn = DDG_SymOn;
++   if(!GlobalVariableCheck(DDG_OnKey()))    g_ddgeOn   = InpDdgEnable;    // default OFF
++   if(!GlobalVariableCheck(DDG_AccKey()))   g_ddgAccOn = InpDdgAccountEnable;
++   if(!GlobalVariableCheck(DDG_SymOnKey())) g_ddgSymOn = InpDdgSymbolEnable;
+ }
+ 
+ 
+@@ -3482,7 +3476,7 @@
+ //| v1.43 T7: CSV time is HKT(+8); hot-window tests always use       |
+ //| TimeGMT()+8h and never the broker server offset (DST-safe).       |
+ //+------------------------------------------------------------------+
+-datetime NG_EvTime(string t){ return(StringToTime(t) + NG_ServerOffsetHours*3600); }   // display/fallback only
++datetime NG_EvTime(string t){ return(StringToTime(t) + InpNewsServerOffsetHours*3600); }   // display/fallback only
+ datetime NG_EvTimeHKT(string t){ return(StringToTime(t)); }                             // CSV raw time is HKT
+ datetime NG_NowHKT(){ return(TimeGMT() + 8*3600); }                                     // now in HKT
+ //--- v1.47 Q9: every persistent key is account-scoped so two accounts sharing
+@@ -3552,8 +3546,8 @@
+       Print("TD: ACCOUNT HISTORY EMPTY (OrdersHistoryTotal==0) - right-click Account History tab and choose All History");
+       return;
+    }
+-   if(ReportStart == "") return;
+-   datetime rs = StringToTime(ReportStart);
++   if(InpReportStart == "") return;
++   datetime rs = StringToTime(InpReportStart);
+    if(rs <= 0) return;
+    datetime earliest = 0;
+    for(int i = OrdersHistoryTotal()-1; i >= 0; i--)
+@@ -3566,7 +3560,7 @@
+    if(earliest == 0 || earliest > rs + 86400)
+    {
+       g_histTruncated = true;
+-      Print("TD: history truncated (earliest=", TimeToString(earliest), " vs ReportStart=", ReportStart, ") - set Account History to All History");
++      Print("TD: history truncated (earliest=", TimeToString(earliest), " vs ReportStart=", InpReportStart, ") - set Account History to All History");
+    }
+ }
+ void     TD_ClearTabContent()
+@@ -3592,7 +3586,7 @@
+ void NG_LoadNews()
+ {
+    g_ngEventCount = 0;
+-   int h = FileOpen(NG_NewsFile, FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   int h = FileOpen(InpNewsFile, FILE_READ|FILE_CSV|FILE_ANSI, ',');
+    if(h == INVALID_HANDLE) return;
+    while(!FileIsEnding(h) && g_ngEventCount < 64)
+    {
+@@ -3603,7 +3597,7 @@
+       if(t == "" || c == "") continue;
+       datetime dt = StringToTime(t);
+       if(dt <= 0) continue;
+-      if(NG_HighOnly && im != "HIGH") continue;
++      if(InpNewsHighImpactOnly && im != "HIGH") continue;
+       g_ngEvents[g_ngEventCount][0] = t;
+       g_ngEvents[g_ngEventCount][1] = c;
+       g_ngEvents[g_ngEventCount][2] = n;
+@@ -3622,7 +3616,7 @@
+    {
+       datetime ev=NG_EvTimeHKT(g_ngEvents[i][0]);
+       if(ev==0) continue;
+-      if(now >= ev-NG_BeforeMin*60 && now <= ev+NG_AfterMin*60)
++      if(now >= ev-InpNewsBeforeMinutes*60 && now <= ev+InpNewsAfterMinutes*60)
+          if(NG_SymbolAffected(sym, g_ngEvents[i][1])) return true;
+    }
+    return false;
+@@ -3636,7 +3630,7 @@
+    {
+       datetime ev=NG_EvTimeHKT(g_ngEvents[i][0]);
+       if(ev==0) continue;
+-      if(now >= ev-NG_BeforeMin*60 && now <= ev+NG_AfterMin*60 && !g_ngFired[i])
++      if(now >= ev-InpNewsBeforeMinutes*60 && now <= ev+InpNewsAfterMinutes*60 && !g_ngFired[i])
+       {
+          g_ngFired[i]=true;
+          string syms="";
+@@ -3662,7 +3656,7 @@
+ //+------------------------------------------------------------------+
+ void NG_Guard()
+ {
+-   if(NG_Mode == 0) return;
++   if(InpNewsGuardMode == 0) return;
+    if(TimeCurrent() - g_ngLastScan < 30) return;
+    g_ngLastScan = TimeCurrent();
+    NG_LoadNews();
+@@ -3672,12 +3666,12 @@
+       datetime evT = NG_EvTimeHKT(g_ngEvents[i][0]);
+       string   ccy = g_ngEvents[i][1];
+       datetime now = NG_NowHKT();
+-      if(now <  evT - NG_BeforeMin*60) continue;   // before the window
+-      if(now >  evT + NG_AfterMin*60)  continue;   // after the window
++      if(now <  evT - InpNewsBeforeMinutes*60) continue;   // before the window
++      if(now >  evT + InpNewsAfterMinutes*60)  continue;   // after the window
+ 
+       string msg = StringFormat("🛡 NewsGuard: %s %s @ %s (-%dm/+%dm) mode=%s",
+-                   ccy, g_ngEvents[i][2], TimeToString(evT, TIME_MINUTES), NG_BeforeMin, NG_AfterMin,
+-                   (NG_Mode==1?"ALERT":NG_Mode==2?"BLOCK":"CLOSE"));
++                   ccy, g_ngEvents[i][2], TimeToString(evT, TIME_MINUTES), InpNewsBeforeMinutes, InpNewsAfterMinutes,
++                   (InpNewsGuardMode==1?"ALERT":InpNewsGuardMode==2?"BLOCK":"CLOSE"));
+       if(msg != g_ngLastAlert)
+       {
+          Print(msg);
+@@ -3685,23 +3679,23 @@
+          g_ngLastAlert = msg;
+       }
+       GlobalVariableSet("NEWSGUARD_" + ccy, 1);
+-      TG_Notify("NG_"+ccy, "🛡 NewsGuard WINDOW OPEN\n━━━━━━━━━━━━━━\n📢 " + g_ngEvents[i][2] + "\n💵 " + ccy + "\n⏳ Window: " + TimeToString(NG_EvTimeHKT(g_ngEvents[i][0])-NG_BeforeMin*60, TIME_MINUTES) + "–" + TimeToString(NG_EvTimeHKT(g_ngEvents[i][0])+NG_AfterMin*60, TIME_MINUTES) + " HKT\n⚡ Mode: " + (NG_Mode==3?"CLOSE (old+new)":NG_Mode==2?"BLOCK (new only)":"ALERT") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
++      TG_Notify("NG_"+ccy, "🛡 NewsGuard WINDOW OPEN\n━━━━━━━━━━━━━━\n📢 " + g_ngEvents[i][2] + "\n💵 " + ccy + "\n⏳ Window: " + TimeToString(NG_EvTimeHKT(g_ngEvents[i][0])-InpNewsBeforeMinutes*60, TIME_MINUTES) + "–" + TimeToString(NG_EvTimeHKT(g_ngEvents[i][0])+InpNewsAfterMinutes*60, TIME_MINUTES) + " HKT\n⚡ Mode: " + (InpNewsGuardMode==3?"CLOSE (old+new)":InpNewsGuardMode==2?"BLOCK (new only)":"ALERT") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+ 
+       //--- v1.47 Q8: 2=BLOCK and 3=CLOSE arm SymbolGuard for the window.
+       //--- BLOCK closes new entries only; CLOSE also liquidates old positions.
+       //--- Auto-expiry at window end restores the user's per-symbol base mode,
+       //--- so a grid EA cannot reopen -> get closed -> reopen forever.
+-      if(NG_Mode >= 2)
++      if(InpNewsGuardMode >= 2)
+       {
+-         int autoMode = (NG_Mode == 2) ? 2 : 3;
+-         datetime until = evT + NG_AfterMin*60;
++         int autoMode = (InpNewsGuardMode == 2) ? 2 : 3;
++         datetime until = evT + InpNewsAfterMinutes*60;
+          for(int a = 0; a < g_sgSymN; a++)
+             if(NG_SymbolAffected(g_sgSym[a], ccy))
+                SG_SetAuto(g_sgSym[a], autoMode, until);
+          if(NG_SymbolAffected(Symbol(), ccy))
+             SG_SetAuto(Symbol(), autoMode, until);
+          //--- fallback when SymbolGuard itself is disabled: CLOSE mode closes here
+-         if(!SG_Enable && NG_Mode == 3)
++         if(!InpSymbolGuardEnable && InpNewsGuardMode == 3)
+          {
+             for(int p = OrdersTotal() - 1; p >= 0; p--)
+             {
+@@ -3722,7 +3716,7 @@
+    {
+       datetime evT2 = NG_EvTimeHKT(g_ngEvents[i2][0]);
+       string   c2   = g_ngEvents[i2][1];
+-      if(NG_NowHKT() > evT2 + NG_AfterMin*60)
++      if(NG_NowHKT() > evT2 + InpNewsAfterMinutes*60)
+          GlobalVariableSet("NEWSGUARD_" + c2, 0);
+    }
+ }
+@@ -3736,7 +3730,7 @@
+    if(ObjectFind(0,o) < 0) ObjectCreate(0,o,OBJ_LABEL,0,0,0);
+    ObjectSetInteger(0,o,OBJPROP_XDISTANCE,x);
+    ObjectSetInteger(0,o,OBJPROP_YDISTANCE,y);
+-   string mode = (NG_Mode==3 ? "CLOSE" : NG_Mode==2 ? "BLOCK" : NG_Mode==1 ? "ALERT" : "OFF");
++   string mode = (InpNewsGuardMode==3 ? "CLOSE" : InpNewsGuardMode==2 ? "BLOCK" : InpNewsGuardMode==1 ? "ALERT" : "OFF");
+    string next = "";
+    int best = 24*3600;
+    for(int i=0;i<g_ngEventCount;i++)
+@@ -3749,7 +3743,7 @@
+        next, best/3600, (best%3600)/60, g_ngEventCount);
+    else txt += "No high-impact events in 48h";
+    ObjectSetString(0,o,OBJPROP_TEXT, txt);
+-   ObjectSetInteger(0,o,OBJPROP_COLOR, NG_Mode>=2 ? clrOrangeRed : clrWhite);
++   ObjectSetInteger(0,o,OBJPROP_COLOR, InpNewsGuardMode>=2 ? clrOrangeRed : clrWhite);
+    ObjectSetInteger(0,o,OBJPROP_FONTSIZE, 9);
+    ObjectSetString(0,o,OBJPROP_FONT,"Arial");
+ }
+@@ -3777,10 +3771,10 @@
+ {
+    // v1.45 Q2: MT4 built-in WebRequest - no wininet DLL needed
+    // NOTE: add https://api.telegram.org to WebRequest whitelist first
+-   if(!TG_Enable || g_tgToken == "") { SendNotification(StringSubstr(text,0,200)); return(false); }
++   if(!InpTelegramEnable || g_tgToken == "") { SendNotification(StringSubstr(text,0,200)); return(false); }
+    string url = "https://api.telegram.org/bot" + g_tgToken + "/sendMessage";
+    // form-encoded body: chat_id + UTF-8 URL-encoded text
+-   string data = "chat_id=" + TG_URLEncode(TG_ChatID) + "&text=" + TG_URLEncode(text);
++   string data = "chat_id=" + TG_URLEncode(InpTelegramChatId) + "&text=" + TG_URLEncode(text);
+    char post[]; int plen = StringToCharArray(data, post, 0, WHOLE_ARRAY, CP_UTF8); plen--;
+    string hdr = "Content-Type: application/x-www-form-urlencoded\r\n";
+    char resp[]; string respHdr;
+@@ -3803,7 +3797,7 @@
+ {
+    datetime now = TimeCurrent();
+    for(int i=0;i<g_tgN;i++)
+-      if(g_tgKey[i]==key){ if(now - g_tgLast[i] < TG_MinGapMin*60) return; g_tgLast[i]=now; TG_SendRaw(text); return; }
++      if(g_tgKey[i]==key){ if(now - g_tgLast[i] < InpTelegramMinGapMinutes*60) return; g_tgLast[i]=now; TG_SendRaw(text); return; }
+    if(g_tgN < 8){ g_tgKey[g_tgN]=key; g_tgLast[g_tgN]=now; g_tgN++; }
+    TG_SendRaw(text);
+ }
+@@ -3861,7 +3855,7 @@
+ //+------------------------------------------------------------------+
+ int DDG_CloseAllWithRetry()
+ {
+-   int retries = MathMax(1, DDG_CloseRetry);
++   int retries = MathMax(1, InpDdgCloseRetry);
+    int residual = 9999;
+    for(int r = 0; r < retries; r++)
+    {
+@@ -3910,7 +3904,7 @@
+ {
+    bool global   = (mode == 5);
+    bool delPend  = (mode == 5 || mode == 6);
+-   int retries = MathMax(1, DDG_CloseRetry);
++   int retries = MathMax(1, InpDdgCloseRetry);
+    int residual = 9999;
+    for(int r = 0; r < retries; r++)
+    {
+@@ -4047,42 +4041,58 @@
+ //+------------------------------------------------------------------+
+ void DDG_Guard()
+ {
++   //--- v1.60 FIX (1400 §四-2): the peak ratchet runs UNCONDITIONALLY, before
++   //--- the master gate. Tracking must never depend on the guard switch: with
++   //--- DDG OFF the old code froze the peak ($0.00 or a stale value) and the
++   //--- panel showed DD -97.51% nonsense. GV persisted only when the mark
++   //--- actually advances (cheap, and restart-safe).
++   double eq  = AccountEquity();
++   if(eq > g_ddgPeakEquity)
++   {
++      g_ddgPeakEquity = eq;
++      GlobalVariableSet(DDG_PeakKey(), g_ddgPeakEquity);
++   }
+    if(!g_ddgeOn) return;
+    DDG_ScanBalanceOps();
+-   double eq  = AccountEquity();
+    double base = DDG_Base();                 // v1.47 Q6: single balance denominator
+-   if(eq > g_ddgPeakEquity) g_ddgPeakEquity = eq;
+    if(g_ddgPeakEquity <= 0) return;
+    if(TimeCurrent() < g_ddgLockUntil) return;
+    if(g_ddgAccountArmed) return;
+ 
+-   double ddPct = (g_ddgPeakEquity - eq) / base * 100.0;   // v1.47 Q6: was /g_ddgPeakEquity
+-   if(g_ddgAccOn && ddPct >= DDG_MaxDDPct)
+-   {
+-      string msg = StringFormat("🚨 DDGuard: ACCOUNT DD %.1f%% >= %.1f%% — %s",
+-                   ddPct, DDG_MaxDDPct, DDG_CloseOnHit ? "CLOSE ALL!" : "block new entries");
++   //--- v1.60 (1230 §3.3): account DD in money, OR-triggered with the % limit.
++   //--- Display clamped >= 0: eq >= peak must read 0.00% DD, never negative.
++   double ddPct   = MathMax(0.0, (g_ddgPeakEquity - eq) / base * 100.0);   // v1.47 Q6 denominator
++   double ddMoney = MathMax(0.0, g_ddgPeakEquity - eq);
++   bool hitPct   = (InpDdgAccountMaxPercent > 0 && ddPct   >= InpDdgAccountMaxPercent);
++   bool hitMoney = (InpDdgAccountMaxMoney   > 0 && ddMoney >= InpDdgAccountMaxMoney);
++   if(g_ddgAccOn && (hitPct || hitMoney))
++   {
++      string trig = hitPct ? StringFormat("DD %.1f%% >= limit %.1f%%", ddPct, InpDdgAccountMaxPercent)
++                            : StringFormat("DD $%.2f >= limit $%.2f", ddMoney, InpDdgAccountMaxMoney);
++      string msg = StringFormat("🚨 DDGuard: ACCOUNT %s — %s",
++                   trig, InpDdgCloseOnHit ? "CLOSE ALL!" : "block new entries");
+       if(msg != g_ddgLastAlert)
+       {
+          Print(msg); SendNotification(msg); g_ddgLastAlert = msg;
+       }
+-      if(DDG_CloseOnHit)
++      if(InpDdgCloseOnHit)
+       {
+          int residual = DDG_CloseAllWithRetry();
+-         g_ddgLockUntil = TimeCurrent() + DDG_LockMinutes*60;
++         g_ddgLockUntil = TimeCurrent() + InpDdgLockMinutes*60;
+          g_ddgAccountArmed = true;
+-         if(DDG_AccStopAT) DDG_StopAT();
++         if(InpDdgAccountStopAutotrade) DDG_StopAT();
+          DDG_SaveState();                       // v1.47 Q9: survive terminal restart
+          if(residual > 0)
+             TG_Notify("DDG_ACC_RESID", "🚨 [URGENT] Close incomplete! " + IntegerToString(residual) + " position(s) still open — manual intervention required!");
+-         TG_Notify("DDG_ACC", "🚨 DDGuard TRIGGERED — ACCOUNT LEVEL\n━━━━━━━━━━━━━━\n🏦 AC: " + IntegerToString(AccountNumber()) + "\n📉 DD: " + DoubleToString(ddPct,2) + "% >= limit " + DoubleToString(DDG_MaxDDPct,1) + "%\n💰 Peak: $" + DoubleToString(g_ddgPeakEquity,2) + "\n💸 Equity: $" + DoubleToString(AccountEquity(),2) + "\n⚡ Action: close all" + (residual>0?" (residual "+IntegerToString(residual)+" open!)":" ✅") + " + AutoTrade " + (DDG_AccStopAT?"STOPPED":"not stopped") + "\n⏱ Awaiting manual confirm [Reset Peak]\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+-         if(DDG_Popup){ int rh; if(TD_TerminalHandle(rh)) MessageBoxW(rh, msg, "DDGuard", 0x30); }
++         TG_Notify("DDG_ACC", "🚨 DDGuard TRIGGERED — ACCOUNT LEVEL\n━━━━━━━━━━━━━━\n🏦 AC: " + IntegerToString(AccountNumber()) + "\n📉 DD: " + DoubleToString(ddPct,2) + "% / $" + DoubleToString(ddMoney,2) + " (limits " + DoubleToString(InpDdgAccountMaxPercent,1) + "% / $" + DoubleToString(InpDdgAccountMaxMoney,2) + ")\n💰 Peak: $" + DoubleToString(g_ddgPeakEquity,2) + "\n💸 Equity: $" + DoubleToString(AccountEquity(),2) + "\n⚡ Action: close all" + (residual>0?" (residual "+IntegerToString(residual)+" open!)":" ✅") + " + AutoTrade " + (InpDdgAccountStopAutotrade?"STOPPED":"not stopped") + "\n⏱ Awaiting manual confirm [Reset Peak]\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
++         if(InpDdgAlertPopup){ int rh; if(TD_TerminalHandle(rh)) MessageBoxW(rh, msg, "DDGuard", 0x30); }
+       }
+       return;
+    }
+ 
+-   if(g_ddgSymOn && DDG_SymMaxDDPct > 0)
++   if(g_ddgSymOn && (InpDdgSymbolMaxPercent > 0 || InpDdgSymbolMaxMoney > 0))   // v1.60 §3.3: OR money limit
+    {
+-      string syms = DDG_Symbols;
++      string syms = InpDdgSymbolList;
+       if(syms == "") syms = Symbol();
+       string parts[20]; int n = StringSplit(syms, ',', parts);
+       for(int s = 0; s < n; s++)
+@@ -4100,23 +4110,28 @@
+             if(OrderSymbol() != sym) continue;
+             floating += OrderProfit() + OrderSwap() + OrderCommission();
+          }
+-         if(-floating >= base * DDG_SymMaxDDPct / 100.0)   // v1.47 Q6: was AcctEquity-based
++         //--- v1.60 (1230 §3.3): per-symbol OR-trigger — % of balance OR money.
++         bool symHitPct   = (InpDdgSymbolMaxPercent > 0 && -floating >= base * InpDdgSymbolMaxPercent / 100.0);
++         bool symHitMoney = (InpDdgSymbolMaxMoney   > 0 && -floating >= InpDdgSymbolMaxMoney);
++         if(symHitPct || symHitMoney)   // v1.47 Q6: pct arm was AcctEquity-based
+          {
+-            string m2 = StringFormat("🚨 DDGuard: %s floating %.0f triggered %.1f%% — %s",
+-                        sym, floating, DDG_SymMaxDDPct, DDG_CloseOnHit?"close":"block new entries");
++            string strig = symHitPct ? StringFormat("%.1f%% limit", InpDdgSymbolMaxPercent)
++                                      : StringFormat("$%.2f limit", InpDdgSymbolMaxMoney);
++            string m2 = StringFormat("🚨 DDGuard: %s floating %.0f hit %s — %s",
++                        sym, floating, strig, InpDdgCloseOnHit?"close":"block new entries");
+             Print(m2); SendNotification(m2);
+-            if(DDG_CloseOnHit)
++            if(InpDdgCloseOnHit)
+             {
+                int residual2 = DDG_CloseSymbolWithRetry(sym);
+                SG_ForceClose(sym);
+                DDG_SetSymLock(sym, true);                  // v1.47 Q9: persist lock
+-               g_ddgLockUntil = TimeCurrent() + DDG_LockMinutes*60;
++               g_ddgLockUntil = TimeCurrent() + InpDdgLockMinutes*60;
+                DDG_SaveState();
+-               if(DDG_SymStopAT) DDG_StopAT();
++               if(InpDdgSymbolStopAutotrade) DDG_StopAT();
+                if(residual2 > 0)
+                   TG_Notify("DDG_SYM_RESID_" + sym, "🚨 [URGENT] " + sym + " close incomplete! " + IntegerToString(residual2) + " position(s) still open — manual intervention required!");
+-               TG_Notify("DDG_"+sym, "⚠️ DDGuard TRIGGERED — SYMBOL LEVEL\n━━━━━━━━━━━━━━\n.Symbol: " + sym + "\n📉 Floating: $" + DoubleToString(floating,2) + " (triggered " + DoubleToString(DDG_SymMaxDDPct,1) + "% limit)\n⚡ Action: close symbol" + (residual2>0?" (residual "+IntegerToString(residual2)+" open!)":" ✅") + " + SymbolGuard CLOSE locked" + (DDG_SymStopAT?" + AutoTrade STOPPED":"") + "\n⏱ Awaiting manual confirm\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+-               if(DDG_Popup){ int rh2; if(TD_TerminalHandle(rh2)) MessageBoxW(rh2, m2, "DDGuard", 0x30); }
++               TG_Notify("DDG_"+sym, "⚠️ DDGuard TRIGGERED — SYMBOL LEVEL\n━━━━━━━━━━━━━━\n.Symbol: " + sym + "\n📉 Floating: $" + DoubleToString(floating,2) + " (hit " + (symHitPct ? DoubleToString(InpDdgSymbolMaxPercent,1) + "% limit" : "$" + DoubleToString(InpDdgSymbolMaxMoney,2) + " limit") + "\n⚡ Action: close symbol" + (residual2>0?" (residual "+IntegerToString(residual2)+" open!)":" ✅") + " + SymbolGuard CLOSE locked" + (InpDdgSymbolStopAutotrade?" + AutoTrade STOPPED":"") + "\n⏱ Awaiting manual confirm\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
++               if(InpDdgAlertPopup){ int rh2; if(TD_TerminalHandle(rh2)) MessageBoxW(rh2, m2, "DDGuard", 0x30); }
+             }
+          }
+       }
