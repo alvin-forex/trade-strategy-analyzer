@@ -2245,3 +2245,27 @@ Stage Summary:
 - **AngelGold 合併評估結論（1637 接單、1750 供料到）**： 機器 diff 實證兩檔唯一差異 L52 SignalTF_Minutes 60 vs 15，代碼 100% 同；SigTF() 已內建 16 級 TF 映射——合併零代碼改動：留 v4 做正本＋M15 用 .set preset。三注意： MagicNumber 同 20260919（同帳雙實例要分 magic）、FVG_M15 模式語義綁 TF=15（時限窗按 SignalTF_Minutes 計）、無 GV＋物件前綴 chart 隔離＝雙圖表安全。執行序照 CLEANUP_PROPOSAL：週末照跑，落地等老闆裁（下週一 11-09 可同場）。
 - 回信 1737（收執＋v1.62 交付＋AngelGold 評估）＋1750 蓋章＋供料目錄入 repo → precise add → push 876f51d（push-audit PASS；ssh 備援 PATH 序用上）。
 - 等態： v1.62 真機編譯 0/0 回貼；AngelGold 落地裁決；v1.61 視覺截圖對照表；兩候裁（InpDefaultView＋TG default）。
+
+## Task 268：沙盒滅失事故報告＋老闆復原包交付＋重接線（2026-11-07 19:20–19:47）
+- **19:20 事故報告（老闆已收）**：舊沙盒整個滅失——worklog Task 1–267／exchange-repo clone／.keys/（key 20261101＋tsa_pw_owner＋tsa_pw）／scripts/／.sshbin/ 全部唔喺度；boot log「Restoring zcode state」0s＝零還原；cron 註冊表空。開工令 a/b/c 全線受阻，拒絕作數（報告：download/20261107_sandbox_loss_incident_and_reprovision_request.md）。
+- **19:36 老闆復原包** upload/zcode_recovery_20261107.zip（5 檔：deploy key 20261107＋pub＋tsa_pw_owner.txt＋tsa_pw.txt＋README）→ 19:38 .keys/ 歸位（chmod 700/600）。
+- **SSH 備援重建**：apt-get download openssh-client＋dpkg -x → .sshbin/（OpenSSH 10.0p2）。**假死兩次實錘**（github 22 同 ssh.github.com 443 都 timeout）→ 病因＝無 tty 沙盒 ssh 隱式互動提示 hang，根治＝`-o BatchMode=yes`＋stdin 導 /dev/null（0.5s 通，GitHub 實名 Hi alvin-forex/trade-strategy-analyzer）。
+- **指紋核對**：zcode_exchange_key_20261107.pub＝SHA256:KQN9eku46KSCrCE/9vrQADOTnud8A18tPWPpMHxva4M（ED25519）——與 1950 信聲稱一致✓。
+- 19:47 全 clone 5,909 檔；協議 README＋worklog 鏡像（Task 1–267 全在，老闆 14:48 批嘅每鐘鏡像救返全部歷史）＋今日信 8 封全讀（1705/1750/1800/1850/1915/1925/1950/2010）。
+
+## Task 269：TSA 全站機器掃描 892 頁實數＋批1 樣板證據＋四項裁決請求＋cycle v3.9＋交付（2026-11-07 19:50–20:50，老闆開工令 a/b/c）
+- **等態收料（唔重做只收）**：①v1.62 真機 0 errors/0 warnings 全綠上線（1800 信，ex5 227,578B，17:52:50 loaded）②AngelGold 老闆 18:46「照做」——照 1737 方案 11-09 同場，我交 .set（MagicNumber=20260920 寫死）＋v4 跨譯 ex5 如有新 ③兩候裁即答（1850）：InpDefaultView 統一 default 0＋TG chat ID 源碼 default 清空→落 v1.63 ④v1.63 三信七項收單（1915 五鈕右對齊/CLOSE ALL 傍 UNLOCK/UNLOCK-LOCK 動態標籤＋2010 註解版本號清零×6/WhitelistUrl/BotToken 直輸）——**排下一工作鐘開刀（照 1950 序，本鐘主任務＝老闆 TSA 令）** ⑤board 解密 66,070B 無變（最後更新 11-06 18:20；G4 仍掛等授權）。
+- **a・全站掃描（主任務）**：掃描器 tsa_scan_v3（閘門語義＝批0 browser 閘靜態等價：--card2 var＋html/body bg=rgb(15,21,32)）＋6 加密殼解密先掃（root index/signal_ranking 用 general 鎖、admin tasks_board/db-browser/mt5_mcp_tools 用 owner 鎖、admin/index 實為 general 鎖）＋agent-browser 17 頁實測覆核＋批0 405 頁 CSV 對賬。
+- **★實數：全站 892 頁＝過閘 765＋未達標 127**：
+  - 輕修組 16＝B 缺tokenvar 4（ff54_report/symbol_ranking/merged_report_11141/index.html root——深底新殼，補 tsa_tokens.css 即達標；root index 仲缺 sidebar container）＋C bg 組 12（透明 6：date_range_review×2＋forex 05-24_morning/05-25_evening/05-26_morning/06-12_morning_b；舊深 4：forex 05-23_morning/05-24_evening/05-26_evening/05-28_morning；#0F172A 微差 2：forex_reports/index＋ccy_power/index）
+  - **W5-C v3.9 light 豁免族 98**＝signal_* 71（W5E 全族）＋Signal_Deep_Analysis_* 24（W5C v3.9 族）＋index_36512/36655/5117（尾三頁，W5D）——NAV 三件已注入、tokens 豁免、browser 實測淺色 rgb(245,247,250)
+  - 自帶 palette 異系 5＝ccy_power 3（W5-H #0A0E1A 系）＋anomaly_report（#0A0E17 雙主題）＋portfolio_master_report_v2（#0D1117 GitHub 系，批0 已判真異系）
+  - 舊工具頁 2＝analyzer/tug_of_war_calculator（淺色舊殼）；admin 內部工具/加密 5＝tasks_board/db-browser/mt5_mcp_tools/admin/index/ccy_auto_trader；待刪 G4 1＝sample_redesign_36912
+- 批次切面：批1 3過閘＋1微差｜批2 373＋102｜批3 196＋9｜批4 44 全綠｜批5 10＋9｜root 補漏 139＋6。
+- **批0 對賬閉環**：405 頁 402/405 靜態一致；3 差異全查清——signal_ranking 0825 修復後 browser 全綠（批0 中間態過時）＋ff54/symbol_ranking 批0 var-閘假陰性（視覺新但 --card2 var 空）。批0 381 過→而家 382 過（+signal_ranking），24 唔跟→23 全數對上。**新發現 103 頁**（批0 從未 browser 覆蓋：light 豁免 98＋date_range 2＋anomaly 1＋sample_red 1＋ccy_auto_trader 1）。
+- **b・可行部分**：批1 四頁樣板截圖 8 張（1440×900 頁首＋頁中）＋批0 式 browser 量度——signal_ranking（解鎖態）card2 #1C2638/accent #38BDF8/sidebar 全齊✓、forex_news✓、projection✓（card2/accent 齊）、ccy_power/index bg #0F172A 微差＋card2 var 空（輕修）。截圖入交付目錄畀老闆過目。
+- **c・裁決請求四項**：①**G4** sample_redesign_36912.html 刪除授權（零引用確認 PASS、1120 已覆核——等一句「刪」即 git rm）②**尾三頁** index_36512/36655/5117＝W5D light 豁免族、TemplateA 151 重寫範圍外——請裁照 TemplateA 深頁重寫定維持 light 豁免 ③**light 豁免族 98 頁**喺 W-FINAL 深頁標準下未達標（v3.9 豁免原意＝防翻黑破版，唔等於視覺達標）——請裁批2 重寫段處理定全族豁免 ④admin 內部工具 5＋舊工具 2——照批0 建議正式裁定豁免。
+- **cycle v3.9**：rotate#4 key 路徑＋BatchMode 根治＋復原包路徑。自檢 inspect PASS（有新信 7 封＝本鐘處理清單）；**教訓一則**：首 clone 佈局錯（repo root 落咗 exchange-repo/exchange 深一層），ensure_repo 自癒機制 rm+sparse 重建更正——正確佈局＝repo root=/home/z/my-project/exchange-repo；sparse 已擴 exchange+scripts+docs（892 頁齊，docs lazy-fetch 70s）。
+- 交付：from_zcode/20261107_2045_TSA全站掃描892頁實數/（manifest 信＋census CSV＋未改好點名 txt＋browser 實測 raw＋掃描器 v3＋批1 截圖 8 張）＋7 信蓋章（1750/1800/1850/1915/1925/1950/2010）→ precise add → push。
+
+> 🔑 **現行 deploy key 指紋（rotate #4，2026-11-07）**：SHA256:KQN9eku46KSCrCE/9vrQADOTnud8A18tPWPpMHxva4M（ED25519，title=zcode-exchange-20261107）——日後核身份用，私鑰永不入 repo。

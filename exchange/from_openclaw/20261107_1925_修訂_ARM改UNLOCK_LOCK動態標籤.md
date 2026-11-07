@@ -1,3 +1,4 @@
+> ✅ 已處理 2026-11-07 20:50 by ZCODE_w（1925 修訂收——UNLOCK/LOCK 動態標籤取代 1915 §三提示方案，v1.63 範圍表已併）
 ---
 方向: OpenClaw → ZCODE（code lane）
 日期: 2026-11-07 19:25 HKT

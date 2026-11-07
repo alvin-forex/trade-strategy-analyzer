@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3.8 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+# exchange_cycle.sh v3.9 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+#
+# v3.9 重點（2026-11-07 沙盒滅失後重建）：
+#   ① key rotate #4：deploy key 換 zcode_exchange_key_20261107（舊 20261101 私鑰已亡失，GitHub 側已清理）
+#   ② BatchMode 根治：GIT_SSH_COMMAND 恆加 -o BatchMode=yes——無 tty 沙盒 ssh 隱式提示會永久 hang（實測22/443兩次假死）
+#   ③ 復原包路徑 zcode_recovery_20261107.zip＋.keys/ 歸位（key＋tsa_pw 兩密碼檔）
 #
 # v3.8 重點（2026-11-04 修復：1700 對比報告實錘漏掃四鐘）——信件入口再加 REPORT.md：
 #   OpenClaw 以 from_openclaw/20261104_1700_對比報告_CCY原版vs_v3/REPORT.md 出貨
@@ -74,8 +79,8 @@ set -u
 ORIG_ARGS=("$@")   # 捕獲原始 argv：self_install exec 時要完整重現（push 子命令路徑唔可以丟失）
 
 REPO="/home/z/my-project/exchange-repo"
-SSH_KEY="/home/z/my-project/.keys/zcode_exchange_key_20261101"   # 2026-11-01 rotate#3：私鑰存 .keys/（project volume 捱得過平台對 ~/.ssh 嘅 rollback；~/.ssh 已兩次被還原食key）
-KEY_ZIP="/home/z/my-project/upload/zcode_test_key.zip"
+SSH_KEY="/home/z/my-project/.keys/zcode_exchange_key_20261107"   # 2026-11-01 rotate#3：私鑰存 .keys/（project volume 捱得過平台對 ~/.ssh 嘅 rollback；~/.ssh 已兩次被還原食key）
+KEY_ZIP="/home/z/my-project/upload/zcode_recovery_20261107.zip"
 SSHBIN_DIR="/home/z/my-project/.sshbin"
 SSH_BIN="$SSHBIN_DIR/extract/usr/bin/ssh"
 REMOTE_SSH="git@github.com:alvin-forex/trade-strategy-analyzer.git"
@@ -173,11 +178,10 @@ ensure_key() {
   fi
   if [ -f "$KEY_ZIP" ]; then
     log "[boot] 金鑰缺失，從 upload zip 自動恢復..."
-    mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
-    ( cd "$HOME/.ssh" && unzip -o "$KEY_ZIP" >/dev/null 2>&1 ) || return 1
-    # zip 內檔名可能係 zcode_test_key，統一歸位
-    [ -f "$SSH_KEY" ] || mv -f "$HOME/.ssh/zcode_test_key" "$SSH_KEY" 2>/dev/null
-    chmod 600 "$SSH_KEY" 2>/dev/null
+    mkdir -p "/home/z/my-project/.keys" && chmod 700 "/home/z/my-project/.keys"
+    # v3.9：復原包內含子目錄，-j 平面提取歸位 .keys/（key＋tsa_pw 兩密碼檔）
+    ( cd "/home/z/my-project/.keys" && unzip -j -o "$KEY_ZIP" '*/zcode_exchange_key_2026110*' '*/tsa_pw*.txt' >/dev/null 2>&1 ) || return 1
+    chmod 600 "/home/z/my-project/.keys/"* 2>/dev/null
   fi
   [ -f "$SSH_KEY" ]
 }
@@ -195,7 +199,7 @@ setup_git() {
   gcfg core.fileMode false    # ⑥ mode 噪音根治（值唔同先寫，穩態零寫入）
   local sshbin; sshbin="$(ensure_ssh)" || return 1
   if ensure_key; then
-    export GIT_SSH_COMMAND="$sshbin -i $SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
+    export GIT_SSH_COMMAND="$sshbin -i $SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o BatchMode=yes"
     return 0
   fi
   return 2   # ssh 有、key 無
