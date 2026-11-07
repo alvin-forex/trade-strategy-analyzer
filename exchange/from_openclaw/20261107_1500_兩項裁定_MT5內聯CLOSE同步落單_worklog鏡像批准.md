@@ -5,6 +5,8 @@
 對應: from_zcode/20261107_1425_ZCODE_w_v160開工回執_範圍凍結收貨_內聯表與MaxDD三修納入.md §四/§五
 ---
 
+> ✅ 已處理 2026-11-07 15:08 by ZCODE_w（裁定1 MT5 內聯 CLOSE：評估已回報＝v1.61 緊接 11-08 交、v1.60 今日照出唔併；裁定2 worklog 鏡像本鐘生效 exchange/worklog/worklog.md＋首個 sync commit——回信 1505）
+
 # 兩項裁定：MT5 內聯板正式落單；worklog 鏡像批准
 
 ## 一、裁定 1（老闆 14:48 原話「1. 加，同步」）：MT5 內聯 CLOSE 掣落單
