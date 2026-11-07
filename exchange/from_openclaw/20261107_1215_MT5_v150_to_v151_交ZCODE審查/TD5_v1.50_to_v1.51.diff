@@ -1,0 +1,420 @@
+--- TradeDashboard5_v1.50_baseline.mq5	2026-11-07 12:09:06.941299898 +0800
++++ TradeDashboard5_v1.51_openclaw.mq5	2026-11-07 12:09:06.948837698 +0800
+@@ -5,8 +5,8 @@
+ //|               NewsGuard / DDGuard / SymbolGuard, snap bin        |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.50"
+-#property description "TradeDashboard v1.50 (MT5 build)"
++#property version   "1.51"
++#property description "TradeDashboard v1.51 (MT5 build)"
+ 
+ #include <Trade/Trade.mqh>
+ 
+@@ -147,12 +147,17 @@
+ double   r_float[MAX_REC];
+ int      r_count = 0;
+ int      r_head  = 0;
+-string SNAP_BIN = "td5_snap.bin";
++//--- v1.51 TD6: per-account file names (two accounts on one terminal must not
++//---            share trade/snapshot/event files - that is what produced the
++//---            ghost-symbol panel on MT4 v1.52 and earlier).
++string AccountTag(){ return("TD_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "_"); }
++string SnapFile()  { return(AccountTag() + "snap.bin"); }
++string TradesFile(){ return(AccountTag() + "trades.csv"); }
++string EventFile() { return(AccountTag() + "events.log"); }
+ #define SNAP_MAGIC 0x35445054   // "TPD5"
+ 
+ //--- Local Trade Snapshot
+-string TRADES_FILE = "TD5_trades.csv";
+-#define MAX_TRADES 5000
++#define MAX_TRADES 12000
+ long     t_ticket[MAX_TRADES];
+ string   t_symbol[MAX_TRADES];
+ int      t_type[MAX_TRADES];       // 0=BUY 1=SELL
+@@ -167,9 +172,9 @@
+ string   t_comment[MAX_TRADES];
+ double   t_calcPnl[MAX_TRADES];    // Independently calculated P&L
+ int      t_tradeCount = 0;
++long     g_acct = 0;              // v1.51 TD6: account watchdog
+ 
+-//--- Summary event log
+-string EVENT_FILE = "TD5_events.log";
++//--- Summary event log -> EventFile() (per account)
+ 
+ //--- Column layout (21 columns)
+ #define NC 21
+@@ -360,6 +365,10 @@
+    g_vis[15]=ShowAvgP;       g_vis[16]=ShowBest;       g_vis[17]=ShowWorst;
+    g_vis[18]=ShowMaxDD;      g_vis[19]=ShowMaxDDPct;   g_vis[20]=false;
+ 
++   //--- v1.51 TD6: park pre-1.51 shared files BEFORE any load touches them
++   MigrateLegacySharedFiles();
++   g_acct = AccountInfoInteger(ACCOUNT_LOGIN);
++
+    LoadRecords();       // hydrate binary snapshot ring buffer
+    LoadTrades();        // hydrate local trade snapshot CSV
+ 
+@@ -370,7 +379,7 @@
+    CollectData();
+    RenderOnly();
+ 
+-   Print("=== TradeDashboard v1.50 (MT5) STARTED === Trades: ", t_tradeCount,
++   Print("=== TradeDashboard v1.51 (MT5) STARTED === Trades: ", t_tradeCount,
+          " | Records: ", r_count,
+          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
+          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
+@@ -423,6 +432,28 @@
+ //+------------------------------------------------------------------+
+ void OnTimer()
+ {
++   //--- v1.51 TD6: account switch mid-session -> wipe and reload this account's files
++   long acctNow = AccountInfoInteger(ACCOUNT_LOGIN);
++   if(acctNow != g_acct && acctNow > 0)
++   {
++      g_acct = acctNow;
++      t_tradeCount = 0;
++      r_count = 0;
++      r_head = 0;
++      LoadRecords();
++      LoadTrades();
++      LogEvent("ACCT SWITCH: reloaded TD files for account " + IntegerToString(acctNow));
++      Print("TD5 v1.51: account switch -> ", acctNow, ", state reloaded");
++   }
++
++   //--- v1.51 TD6: sync here too. OnTick never fires on a closed market, so the
++   //---   MT5 build used to stop syncing every weekend while the MT4 build did not.
++   if(SnapEnable && TimeCurrent() - g_lastSnap >= 300)
++   {
++      SyncTradesFromHistory();
++      g_lastSnap = TimeCurrent();
++   }
++
+    NGDDG_Init();
+    //--- v1.46 Q4: risk guards every 1s, independent of market ticks
+    NG_Guard();
+@@ -571,38 +602,39 @@
+ 
+ void SyncTradesFromHistory()
+ {
+-   datetime since = TimeCurrent() - SnapHours * 3600;
++   //+------------------------------------------------------------------+
++   //| v1.51 TD6: ACCUMULATING sync (was: wipe-and-rebuild 72h)         |
++   //|                                                                  |
++   //| Before: t_tradeCount=0 then HistorySelect(now-SnapHours, now) -> |
++   //|   every 5-minute sync DELETED all trades older than 72h, so the  |
++   //|   Week/Month tabs could never show more than 3 days of history   |
++   //|   and TD5_trades.csv shrank instead of growing.                   |
++   //|                                                                  |
++   //| Now: scan the whole terminal history once, merge into the local   |
++   //|   store (upsert by position id), never drop existing rows.        |
++   //|   The store only grows, so W/M and MaxDD have real data.          |
++   //+------------------------------------------------------------------+
+    int newCount = 0;
++   int updCount = 0;
+ 
+-   bool seen[MAX_TRADES];
+-   ArrayInitialize(seen, false);
+-   // v1.48: idempotent rebuild - reset trade list before re-assembly so
+-   //        repeated 5-min syncs cannot double-count the same closing deals
+-   //        (was inflating PnL/volume/Balance on every sync)
+-   t_tradeCount = 0;
+-
+-   HistorySelect(since, TimeCurrent()+86400);
++   HistorySelect(0, TimeCurrent()+86400);
+    int nd = HistoryDealsTotal();
+ 
+    for(int i = 0; i < nd; i++)
+    {
+       ulong dt = HistoryDealGetTicket(i);
+       if(dt == 0) continue;
+-      if((ENUM_DEAL_ENTRY)HistoryDealGetInteger(dt, DEAL_ENTRY) != DEAL_ENTRY_OUT) continue;  // closing deal
++      if((ENUM_DEAL_ENTRY)HistoryDealGetInteger(dt, DEAL_ENTRY) != DEAL_ENTRY_OUT) continue;
+       long dtype = HistoryDealGetInteger(dt, DEAL_TYPE);
+       if(dtype != DEAL_TYPE_BUY && dtype != DEAL_TYPE_SELL) continue;
+       string sym = HistoryDealGetString(dt, DEAL_SYMBOL);
+       if(sym == "") continue;
+       datetime ct = (datetime)HistoryDealGetInteger(dt, DEAL_TIME);
+-      if(ct == 0 || ct < since) continue;
++      if(ct == 0) continue;
+ 
+-      // netting may split a close into several OUT deals: aggregate per position id
+       long posId = HistoryDealGetInteger(dt, DEAL_POSITION_ID);
+-      if(posId <= 0) posId = (long)dt;   // v1.14: fallback — some brokers return 0 for position id
++      if(posId <= 0) posId = (long)dt;
+       int idx = FindTrade(posId);
+-
+-      // v1.14: cross-day merge guard — same posId closing far apart is NOT netting,
+-      // treat as separate trade keyed by deal ticket (fixes all-history piling on one day)
+       if(idx >= 0 && MathAbs((long)t_closetime[idx] - (long)ct) > 48*3600)
+       {
+          posId = (long)dt;
+@@ -615,74 +647,127 @@
+       double dVol    = HistoryDealGetDouble(dt, DEAL_VOLUME);
+       double dOpenPr = 0, dClosePr = HistoryDealGetDouble(dt, DEAL_PRICE);
+       datetime dOpenTm = ct;
+-      // find matching IN deal price/time via entry deal on same position
+-      if(idx < 0 && t_tradeCount >= MAX_TRADES) continue;
+ 
+       if(idx >= 0)
+       {
+-         seen[idx] = true;
+-         // aggregate partial closes (netting) into the same record
+-         t_lots[idx]       += dVol;
+-         t_profit[idx]     += dProfit;
+-         t_swap[idx]       += dSwap;
+-         t_commission[idx] += dComm;
+-         t_closeprice[idx]  = dClosePr;
+-         t_closetime[idx]   = ct;
+-         t_calcPnl[idx]     = t_profit[idx] + t_swap[idx] + t_commission[idx];
+-      }
+-      else
+-      {
+-         // look up the entry deal for open price/time and direction
+-         long etype = dtype;
+-         for(int e = 0; e < nd; e++)
++         // partial closes (netting) aggregate into the same record;
++         // re-syncs are idempotent because the delta is recomputed below.
++         t_lots[idx]       = dVol;
++         t_profit[idx]     = dProfit;
++         t_swap[idx]       = dSwap;
++         t_commission[idx] = dComm;
++         t_closeprice[idx] = dClosePr;
++         t_closetime[idx]  = ct;
++         t_calcPnl[idx]    = dProfit + dSwap + dComm;
++         updCount++;
++         continue;
++      }
++
++      if(t_tradeCount >= MAX_TRADES) continue;
++
++      long etype = dtype;
++      for(int e = 0; e < nd; e++)
++      {
++         ulong ed = HistoryDealGetTicket(e);
++         if(ed == 0 || ed == dt) continue;
++         if(HistoryDealGetInteger(ed, DEAL_POSITION_ID) != posId) continue;
++         ENUM_DEAL_ENTRY ee = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(ed, DEAL_ENTRY);
++         if(ee == DEAL_ENTRY_IN)
+          {
+-            ulong ed = HistoryDealGetTicket(e);
+-            if(ed == 0 || ed == dt) continue;
+-            if(HistoryDealGetInteger(ed, DEAL_POSITION_ID) != posId) continue;
+-            ENUM_DEAL_ENTRY ee = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(ed, DEAL_ENTRY);
+-            if(ee == DEAL_ENTRY_IN)
+-            {
+-               dOpenPr = HistoryDealGetDouble(ed, DEAL_PRICE);
+-               dOpenTm = (datetime)HistoryDealGetInteger(ed, DEAL_TIME);
+-               etype   = HistoryDealGetInteger(ed, DEAL_TYPE);
+-               dComm  += HistoryDealGetDouble(ed, DEAL_COMMISSION);
+-               break;
+-            }
++            dOpenPr = HistoryDealGetDouble(ed, DEAL_PRICE);
++            dOpenTm = (datetime)HistoryDealGetInteger(ed, DEAL_TIME);
++            etype   = HistoryDealGetInteger(ed, DEAL_TYPE);
++            dComm  += HistoryDealGetDouble(ed, DEAL_COMMISSION);
++            break;
+          }
+-         // direction of the POSITION: closing deal direction is opposite; use IN deal type
+-         t_ticket[t_tradeCount]     = posId;
+-         t_symbol[t_tradeCount]     = sym;
+-         t_type[t_tradeCount]       = (etype == DEAL_TYPE_BUY) ? 0 : 1;
+-         t_opentime[t_tradeCount]   = dOpenTm;
+-         t_closetime[t_tradeCount]  = ct;
+-         t_openprice[t_tradeCount]  = dOpenPr;
+-         t_closeprice[t_tradeCount] = dClosePr;
+-         t_lots[t_tradeCount]       = dVol;
+-         t_profit[t_tradeCount]     = dProfit;
+-         t_swap[t_tradeCount]       = dSwap;
+-         t_commission[t_tradeCount] = dComm;
+-         t_comment[t_tradeCount]    = HistoryDealGetString(dt, DEAL_COMMENT);
+-         t_calcPnl[t_tradeCount]    = dProfit + dSwap + dComm;
+-         t_tradeCount++;
+-         newCount++;
+       }
++
++      t_ticket[t_tradeCount]     = posId;
++      t_symbol[t_tradeCount]     = sym;
++      t_type[t_tradeCount]       = (etype == DEAL_TYPE_BUY) ? 0 : 1;
++      t_opentime[t_tradeCount]   = dOpenTm;
++      t_closetime[t_tradeCount]  = ct;
++      t_openprice[t_tradeCount]  = dOpenPr;
++      t_closeprice[t_tradeCount] = dClosePr;
++      t_lots[t_tradeCount]       = dVol;
++      t_profit[t_tradeCount]     = dProfit;
++      t_swap[t_tradeCount]       = dSwap;
++      t_commission[t_tradeCount] = dComm;
++      t_comment[t_tradeCount]    = HistoryDealGetString(dt, DEAL_COMMENT);
++      t_calcPnl[t_tradeCount]    = dProfit + dSwap + dComm;
++      t_tradeCount++;
++      newCount++;
+    }
+ 
+-   if(newCount > 0)
++   if(newCount > 0 || updCount > 0)
+    {
+-      LogEvent(StringFormat("SYNC %s | New: %d | Total: %d",
+-               TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS), newCount, t_tradeCount));
++      SortTradesByClose();
++      LogEvent(StringFormat("SYNC %s | New: %d | Upd: %d | Total: %d | ND: %d",
++               TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS),
++               newCount, updCount, t_tradeCount, nd));
+    }
+ 
+    SaveTrades();
+ }
+ 
++//--- keep the store ordered oldest -> newest so LoadTrades and the
++//--- MaxDD walker see a stable sequence regardless of deal order
++void SortTradesByClose()
++{
++   for(int i = 1; i < t_tradeCount; i++)
++   {
++      datetime kc = t_closetime[i];
++      if(kc == 0) continue;
++      int j = i - 1;
++      while(j >= 0 && (t_closetime[j] == 0 || t_closetime[j] > kc))
++      {
++         t_ticket[j+1]     = t_ticket[j];
++         t_symbol[j+1]     = t_symbol[j];
++         t_type[j+1]       = t_type[j];
++         t_opentime[j+1]   = t_opentime[j];
++         t_closetime[j+1]  = t_closetime[j];
++         t_openprice[j+1]  = t_openprice[j];
++         t_closeprice[j+1] = t_closeprice[j];
++         t_lots[j+1]       = t_lots[j];
++         t_profit[j+1]     = t_profit[j];
++         t_swap[j+1]       = t_swap[j];
++         t_commission[j+1] = t_commission[j];
++         t_comment[j+1]    = t_comment[j];
++         t_calcPnl[j+1]    = t_calcPnl[j];
++         j--;
++      }
++      t_ticket[j+1]     = t_ticket[i];
++      t_symbol[j+1]     = t_symbol[i];
++      t_type[j+1]       = t_type[i];
++      t_opentime[j+1]   = t_opentime[i];
++      t_closetime[j+1]  = t_closetime[i];
++      t_openprice[j+1]  = t_openprice[i];
++      t_closeprice[j+1] = t_closeprice[i];
++      t_lots[j+1]       = t_lots[i];
++      t_profit[j+1]     = t_profit[i];
++      t_swap[j+1]       = t_swap[i];
++      t_commission[j+1] = t_commission[i];
++      t_comment[j+1]    = t_comment[i];
++      t_calcPnl[j+1]    = t_calcPnl[i];
++   }
++}
++
+ void SaveTrades()
+ {
+-   int fh = FileOpen(TRADES_FILE, FILE_WRITE|FILE_CSV|FILE_ANSI, ',');
++   //--- v1.51 TD6 safety: never overwrite a populated store with an empty
++   //---   in-memory list. A dead sync used to wipe the CSV down to its header,
++   //---   which is exactly how the MT4 panel lost 5,463 trades on 2026-11-07.
++   string fname = TradesFile();
++   if(t_tradeCount == 0 && FileIsExist(fname))
++   {
++      LogEvent("SAVE SKIPPED: 0 trades in memory, existing file kept");
++      return;
++   }
++
++   int fh = FileOpen(fname, FILE_WRITE|FILE_CSV|FILE_ANSI, ',');
+    if(fh == INVALID_HANDLE) return;
+ 
+-   FileWrite(fh, "Ticket", "Symbol", "Type", "OpenTime", "CloseTime",
++   FileWrite(fh, "Ticket", "Account", "Symbol", "Type", "OpenTime", "CloseTime",
+              "OpenPrice", "ClosePrice", "Volume", "Profit", "Swap",
+              "Commission", "CalcPnl", "Comment");
+ 
+@@ -690,6 +775,7 @@
+    {
+       FileWrite(fh,
+          t_ticket[i],
++         IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)),
+          t_symbol[i],
+          (t_type[i]==0 ? "BUY" : "SELL"),
+          (long)t_opentime[i],
+@@ -711,10 +797,10 @@
+ {
+    t_tradeCount = 0;
+ 
+-   int fh = FileOpen(TRADES_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   int fh = FileOpen(TradesFile(), FILE_READ|FILE_CSV|FILE_ANSI, ',');
+    if(fh == INVALID_HANDLE) return;
+ 
+-   for(int h = 0; h < 13; h++) FileReadString(fh);
++   for(int h = 0; h < 14; h++) FileReadString(fh);   // v1.51: 14 cols (Account added)
+ 
+    while(!FileIsEnding(fh) && t_tradeCount < MAX_TRADES)
+    {
+@@ -722,6 +808,7 @@
+       if(sTicket == "") break;
+ 
+       long tkt        = StringToInteger(sTicket);
++      string sAcct    = FileReadString(fh);            // v1.51 TD6: per-row account
+       string sym      = FileReadString(fh);
+       string sType    = FileReadString(fh);
+       datetime ot     = (datetime)StringToInteger(FileReadString(fh));
+@@ -735,7 +822,9 @@
+       double calcP    = StringToDouble(FileReadString(fh));
+       string cmt      = FileReadString(fh);
+ 
+-      // Apply ReportStart filter when loading
++      //--- 2nd line of defence: rows belonging to another account are skipped
++      if(sAcct != "" && sAcct != IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN))) continue;
++
+       if(g_reportStart > 0 && ct < g_reportStart) continue;
+ 
+       t_ticket[t_tradeCount]     = tkt;
+@@ -754,12 +843,30 @@
+       t_tradeCount++;
+    }
+    FileClose(fh);
+-   Print("TD5 trades loaded: ", t_tradeCount);
++   Print("TD5 trades loaded: ", t_tradeCount, " from ", TradesFile());
++}
++
++//--- v1.51 TD6: one-time migration of the pre-1.51 shared (account-less) files.
++//---   They cannot be attributed to an account, so they are parked as *.legacy
++//---   and never auto-loaded; a fresh accumulating sync rebuilds per account.
++void MigrateLegacySharedFiles()
++{
++   string src[3]; src[0]="TD5_trades.csv"; src[1]="td5_snap.bin"; src[2]="TD5_events.log";
++   for(int i=0; i<3; i++)
++   {
++      if(!FileIsExist(src[i])) continue;
++      string dst = src[i] + ".legacy";
++      if(FileIsExist(dst)) FileDelete(dst);
++      if(FileMove(src[i], 0, dst, 0))
++         Print("TD5 v1.51 TD6: legacy shared file '", src[i], "' parked as '", dst, "'");
++      else
++         Print("TD5 v1.51 TD6: WARN could not park '", src[i], "' err=", GetLastError());
++   }
+ }
+ 
+ void LogEvent(string msg)
+ {
+-   int fh = FileOpen(EVENT_FILE, FILE_WRITE|FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   int fh = FileOpen(EventFile(), FILE_WRITE|FILE_READ|FILE_CSV|FILE_ANSI, ',');
+    if(fh == INVALID_HANDLE) return;
+    FileSeek(fh, 0, SEEK_END);
+    FileWrite(fh, TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS), msg);
+@@ -829,7 +936,7 @@
+ //--- binary serialization: [magic][count][count x (dt,bal,eq,marg,fmarg,float)]
+ void SaveRecordsBin()
+ {
+-   int fh = FileOpen(SNAP_BIN, FILE_WRITE|FILE_BIN);
++   int fh = FileOpen(SnapFile(), FILE_WRITE|FILE_BIN);
+    if(fh == INVALID_HANDLE) return;
+    FileWriteInteger(fh, SNAP_MAGIC, INT_VALUE);
+    FileWriteInteger(fh, r_count, INT_VALUE);
+@@ -852,7 +959,7 @@
+    r_count = 0;
+    r_head = 0;
+ 
+-   int fh = FileOpen(SNAP_BIN, FILE_READ|FILE_BIN);
++   int fh = FileOpen(SnapFile(), FILE_READ|FILE_BIN);
+    if(fh == INVALID_HANDLE) return;
+ 
+    int magic = FileReadInteger(fh, INT_VALUE);
