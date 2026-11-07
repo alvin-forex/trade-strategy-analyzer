@@ -1,0 +1,495 @@
+--- 20261107_0635_FIX-TD5_patch_TDv153/TradeDashboard_v1.53_full_preview.mq4	2026-11-07 00:33:04.659082629 +0000
++++ 20261107_0831_FIX-TD4_patch_TDv154/TradeDashboard_v1.54_full_preview.mq4	2026-11-07 00:45:35.725551620 +0000
+@@ -5,7 +5,7 @@
+ //|                                    Broker summary-proof engine   |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.53"
++#property version   "1.54"
+ #property strict
+ #property description "TradeDashboard v1.53"
+ 
+@@ -146,6 +146,20 @@
+ bool     g_histEmpty = false;   // v1.51 FIX-TD2 BugB: OrdersHistoryTotal()==0
+ 
+ string PFX = "TD116_";
++
++//--- v1.54 FIX-TD4 (0745 放行信): BINGO CLOSE BOARD state -------------------
++//--- ARM is deliberately memory-only: EA reload / account switch / 60s expiry
++//--- all reset it, so a stale ARM can never outlive a re-init.
++int      g_bingoPage    = 0;     // BINGO pagination (1/2 [<][>])
++int      g_bingoPerPg   = 6;     // rows per page, recomputed per render
++datetime g_bingoCool[28][5];     // per-row per-button 30s cooldown
++datetime g_bingoCoolAll = 0;     // [CLOSE 全倉] 30s cooldown
++bool     g_bingoArmed   = false; // ARM gate - whole board disabled until armed
++datetime g_bingoArmT    = 0;     // ARM start time (60s window)
++string   g_bingoLast    = "";    // LAST action line (board footer)
++string   g_bingoResidSym= "";    // last symbol with residual after close
++int      g_bingoResidN  = 0;
++datetime g_bingoResidT  = 0;
+ int    g_view = 0;
+ int    g_offset = 0;
+ datetime g_lastFull = 0;
+@@ -721,6 +735,15 @@
+    g_acct = AccountNumber();
+    MigrateLegacyTDFiles();
+ 
++   // v1.54 FIX-TD4 (0745 spec): BINGO board starts cold - no ARM survives a
++   //   restart, all per-button cooldowns cleared.
++   g_bingoArmed = false;
++   g_bingoPage  = 0;
++   g_bingoLast  = "";
++   for(int bi = 0; bi < 28; bi++)
++      for(int bj = 0; bj < 5; bj++)
++         g_bingoCool[bi][bj] = 0;
++
+    LoadRecordsBin();   // v1.43 T6: hydrate from bin first
+    if(r_count == 0) LoadRecords();   // fallback: legacy CSV
+    LoadTrades();
+@@ -737,7 +760,7 @@
+    // Save initial fingerprint on startup
+    SaveFingerprint(CalcInputFingerprint());
+    
+-   Print("=== TradeDashboard v1.52 STARTED === Trades: ", t_tradeCount,
++   Print("=== TradeDashboard v1.54 STARTED === Trades: ", t_tradeCount,
+          " | Records: ", r_count,
+          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
+          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
+@@ -790,6 +813,7 @@
+    if(ti>=0 && ti<4 && ti!=g_tab)
+    {
+       g_tab=ti;
++      g_bingoArmed=false;   // v1.54 FIX-TD4: ARM 解除（切 TAB，含 agent hook）
+       RenderOnly();
+    }
+    if(snap!="")
+@@ -1044,6 +1068,9 @@
+    ObjectsDeleteAll(0, PFX+"DDP"); ObjectsDeleteAll(0, PFX+"DDM");
+    ObjectsDeleteAll(0, PFX+"TPH"); ObjectsDeleteAll(0, PFX+"TPC");
+    ObjectsDeleteAll(0, PFX+"DDGT"); ObjectsDeleteAll(0, PFX+"DDRESET");
++   // v1.54 FIX-TD4 (0745 item 4): BINGO CLOSE BOARD family - without this the
++   // board ghosts across TAB switches (v1.50 lesson, boss repro).
++   ObjectsDeleteAll(0, PFX+"BG");
+    string tids[]={"TNX","TA0","TAX","TAM","TD0","TD1","TD2","TD3","TD4","TDB","TDF","TS0","TS1","TS2","TS3","TS4"};
+    for(int g5=0;g5<ArraySize(tids);g5++) ObjectDelete(0,PFX+tids[g5]);
+ }
+@@ -1226,6 +1253,8 @@
+       UpdBtn("DDRESET","[ Confirm / Reset Peak ]",x+w-230*scale,by+16*scale,220*scale,16*scale,true);
+    }
+    else UpdBtn("DDRESET","[ Reset Peak ]",x+w-230*scale,by+16*scale,220*scale,16*scale,false);
++   // v1.54 FIX-TD4 (0745): BINGO CLOSE BOARD below DDRESET
++   BINGO_Render(x, by + 36*scale, w, scale);
+    // v1.37: tickbox/bar chart removed (was confusing, no info value)
+ }
+ void TabRender_Set(int x,int y,int scale,int w)
+@@ -1237,6 +1266,233 @@
+    UpdTxt("TS4","Tip: click tabs to switch. Guard tab = per-symbol ON/ALERT/BLOCK/CLOSE (CLOSE needs 2nd press).",x,y+59*scale,clrWhite,9*scale);
+ }
+ 
++//================= v1.54 FIX-TD4: BINGO CLOSE BOARD (0745 放行信) =========
++// 覆蓋 0745 信全部硬約束：
++//   - 品種來源只准即時掃 OrdersTotal()，禁 g_ddSyms[]（跨帳戶幽靈 SYMBOL）
++//   - 平倉只准 OrderSelect(SELECT_BY_POS, MODE_TRADES) 即時重掃，禁 t_ 陣列
++//   - ARM 60s 倒數未 ARM 全板禁用灰；到期自動失效；切 TAB／帳號變更解除
++//   - 每按鈕獨立 30s 冷卻；橙紅色；即按即執行無延遲；殘留顯示 RESID n
++//   - 底部 LAST 行；[CLOSE 全倉] 含刪除全部 pending
++string BINGO_BtnName(int b)
++{
++   if(b == 0) return("BUY");
++   if(b == 1) return("SELL");
++   if(b == 2) return("WIN");
++   if(b == 3) return("LOSE");
++   return("ALL");
++}
++
++//--- rows per page from live chart height (0745: 高度自適應 + 分頁唔跌出圖底)
++int BINGO_RowsPerPage(int boardTopY)
++{
++   int ch = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
++   int avail = ch - 30 - boardTopY - 18 - 18 - 10;
++   int n = avail / 15;
++   if(n < 3)  n = 3;
++   if(n > 28) n = 28;
++   return(n);
++}
++
++//--- live scan of OrdersTotal(): symbol / position count / lots / float P&L
++//--- sorted worst floating loss on top (tie: more positions first)
++int BINGO_Collect(string &syms[], int &cnt[], double &lots[], double &fl[], int maxN)
++{
++   for(int z = 0; z < maxN; z++) { syms[z] = ""; cnt[z] = 0; lots[z] = 0; fl[z] = 0; }
++   int n = 0;
++   for(int i = 0; i < OrdersTotal() && n < maxN; i++)
++   {
++      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
++      if(OrderType() > OP_SELL) continue;               // positions only, no pending
++      string s = OrderSymbol();
++      int k = -1;
++      for(int j = 0; j < n; j++) if(syms[j] == s) { k = j; break; }
++      if(k < 0) { k = n; n++; syms[k] = s; }
++      cnt[k]++; lots[k] += OrderLots();
++      fl[k] += OrderProfit() + OrderSwap() + OrderCommission();
++   }
++   for(int a = 1; a < n; a++)                           // insertion sort
++   {
++      string sA = syms[a]; int cA = cnt[a]; double lA = lots[a]; double fA = fl[a];
++      int b2 = a - 1;
++      while(b2 >= 0 && (fl[b2] > fA || (fl[b2] == fA && cnt[b2] < cA)))
++      {
++         syms[b2+1] = syms[b2]; cnt[b2+1] = cnt[b2]; lots[b2+1] = lots[b2]; fl[b2+1] = fl[b2];
++         b2--;
++      }
++      syms[b2+1] = sA; cnt[b2+1] = cA; lots[b2+1] = lA; fl[b2+1] = fA;
++   }
++   return(n);
++}
++
++//--- count open positions matching a BINGO mode (live rescan)
++int BINGO_CountMatch(int mode, string sym)
++{
++   int n = 0;
++   for(int p = OrdersTotal()-1; p >= 0; p--)
++   {
++      if(!OrderSelect(p, SELECT_BY_POS, MODE_TRADES)) continue;
++      if(OrderType() > OP_SELL) continue;
++      if(mode != 5 && OrderSymbol() != sym) continue;
++      if(mode == 0 && OrderType() != OP_BUY) continue;
++      if(mode == 1 && OrderType() != OP_SELL) continue;
++      double pf = OrderProfit() + OrderSwap() + OrderCommission();
++      if(mode == 2 && pf <= 0) continue;                // WIN = floating profit
++      if(mode == 3 && pf >= 0) continue;                // LOSE = floating loss
++      n++;
++   }
++   return(n);
++}
++
++//--- the board: header row (ARM + pager), symbol rows, LAST + [CLOSE 全倉]
++void BINGO_Render(int x, int y, int w, int scale)
++{
++   int perPage = BINGO_RowsPerPage(y);
++   g_bingoPerPg = perPage;
++   string syms[28]; int cnt[28]; double lots[28]; double fl[28];
++   int n = BINGO_Collect(syms, cnt, lots, fl, 28);
++   int pages = (n + perPage - 1) / perPage;
++   if(pages < 1) pages = 1;
++   if(g_bingoPage >= pages) g_bingoPage = pages - 1;
++   if(g_bingoPage < 0) g_bingoPage = 0;
++   int row0 = g_bingoPage * perPage;
++
++   UpdRect("BGBOARD", x, y, w, 18*scale + perPage*15 + 18*scale + 10*scale, C'16,21,46', C'150,60,30');
++   UpdTxtBold("BGH", "CLOSE BOARD", x + 6, y + 3*scale, clrOrange, 10*scale);
++   string armTxt = g_bingoArmed ? StringFormat("ARM %ds", 60 - (int)(TimeCurrent() - g_bingoArmT)) : "ARM";
++   UpdBtn("BGA", armTxt, x + 120*scale, y + 2*scale, 64*scale, 14*scale, g_bingoArmed);
++   if(g_bingoArmed) ObjectSetInteger(0, PFX+"BGA", OBJPROP_BGCOLOR, clrOrange);
++   UpdTxt("BGP", StringFormat("%d/%d", g_bingoPage + 1, pages), x + w - 96*scale, y + 4*scale, clrWhite, 9*scale);
++   UpdBtn("BGP_L", "[<]", x + w - 64*scale, y + 2*scale, 28*scale, 13*scale, (g_bingoPage > 0));
++   UpdBtn("BGP_R", "[>]", x + w - 32*scale, y + 2*scale, 28*scale, 13*scale, (g_bingoPage < pages - 1));
++
++   double bal = DDG_Base();
++   for(int i = 0; i < perPage; i++)
++   {
++      int idx = row0 + i;
++      int ry  = y + 18*scale + i*15;
++      if(idx >= n) break;
++      color flC = (fl[idx] < 0) ? clrTomato : clrLime;
++      UpdTxt("BGR_"+IntegerToString(i), syms[idx], x, ry, clrWhite, 9*scale);
++      UpdTxt("BGN_"+IntegerToString(i), StringFormat("%d張", cnt[idx]), x + 74*scale, ry, clrWhite, 9*scale);
++      UpdTxt("BGF_"+IntegerToString(i), StringFormat("%+.2f", fl[idx]), x + 116*scale, ry, flC, 9*scale);
++      bool resid = (syms[idx] == g_bingoResidSym && g_bingoResidN > 0 && TimeCurrent() - g_bingoResidT < 60);
++      if(resid)
++         UpdTxt("BGD_"+IntegerToString(i), StringFormat("RESID %d", g_bingoResidN), x + 186*scale, ry, clrRed, 9*scale);
++      else
++      {
++         double pctP = (bal > 0) ? MathAbs(fl[idx]) / bal * 100.0 : 0;
++         UpdTxt("BGD_"+IntegerToString(i), StringFormat("%.1f%%", pctP), x + 186*scale, ry, (fl[idx] < 0) ? clrOrange : clrKhaki, 9*scale);
++      }
++      for(int b = 0; b < 5; b++)
++      {
++         bool cool = (TimeCurrent() - g_bingoCool[i][b] < 30);
++         string bl = BINGO_BtnName(b);
++         if(cool) bl = StringFormat("%ds", 30 - (int)(TimeCurrent() - g_bingoCool[i][b]));
++         string onm = PFX+"BGB_"+IntegerToString(i)+"_"+IntegerToString(b);
++         UpdBtn("BGB_"+IntegerToString(i)+"_"+IntegerToString(b), bl, x + 236*scale + b*50*scale, ry - 1, 46*scale, 13*scale, (g_bingoArmed && !cool));
++         if(g_bingoArmed && !cool)
++         {
++            ObjectSetInteger(0, onm, OBJPROP_BGCOLOR, clrOrangeRed);   // 橙紅、即按即執行
++            ObjectSetInteger(0, onm, OBJPROP_COLOR, clrWhite);
++         }
++      }
++   }
++   int ly = y + 18*scale + perPage*15 + 3*scale;
++   UpdTxt("BGL", (g_bingoLast == "" ? "LAST: -" : g_bingoLast), x, ly, clrKhaki, 9*scale);
++   bool allOn = (g_bingoArmed && TimeCurrent() - g_bingoCoolAll >= 30);
++   UpdBtn("BGC", "[ CLOSE 全倉 ]", x + w - 122*scale, ly - 2*scale, 118*scale, 16*scale, allOn);
++   if(allOn)
++   {
++      ObjectSetInteger(0, PFX+"BGC", OBJPROP_BGCOLOR, clrOrangeRed);
++      ObjectSetInteger(0, PFX+"BGC", OBJPROP_COLOR, clrWhite);
++   }
++}
++
++//--- ARM toggle: 60s window starts here; whole board gates on this flag
++void BINGO_ArmToggle()
++{
++   if(!g_bingoArmed)
++   {
++      g_bingoArmed = true;
++      g_bingoArmT = TimeCurrent();
++      LogEvent("BINGO: ARM on (60s window)");
++   }
++   else
++   {
++      g_bingoArmed = false;
++      LogEvent("BINGO: ARM off (manual)");
++   }
++}
++
++//--- per-symbol row button: 0=BUY 1=SELL 2=WIN 3=LOSE 4=SYM-ALL(keeps pending)
++void BINGO_Press(int row, int b)
++{
++   if(row < 0 || row >= 28 || b < 0 || b >= 5) return;
++   if(!g_bingoArmed) return;                                            // 未 ARM 全板禁用
++   if(TimeCurrent() > g_bingoArmT + 60) { g_bingoArmed = false; return; } // 到期自動失效
++   if(TimeCurrent() - g_bingoCool[row][b] < 30) return;                 // 每按鈕獨立冷卻 30s
++   // 0745 硬約束：即時重掃品種表，唔用 render 快取亦唔用 t_ 陣列
++   string syms[28]; int cnt[28]; double lots[28]; double fl[28];
++   int n = BINGO_Collect(syms, cnt, lots, fl, 28);
++   int pages = (n + g_bingoPerPg - 1) / g_bingoPerPg;
++   if(pages < 1) pages = 1;
++   int pg = (g_bingoPage < pages) ? g_bingoPage : pages - 1;
++   int idx = pg * g_bingoPerPg + row;
++   if(idx >= n) return;
++   string sym = syms[idx];
++   int closed = BINGO_CountMatch(b, sym);
++   if(closed == 0) return;                                              // 該範圍無單，唔燒冷卻
++   double balBefore = AccountBalance();
++   int residual = DDG_CloseMatch(b, sym);
++   double realized = AccountBalance() - balBefore;
++   g_bingoCool[row][b] = TimeCurrent();
++   if(residual > 0) { g_bingoResidSym = sym; g_bingoResidN = residual; g_bingoResidT = TimeCurrent(); }
++   else if(sym == g_bingoResidSym) { g_bingoResidSym = ""; g_bingoResidN = 0; }
++   g_bingoLast = StringFormat("LAST: %s %s %d張 %+.2f @%s", BINGO_BtnName(b), sym, closed, realized, TimeToString(TimeCurrent(), TIME_MINUTES));
++   LogEvent(StringFormat("BINGO %s %s: closed %d, residual %d, realized $%.2f", BINGO_BtnName(b), sym, closed, residual, realized));
++   TG_Notify("TD_BINGO_" + sym + "_" + IntegerToString(b), "🎯 BINGO " + BINGO_BtnName(b) + " — " + sym + "\n▪ Closed: " + IntegerToString(closed) + " position(s)\n▪ Realized: $" + DoubleToString(realized, 2) + (residual > 0 ? "\n⚠ Residual: " + IntegerToString(residual) + " still open!" : "\n▪ Residual: 0 ✅") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
++   RenderOnly();
++}
++
++//--- global [CLOSE 全倉]: all symbols all positions + delete ALL pending
++void BINGO_CloseAll()
++{
++   if(!g_bingoArmed) return;
++   if(TimeCurrent() > g_bingoArmT + 60) { g_bingoArmed = false; return; }
++   if(TimeCurrent() - g_bingoCoolAll < 30) return;
++   int closed = BINGO_CountMatch(5, "");
++   if(closed == 0) return;
++   double balBefore = AccountBalance();
++   int residual = DDG_CloseMatch(5, "");
++   double realized = AccountBalance() - balBefore;
++   g_bingoCoolAll = TimeCurrent();
++   g_bingoLast = StringFormat("LAST: CLOSE全倉 %d張 %+.2f @%s", closed, realized, TimeToString(TimeCurrent(), TIME_MINUTES));
++   LogEvent(StringFormat("BINGO CLOSEALL: closed %d, residual %d, realized $%.2f", closed, residual, realized));
++   TG_Notify("TD_CLOSEALL", "🎯 TD CLOSE ALL\n▪ Closed: " + IntegerToString(closed) + " position(s)\n▪ Realized: $" + DoubleToString(realized, 2) + (residual > 0 ? "\n⚠ Residual: " + IntegerToString(residual) + " still open — manual check!" : "\n▪ Residual: 0 ✅") + "\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
++   RenderOnly();
++}
++
++//--- per-second upkeep from OnTimer: ARM countdown text, cooldown expiry,
++//--- RESID timeout; renders ONLY when something on the board is live.
++void BINGO_Tick()
++{
++   if(g_tab != 2) return;
++   if(g_bingoArmed && TimeCurrent() > g_bingoArmT + 60)
++   {
++      g_bingoArmed = false;                    // ARM 到期自動失效
++      RenderOnly();
++      return;
++   }
++   bool busy = g_bingoArmed;
++   if(!busy)
++      for(int i = 0; i < 28 && !busy; i++)
++         for(int b = 0; b < 5; b++)
++            if(TimeCurrent() - g_bingoCool[i][b] < 30) { busy = true; break; }
++   if(!busy && TimeCurrent() - g_bingoCoolAll < 30) busy = true;
++   if(!busy && g_bingoResidN > 0 && TimeCurrent() - g_bingoResidT < 60) busy = true;
++   if(busy) RenderOnly();
++}
++
+ void OnTick()
+ {
+    CheckTabCmd();   // v1.35: agent self-test hook
+@@ -1335,11 +1591,13 @@
+       if(r_count == 0) LoadRecords();   // fallback legacy per-account CSV
+       LoadTrades();                     // TD_<acct>_trades.csv
+       DDG_LoadState();                  // account-scoped risk state (v1.47 Q9 keys)
++      g_bingoArmed = false;             // v1.54 FIX-TD4: ARM 解除（帳號變更）
+       LogEvent("ACCT SWITCH: reloaded TD files for account " + IntegerToString(g_acct));
+       Print("TD v1.53 FIX-TD5: account switch -> ", g_acct, ", state reloaded");
+    }
+ 
+    CheckTabCmd();   // v1.35: agent self-test hook (also when no ticks)
++   BINGO_Tick();    // v1.54 FIX-TD4: ARM countdown / cooldown expiry refresh
+ 
+    //--- v1.46 Q4: risk guards every 1s, independent of market ticks
+    NGDDG_Init();
+@@ -1425,7 +1683,11 @@
+       else if(StringFind(s, PFX+"TAB") == 0)
+       {
+          int ti = (int)StringToInteger(StringSubstr(s, StringLen(PFX)+3));
+-         if(ti >= 0 && ti < 4) g_tab = ti;
++         if(ti >= 0 && ti < 4)
++         {
++            if(ti != g_tab) g_bingoArmed = false;   // v1.54 FIX-TD4: ARM 解除（切 TAB）
++            g_tab = ti;
++         }
+          changed = true;
+       }
+       else if(s == PFX+"V_H")       { g_view=0; g_offset=0; changed=true; }
+@@ -1465,6 +1727,20 @@
+          Print("DDGuard v1.48: symbol guard ", (g_ddgSymOn?"ON":"OFF"), " (panel)");
+          DDG_SaveState(); changed = true;
+       }
++      //--- v1.54 FIX-TD4: BINGO CLOSE BOARD buttons -------------------------
++      else if(StringFind(s, PFX+"BGB_") == 0)
++      {
++         string bgRest = StringSubstr(s, StringLen(PFX) + 4);
++         int us = StringFind(bgRest, "_");
++         if(us > 0)
++            BINGO_Press((int)StringToInteger(StringSubstr(bgRest, 0, us)),
++                        (int)StringToInteger(StringSubstr(bgRest, us + 1)));
++         changed = true;
++      }
++      else if(s == PFX+"BGA")   { BINGO_ArmToggle(); changed = true; }
++      else if(s == PFX+"BGC")   { BINGO_CloseAll();  changed = true; }
++      else if(s == PFX+"BGP_L") { g_bingoPage--; if(g_bingoPage < 0) g_bingoPage = 0; changed = true; }
++      else if(s == PFX+"BGP_R") { g_bingoPage++; changed = true; }
+       else if(s == PFX+"SAVE") { ManualBackupNow(); changed=false; }
+       else if(StringFind(s, PFX+"SG_") == 0)
+       {
+@@ -2595,13 +2871,22 @@
+    {
+       tabNeedH = (14 + 17) + 8;                 // header block above content
+       if(g_tab == 2)      // DDGuard: 64*scale block + col header 16 + rows 15 each + footer 26
+-         tabNeedH = tabNeedH + 86*scale + 16*scale + MathMin(g_ddSymN,12)*15*scale + 30*scale + 12;
++      {
++         // v1.54 FIX-TD4 (0745 item 5): + CLOSE BOARD = 板頭 18 + 行數×15 + LAST 18 + 邊距 10
++         int bgRows = BINGO_RowsPerPage(tabNeedH + 86*scale + 16*scale + MathMin(g_ddSymN,12)*15*scale + 30*scale + 33*scale);
++         tabNeedH = tabNeedH + 86*scale + 16*scale + MathMin(g_ddSymN,12)*15*scale + 30*scale + 12
++                  + 18 + bgRows*15 + 18 + 10;
++      }
+       else if(g_tab == 1) // Alerts: news up to 8 lines *14 + symbol block 8 rows *16 + footer
+          tabNeedH = tabNeedH + 8*14*scale + 8*16*scale + 40*scale + 12;
+       else                // Set: 4 lines
+          tabNeedH = tabNeedH + 70*scale + 12;
+       if(tabNeedH > panelH) panelH = tabNeedH;
+    }
++   // v1.54 FIX-TD4 (0745 item 6): vertical clamp - panel must never fall off
++   // the chart bottom; BINGO_RowsPerPage() already pages rows to fit.
++   int chartHpxV = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
++   if(chartHpxV > 100 && panelH > chartHpxV - 30) panelH = chartHpxV - 30;
+ 
+    UpdRect("BG", px, py, panelW, panelH, C'16,21,46', C'40,50,80');
+ 
+@@ -3137,6 +3422,7 @@
+    ObjectsDeleteAll(0, PFX+"DDF"); ObjectsDeleteAll(0, PFX+"DDP");
+    ObjectsDeleteAll(0, PFX+"DDM"); ObjectsDeleteAll(0, PFX+"TPC");
+    ObjectsDeleteAll(0, PFX+"DDGT"); ObjectsDeleteAll(0, PFX+"DDRESET");
++   ObjectsDeleteAll(0, PFX+"BG");   // v1.54 FIX-TD4: BINGO CLOSE BOARD family
+ }
+ 
+ void NG_LoadNews()
+@@ -3446,37 +3732,63 @@
+ }
+ 
+ //+------------------------------------------------------------------+
+-//| v1.43 T2: close one symbol with retry-until-zero                 |
++//| v1.54 FIX-TD4 (0745 item 1): unified close body                  |
++//| int DDG_CloseMatch(int mode, string sym)                         |
++//|   mode 0=BUY 1=SELL 2=WIN 3=LOSE 4=SYM-ALL (keeps pending)       |
++//|   mode 5=GLOBAL (all symbols, all positions + delete ALL pending)|
++//|   mode 6=legacy alias: sym positions + THIS symbol's pending     |
++//|         deleted - keeps DDG_CloseSymbolWithRetry bit-for-bit     |
++//| One shared retry-until-zero loop (RefreshRates + Sleep(150)),    |
++//| live rescans OrdersTotal() only, never touches t_* arrays.       |
++//| WIN/LOSE split on net floating P&L (profit+swap+commission).     |
+ //+------------------------------------------------------------------+
+-int DDG_CloseSymbolWithRetry(string sym)
++int DDG_CloseMatch(int mode, string sym)
+ {
++   bool global   = (mode == 5);
++   bool delPend  = (mode == 5 || mode == 6);
+    int retries = MathMax(1, DDG_CloseRetry);
+    int residual = 9999;
+    for(int r = 0; r < retries; r++)
+    {
+-      for(int p = OrdersTotal()-1; p >= 0; p--)
++      if(delPend)
+       {
+-         if(!OrderSelect(p, SELECT_BY_POS, MODE_TRADES)) continue;
+-         if(OrderSymbol() != sym) continue;
+-         if(OrderType() <= OP_SELL) continue;
+-         if(!OrderDelete(OrderTicket()))
+-            Print("DDGuard sym pending-del fail #", OrderTicket(), " err=", GetLastError());
++         for(int p = OrdersTotal()-1; p >= 0; p--)
++         {
++            if(!OrderSelect(p, SELECT_BY_POS, MODE_TRADES)) continue;
++            if(OrderType() <= OP_SELL) continue;
++            if(!global && OrderSymbol() != sym) continue;
++            if(!OrderDelete(OrderTicket()))
++               Print("DDG close-match pending-del fail #", OrderTicket(), " err=", GetLastError());
++         }
+       }
+-      for(int p = OrdersTotal()-1; p >= 0; p--)
++      for(int p2 = OrdersTotal()-1; p2 >= 0; p2--)
+       {
+-         if(!OrderSelect(p, SELECT_BY_POS, MODE_TRADES)) continue;
+-         if(OrderSymbol() != sym || OrderType() > OP_SELL) continue;
+-         double px = (OrderType()==OP_BUY) ? MarketInfo(sym,MODE_BID) : MarketInfo(sym,MODE_ASK);
++         if(!OrderSelect(p2, SELECT_BY_POS, MODE_TRADES)) continue;
++         if(OrderType() > OP_SELL) continue;
++         if(!global && OrderSymbol() != sym) continue;
++         if(mode == 0 && OrderType() != OP_BUY) continue;
++         if(mode == 1 && OrderType() != OP_SELL) continue;
++         double pf = OrderProfit() + OrderSwap() + OrderCommission();
++         if(mode == 2 && pf <= 0) continue;   // WIN = floating profit
++         if(mode == 3 && pf >= 0) continue;   // LOSE = floating loss
++         double px = (OrderType()==OP_BUY) ? MarketInfo(OrderSymbol(),MODE_BID)
++                                           : MarketInfo(OrderSymbol(),MODE_ASK);
+          if(!OrderClose(OrderTicket(), OrderLots(), px, 30, clrRed))
+-            Print("DDGuard sym close fail #", OrderTicket(), " err=", GetLastError());
++            Print("DDG close-match fail #", OrderTicket(), " err=", GetLastError());
+       }
+       RefreshRates();
+       Sleep(150);
+       residual = 0;
+-      for(int p = OrdersTotal()-1; p >= 0; p--)
++      for(int p3 = OrdersTotal()-1; p3 >= 0; p3--)
+       {
+-         if(!OrderSelect(p, SELECT_BY_POS, MODE_TRADES)) continue;
+-         if(OrderSymbol() != sym || OrderType() > OP_SELL) continue;
++         if(!OrderSelect(p3, SELECT_BY_POS, MODE_TRADES)) continue;
++         if(OrderType() > OP_SELL) continue;
++         if(!global && OrderSymbol() != sym) continue;
++         if(mode == 0 && OrderType() != OP_BUY) continue;
++         if(mode == 1 && OrderType() != OP_SELL) continue;
++         double pf3 = OrderProfit() + OrderSwap() + OrderCommission();
++         if(mode == 2 && pf3 <= 0) continue;
++         if(mode == 3 && pf3 >= 0) continue;
+          residual++;
+       }
+       if(residual == 0) break;
+@@ -3485,6 +3797,16 @@
+ }
+ 
+ //+------------------------------------------------------------------+
++//| v1.43 T2: close one symbol with retry-until-zero                 |
++//| v1.54 FIX-TD4: legacy alias over DDG_CloseMatch(6, sym);         |
++//| behaviour unchanged - still deletes THIS symbol's pending.       |
++//+------------------------------------------------------------------+
++int DDG_CloseSymbolWithRetry(string sym)
++{
++   return(DDG_CloseMatch(6, sym));
++}
++
++//+------------------------------------------------------------------+
+ //| v1.43 T3: stop AT — guarded toggle, DLL-safe                     |
+ //+------------------------------------------------------------------+
+ void DDG_StopAT()
