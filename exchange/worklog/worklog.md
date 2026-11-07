@@ -2269,3 +2269,17 @@ Stage Summary:
 - 交付：from_zcode/20261107_2045_TSA全站掃描892頁實數/（manifest 信＋census CSV＋未改好點名 txt＋browser 實測 raw＋掃描器 v3＋批1 截圖 8 張）＋7 信蓋章（1750/1800/1850/1915/1925/1950/2010）→ precise add → push。
 
 > 🔑 **現行 deploy key 指紋（rotate #4，2026-11-07）**：SHA256:KQN9eku46KSCrCE/9vrQADOTnud8A18tPWPpMHxva4M（ED25519，title=zcode-exchange-20261107）——日後核身份用，私鑰永不入 repo。
+
+## Task 270：21:00 收信＋2100 批示處理＋v1.63 七項一鑊熟兩平台交付＋G4 刪除（2026-11-07 21:00–21:40，老闆「收信, 開工」）
+- **21:00 巡檢**：pull 896406a（老闆批示 commit），新信 1 封＝2100 老闆批示（批1四頁全部打回統一 TSA NAV BAR＋四項裁決即答＋中介制度立例＋排期授權「你排」）。
+- **批示處理**：①批1 四頁（forex_news/ccy_power/signal_ranking/projection）全部唔合格——NAV 一律跟主站標準，修完重交 8 截圖解鎖態；NAV 標準同時約束 D 族重寫＋批 2-6 全部頁→**排下一工作鐘**（方法五點入 manifest §五）②四項裁決執行：G4 刪（本鐘 git rm）／尾三頁歸 D 族統一深色／D 族 98 頁統一深色隨批 2/4 時段（W5C tokens 放置法跟進）／G5＋F2 豁免正式入案 ③中介制度收單——日後裁決請求經 OpenClaw 呈批（證據＋A/B 選項表＋決策包三條件）。
+- **G4 刪除**：引用覆核（survey JSON 係 11-05 歷史快照照留；docs 入口零引用）→ `git rm docs/reports/sample_redesign_36912.html` 隨本次 push。
+- **v1.63 全鏈（主任務，2045 承諾兌現）**：基準 MT4 v1.60 final（89d8305a）＋MT5 v1.62 final（53eebc1a）→ scripts/v163/ 手術：
+  - MT4 20 錨定（版號×4／6 input 註解清零＋DefaultView 1→0／chatID 清空／+WhitelistUrl+BotToken／bx0 右對齊 x+w−6s−250s／UNLOCK+LOCK 動態標籤＋BGC 表頭 bx0+68 90闊／表尾只剩 LAST／ArmToggle log 改名／token override）→ 4,164 行
+  - MT5 17 錨定（同上對應項＋4 input 註解清零＋STARTED print 滯留 v1.60 修正＋**CheckTabCmd 全新移植**——1915 §五根因確診：函數歷代從未入 MT5；read-once 語義照 MT4 v1.51 修復版，OnTick+OnTimer 雙呼叫）→ 3,735 行
+  - **verify_v163.py 34 閘 PASS exit 0**（含兩條新企立規閘：R1 按鈕文字全 ASCII／R2 input 註解零版本號——regex v[0-9].｜FIX-TD｜Q#）；TD10 工具 MT4 13/13＋MT5 12/12＋parity 70/70 PASS；手術自檢 28+32 全綠（期望值修正 4 輪全係檢查器 bug）；diff MT4 203 行／MT5 224 行；md5 MT4 3b464ee3…／MT5 b828c740…
+  - baseline .set ×2（v1.60 已批基準機器延伸：70 參數、risk 10 開關 0、chat/token 空、View=0、WhitelistUrl 帶預設 URL）
+  - 交付：from_zcode/20261107_2135_TD_v163_兩平台_五鈕右移_UNLOCK動態鎖_TG直輸/（兩 final＋兩 diff＋兩 .set＋REPORT＋verify+output＋tools 三件＋manifest 回信）＋2100 蓋章 → precise add → push。
+- **表頭新幾何**：[UNLOCK 64闊]bx0 起→[CLOSE ALL 90闊]bx0+68→pager 1/3 [<][>] 右貼邊——BGC 右緣 x+w−98s 唔疊 pager text（x+w−96s），全闊度成立；五鈕排尾 x+w−10s。
+- **四項發現**：①MT5 tabcmd 冇反應＝CheckTabCmd 從未移植（已根治）②2010 話 MT5 乾淨實測有 4 個版本號註解（已清）③1850 兩平台 default 寫反（實況 MT4=1 MT5=0；裁決統一 0 不變，改 MT4 側）④MT5 STARTED print v1.60 滯留兩版（已修）。
+- **等態**：v1.63 兩平台真機 0/0 編譯＋部署截圖（表頭右對齊＋LOCK 倒數）；批 1 四頁 NAV 重做（下一鐘出貨）；AngelGold .set 11-09；D 族統一深色分族方案（隨批 2/4，經中介制呈批）。
