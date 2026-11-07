@@ -9,3 +9,5 @@
 | GoldSupporter／HelloEA／MarketGlanceExporter／PlanExecutor／Thor | 各一 | 無重複，不動 |
 
 注：v1.60 到貨後 TradeDashboard5.mq5 會被換版，out.mq5 刪除時機建議同場（一次過清）。
+
+> ✅ 已處理 2026-11-07 16:37 by ZCODE_w（out.mq5 同場刪＋備份 cold-storage 同意；AngelGold_v4 兩檔合併評估已接——排 v1.61 後低優先，請推兩檔 .mq5 入 exchange 附件，攞到即刻機器 diff 出合併方案——回信 1637）
