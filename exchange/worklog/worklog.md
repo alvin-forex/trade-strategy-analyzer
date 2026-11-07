@@ -2293,3 +2293,15 @@ Stage Summary:
 - baseline .set ×2 重生：**82 行=70 參數+12 spacer**，68 legacy 與 v1.60 已批基準逐名零差異（機器對账），View=0/chat 空/token 空/risk10=0。
 - 交付：from_zcode/20261107_2155_TD_v163r2_兩平台_九項齊_分組間隔_空值註釋/（兩 final＋兩 diff＋兩 .set＋REPORT＋verify+output＋tools 六件（手術×3＋TD10-r2×2＋rename_inputs）＋manifest）＋2130 蓋章 → precise add → push。**取代 2135 七項版**（舊目錄留審計軌跡）。md5：MT4 3b5920b5…／MT5 62867f68…。
 - 等態：v1.63r2 真機 0/0＋F7 觀感截圖（12 分隔線＋表頭右對齊＋LOCK 倒數）；批 1 四頁 NAV 重做下一鐘；AngelGold 11-09；D 族隨批 2/4。
+
+## Task 272：Task 271 斷線交付補 push＋批1 四頁 NAV 統一 2100 批示全執行（2026-11-07 22:06–23:00）
+- **22:06 接手「繼續」**：實機查證——Task 269/270/271 已由前段 session 完成（worklog 鏡像＋commit 3d79c3d 為證），但 **Task 271 最後一步 precise add→push 未完成**（2155 文件夾 untracked＋worklog/2130 蓋章未 commit）。22:10 補齊：18 檔 10,319 行 staged → push **69f8c0b**（v1.63r2 九項齊兩平台，取代 2135 版；MT4 4,176 行/MT5 3,747 行=+12 spacer 核對）。pull 無新信。
+- **批1 四頁 NAV 統一（2100 批示主工序）**：forex_news＋ccy_power＋signal_ranking 拆自建 sidebar/topnav→套主站方案 C 標準 NAV（48px sticky 六連結＋aria-current＋漢堡 drawer＋一致性 JS）；projection 一錨對齊全出血（body padding 補償 margin＋padding 24px）。
+  - P2 ccy_power 唔止 C3：**整套暗 palette slate→TSA tokens**（bg/card/hover/text/text2/primary/border 七值）＋ApexCharts 內嵌舊色四點＋body margin-left:260px 移除＋../tsa_tokens.css 補鏈（card2 var 空→#1C2638）。
+  - P4 signal_ranking 加密頁：**加解密管道先行自證**（HEAD 密文→解密→重加密→byte-identical）先郁手；手術（topnav/sidebar 拆除＋toggle 掣遷移右上 fixed）→deterministic 重加密→round-trip byte-identical→替換。
+  - **projection「fetch TypeError＋空表」真相**：file:// CORS 量測假象（live 200/200 實證＋JSON 有效）；**browser 閘升級 localhost http server**→997 行 full render、err 空。
+- **三重驗證全綠**：手術自檢（錨點計數斷言）＋獨立靜態閘 31/31（掃描器 v3 同款 regex＋N1-N4/E1，獨立第二實現）＋browser 閘（http server：四頁 bg/card2/nav6/aria-current/drawer 隱藏/漢堡桌面不現全對；ccy 表 30 行＋ApexCharts render 實證；projection 997 行；signal 150 行＋toggle 可見）＋**像素閘 20/20**（截圖驗 nav #161E2E 佔比/全出血/藍字/無白邊）。
+- **檢查器 bug 五修**（全部係驗證代碼病非產品病）：aria-current 計埋 CSS selector／bar nav 同 drawer nav 計數邏輯／S7 錨點空格差（`colors: isDark` vs `colors:isDark`）／ccy light --text #1e293b 誤判舊色／**nav_html ccy aria-current 落錯首頁**（current key 撞標準清單首頁——呢個係真 bug，重設計 canonical 身份比對＋self_href 自指）。
+- **教訓一則**：曾判 projection/主站 `.navdrawer[hidden]` selector「損壞」——od -c 實證檔案本正確，係讀檔顯示層食字假象——獨立 code span 內 hidden 屬性選擇器嘅頭兩字元會被食去；字元級實證（od/grep -o）先可落結論。
+- 交付：from_zcode/20261107_2300_批1四頁NAV統一_主站標準_8截圖解鎖態/（manifest＋REPORT＋shots 8＋browser_raw＋verify/pixel 輸出＋tools 四件＋three_pages.diff＋signal_ranking_decrypted.diff）→ precise add → push。
+- 等態：老闆 F7 過目 8 截圖；v1.63r2 真機 0/0；D 族 98 頁隨批 2/4（中介制）；AngelGold .set 11-09。
