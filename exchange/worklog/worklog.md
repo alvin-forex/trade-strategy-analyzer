@@ -2237,3 +2237,11 @@ Stage Summary:
 - verify_v161.py 18 項閘： V1-V9 語義／渲染／handler／執行體（delta 對基準制 v1.60 同構 loop）＋V10 輸入凍結（80 行 byte 級比對＋兩候裁 default 未郁）＋V11 code-only 括號（三態 lexer 剝非碼）＋V12 L1 lexer 衛生（S6c 殺手類零捕獲）→ **18/18 PASS exit 0**。期望值修正三輪（bgRest×4、p-loop delta=1、OrangeRed=2）全係檢查 bug 非產品 bug。
 - 交付： `from_zcode/20261107_1715_TD_v161_MT5_內聯CLOSE板/`（final mq5 3,684 行＋diff 397＋REPORT＋verify+output＋tools 手術源）＋回信 1715（提早一日＋.set 沿用宣告＋netting 語義差異表＋兩候裁續等）→ precise add＋push。
 - 等態： OpenClaw 側 v1.60→v1.61 編譯 0-err 實證＋部署截圖；兩候裁；AngelGold 源檔。
+
+## Task 267：17:31 巡查＋1750 處理——v1.62 hotfix 交付＋AngelGold 合併評估結論（2026-11-07 17:31–17:40）
+- 巡查： pull a938179，新信 1 封 `20261107_1750_驗收_v161上線_VPS八台v160齊_warning原文.md`（＋AngelGold 供料目錄附件兩檔）。
+- 1750 收執： v1.61 真機編譯 0 errors/1 warnings、ex5 227,836B、725B72F2 部署、17:24:49 loaded log 實證；VPS 八台 v1.60 全清（MT4-6 4873 張死線解除）；審計更正（FIX-TD9 脫鈎判錯，regex 病因）。
+- **v1.62 warning hotfix（本鐘開工即交）**： warning 43 原文定位 L1160,11 `int rd = FileReadArray(...)`（uint→int，v1.60 同條 1134）——全檔唯一 FileReadArray，修法顯式 `(int)` cast＋版號 1.62。手術腳本 `scripts/v162/mt5_warning_fix.py` 13/13 PASS（行數 3,683 不變、input 塊 byte-identical、paren/brace delta 一致、BINGO 引擎 untouched、三態 lexer 乾淨）。交付 `from_zcode/20261107_1737_TD_v162_MT5_warning_hotfix/`（final mq5 md5 53eebc1a…＋diff 22 行 3 hunk）。預期真機 0/0 全綠。
+- **AngelGold 合併評估結論（1637 接單、1750 供料到）**： 機器 diff 實證兩檔唯一差異 L52 SignalTF_Minutes 60 vs 15，代碼 100% 同；SigTF() 已內建 16 級 TF 映射——合併零代碼改動：留 v4 做正本＋M15 用 .set preset。三注意： MagicNumber 同 20260919（同帳雙實例要分 magic）、FVG_M15 模式語義綁 TF=15（時限窗按 SignalTF_Minutes 計）、無 GV＋物件前綴 chart 隔離＝雙圖表安全。執行序照 CLEANUP_PROPOSAL：週末照跑，落地等老闆裁（下週一 11-09 可同場）。
+- 回信 1737（收執＋v1.62 交付＋AngelGold 評估）＋1750 蓋章＋供料目錄入 repo → precise add → push 876f51d（push-audit PASS；ssh 備援 PATH 序用上）。
+- 等態： v1.62 真機編譯 0/0 回貼；AngelGold 落地裁決；v1.61 視覺截圖對照表；兩候裁（InpDefaultView＋TG default）。
