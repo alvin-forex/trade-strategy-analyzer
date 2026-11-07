@@ -1,0 +1,280 @@
+diff --git a/base_mt5_v162.mq5 b/TradeDashboard5_v1.63_final.mq5
+index 787a20d..01346f5 100644
+--- a/base_mt5_v162.mq5
++++ b/TradeDashboard5_v1.63_final.mq5
+@@ -5,8 +5,8 @@
+ //|               NewsGuard / DDGuard / SymbolGuard, snap bin        |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.62"
+-#property description "TradeDashboard v1.62 (MT5 build, inline CLOSE board port)"
++#property version   "1.63"
++#property description "TradeDashboard v1.63 (MT5 build, inline CLOSE board port)"
+ 
+ #include <Trade/Trade.mqh>
+ 
+@@ -30,16 +30,18 @@ CTrade trade;
+ 
+ //=== INPUTS ===
+ //--- v1.44: Panel Label first; NewsGuard/DDGuard default OFF (enable when needed)
+-//=== INPUTS (v1.60: 12 groups / 68 params, two-platform aligned) ===
++//=== INPUTS (v1.63: 12 groups / 70 params, two-platform aligned) ===
+ //--- v1.44: NewsGuard/DDGuard default OFF (enable when needed)
+ //--- v1.60 FIX-TD10: rename per 1230 letter 66-row table; 2 new DD-money params
+ 
++sinput string Spacer01                  = "";                                        // ────────────────────────────────
+ input group "General"
+ input string InpTitleLine1              = "TradeDashboard";                          // Line 1 (max 30 chars) - no version in panel
+ input string InpTitleLine2              = "Flying to the moon";                      // Line 2 Subtitle
+ input int    InpPanelScale              = 1;                                         // Panel size multiplier (1, 2 or 3)
+ input int    InpDefaultView             = 0;                                         // 0=Hour, 1=Day, 2=Week, 3=Month
+ 
++sinput string Spacer02                  = "";                                        // ────────────────────────────────
+ input group "Display"
+ input bool   InpShowDay                 = true;                                      // Show Day column in stats table
+ input bool   InpShowTrades              = true;                                      // Show trade count column
+@@ -63,26 +65,30 @@ input bool   InpShowMaxDdMoney          = true;
+ input bool   InpShowMaxDdPercent        = true;                                      // Max drawdown %
+ input bool   InpShowPnlChart            = false;                                     // Show cumulative P&L chart
+ 
++sinput string Spacer03                  = "";                                        // ────────────────────────────────
+ input group "Refresh & Recording"
+ input int    InpRefreshSeconds          = 10;                                        // Panel refresh interval in seconds
+ input int    InpRecordSeconds           = 1;                                         // Min seconds between records (1=every tick)
+ input int    InpMaxRecords              = 12000;                                     // Records in ring buffer (max 20000)
+ 
++sinput string Spacer04                  = "";                                        // ────────────────────────────────
+ input group "Data Filter"
+-input string InpReportStart             = "";                                        // Report start date YYYY.MM.DD (empty=no filter)
+-input string InpFilterSymbol            = "";                                        // Filter by symbol (empty=all)
+-input string InpFilterComment           = "";                                        // Filter by comment (empty=all)
++input string InpReportStart             = "";                                        // Report start date YYYY.MM.DD (empty = from beginning)
++input string InpFilterSymbol            = "";                                        // Filter by symbol (empty = all)
++input string InpFilterComment           = "";                                        // Filter by comment (empty = all)
+ 
++sinput string Spacer05                  = "";                                        // ────────────────────────────────
+ input group "Trade Snapshot"
+ input bool   InpSnapshotEnable          = true;                                      // Enable local trade snapshots
+ input int    InpSnapshotHours           = 72;                                        // Snapshot lookback hours
+ input bool   InpSnapshotBackfillOnce    = false;                                     // One-shot full-history backfill, flip back after run
+ 
++sinput string Spacer06                  = "";                                        // ────────────────────────────────
+ input group "DD Guard - Account"
+ input bool   InpDdgEnable               = false;                                     // default OFF - enable when needed
+ input double InpDdgAccountMaxPercent    = 20.0;                                      // account max drawdown % (peak-to-equity)
+ input double InpDdgAccountMaxMoney      = 0.0;                                       // Account max drawdown in money (0 = off)
+-input bool   InpDdgAccountEnable        = true;                                      // v1.46 Q5: account-level DD guard (independent switch)
++input bool   InpDdgAccountEnable        = true;                                      // account-level DD guard (independent switch)
+ input bool   InpDdgCloseOnHit           = true;                                      // close positions on trigger
+ input int    InpDdgLockMinutes          = 60;                                        // lockout minutes after DD trigger (peak NOT lowered)
+ input bool   InpDdgStopAutoTrade        = true;                                      // toggle terminal AutoTrading OFF on trigger (DLL)
+@@ -90,31 +96,38 @@ input bool   InpDdgAlertPopup           = false;
+ input bool   InpDdgAccountStopAutotrade = true;                                      // account-level DD stops global AutoTrading
+ input int    InpDdgCloseRetry           = 4;                                         // close retry attempts before giving up
+ 
++sinput string Spacer07                  = "";                                        // ────────────────────────────────
+ input group "DD Guard - Per Symbol"
+-input bool   InpDdgSymbolEnable         = false;                                     // v1.46 Q5: per-symbol DD guard (independent switch)
+-input string InpDdgSymbolList           = "";                                        // Guarded symbols, comma-separated (empty=all)
++input bool   InpDdgSymbolEnable         = false;                                     // per-symbol DD guard (independent switch)
++input string InpDdgSymbolList           = "";                                        // Guarded symbols, comma-separated (empty = all)
+ input double InpDdgSymbolMaxPercent     = 12.0;                                      // per-symbol max drawdown %
+ input double InpDdgSymbolMaxMoney       = 0.0;                                       // Per-symbol max drawdown in money (0 = off)
+ input bool   InpDdgSymbolStopAutotrade  = false;                                     // per-symbol DD stops global AutoTrading (default OFF)
+ 
++sinput string Spacer08                  = "";                                        // ────────────────────────────────
+ input group "Symbol Guard"
+ input bool   InpSymbolGuardEnable       = true;                                      // Symbol Guard: monitor per-symbol trading
+-input int    InpSymbolGuardMode         = 0;                                         // v1.47 Q7: new symbol default 0=ON 1=ALERT 2=BLOCK 3=CLOSE
++input int    InpSymbolGuardMode         = 0;                                         // new symbol default 0=ON 1=ALERT 2=BLOCK 3=CLOSE
+ 
++sinput string Spacer09                  = "";                                        // ────────────────────────────────
+ input group "News Guard"
+-input int    InpNewsGuardMode           = 0;                                         // v1.47 Q8: 0=OFF(default) 1=ALERT 2=BLOCK(new only) 3=CLOSE(new+old)
++input int    InpNewsGuardMode           = 0;                                         // 0=OFF(default) 1=ALERT 2=BLOCK(new only) 3=CLOSE(new+old)
+ input int    InpNewsBeforeMinutes       = 30;                                        // Minutes before news event to guard
+ input int    InpNewsAfterMinutes        = 15;                                        // Minutes after news event to guard
+ input bool   InpNewsHighImpactOnly      = true;                                      // Guard high-impact news only
+ input string InpNewsFile                = "news_guard.csv";                          // News calendar CSV file name
+ input int    InpNewsServerOffsetHours   = -5;                                        // news CSV(HKT+8) -> broker server hours
+ 
++sinput string Spacer10                  = "";                                        // ────────────────────────────────
+ input group "Telegram"
+-input string InpTelegramChatId          = "920593269";                               // Telegram chat ID
++input string InpTelegramChatId          = "";                                        // Telegram chat ID (empty = no Telegram target; set via input/.set)
+ input string InpTelegramTokenFile       = "tg_token.txt";                            // File name holding the bot token
+ input bool   InpTelegramEnable          = true;                                      // Enable Telegram notifications
+ input int    InpTelegramMinGapMinutes   = 10;                                        // min minutes between notifications per key
++input string InpTelegramWhitelistUrl    = "https://api.telegram.org";               // Whitelist this URL in firewall/proxy (copy)
++input string InpTelegramBotToken        = "";                                        // Bot token direct (overrides token file; empty=use file)
+ 
++sinput string Spacer11                  = "";                                        // ────────────────────────────────
+ input group "Backup & Recovery"
+ input bool   InpAutoBackup              = true;                                      // Enable daily auto backup on change
+ input bool   InpAutoReconnect           = true;                                      // Auto-restart terminal on stuck disconnect
+@@ -122,8 +135,9 @@ input int    InpReconnectAfterMinutes   = 10;
+ input int    InpRestartCooldownHours    = 2;                                         // Min hours between restarts
+ input int    InpMaxRestartAttempts      = 3;                                         // Give up after N consecutive failed restarts
+ input string InpBackupTime              = "05:30";                                   // Daily check time, server time HH:MM
+-input string InpBackupFolder            = "";                                        // Custom backup root (empty=auto data path)
++input string InpBackupFolder            = "";                                        // Custom backup root (empty = auto data path)
+ 
++sinput string Spacer12                  = "";                                        // ────────────────────────────────
+ input group "Diagnostics"
+ //--- (reserved: no diagnostics inputs yet)
+ 
+@@ -450,7 +464,7 @@ int OnInit()
+    CollectData();
+    RenderOnly();
+ 
+-   Print("=== TradeDashboard v1.60 (MT5) STARTED === Trades: ", t_tradeCount,
++   Print("=== TradeDashboard v1.63 (MT5) STARTED === Trades: ", t_tradeCount,
+          " | Records: ", r_count,
+          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
+          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
+@@ -840,8 +854,44 @@ void OnDeinit(const int reason)
+ //+------------------------------------------------------------------+
+ //| OnTick                                                           |
+ //+------------------------------------------------------------------+
++//--- v1.63 (1915 §五): remote self-test hook ported from MT4 v1.35 — the
++//---   agent writes MQL5/Files/TD_tabcmd.txt ("tab=N" and/or "snap=name");
++//---   read-once semantics (MT4 v1.51 FIX-TD2): the hook file is ALWAYS
++//---   deleted after read, only well-formed "tab=" acts. This hook was absent
++//---   from every MT5 build — the root cause of the "MT5 tabcmd no reaction"
++//---   ticket (1915 §五).
++datetime g_tabCmdLast=0;
++void CheckTabCmd()
++{
++   if(TimeLocal()-g_tabCmdLast < 2) return;   // v1.49: TimeLocal (weekend-safe)
++   g_tabCmdLast=TimeCurrent();
++   int h=FileOpen("TD_tabcmd.txt",FILE_READ|FILE_TXT|FILE_ANSI);
++   if(h==INVALID_HANDLE) return;
++   string cmd=FileReadString(h);
++   FileClose(h);
++   FileDelete("TD_tabcmd.txt");
++   int tp=StringFind(cmd,"tab=");
++   if(tp<0) return;               // v1.51 FIX-TD2: only well-formed commands act
++   int ti=(int)StringToInteger(StringSubstr(cmd,tp+4));
++   string snap="";
++   int sp=StringFind(cmd,"snap=");
++   if(sp>=0) snap=StringSubstr(cmd,sp+5);
++   if(ti>=0 && ti<4 && ti!=g_tab)
++   {
++      g_tab=ti;
++      g_bingoArmed=false;   // v1.54 FIX-TD4: ARM 解除（切 TAB，含 agent hook）
++      RenderOnly();
++   }
++   if(snap!="")
++   {
++      string f="TD_tabcheck_"+snap+".png";
++      ChartScreenShot(0,f,1600,900,ALIGN_LEFT);
++      Print("[TD5] self-test snap ",f," tab=",g_tab);
++   }
++}
+ void OnTick()
+ {
++   CheckTabCmd();   // v1.63 (1915 §五): agent self-test hook (MT4 v1.35 parity)
+    NGDDG_Init();
+    NG_Guard();
+    DDG_Guard();
+@@ -919,6 +969,7 @@ void OnTimer()
+    DDG_ATStatusCheck();
+    SymbolGuard();
+    NG_WindowPush();
++   CheckTabCmd();   // v1.63 (1915 §五): agent self-test hook (also when no ticks)
+    BINGO_Tick();    // v1.61: ARM countdown / cooldown expiry refresh (g_tab==2 only)
+    GlobalVariableSet(DDG_PeakKey(), g_ddgPeakEquity);
+    SG_CollectSymbols();
+@@ -2349,12 +2400,12 @@ void BINGO_ArmToggle()
+    {
+       g_bingoArmed = true;
+       g_bingoArmT = TimeCurrent();
+-      LogEvent("BINGO: ARM on (60s window)");
++      LogEvent("BINGO: UNLOCK on (60s window)");
+    }
+    else
+    {
+       g_bingoArmed = false;
+-      LogEvent("BINGO: ARM off (manual)");
++      LogEvent("BINGO: LOCK (manual)");
+    }
+ }
+ 
+@@ -2503,8 +2554,11 @@ void TabRender_DDG(int x,int y,int scale,int w)
+ 
+    //--- v1.37: aligned column table, one row per traded symbol ---
+    //--- v1.61 (1400 §三 MT5 port): CLOSE buttons INLINE — five buttons per
+-   //--- row right of MaxDD$; ARM + pager live in the table header, LAST +
+-   //--- [CLOSE 全倉] in the tail (MT4 v1.60 parity, direct translation).
++   //--- row right of MaxDD$; ARM + pager live in the table header, LAST in
++   //--- the tail (MT4 v1.60 parity, direct translation).
++   //--- v1.63 (1915 §一/§二, boss 19:04): five-button column RIGHT-ALIGNED to
++   //---   the panel edge; ARM renamed UNLOCK/LOCK (1925); [CLOSE ALL] moved to
++   //---   the header beside UNLOCK, pure-ASCII label (MQL button font mangles CJK).
+    int ty = y + 96*scale;   // v1.49: table pushed down, fixed reset-block above
+    double bal = DDG_Base(); if(bal <= 0) bal = 1;
+    int c1 = x + 8*scale;
+@@ -2512,7 +2566,7 @@ void TabRender_DDG(int x,int y,int scale,int w)
+    int c3 = x + 175*scale;
+    int c4 = x + 250*scale;
+    int c5 = x + 320*scale;
+-   int bx0 = x + 340*scale;       // v1.61: inline button column origin
++   int bx0 = x + w - 6*scale - 250*scale;   // v1.63 (1915 §一): button column right-aligned to the panel edge
+    int rows = 12;                 // v1.61: rows per page (12 over g_ddSymN, cap 32 => max 3 pages)
+    int pages = (g_ddSymN + rows - 1) / rows;
+    if(pages < 1) pages = 1;
+@@ -2524,10 +2578,20 @@ void TabRender_DDG(int x,int y,int scale,int w)
+    UpdTxtBold("TPC3","DD now %", c3, ty, clrDeepSkyBlue, 9*scale);
+    UpdTxtBold("TPC4","MaxDD %",  c4, ty, clrDeepSkyBlue, 9*scale);
+    UpdTxtBold("TPC5","MaxDD $",  c5, ty, clrDeepSkyBlue, 9*scale);
+-   // v1.61: ARM + pager in the table header row (MT4 v1.60 parity)
+-   string armTxt = g_bingoArmed ? StringFormat("ARM %ds", 60 - (int)(TimeCurrent() - g_bingoArmT)) : "ARM";
++   // v1.63 (1925): ARM renamed — UNLOCK when locked (opens the 60s window);
++   //   LOCK + countdown when armed (press = immediate manual re-lock).
++   // v1.63 (1915 §二): [CLOSE ALL] moved from the tail into the header, right
++   //   of the UNLOCK button (boss: "放在ARM鍵旁"); ASCII-only label.
++   string armTxt = g_bingoArmed ? StringFormat("LOCK %ds", 60 - (int)(TimeCurrent() - g_bingoArmT)) : "UNLOCK";
+    UpdBtn("BGA", armTxt, bx0, ty - 2*scale, 64*scale, 13*scale, g_bingoArmed);
+    if(g_bingoArmed) ObjectSetInteger(0, PFX+"BGA", OBJPROP_BGCOLOR, clrOrange);
++   bool allOn = (g_bingoArmed && TimeCurrent() - g_bingoCoolAll >= 30);   // v1.63: moved up from the tail (BGC now in the header)
++   UpdBtn("BGC", "[ CLOSE ALL ]", bx0 + 68*scale, ty - 2*scale, 90*scale, 13*scale, allOn);
++   if(allOn)
++   {
++      ObjectSetInteger(0, PFX+"BGC", OBJPROP_BGCOLOR, clrOrangeRed);
++      ObjectSetInteger(0, PFX+"BGC", OBJPROP_COLOR, clrWhite);
++   }
+    UpdTxt("BGP", StringFormat("%d/%d", g_bingoPage + 1, pages), x + w - 96*scale, ty, clrWhite, 9*scale);
+    UpdBtn("BGP_L", "[<]", x + w - 64*scale, ty - 2*scale, 28*scale, 13*scale, (g_bingoPage > 0));
+    UpdBtn("BGP_R", "[>]", x + w - 32*scale, ty - 2*scale, 28*scale, 13*scale, (g_bingoPage < pages - 1));
+@@ -2578,16 +2642,9 @@ void TabRender_DDG(int x,int y,int scale,int w)
+    }
+    int shown = MathMin(g_ddSymN - row0, rows); if(shown < 0) shown = 0;
+    if(g_ddSymN==0) UpdTxt("TAX2","(no traded symbols yet)",x+8*scale,ty+16*scale,clrKhaki,9*scale);
+-   // v1.61: table tail — LAST + [CLOSE 全倉] (MT4 v1.60 tail, ported)
++   // v1.63 (1915 §二): table tail — LAST only ([CLOSE ALL] moved to the header)
+    int ly = ty + 18*scale + shown*15*scale;
+    UpdTxt("BGL", (g_bingoLast == "" ? "LAST: -" : g_bingoLast), x, ly, clrKhaki, 9*scale);
+-   bool allOn = (g_bingoArmed && TimeCurrent() - g_bingoCoolAll >= 30);
+-   UpdBtn("BGC", "[ CLOSE 全倉 ]", x + w - 122*scale, ly - 2*scale, 118*scale, 16*scale, allOn);
+-   if(allOn)
+-   {
+-      ObjectSetInteger(0, PFX+"BGC", OBJPROP_BGCOLOR, clrOrangeRed);
+-      ObjectSetInteger(0, PFX+"BGC", OBJPROP_COLOR, clrWhite);
+-   }
+    // v1.60 (1230 §3.4): Gain definition note - MT5 Gain is broker-true
+    //   DEAL_PROFIT+SWAP+COMMISSION (MT4 recomputes from prices).
+    //   v1.61: note moved below the CLOSE tail; WIN/LOSE split uses
+@@ -3377,6 +3434,13 @@ void NG_Guard()
+ //---            (Tools -> Options -> Expert Advisors -> Allow WebRequest)
+ void TG_LoadToken()
+ {
++   // v1.63 (2010 §三): InpTelegramBotToken non-empty overrides the token file
++   if(InpTelegramBotToken != "")
++   {
++      g_tgToken = InpTelegramBotToken;
++      StringTrimLeft(g_tgToken); StringTrimRight(g_tgToken);
++      return;
++   }
+    int th = FileOpen(InpTelegramTokenFile, FILE_READ|FILE_TXT|FILE_ANSI);
+    if(th != INVALID_HANDLE)
+    {

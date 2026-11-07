@@ -2283,3 +2283,13 @@ Stage Summary:
 - **表頭新幾何**：[UNLOCK 64闊]bx0 起→[CLOSE ALL 90闊]bx0+68→pager 1/3 [<][>] 右貼邊——BGC 右緣 x+w−98s 唔疊 pager text（x+w−96s），全闊度成立；五鈕排尾 x+w−10s。
 - **四項發現**：①MT5 tabcmd 冇反應＝CheckTabCmd 從未移植（已根治）②2010 話 MT5 乾淨實測有 4 個版本號註解（已清）③1850 兩平台 default 寫反（實況 MT4=1 MT5=0；裁決統一 0 不變，改 MT4 側）④MT5 STARTED print v1.60 滯留兩版（已修）。
 - **等態**：v1.63 兩平台真機 0/0 編譯＋部署截圖（表頭右對齊＋LOCK 倒數）；批 1 四頁 NAV 重做（下一鐘出貨）；AngelGold .set 11-09；D 族統一深色分族方案（隨批 2/4，經中介制呈批）。
+
+## Task 271：2130 追加兩項——v1.63r2 九項齊兩平台重交（2026-11-07 21:32–22:00）
+- 21:32 巡檢（2135 push 後覆核）：新信 1 封＝2130 v1.63 再追加（老闆 21:27 F7 觀感：§八「加返啲分組用的間隔, 原本我覺得OK的」——v1.55 ___ 分隔線喺 v1.60 被清過龍＋§九「EMPTY或0 = 不用果啲參數, 請你加返()註釋」）→ 累計 9 項，併入 v1.63。
+- **§八 spacer**：兩平台每個 group 邊界一行標準化 spacer——MT4 `input string SpacerNN = ""`（MQL4 無 sinput；string 參數優化器唔掃，等價）／MT5 `sinput string SpacerNN = ""`（照信關鍵字），註釋 ─×32 統一、值空、12 行=組數、**唔計入 70 參數**；v1.55 `___` 假分隔照封。兩平台都加（信話 MT5 可唔加，為 F7 觀感一致齊上）。
+- **§九 () 註釋**：兩平台實測各 12 個 0/0.0/空預設參數全覆蓋；修 6 處（ReportStart→"empty = from beginning" 照信措辭／ChatId 補 empty 意義／FilterSymbol/FilterComment/DdgSymbolList/BackupFolder 格式統一）；DdgAccountMaxMoney 實測已有 (0 = off) 唔使補（manifest §六備註）。
+- **閘改版**：check_input_standard_r2（F1→SP1 數目=組數＋SP2 組邊界＋SP3 格式統一；G2 spacer 豁免）＋check_param_parity_r2（Spacer* 排除 P1-P5；sinput 解析；ALLOWED_DEFAULT_DIFFS 清空——View 已統一）；verify_v163 r2 新增 V19/V20，共 **38 閘 PASS exit 0**；TD10-r2：MT4 16/16＋MT5 15/15＋parity PASS（70+12 spacers 兩側）。
+- 手術擴展：MT4 21 錨定（+S8 程式化 spacer 批次＋S9 六 rep）＋34 自檢；MT5 26 錨定（+T9/T10）＋36 自檢；期望值修正 3 輪全係檢查器 bug（diff 行數 37/33 實測）。
+- baseline .set ×2 重生：**82 行=70 參數+12 spacer**，68 legacy 與 v1.60 已批基準逐名零差異（機器對账），View=0/chat 空/token 空/risk10=0。
+- 交付：from_zcode/20261107_2155_TD_v163r2_兩平台_九項齊_分組間隔_空值註釋/（兩 final＋兩 diff＋兩 .set＋REPORT＋verify+output＋tools 六件（手術×3＋TD10-r2×2＋rename_inputs）＋manifest）＋2130 蓋章 → precise add → push。**取代 2135 七項版**（舊目錄留審計軌跡）。md5：MT4 3b5920b5…／MT5 62867f68…。
+- 等態：v1.63r2 真機 0/0＋F7 觀感截圖（12 分隔線＋表頭右對齊＋LOCK 倒數）；批 1 四頁 NAV 重做下一鐘；AngelGold 11-09；D 族隨批 2/4。
