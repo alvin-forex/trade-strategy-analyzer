@@ -1,0 +1,479 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""v1.61 surgery: MT5 inline CLOSE board (1400 §三 MT5 port, MT4 v1.60 parity).
+
+Input : exchange-repo delivery TradeDashboard5_v1.60_full_preview.mq5 (3,406 lines)
+Output: scripts/v161/TradeDashboard5_v1.61_final.mq5 + diff + self-check report.
+
+Scope (frozen, 1540 agreed):
+  - BINGO engine Order->Position port (0745 hard rules intact: live rescan,
+    ARM 60s, per-button 30s cooldown, residual visible, LAST line)
+  - Panel direct translation: inline 5 buttons/row, ARM+pager header,
+    LAST + [CLOSE 全倉] tail, 12 rows/page over g_ddSymN (cap 32 => 3 pages)
+  - guard tab panelW >= 620*scale (MT4 v1.60 parity)
+  - NO new inputs, NO default changes (InpDefaultView / TG chat id untouched)
+"""
+import re, subprocess, sys, pathlib
+
+SRC = pathlib.Path("/home/z/my-project/exchange-repo/exchange/from_zcode/20261107_1557_TD_v160_兩平台對齊/TradeDashboard5_v1.60_full_preview.mq5")
+OUT = pathlib.Path("/home/z/my-project/scripts/v161/TradeDashboard5_v1.61_final.mq5")
+DIFF = pathlib.Path("/home/z/my-project/scripts/v161/TradeDashboard5_v1.60_to_v1.61.diff")
+
+txt = SRC.read_text(encoding="utf-8")
+orig = txt
+applied = []
+
+def rep(tag, old, new, count=1):
+    global txt
+    n = txt.count(old)
+    assert n == count, f"[{tag}] anchor count {n} != {count}\n--- anchor ---\n{old[:200]}"
+    txt = txt.replace(old, new, count)
+    applied.append(tag)
+
+# ---------- A1: version ----------
+rep("A1-version",
+'#property version   "1.60"\n#property description "TradeDashboard v1.60 (MT5 build, two-platform aligned)"',
+'#property version   "1.61"\n#property description "TradeDashboard v1.61 (MT5 build, inline CLOSE board port)"')
+
+# ---------- A2: globals ----------
+rep("A2-globals",
+'double g_ddSymDDPct[32];   // max DD as % of cumulative peak',
+'''double g_ddSymDDPct[32];   // max DD as % of cumulative peak
+
+//--- v1.61 (1400 §三 MT5 port): BINGO CLOSE BOARD state -------------------
+//--- ARM is deliberately memory-only: EA reload / account switch / 60s expiry
+//--- all reset it, so a stale ARM can never outlive a re-init (0745 rule).
+int      g_bingoPage    = 0;     // v1.61: DDGuard table page (12 rows/page over g_ddSymN, cap 32)
+datetime g_bingoCool[12][5];     // per-row per-button 30s cooldown (12 visible rows)
+datetime g_bingoCoolAll = 0;     // [CLOSE 全倉] 30s cooldown
+bool     g_bingoArmed   = false; // ARM gate - whole board disabled until armed
+datetime g_bingoArmT    = 0;     // ARM start time (60s window)
+string   g_bingoLast    = "";    // LAST action line (table tail)
+string   g_bingoResidSym= "";    // last symbol with residual after close
+int      g_bingoResidN  = 0;
+datetime g_bingoResidT  = 0;''')
+
+# ---------- A3: OnInit cold start ----------
+rep("A3-oninit-cold",
+'   TG_LoadToken();      // v1.15 Q2: load TG token at startup (was only in NewsGuard)',
+'''   TG_LoadToken();      // v1.15 Q2: load TG token at startup (was only in NewsGuard)
+
+   // v1.61 (0745 spec MT5 port): BINGO board starts cold - no ARM survives a
+   //   restart, all per-button cooldowns cleared.
+   g_bingoArmed = false;
+   g_bingoPage  = 0;
+   g_bingoLast  = "";
+   for(int bi = 0; bi < 12; bi++)
+      for(int bj = 0; bj < 5; bj++)
+         g_bingoCool[bi][bj] = 0;''')
+
+# ---------- A4: account switch releases ARM ----------
+rep("A4-acctswitch",
+'      LogEvent("ACCT SWITCH: reloaded TD files for account " + IntegerToString(acctNow));\n      Print("TD5 v1.60: account switch -> ", acctNow, ", state reloaded");',
+'''      LogEvent("ACCT SWITCH: reloaded TD files for account " + IntegerToString(acctNow));
+      Print("TD5 v1.60: account switch -> ", acctNow, ", state reloaded");
+      // v1.61 (0745): 帳號變更解除 ARM — cold board on account switch
+      g_bingoArmed = false;
+      g_bingoPage  = 0;''')
+
+# ---------- A5: BINGO engine before TabRender_DDG ----------
+rep("A5-engine",
+'void TabRender_DDG(int x,int y,int scale,int w)',
+'''//================= v1.61 FIX (1400 §三 MT5 port): BINGO CLOSE BOARD =========
+// 覆蓋 0745 信全部硬約束（MT4 v1.54/v1.60 同源，Order 引擎移植為 Position）：
+//   - 平倉只准即時重掃 PositionsTotal()，禁 t_ 陣列；行標籤 = DDGuard 表行
+//     (v1.60 1400 §三 ruling：g_ddSyms[page*12+row] 只做行標籤，關倉路徑 live rescan)
+//   - ARM 60s 倒數未 ARM 全板禁用灰；到期自動失效；切 TAB／帳號變更解除
+//   - 每按鈕獨立 30s 冷卻；橙紅色；即按即執行無延遲；殘留顯示 RESID n（LAST 行）
+//   - 底部 LAST 行；[CLOSE 全倉] 含刪除全部 pending（MT5 OrdersTotal = pending 集）
+// MT5 語義差異（REPORT 記錄）：WIN/LOSE 以 POSITION_PROFIT+SWAP 分類
+//   （MT5 commission 落 deals 唔落 position，與 Float$ 欄同口徑）。
+string BINGO_BtnName(int b)
+{
+   if(b == 0) return("BUY");
+   if(b == 1) return("SELL");
+   if(b == 2) return("WIN");
+   if(b == 3) return("LOSE");
+   return("ALL");
+}
+
+//--- count open positions matching a BINGO mode (live rescan, never caches)
+int BINGO_CountMatch(int mode, string sym)
+{
+   int n = 0;
+   for(int p = PositionsTotal()-1; p >= 0; p--)
+   {
+      ulong tk = PositionGetTicket(p);
+      if(tk == 0) continue;
+      if(mode != 5 && PositionGetString(POSITION_SYMBOL) != sym) continue;
+      long pty = PositionGetInteger(POSITION_TYPE);
+      if(mode == 0 && pty != POSITION_TYPE_BUY)  continue;
+      if(mode == 1 && pty != POSITION_TYPE_SELL) continue;
+      double pf = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+      if(mode == 2 && pf <= 0) continue;                // WIN = floating profit
+      if(mode == 3 && pf >= 0) continue;                // LOSE = floating loss
+      n++;
+   }
+   return(n);
+}
+
+//--- ARM toggle: 60s window starts here; whole board gates on this flag
+void BINGO_ArmToggle()
+{
+   if(!g_bingoArmed)
+   {
+      g_bingoArmed = true;
+      g_bingoArmT = TimeCurrent();
+      LogEvent("BINGO: ARM on (60s window)");
+   }
+   else
+   {
+      g_bingoArmed = false;
+      LogEvent("BINGO: ARM off (manual)");
+   }
+}
+
+//--- per-symbol row button: 0=BUY 1=SELL 2=WIN 3=LOSE 4=SYM-ALL(keeps pending)
+//--- v1.61: row = DDGuard table visible row on the current page; symbol =
+//--- g_ddSyms[page*12+row] (row label only). Close path = LIVE rescan at
+//--- press time via DDG_CloseMatch — 0745 hard rule, never caches.
+void BINGO_Press(int row, int b)
+{
+   if(row < 0 || row >= 12 || b < 0 || b >= 5) return;
+   if(!g_bingoArmed) return;                                            // 未 ARM 全板禁用
+   if(TimeCurrent() > g_bingoArmT + 60) { g_bingoArmed = false; return; } // 到期自動失效
+   if(TimeCurrent() - g_bingoCool[row][b] < 30) return;                 // 每按鈕獨立冷卻 30s
+   int idx = g_bingoPage * 12 + row;                                    // v1.61: table row
+   if(idx >= g_ddSymN || idx >= 32) return;
+   string sym = g_ddSyms[idx];
+   int closed = BINGO_CountMatch(b, sym);
+   if(closed == 0) return;                                              // 該範圍無單，唔燒冷卻
+   double balBefore = AcctBalance();
+   int residual = DDG_CloseMatch(b, sym);
+   double realized = AcctBalance() - balBefore;
+   g_bingoCool[row][b] = TimeCurrent();
+   if(residual > 0) { g_bingoResidSym = sym; g_bingoResidN = residual; g_bingoResidT = TimeCurrent(); }
+   else if(sym == g_bingoResidSym) { g_bingoResidSym = ""; g_bingoResidN = 0; }
+   // v1.61: RESID lives in the LAST line (0745: residual must stay visible)
+   g_bingoLast = StringFormat("LAST: %s %s %d張 %+.2f @%s", BINGO_BtnName(b), sym, closed, realized, TimeToString(TimeCurrent(), TIME_MINUTES))
+             + (residual > 0 ? StringFormat(" ⚠RESID %d!", residual) : "");
+   LogEvent(StringFormat("BINGO %s %s: closed %d, residual %d, realized $%.2f", BINGO_BtnName(b), sym, closed, residual, realized));
+   TG_Notify("TD_BINGO_" + sym + "_" + IntegerToString(b), "🎯 BINGO " + BINGO_BtnName(b) + " — " + sym + "\\n▪ Closed: " + IntegerToString(closed) + " position(s)\\n▪ Realized: $" + DoubleToString(realized, 2) + (residual > 0 ? "\\n⚠ Residual: " + IntegerToString(residual) + " still open!" : "\\n▪ Residual: 0 ✅") + "\\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+   RenderOnly();
+}
+
+//--- global [CLOSE 全倉]: all symbols all positions + delete ALL pending
+void BINGO_CloseAll()
+{
+   if(!g_bingoArmed) return;
+   if(TimeCurrent() > g_bingoArmT + 60) { g_bingoArmed = false; return; }
+   if(TimeCurrent() - g_bingoCoolAll < 30) return;
+   int closed = BINGO_CountMatch(5, "");
+   if(closed == 0) return;
+   double balBefore = AcctBalance();
+   int residual = DDG_CloseMatch(5, "");
+   double realized = AcctBalance() - balBefore;
+   g_bingoCoolAll = TimeCurrent();
+   g_bingoLast = StringFormat("LAST: CLOSE全倉 %d張 %+.2f @%s", closed, realized, TimeToString(TimeCurrent(), TIME_MINUTES))
+             + (residual > 0 ? StringFormat(" ⚠RESID %d!", residual) : "");
+   LogEvent(StringFormat("BINGO CLOSEALL: closed %d, residual %d, realized $%.2f", closed, residual, realized));
+   TG_Notify("TD_CLOSEALL", "🎯 TD CLOSE ALL\\n▪ Closed: " + IntegerToString(closed) + " position(s)\\n▪ Realized: $" + DoubleToString(realized, 2) + (residual > 0 ? "\\n⚠ Residual: " + IntegerToString(residual) + " still open — manual check!" : "\\n▪ Residual: 0 ✅") + "\\n🕐 " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES) + " server");
+   RenderOnly();
+}
+
+//--- per-second upkeep from OnTimer: ARM countdown text, cooldown expiry,
+//--- RESID timeout; renders ONLY when something on the board is live.
+void BINGO_Tick()
+{
+   if(g_tab != 2) return;
+   if(g_bingoArmed && TimeCurrent() > g_bingoArmT + 60)
+   {
+      g_bingoArmed = false;                    // ARM 到期自動失效
+      RenderOnly();
+      return;
+   }
+   bool busy = g_bingoArmed;
+   if(!busy)
+      for(int i = 0; i < 12 && !busy; i++)
+         for(int b = 0; b < 5; b++)
+            if(TimeCurrent() - g_bingoCool[i][b] < 30) { busy = true; break; }
+   if(!busy && TimeCurrent() - g_bingoCoolAll < 30) busy = true;
+   if(!busy && g_bingoResidN > 0 && TimeCurrent() - g_bingoResidT < 60) busy = true;
+   if(busy) RenderOnly();
+}
+
+//+------------------------------------------------------------------+
+//| v1.61: DDG_CloseMatch — MT5 port of the MT4 retry-until-zero     |
+//| close executor. mode 0=BUY 1=SELL 2=WIN 3=LOSE 4=SYM-ALL(keeps   |
+//| pending) 5=GLOBAL(all positions + delete ALL pending).           |
+//| Live rescans PositionsTotal()/OrdersTotal() only, never t_* arr. |
+//| MT5: CTrade trade.PositionClose / trade.OrderDelete; WIN/LOSE    |
+//| split on POSITION_PROFIT+SWAP (commission lives on deals).       |
+//+------------------------------------------------------------------+
+int DDG_CloseMatch(int mode, string sym)
+{
+   bool global  = (mode == 5);
+   bool delPend = (mode == 5);          // v1.61: MT5 has no legacy mode-6 caller
+   int retries = MathMax(1, InpDdgCloseRetry);
+   int residual = 9999;
+   for(int r = 0; r < retries; r++)
+   {
+      if(delPend)
+      {
+         for(int p = OrdersTotal()-1; p >= 0; p--)
+         {
+            ulong ot = OrderGetTicket(p);
+            if(ot == 0) continue;
+            if(!trade.OrderDelete(ot))
+               Print("DDG close-match pending-del fail #", ot, " ret=", trade.ResultRetcode());
+         }
+      }
+      for(int p2 = PositionsTotal()-1; p2 >= 0; p2--)
+      {
+         ulong tk = PositionGetTicket(p2);
+         if(tk == 0) continue;
+         if(!global && PositionGetString(POSITION_SYMBOL) != sym) continue;
+         long pty = PositionGetInteger(POSITION_TYPE);
+         if(mode == 0 && pty != POSITION_TYPE_BUY)  continue;
+         if(mode == 1 && pty != POSITION_TYPE_SELL) continue;
+         double pf = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+         if(mode == 2 && pf <= 0) continue;   // WIN = floating profit
+         if(mode == 3 && pf >= 0) continue;   // LOSE = floating loss
+         if(!trade.PositionClose(tk))
+            Print("DDG close-match fail #", tk, " ret=", trade.ResultRetcode());
+      }
+      Sleep(150);
+      residual = 0;
+      for(int p3 = PositionsTotal()-1; p3 >= 0; p3--)
+      {
+         ulong tk3 = PositionGetTicket(p3);
+         if(tk3 == 0) continue;
+         if(!global && PositionGetString(POSITION_SYMBOL) != sym) continue;
+         long pty3 = PositionGetInteger(POSITION_TYPE);
+         if(mode == 0 && pty3 != POSITION_TYPE_BUY)  continue;
+         if(mode == 1 && pty3 != POSITION_TYPE_SELL) continue;
+         double pf3 = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+         if(mode == 2 && pf3 <= 0) continue;
+         if(mode == 3 && pf3 >= 0) continue;
+         residual++;
+      }
+      if(residual == 0) break;
+   }
+   return residual;
+}
+
+void TabRender_DDG(int x,int y,int scale,int w)''')
+
+# ---------- A6: inline table with buttons ----------
+OLD_TABLE = '''   //--- v1.37: aligned column table, one row per traded symbol ---
+   int ty = y + 96*scale;   // v1.49: table pushed down, fixed reset-block above
+   double bal = DDG_Base(); if(bal <= 0) bal = 1;
+   int c1 = x + 8*scale;
+   int c2 = x + 100*scale;
+   int c3 = x + 175*scale;
+   int c4 = x + 250*scale;
+   int c5 = x + 320*scale;
+   UpdTxtBold("TPH", "SYMBOL",   c1, ty, clrDeepSkyBlue, 9*scale);
+   UpdTxtBold("TPC2","Float $",  c2, ty, clrDeepSkyBlue, 9*scale);
+   UpdTxtBold("TPC3","DD now %", c3, ty, clrDeepSkyBlue, 9*scale);
+   UpdTxtBold("TPC4","MaxDD %",  c4, ty, clrDeepSkyBlue, 9*scale);
+   UpdTxtBold("TPC5","MaxDD $",  c5, ty, clrDeepSkyBlue, 9*scale);
+   for(int k=0;k<g_ddSymN && k<12;k++)
+   {
+      int ry2=ty+16*scale+k*15*scale;
+      double fl=0;
+      for(int p3=PositionsTotal()-1;p3>=0;p3--)
+      {
+         ulong tk=PositionGetTicket(p3);
+         if(tk==0) continue;
+         if(PositionGetString(POSITION_SYMBOL)!=g_ddSyms[k]) continue;
+         fl += PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+      }
+      double ddNow = MathMax(0.0, -fl/bal*100.0);   // v1.60 (1425 §三-2): clamp display
+      color cFl  = (fl>=0)?clrLime:clrTomato;
+      color cDn  = (ddNow>=InpDdgSymbolMaxPercent)?clrRed:(ddNow>=InpDdgSymbolMaxPercent*0.7?clrYellow:clrWhite);
+      color cMx  = (g_ddSymDDPct[k]>=InpDdgSymbolMaxPercent)?clrRed:(g_ddSymDDPct[k]>=InpDdgSymbolMaxPercent*0.7?clrYellow:clrKhaki);
+      UpdTxt("DDN"+IntegerToString(k), g_ddSyms[k], c1, ry2, clrWhite, 9*scale);
+      UpdTxt("DDF"+IntegerToString(k), StringFormat("%+.2f", fl), c2, ry2, cFl, 9*scale);
+      UpdTxt("DDP"+IntegerToString(k), StringFormat("%.2f%%", ddNow), c3, ry2, cDn, 9*scale);
+      UpdTxt("DDM"+IntegerToString(k), StringFormat("%.2f%%", g_ddSymDDPct[k]), c4, ry2, cMx, 9*scale);
+      UpdTxt("DDC"+IntegerToString(k), StringFormat("%.2f", g_ddSymDD[k]), c5, ry2, cMx, 9*scale);
+   }
+   if(g_ddSymN==0) UpdTxt("TAX2","(no traded symbols yet)",x+8*scale,ty+16*scale,clrKhaki,9*scale);
+   // v1.60 (1230 §3.4): Gain definition note - MT5 Gain is broker-true
+   //   DEAL_PROFIT+SWAP+COMMISSION (MT4 recomputes from prices).
+   UpdTxt("TAM2","DD now = live floating loss / balance | MaxDD = historical peak decline | base = balance | Gain = broker-true P/L (profit+swap+comm)", x, ty+18*scale+MathMin(g_ddSymN,12)*15*scale, clrKhaki, 8*scale);'''
+
+NEW_TABLE = '''   //--- v1.37: aligned column table, one row per traded symbol ---
+   //--- v1.61 (1400 §三 MT5 port): CLOSE buttons INLINE — five buttons per
+   //--- row right of MaxDD$; ARM + pager live in the table header, LAST +
+   //--- [CLOSE 全倉] in the tail (MT4 v1.60 parity, direct translation).
+   int ty = y + 96*scale;   // v1.49: table pushed down, fixed reset-block above
+   double bal = DDG_Base(); if(bal <= 0) bal = 1;
+   int c1 = x + 8*scale;
+   int c2 = x + 100*scale;
+   int c3 = x + 175*scale;
+   int c4 = x + 250*scale;
+   int c5 = x + 320*scale;
+   int bx0 = x + 340*scale;       // v1.61: inline button column origin
+   int rows = 12;                 // v1.61: rows per page (12 over g_ddSymN, cap 32 => max 3 pages)
+   int pages = (g_ddSymN + rows - 1) / rows;
+   if(pages < 1) pages = 1;
+   if(g_bingoPage >= pages) g_bingoPage = pages - 1;
+   if(g_bingoPage < 0) g_bingoPage = 0;
+   int row0 = g_bingoPage * rows;
+   UpdTxtBold("TPH", "SYMBOL",   c1, ty, clrDeepSkyBlue, 9*scale);
+   UpdTxtBold("TPC2","Float $",  c2, ty, clrDeepSkyBlue, 9*scale);
+   UpdTxtBold("TPC3","DD now %", c3, ty, clrDeepSkyBlue, 9*scale);
+   UpdTxtBold("TPC4","MaxDD %",  c4, ty, clrDeepSkyBlue, 9*scale);
+   UpdTxtBold("TPC5","MaxDD $",  c5, ty, clrDeepSkyBlue, 9*scale);
+   // v1.61: ARM + pager in the table header row (MT4 v1.60 parity)
+   string armTxt = g_bingoArmed ? StringFormat("ARM %ds", 60 - (int)(TimeCurrent() - g_bingoArmT)) : "ARM";
+   UpdBtn("BGA", armTxt, bx0, ty - 2*scale, 64*scale, 13*scale, g_bingoArmed);
+   if(g_bingoArmed) ObjectSetInteger(0, PFX+"BGA", OBJPROP_BGCOLOR, clrOrange);
+   UpdTxt("BGP", StringFormat("%d/%d", g_bingoPage + 1, pages), x + w - 96*scale, ty, clrWhite, 9*scale);
+   UpdBtn("BGP_L", "[<]", x + w - 64*scale, ty - 2*scale, 28*scale, 13*scale, (g_bingoPage > 0));
+   UpdBtn("BGP_R", "[>]", x + w - 32*scale, ty - 2*scale, 28*scale, 13*scale, (g_bingoPage < pages - 1));
+   for(int k=row0; k<row0+rows && k<g_ddSymN; k++)
+   {
+      int i2 = k - row0;               // v1.61: visible row index (object suffix)
+      int ry2=ty+16*scale+i2*15*scale;
+      double fl=0;
+      for(int p3=PositionsTotal()-1;p3>=0;p3--)
+      {
+         ulong tk=PositionGetTicket(p3);
+         if(tk==0) continue;
+         if(PositionGetString(POSITION_SYMBOL)!=g_ddSyms[k]) continue;
+         fl += PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+      }
+      double ddNow = MathMax(0.0, -fl/bal*100.0);   // v1.60 (1425 §三-2): clamp display
+      color cFl  = (fl>=0)?clrLime:clrTomato;
+      color cDn  = (ddNow>=InpDdgSymbolMaxPercent)?clrRed:(ddNow>=InpDdgSymbolMaxPercent*0.7?clrYellow:clrWhite);
+      color cMx  = (g_ddSymDDPct[k]>=InpDdgSymbolMaxPercent)?clrRed:(g_ddSymDDPct[k]>=InpDdgSymbolMaxPercent*0.7?clrYellow:clrKhaki);
+      UpdTxt("DDN"+IntegerToString(i2), g_ddSyms[k], c1, ry2, clrWhite, 9*scale);
+      UpdTxt("DDF"+IntegerToString(i2), StringFormat("%+.2f", fl), c2, ry2, cFl, 9*scale);
+      UpdTxt("DDP"+IntegerToString(i2), StringFormat("%.2f%%", ddNow), c3, ry2, cDn, 9*scale);
+      UpdTxt("DDM"+IntegerToString(i2), StringFormat("%.2f%%", g_ddSymDDPct[k]), c4, ry2, cMx, 9*scale);
+      UpdTxt("DDC"+IntegerToString(i2), StringFormat("%.2f", g_ddSymDD[k]), c5, ry2, cMx, 9*scale);
+      // v1.61 (1400 §三): inline [BUY][SELL][WIN][LOSE][ALL] for this row's
+      //   symbol — identical semantics to the MT4 v1.60 inline buttons.
+      for(int b = 0; b < 5; b++)
+      {
+         bool cool = (TimeCurrent() - g_bingoCool[i2][b] < 30);
+         string bl = BINGO_BtnName(b);
+         if(cool) bl = StringFormat("%ds", 30 - (int)(TimeCurrent() - g_bingoCool[i2][b]));
+         string onm = PFX+"BGB_"+IntegerToString(i2)+"_"+IntegerToString(b);
+         UpdBtn("BGB_"+IntegerToString(i2)+"_"+IntegerToString(b), bl, bx0 + b*50*scale, ry2 - 1, 46*scale, 13*scale, (g_bingoArmed && !cool));
+         if(g_bingoArmed && !cool)
+         {
+            ObjectSetInteger(0, onm, OBJPROP_BGCOLOR, clrOrangeRed);   // 橙紅、即按即執行
+            ObjectSetInteger(0, onm, OBJPROP_COLOR, clrWhite);
+         }
+      }
+   }
+   // v1.61: hide stale row objects on shorter pages (page 2+ tails)
+   for(int i3=0; i3<rows; i3++)
+   {
+      if(row0 + i3 < g_ddSymN) continue;
+      HideObj("DDN"+IntegerToString(i3)); HideObj("DDF"+IntegerToString(i3)); HideObj("DDP"+IntegerToString(i3));
+      HideObj("DDM"+IntegerToString(i3)); HideObj("DDC"+IntegerToString(i3));
+      for(int b3=0; b3<5; b3++) HideObj("BGB_"+IntegerToString(i3)+"_"+IntegerToString(b3));
+   }
+   int shown = MathMin(g_ddSymN - row0, rows); if(shown < 0) shown = 0;
+   if(g_ddSymN==0) UpdTxt("TAX2","(no traded symbols yet)",x+8*scale,ty+16*scale,clrKhaki,9*scale);
+   // v1.61: table tail — LAST + [CLOSE 全倉] (MT4 v1.60 tail, ported)
+   int ly = ty + 18*scale + shown*15*scale;
+   UpdTxt("BGL", (g_bingoLast == "" ? "LAST: -" : g_bingoLast), x, ly, clrKhaki, 9*scale);
+   bool allOn = (g_bingoArmed && TimeCurrent() - g_bingoCoolAll >= 30);
+   UpdBtn("BGC", "[ CLOSE 全倉 ]", x + w - 122*scale, ly - 2*scale, 118*scale, 16*scale, allOn);
+   if(allOn)
+   {
+      ObjectSetInteger(0, PFX+"BGC", OBJPROP_BGCOLOR, clrOrangeRed);
+      ObjectSetInteger(0, PFX+"BGC", OBJPROP_COLOR, clrWhite);
+   }
+   // v1.60 (1230 §3.4): Gain definition note - MT5 Gain is broker-true
+   //   DEAL_PROFIT+SWAP+COMMISSION (MT4 recomputes from prices).
+   //   v1.61: note moved below the CLOSE tail; WIN/LOSE split uses
+   //   POSITION_PROFIT+SWAP (MT5 commission lives on deals, not positions).
+   UpdTxt("TAM2","DD now = live floating loss / balance | MaxDD = historical peak decline | base = balance | Gain = broker-true P/L (profit+swap+comm)", x, ly + 16*scale, clrKhaki, 8*scale);'''
+
+rep("A6-table", OLD_TABLE, NEW_TABLE)
+
+# ---------- A7: panelW widen for guard tab ----------
+rep("A7-panelw",
+'   int panelW=tableW+30;\n   if(panelW<380) panelW=380;',
+'''   int panelW=tableW+30;
+   if(panelW<380) panelW=380;
+   if(g_tab==2 && panelW<620*scale) panelW=620*scale;   // v1.61: DDGuard hosts inline CLOSE button column (MT4 v1.60 parity)''')
+
+# ---------- A8: tabNeedH for guard tab ----------
+rep("A8-tabneedh",
+'         tabNeedH = tabNeedH + 96*scale + 16*scale + MathMin(g_ddSymN,12)*15*scale + 18*scale + 12;   // v1.49: table offset 64->96, reset-block above table',
+'         tabNeedH = tabNeedH + 96*scale + 16*scale + ((g_ddSymN>0)?12:0)*15*scale + 18*scale + 34*scale + 12;   // v1.61: fixed 12-row pages + LAST/[CLOSE 全倉] tail + Gain note (was MathMin(g_ddSymN,12))')
+
+# ---------- A9: OnTimer BINGO_Tick ----------
+rep("A9-ontimer",
+'   SymbolGuard();\n   NG_WindowPush();\n   GlobalVariableSet(DDG_PeakKey(), g_ddgPeakEquity);\n   SG_CollectSymbols();',
+'''   SymbolGuard();
+   NG_WindowPush();
+   BINGO_Tick();    // v1.61: ARM countdown / cooldown expiry refresh (g_tab==2 only)
+   GlobalVariableSet(DDG_PeakKey(), g_ddgPeakEquity);
+   SG_CollectSymbols();''')
+
+# ---------- A10: OnChartEvent handlers ----------
+rep("A10-chartevent",
+'      else if(s == PFX+"DDRESET") { DDG_ResetPeakConfirm(); changed=true; }',
+'''      else if(s == PFX+"DDRESET") { DDG_ResetPeakConfirm(); changed=true; }
+      //--- v1.61 (1400 §三 MT5 port): BINGO CLOSE BOARD buttons ---------------
+      else if(StringFind(s, PFX+"BGB_") == 0)
+      {
+         string bgRest = StringSubstr(s, StringLen(PFX)+4);
+         int us = StringFind(bgRest, "_");
+         if(us > 0)
+            BINGO_Press((int)StringToInteger(StringSubstr(bgRest, 0, us)), (int)StringToInteger(StringSubstr(bgRest, us+1)));
+         changed = true;
+      }
+      else if(s == PFX+"BGA")   { BINGO_ArmToggle(); changed = true; }
+      else if(s == PFX+"BGC")   { BINGO_CloseAll();  changed = true; }
+      else if(s == PFX+"BGP_L") { g_bingoPage--; if(g_bingoPage < 0) g_bingoPage = 0; changed = true; }
+      else if(s == PFX+"BGP_R") { g_bingoPage++; changed = true; }''')
+
+# ---------- A11: user-facing version string ----------
+rep("A11-printver",
+'      Print("TD5 v1.60: account switch -> ", acctNow, ", state reloaded");',
+'      Print("TD5 v1.61: account switch -> ", acctNow, ", state reloaded");')
+
+OUT.write_text(txt, encoding="utf-8")
+
+# ---------- diff ----------
+d = subprocess.run(["diff", "-u", str(SRC), str(OUT)], capture_output=True, text=True)
+DIFF.write_text(d.stdout, encoding="utf-8")
+
+# ---------- self-check ----------
+def gc(p): return len(re.findall(p, txt))
+checks = [
+    ("version 1.61 x3",            gc(r'#property version\s+"1\.61"')==1 and gc(r'v1\.61 \(MT5 build, inline CLOSE board port\)')==1 and gc(r'TD5 v1\.61: account switch')==1),
+    ("engine fns x7",              all(gc(r'\b'+f+r'\(')>0 for f in ["BINGO_BtnName","BINGO_CountMatch","BINGO_ArmToggle","BINGO_Press","BINGO_CloseAll","BINGO_Tick","DDG_CloseMatch"])),
+    ("globals x9",                 all(f in txt for f in ["g_bingoPage","g_bingoCool[12][5]","g_bingoCoolAll","g_bingoArmed","g_bingoArmT","g_bingoLast","g_bingoResidSym","g_bingoResidN","g_bingoResidT"])),
+    ("cold start OnInit",          gc(r'g_bingoArmed = false;')>=3),  # OnInit + acct-switch + BINGO_Tick/ArmToggle writes
+    ("buttons rendered",           gc(r'"BGB_"\+IntegerToString\(i2\)\+"_"\+IntegerToString\(b\)')==2),
+    ("BGA/BGC/BGL/BGP objects",    all(gc(r'"'+o+r'"')>0 for o in ["BGA","BGC","BGL","BGP","BGP_L","BGP_R"])),
+    ("handlers x5",                all(gc(re.escape('PFX+"'+o+'"'))>0 for o in ["BGB_","BGA","BGC","BGP_L","BGP_R"])),
+    ("OnTimer tick",               gc(r'BINGO_Tick\(\);')==1 and gc(r'void BINGO_Tick\(\)')==1),
+    ("live rescan (no t_ in BINGO)", 'BINGO' in txt and gc(r'BINGO_CountMatch\(b, sym\)')==1),
+    ("PositionClose executor",     gc(r'if\(!trade\.PositionClose\(tk\)\)')==5 and gc(r'trade\.OrderDelete\(ot\)')==1),   # 4 source guards + 1 new in DDG_CloseMatch
+    ("panelW 620",                 gc(r'g_tab==2 && panelW<620\*scale')==1),
+    ("tabNeedH updated",           gc(r'\(\(g_ddSymN>0\)\?12:0\)\*15\*scale')==1),
+    ("scope: no new inputs",       gc(r'(?m)^\s*input\s')==len(re.findall(r'(?m)^\s*input\s', orig))),   # 80 = 68 params + 12 group lines, unchanged
+    ("scope: 12 group lines",      gc(r'(?m)^\s*input\s+group')==12),
+    ("scope: InpDefaultView=0",    gc(r'InpDefaultView.*=.*0')>0 and 'InpDefaultView.*=.*1' not in txt.replace('MathMin(3, InpDefaultView)','')),
+    ("brace balance",              txt.count('{')==txt.count('}')),
+    ("paren delta (source off-by-1)", (txt.count('(')-txt.count(')')) == (orig.count('(')-orig.count(')'))),
+]
+fails = [n for n,ok in checks if not ok]
+print(f"applied anchors: {len(applied)} -> {applied}")
+print(f"lines: {orig.count(chr(10))+1} -> {txt.count(chr(10))+1}  (+{txt.count(chr(10))-orig.count(chr(10))})")
+print(f"diff hunks: {d.stdout.count('@@')}  diff lines: {len(d.stdout.splitlines())}")
+print(f"self-check: {len(checks)-len(fails)}/{len(checks)} PASS")
+for n in fails: print(f"  FAIL: {n}")
+sys.exit(1 if fails else 0)

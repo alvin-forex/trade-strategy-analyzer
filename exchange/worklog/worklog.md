@@ -2224,3 +2224,16 @@ Stage Summary:
 - 核實：1540 實物請求已由 e0fea09 滿足——交付目錄 `exchange/from_zcode/20261107_1557_TD_v160_兩平台對齊/` 15 檔齊（mq4 4,147 行／mq5 3,406 行／兩平台 diff＋.set×2＋verify_v160＋輸出＋tools 三件＋REPORT），md5 已驗。1540 蓋章→push 0843f4d。
 - Board：66,070B 無變，無 ZCODE_w 現行卡。
 - 本鐘 w-lane 輕量完結；v1.60 全鏈等態＝OpenClaw 側（真機 0-err 編譯＋部署＋#9/#10 截圖＋入 ea-repo）；v1.61（MT5 內聯 CLOSE＋InpDefaultView 對齊＋TG default 清空兩提案候裁）11-08 交。
+
+## Task 265：16:38 巡查（收信指令）＋1600 處理補記（2026-11-07 16:32–16:38）
+- 16:31 cron 輪（Task 264）後續：1600 FIX-TD9 全機盤點數據採集（目錄式附件，掃描器冇 flag 由 w 補捉）——TERMINAL_AUDIT（10 台判定：6 台 EA 脫鈎/死、MT4-6 開市前死線周一 06:00、MT4-9/10 老闆自理、251986505 舊圖結案）＋MT5_CLEANUP_PROPOSAL（out.mq5 同場刪＋AngelGold_v4 兩檔合併評估）。兩檔蓋章＋回信 1637（AngelGold 評估接單排 v1.61 後＋請推源檔＋v1.61 預告）→ push 4259f60。
+- 16:38 巡查：無新信，HEAD=4259f60。Board 66,070B byte 級無變，無 ZCODE_w 新卡。
+- 等態：OpenClaw 側 v1.60 真機編譯（結果一到修復優先於一切）／AngelGold 兩檔 .mq5 源檔／v1.61（MT5 內聯 CLOSE）11-08 交。
+
+## Task 266：v1.61 MT5 內聯 CLOSE 板——提早全鏈交付（2026-11-07 17:13–17:15，老闆「仲有咩未做，即開工」）
+- 開工盤點：本地 scripts/v160＋td10 第 5 次被沙箱回收吞噬（repo 交付檔係權威正本，無損）；AngelGold 評估等 OpenClaw 推源檔（阻塞）；InpDefaultView/TG default 兩候裁唔自行動 → 唯一可開工大項＝v1.61（1540 同意、原排 11-08）。
+- 藍本研究： MT4 v1.60 inline 表（1255-1345）＋BINGO 引擎（1370-1500）＋DDG_CloseMatch（3894-3960）＋0745 硬約束；MT5 插入點＝TabRender_DDG（2268）／OnChartEvent（976）／OnTimer（864）／OnInit（330）／帳戶切換（881）／RenderOnly 幾何（2355-2392）。
+- 施工 scripts/v161/mt5_close_board.py： 11 錨定替換（A1 版號×3、A2 狀態 9 變數 g_bingoCool[12][5]、A3 OnInit 冷啟動、A4 帳戶切換解除 ARM、A5 引擎 7 函數＋DDG_CloseMatch MT5 版、A6 內聯表全段、A7 panelW≥620、A8 tabNeedH 固定 12 行頁＋尾、A9 OnTimer BINGO_Tick、A10 handler×5、A11 print 版號）→ 17/17 自檢 PASS；修錨一輪（A9 用四行序列錨避 6 處撞）。
+- verify_v161.py 18 項閘： V1-V9 語義／渲染／handler／執行體（delta 對基準制 v1.60 同構 loop）＋V10 輸入凍結（80 行 byte 級比對＋兩候裁 default 未郁）＋V11 code-only 括號（三態 lexer 剝非碼）＋V12 L1 lexer 衛生（S6c 殺手類零捕獲）→ **18/18 PASS exit 0**。期望值修正三輪（bgRest×4、p-loop delta=1、OrangeRed=2）全係檢查 bug 非產品 bug。
+- 交付： `from_zcode/20261107_1715_TD_v161_MT5_內聯CLOSE板/`（final mq5 3,684 行＋diff 397＋REPORT＋verify+output＋tools 手術源）＋回信 1715（提早一日＋.set 沿用宣告＋netting 語義差異表＋兩候裁續等）→ precise add＋push。
+- 等態： OpenClaw 側 v1.60→v1.61 編譯 0-err 實證＋部署截圖；兩候裁；AngelGold 源檔。
