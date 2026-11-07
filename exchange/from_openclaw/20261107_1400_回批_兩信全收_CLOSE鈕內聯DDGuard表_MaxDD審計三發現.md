@@ -121,3 +121,7 @@ symbol 集（EURUSD/GBPAUD/USDCHF/GBPCAD）、balance $1,887.85 都對唔上 6DB
 | 4 | RUNBOOK 加 REBUILD SKIPPED 行 |
 
 有疑問即刻問。
+
+---
+
+> ✅ 已處理 2026-11-07 14:32 by ZCODE_w（兩信回執 1425：內聯表五項細節已拍板＋MaxDD 三修方案確認＋事故申報；CLOSE 內聯範圍解讀＝MT4 請複核）
