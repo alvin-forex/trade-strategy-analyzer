@@ -2305,3 +2305,12 @@ Stage Summary:
 - **教訓一則**：曾判 projection/主站 `.navdrawer[hidden]` selector「損壞」——od -c 實證檔案本正確，係讀檔顯示層食字假象——獨立 code span 內 hidden 屬性選擇器嘅頭兩字元會被食去；字元級實證（od/grep -o）先可落結論。
 - 交付：from_zcode/20261107_2300_批1四頁NAV統一_主站標準_8截圖解鎖態/（manifest＋REPORT＋shots 8＋browser_raw＋verify/pixel 輸出＋tools 四件＋three_pages.diff＋signal_ranking_decrypted.diff）→ precise add → push。
 - 等態：老闆 F7 過目 8 截圖；v1.63r2 真機 0/0；D 族 98 頁隨批 2/4（中介制）；AngelGold .set 11-09。
+
+
+## Task 273：2305 r2驗收回執處理＋v1.63r3 五鈕+65px 交貨（2026-11-07 23:08–23:30）
+- 23:08 巡檢（批1 NAV push f9a20c5 前 pull）：新信 1 封＝2305 r2 驗收（**8.5/9**：8 項綠＋四台熱替換 22:50 實證＋MT4 0/0（107ms, ex4 352,410B）/MT5 0/0（4983ms, ex5 234,732B）全綠；0.5 差額＝r3 一項）。
+- **r3 手術**：兩平台同一行 `bx0 = x+w−6s−250s` → `x+w−6s−185s`（=+65s，預設 s=1 即 +65px）——老闆 6DB4 像素實測 gap 71px vs 規格 6-12px；表頭 UNLOCK/CLOSE ALL/pager 原封（#2 已驗收）。行數不變（4,176/3,747）；.set 零參數變動沿用 r2。
+- **幾何鏈靜態覆核**：UpdBtn CORNER_LEFT_UPPER anchor／caller(px+14, panelW−28)／panelW=tableW+30（620s 下限＋chartW−20 clamp）／按鈕序 b=0..4——公式 gap=14+10s（s=1 得 24px），同實測 71px 差 ~47px 靜態解釋唔到；以老闆實機截圖為準照辦 +65s，差異分析＋四台覆核請求如實隨信（候選回滾方案留註釋）。
+- 閘：verify_v163 r3 **38/38 PASS exit 0**（V8 改版斷言 −185s 在場＋舊式絕跡）；TD10-r2 MT4 16/16＋MT5 15/15＋parity PASS；md5 MT4 a3a5ce22…／MT5 e4182854…；diff 每平台 1 行。手術源頭（mt4/mt5_surgery.py S5b/T5b＋自檢）同步 r3，未來由 base 重跑即出 r3。
+- 交付：from_zcode/20261107_2330_TD_v163r3_五鈕右移65px/（兩 final＋r2→r3 diff×2＋verify 輸出＋tools 三件＋manifest）＋2305 蓋章 → precise add → push。
+- 等態：r3 四台熱替換覆核（47px 之謎）＋LOCK 態截圖（#3 尾；沙盒無終端如實聲明，步驟可代擬）；AngelGold 11-09；批1 NAV 8 截圖等 F7；D 族隨批 2/4。
