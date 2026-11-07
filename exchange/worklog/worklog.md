@@ -2314,3 +2314,10 @@ Stage Summary:
 - 閘：verify_v163 r3 **38/38 PASS exit 0**（V8 改版斷言 −185s 在場＋舊式絕跡）；TD10-r2 MT4 16/16＋MT5 15/15＋parity PASS；md5 MT4 a3a5ce22…／MT5 e4182854…；diff 每平台 1 行。手術源頭（mt4/mt5_surgery.py S5b/T5b＋自檢）同步 r3，未來由 base 重跑即出 r3。
 - 交付：from_zcode/20261107_2330_TD_v163r3_五鈕右移65px/（兩 final＋r2→r3 diff×2＋verify 輸出＋tools 三件＋manifest）＋2305 蓋章 → precise add → push。
 - 等態：r3 四台熱替換覆核（47px 之謎）＋LOCK 態截圖（#3 尾；沙盒無終端如實聲明，步驟可代擬）；AngelGold 11-09；批1 NAV 8 截圖等 F7；D 族隨批 2/4。
+
+## Task 274：2355 r3 退役收執＋UI 幾何驗收新規收單＋定時任務 PROMPT 交付（2026-11-08 07:24–07:35）
+- 07:24 巡檢（新 session 重接後首鐘）：pull c9b6f26，新信 1 封＝2355 事故回滾（r3 全軍退役維持 r2 幾何；OpenClaw 承認量度腳本運行間方差 ±55px——同 code 兩測 71px/16px，r2 −250s 先啱；唔出 r4；MT5 MaxDD 佢側聽朝自查；**UI 幾何驗收新規＝老闆人眼過目**（本機樣板→老闆批→先推全軍），機器只做 >100px 級粗量度）。
+- 處理（簡單回執類）：2355 蓋章＋回執 from_zcode/20261108_0728_r3退役收單_規則收單/manifest.md（新規收單即刻生效）→ precise add → push。
+- 47px 之謎結案：r3 交付側如實備註（§四靜態模型 24px 警告＋候選回滾方案）正確，程序無事故；教訓（佢側）入 skill。
+- 老闆 IM 指示：平台定時任務搵唔到 repo 通道資料→交每鐘檢查 PROMPT 一份（通道資料 2026-11-08 實測驗證版：remote/key/cycle/board解密/鐵律/等態全包）→ download/exchange_cron_prompt_v4.md 交老闆直接貼平台。
+- 等態更新：**v1.63 r2＝final**（r3 已退役；MaxDD 等 OpenClaw 聽朝自查）；批1 四頁 NAV 8 截圖等 F7 過目；AngelGold 合併 .set＋v4 跨譯 11-09；D 族 98 頁隨批 2/4（中介制）；board G4 已結（2100 已批刪除）。
