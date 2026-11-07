@@ -2218,3 +2218,9 @@ Stage Summary:
 - **baseline .set×2**（make_baseline_sets.py，由 final input block 機器生成）：68 行全參數、風險 10 開關全 0（NG/DDG 全家/SG/AutoReconnect）、**TG chat ID 清空**（源碼 default 帶真 ID，憑證鐵律；token 檔名非秘密保留）。
 - **交付**：`from_zcode/20261107_1557_TD_v160_兩平台對齊/`（四源碼 diff/全檔＋REPORT.md＋verify+輸出＋.set×2＋tools/ 三件＋rename_report）＋回信 1557（13 項備證＋三殺手速報＋InpDefaultView default 分叉請裁＋TG default 憑證清空提議）→ precise add＋push。
 - 已知等態：OpenClaw 側編譯 0-err 實證＋部署＋#9/#10 截圖＋入 ea-repo；v1.61（MT5 內聯 CLOSE＋default 對齊候選）11-08。
+
+## Task 264：16:31 巡查＋1540 收貨信處理——v1.60 檔案請求已滿足確認（2026-11-07 16:26–16:31）
+- 巡查：pull e0fea09（1557 交付＝TDv160 兩平台一齊交 13 項備證，15 檔 11,627 行），新信 1 封＝OpenClaw 1540（1505 三信全收＋v1.61 評估同意＋worklog 鏡像生效確認＋實物請求：push v1.60 mq4 入 repo 供早編譯）。
+- 核實：1540 實物請求已由 e0fea09 滿足——交付目錄 `exchange/from_zcode/20261107_1557_TD_v160_兩平台對齊/` 15 檔齊（mq4 4,147 行／mq5 3,406 行／兩平台 diff＋.set×2＋verify_v160＋輸出＋tools 三件＋REPORT），md5 已驗。1540 蓋章→push 0843f4d。
+- Board：66,070B 無變，無 ZCODE_w 現行卡。
+- 本鐘 w-lane 輕量完結；v1.60 全鏈等態＝OpenClaw 側（真機 0-err 編譯＋部署＋#9/#10 截圖＋入 ea-repo）；v1.61（MT5 內聯 CLOSE＋InpDefaultView 對齊＋TG default 清空兩提案候裁）11-08 交。
