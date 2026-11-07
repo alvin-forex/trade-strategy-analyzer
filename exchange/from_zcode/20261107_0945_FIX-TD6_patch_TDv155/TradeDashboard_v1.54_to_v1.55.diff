@@ -1,0 +1,312 @@
+--- 20261107_0831_FIX-TD4_patch_TDv154/TradeDashboard_v1.54_full_preview.mq4
++++ 20261107_0945_FIX-TD6_patch_TDv155/TradeDashboard_v1.55_full_preview.mq4
+@@ -5,9 +5,9 @@
+ //|                                    Broker summary-proof engine   |
+ //+------------------------------------------------------------------+
+ #property copyright "FF48 Alvin"
+-#property version   "1.54"
++#property version   "1.55"
+ #property strict
+-#property description "TradeDashboard v1.53"
++#property description "TradeDashboard v1.55"
+ 
+ #import "shell32.dll"
+    int ShellExecuteW(int hWnd, string Operation, string File, string Parameters, string Directory, int ShowCmd);
+@@ -44,6 +44,7 @@
+ input string ___SNAP___      = "=== Trade Snapshot ===";
+ input bool   SnapEnable      = true;    // Enable local trade snapshots
+ input int    SnapHours       = 72;      // Snapshot lookback hours
++input bool   BackfillOnce    = false;   // v1.55 FIX-TD6 addendum 608dbe5: one-shot full-history backfill, ignores SnapHours; flip back to false after the run
+ input string ___FILTER___    = "=== Data Filter ===";
+ input string ReportStart     = "";      // Report start date YYYY.MM.DD (empty=no filter)
+ input string FilterSymbol    = "";      // Filter by symbol (empty=all)
+@@ -145,6 +146,13 @@
+ bool     g_histTruncated = false;
+ bool     g_histEmpty = false;   // v1.51 FIX-TD2 BugB: OrdersHistoryTotal()==0
+ 
++//--- v1.55 FIX-TD6 (0925 spec item 6): sync heartbeat - a frozen sync becomes
++//---   visible on the panel instead of dying silently.
++datetime g_syncLastOk = 0;      // last completed history sync
++int      g_syncNew    = 0;      // rows added by the last sync
++int      g_syncHist   = 0;      // OrdersHistoryTotal() seen by the last sync
++bool     g_syncCap    = false;  // MAX_HISTORY_SCAN safety cap was hit
++
+ string PFX = "TD116_";
+ 
+ //--- v1.54 FIX-TD4 (0745 放行信): BINGO CLOSE BOARD state -------------------
+@@ -229,6 +237,15 @@
+ //--- v1.53 FIX-TD5 (2345 spec item 4): one-time migration — pre-v1.53 shared
+ //---   files carry no account column, so rows cannot be attributed to any
+ //---   account: the whole file is parked as *.legacy and never auto-loaded.
++//--- v1.55 FIX-TD6 (0925 spec item 3): load-then-migrate. Parking the trades
++//---   file BEFORE loading its rows is what zeroed the panel on the first
++//---   v1.53 start - root cause 3: TD_trades.csv.legacy held 872 trades while
++//---   TD_<acct>_trades.csv was born empty and the frozen sync never filled
++//---   it. Now: if the account-scoped file is missing or bare and the legacy
++//---   file still holds data rows, hydrate memory from the legacy file first,
++//---   park it, then immediately re-save into the account-scoped file. Legacy
++//---   rows carry no account column, so current-account attribution is the
++//---   best possible and is applied by construction.
+ void MigrateLegacyTDFiles()
+ {
+    string src3[3]; src3[0]=TRADES_FILE; src3[1]=REC_FILE; src3[2]=SNAP_BIN;
+@@ -237,14 +254,30 @@
+    {
+       if(!FileIsExist(src3[m])) continue;
+       if(FileIsExist(dst3[m])) FileDelete(dst3[m]);   // keep the latest legacy copy only
++
++      if(m == 0 && LegacyTradesHasData() && !PerAcctTradesHasData())
++      {
++         int nLoaded = LoadTradesLegacy();
++         if(FileMove(src3[m], 0, dst3[m], 0))
++         {
++            SaveTrades();
++            LogEvent(StringFormat("MIGRATE load-then-park | Legacy rows: %d -> %s", nLoaded, TD_F_trades()));
++            Print("TD v1.55 FIX-TD6: legacy trades hydrated (", nLoaded, " rows) into ", TD_F_trades(), ", legacy file parked");
++         }
++         else
++            Print("TD v1.55 FIX-TD6: WARN could not park '", src3[m], "' err=", GetLastError());
++         continue;
++      }
++
+       if(FileMove(src3[m], 0, dst3[m], 0))
+          Print("TD v1.53 FIX-TD5: legacy shared file '", src3[m], "' parked as '", dst3[m], "' (unattributable, not auto-loaded)");
+       else
+-         Print("TD v1.53 FIX-TD5: WARN could not park '", src3[m], "' err=", GetLastError());
+-   }
+-}
+-
+-#define MAX_TRADES 5000
++         Print("TD v1.55 FIX-TD6: WARN could not park '", src3[m], "' err=", GetLastError());
++   }
++}
++
++#define MAX_TRADES 12000         // v1.55 FIX-TD6 (0925 spec item 4): was 5000 - acct 28152862 passed 5463 closed trades in 6 weeks
++#define MAX_HISTORY_SCAN 20000   // v1.55 FIX-TD6 (0925 spec item 2): runaway safety cap only; the `since` window is the real limiter
+ int      t_ticket[MAX_TRADES];
+ string   t_symbol[MAX_TRADES];
+ int      t_type[MAX_TRADES];       // OP_BUY=0, OP_SELL=1
+@@ -308,6 +341,7 @@
+               IntegerToString(MaxRecords) + "_" +
+               IntegerToString((int)SnapEnable) + "_" +
+               IntegerToString(SnapHours) + "_" +
++              IntegerToString((int)BackfillOnce) + "_" +
+               ReportStart + "_" +
+               FilterSymbol + "_" +
+               FilterComment + "_" +
+@@ -760,7 +794,7 @@
+    // Save initial fingerprint on startup
+    SaveFingerprint(CalcInputFingerprint());
+    
+-   Print("=== TradeDashboard v1.54 STARTED === Trades: ", t_tradeCount,
++   Print("=== TradeDashboard v1.55 STARTED === Trades: ", t_tradeCount,
+          " | Records: ", r_count,
+          " | Filter: SYM='", g_filterSymbol, "' COM='", g_filterComment, "'",
+          " | ReportStart: ", (g_reportStart>0 ? TimeToString(g_reportStart,TIME_DATE) : "None"));
+@@ -1173,7 +1207,7 @@
+    }
+ }
+ // helper consumed-marks for the ordering pass (per symbol build)
+-bool g_ddUsed[5000];
++bool g_ddUsed[MAX_TRADES];   // v1.55 FIX-TD6 (0925 spec item 4): was literal 5000 - must track MAX_TRADES or the DDG build crashes past 5000 trades
+ bool TD_TradeConsumed(string sym,int i,int j){ return g_ddUsed[i]; }
+ void TD_MarkConsumed(string sym,int i,int j){ g_ddUsed[i]=true; }
+ 
+@@ -1853,22 +1887,38 @@
+ 
+ void SyncTradesFromHistory()
+ {
+-   datetime since = TimeCurrent() - SnapHours * 3600;
++   //--- v1.55 FIX-TD6 addendum (608dbe5): BackfillOnce ignores SnapHours and
++   //---   scans the whole history once (since=0) - the frozen-window gap
++   //---   between freeze day and 72h ago would otherwise stay missing forever.
++   datetime since;
++   if(BackfillOnce) since = 0;
++   else since = TimeCurrent() - SnapHours * 3600;
+    int newCount = 0;
+    int lostCount = 0;
+ 
++   //--- v1.55 FIX-TD6 (0925 spec items 1+2): scan NEWEST-first, no 2000 cap.
++   //---   MT4 history index 0 = oldest; the old oldest-first scan froze at
++   //---   index 1999 once history passed 2000 rows - this account crossed the
++   //---   line on 10-21 and every newer close was never scanned again, so the
++   //---   sync silently died (last ok 2026.10.21 17:36). Walking down from
++   //---   the newest row, the first row older than `since` ends the scan -
++   //---   the window is the natural limiter; MAX_HISTORY_SCAN is only a
++   //---   runaway safety cap.
+    int histTotal = OrdersHistoryTotal();
+-   if(histTotal > 2000) histTotal = 2000;
++   int scanned   = 0;
++   bool capHit   = false;
+ 
+    bool seen[MAX_TRADES];
+    ArrayInitialize(seen, false);
+ 
+-   for(int i = 0; i < histTotal; i++)
+-   {
++   for(int i = histTotal - 1; i >= 0; i--)
++   {
++      if(scanned >= MAX_HISTORY_SCAN) { capHit = true; break; }
++      scanned++;
+       if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY)) continue;
+       if(OrderType() > OP_SELL) continue;
+       if(OrderCloseTime() == 0) continue;
+-      if(OrderCloseTime() < since) continue;
++      if(OrderCloseTime() < since) break;   // ascending close times: everything below is older
+ 
+       int ticket = OrderTicket();
+       int idx = FindTrade(ticket);
+@@ -1930,11 +1980,35 @@
+                newCount, lostCount, t_tradeCount));
+    }
+ 
++   //--- v1.55 FIX-TD6 (0925 spec item 6): feed the panel heartbeat line
++   g_syncLastOk = TimeCurrent();
++   g_syncNew    = newCount;
++   g_syncHist   = histTotal;
++   g_syncCap    = capHit;
++   if(capHit)
++      LogEvent(StringFormat("SYNC CAP HIT | scanned %d of hist %d - raise MAX_HISTORY_SCAN", scanned, histTotal));
++
++   //--- v1.55 FIX-TD6 addendum (608dbe5): one-shot backfill result line
++   if(BackfillOnce)
++      LogEvent(StringFormat("BACKFILL DONE n=%d", t_tradeCount));
++
+    SaveTrades();
+ }
+ 
+ void SaveTrades()
+ {
++   //--- v1.55 FIX-TD6 (0925 spec item 5): silent-wipe guard. A sync that
++   //---   legitimately holds 0 in-memory trades must never overwrite an
++   //---   account-scoped file that still carries data rows - the frozen sync
++   //---   kept rewriting from the stale array, and the boss's manually rebuilt
++   //---   file would have been wiped by the first tick after a reload.
++   if(t_tradeCount == 0 && PerAcctTradesHasData())
++   {
++      LogEvent("SAVE SKIPPED: 0 trades in memory, file non-empty (v1.55 guard)");
++      Print("TD v1.55 FIX-TD6: SAVE SKIPPED - 0 trades in memory, non-empty ", TD_F_trades(), " left untouched");
++      return;
++   }
++
+    int fh = FileOpen(TD_F_trades(), FILE_WRITE|FILE_CSV|FILE_ANSI, ',');   // v1.53 FIX-TD5: TD_<acct>_trades.csv
+    if(fh == INVALID_HANDLE) return;
+ 
+@@ -2022,6 +2096,86 @@
+    Print("TD trades loaded: ", t_tradeCount);
+ }
+ 
++//--- v1.55 FIX-TD6 (0925 spec item 3): 13-column pre-v1.53 loader (no Account
++//---   column). Rows are attributed to the current account by construction.
++//---   Returns the number of rows loaded into memory.
++int LoadTradesLegacy()
++{
++   t_tradeCount = 0;
++
++   int fh = FileOpen(TRADES_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   if(fh == INVALID_HANDLE) return(0);
++
++   for(int h = 0; h < 13; h++) FileReadString(fh);   // legacy 13-col header
++
++   while(!FileIsEnding(fh) && t_tradeCount < MAX_TRADES)
++   {
++      string sTicket = FileReadString(fh);
++      if(sTicket == "") break;
++
++      int tkt        = (int)StringToInteger(sTicket);
++      string sym     = FileReadString(fh);
++      string sType   = FileReadString(fh);
++      datetime ot    = (datetime)StringToInteger(FileReadString(fh));
++      datetime ct    = (datetime)StringToInteger(FileReadString(fh));
++      double op      = StringToDouble(FileReadString(fh));
++      double cp      = StringToDouble(FileReadString(fh));
++      double lots    = StringToDouble(FileReadString(fh));
++      double prof    = StringToDouble(FileReadString(fh));
++      double swp     = StringToDouble(FileReadString(fh));
++      double comm    = StringToDouble(FileReadString(fh));
++      double calcP   = StringToDouble(FileReadString(fh));
++      string cmt     = FileReadString(fh);
++
++      // Apply ReportStart filter when loading (same rule as LoadTrades)
++      if(g_reportStart > 0 && ct < g_reportStart) continue;
++
++      t_ticket[t_tradeCount]     = tkt;
++      t_symbol[t_tradeCount]     = sym;
++      t_type[t_tradeCount]       = (sType == "BUY") ? OP_BUY : OP_SELL;
++      t_opentime[t_tradeCount]   = ot;
++      t_closetime[t_tradeCount]  = ct;
++      t_openprice[t_tradeCount]  = op;
++      t_closeprice[t_tradeCount] = cp;
++      t_lots[t_tradeCount]       = lots;
++      t_profit[t_tradeCount]     = prof;
++      t_swap[t_tradeCount]       = swp;
++      t_commission[t_tradeCount] = comm;
++      t_calcPnl[t_tradeCount]    = calcP;
++      t_comment[t_tradeCount]    = cmt;
++      t_tradeCount++;
++   }
++   FileClose(fh);
++   Print("TD v1.55 FIX-TD6: legacy trades loaded: ", t_tradeCount);
++   return(t_tradeCount);
++}
++
++//--- v1.55 FIX-TD6: true when the legacy shared trades file exists and still
++//---   holds at least one data row beyond the 13-col header.
++bool LegacyTradesHasData()
++{
++   if(!FileIsExist(TRADES_FILE)) return(false);
++   int fh = FileOpen(TRADES_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   if(fh == INVALID_HANDLE) return(false);
++   for(int h = 0; h < 13; h++) FileReadString(fh);
++   bool hasData = !FileIsEnding(fh);
++   FileClose(fh);
++   return(hasData);
++}
++
++//--- v1.55 FIX-TD6: true when the account-scoped trades file exists and holds
++//---   at least one data row beyond the 14-col header (mirrors LoadTrades).
++bool PerAcctTradesHasData()
++{
++   if(!FileIsExist(TD_F_trades())) return(false);
++   int fh = FileOpen(TD_F_trades(), FILE_READ|FILE_CSV|FILE_ANSI, ',');
++   if(fh == INVALID_HANDLE) return(false);
++   for(int h = 0; h < 14; h++) FileReadString(fh);
++   bool hasData = !FileIsEnding(fh);
++   FileClose(fh);
++   return(hasData);
++}
++
+ void LogEvent(string msg)
+ {
+    int fh = FileOpen(EVENT_FILE, FILE_WRITE|FILE_READ|FILE_CSV|FILE_ANSI, ',');
+@@ -2285,9 +2439,9 @@
+ //+------------------------------------------------------------------+
+ void GetRealizedMaxDD(datetime from, datetime to, double startBal, double &ddAmt, double &ddPct)
+ {
+-   datetime ctArr[5000] = {0}; double pnlArr[5000] = {0};
++   datetime ctArr[MAX_TRADES] = {0}; double pnlArr[MAX_TRADES] = {0};   // v1.55 FIX-TD6 (0925 spec item 4): was literal 5000 - realized MaxDD silently truncated at 5000 rows
+    int n = 0;
+-   for(int i = 0; i < t_tradeCount && n < 5000; i++)
++   for(int i = 0; i < t_tradeCount && n < MAX_TRADES; i++)
+    {
+       if(t_closetime[i] == 0 || t_closetime[i] < from || t_closetime[i] >= to) continue;
+       if(!PassesFilter(i)) continue;
+@@ -2932,7 +3086,17 @@
+    if(g_histEmpty) UpdTxt("HISTW", StringFormat("!! TERMINAL HISTORY EMPTY (0 orders) - right-click History -> All History; panel on local snapshot %d trades, last close %s",
+       t_tradeCount, (aLast>0 ? TimeToString(aLast, TIME_DATE|TIME_MINUTES) : "n/a")),
+       px+170*scale, ttlY, clrOrangeRed, 8*scale);   // v1.52 FIX-TD3: snapshot vs terminal timestamps visible
+-   else if(g_histTruncated) UpdTxt("HISTW", "HIST truncated! Switch to All History", px+170*scale, ttlY, clrOrangeRed, 8*scale); else ObjectDelete(0,PFX+"HISTW");
++   else if(g_histTruncated) UpdTxt("HISTW", "HIST truncated! Switch to All History", px+170*scale, ttlY, clrOrangeRed, 8*scale);
++   else
++   {
++      ObjectDelete(0,PFX+"HISTW");
++      //--- v1.55 FIX-TD6 (0925 spec item 6): sync heartbeat line - a frozen
++      //---   sync is now visible at a glance instead of dying silently.
++      UpdTxt("SYNCLN", StringFormat("SYNC: last ok %s / new %d / hist %d%s",
++         (g_syncLastOk > 0 ? TimeToString(g_syncLastOk, TIME_MINUTES) : "never"),
++         g_syncNew, g_syncHist, (g_syncCap ? " / CAP HIT" : "")),
++         px+170*scale, ttlY, (g_syncCap ? clrOrangeRed : clrSilver), 8*scale);
++   }
+    UpdTxtBold("SUB", Title2, px+4, ttlY+lh, clrLime, 10*scale);
+    int acY = ttlY+lh*2;
+    UpdTxt("AC1", StringFormat("AC: %d  |  Balance: $%.2f  |  Equity: $%.2f",
