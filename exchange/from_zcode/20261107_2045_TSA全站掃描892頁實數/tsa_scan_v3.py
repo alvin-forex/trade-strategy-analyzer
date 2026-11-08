@@ -8,14 +8,26 @@ TSA 全站頁面機器掃描 v3（終版）— Job 505164 / Task a
 另解析 W5 注入註釋（tokens 豁免＝W5-C v3.9 裁定）同 browser 實測覆核結果。
 分類桶：A過閘 B半程缺tokenvar C bg微差/舊/透明 D light豁免族 E自帶palette F舊工具 G admin內部 H待刪G4
 """
-import os, re, csv, urllib.parse
+import os, re, csv, argparse, urllib.parse
 from pathlib import Path
 from collections import Counter, defaultdict
 
-REPO = Path("/home/z/my-project/exchange-repo/exchange")
+# v3.1（2026-11-08 應 OpenClaw 0740 信附註）：REPO/OUT 參數化，預設值不變——其他框可用 --repo/--out 指自己路徑
+def _parse_args():
+    ap = argparse.ArgumentParser(description="TSA 全站頁面機器掃描 v3.1")
+    ap.add_argument("--repo", default="/home/z/my-project/exchange-repo/exchange",
+                    help="repo exchange 子樹路徑（預設機房框路徑）")
+    ap.add_argument("--out", default="/home/z/my-project/scripts/scan_out",
+                    help="掃描輸出目錄（預設機房框路徑）")
+    return ap.parse_args()
+
+_ARGS = _parse_args()
+REPO = Path(_ARGS.repo)
 DOCS = REPO / "docs"
-OUT = Path("/home/z/my-project/scripts/scan_out")
+OUT = Path(_ARGS.out)
 DEC = OUT / "decrypted"
+OUT.mkdir(parents=True, exist_ok=True)   # v3.1：--out 指到新目錄都直接跑
+DEC.mkdir(parents=True, exist_ok=True)
 
 GENERAL_LOCK = {"index.html", "signal_ranking.html"}
 OWNER_LOCK   = {"admin/tasks_board.html", "admin/index.html", "admin/db-browser.html", "admin/mt5_mcp_tools.html"}
@@ -184,8 +196,12 @@ for rel in allpages:
         "canonical": "Y" if RE_CANONICAL.search(txt) else "",
         "browser_verified": "Y" if bt else "",
         "browser_bodyBg": bt[1] if bt else "", "browser_card2": bt[2] if bt else "",
-        "bytes": (DOCS / rel).stat().st_size,
+        "bytes": ((src.stat().st_size if src.exists() else ((DOCS / rel).stat().st_size if (DOCS / rel).exists() else 0))),
     })
+
+if not rows:
+    print(f"[v3.1] DOCS 無 .html 頁（{DOCS}）——稀疏 clone 冇 docs/ 子樹？請用 --repo 指向有 docs/ 嘅完整 checkout 後再跑。")
+    raise SystemExit(2)
 
 with open(OUT / "tsa_census_final.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.DictWriter(f, fieldnames=list(rows[0].keys())); w.writeheader(); w.writerows(rows)
