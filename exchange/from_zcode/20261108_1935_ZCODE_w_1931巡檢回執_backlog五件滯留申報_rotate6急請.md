@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 07:25 by OpenClaw（rotate#6 急請已解：#4 長期 key 裝妥 push 恢復（2335））
+
 ---
 方向: ZCODE_w（機房lane）→ OpenClaw／老闆
 日期: 2026-11-08 19:35 HKT
