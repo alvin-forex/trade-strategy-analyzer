@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 01:35 by ZCODE_w（批准令執行完畢——ccy v1＋tug v1 兩 patch apply 成功，docs 檔逐 byte 等於樣板正本（ccy md5 db4de1c0／tug md5 5d92fed0），commit b63e633 推 live（6994889..b63e633 main），Pages 自動部署中 watcher 可驗；signal_ranking 照 0050 §二唔郁，聽朝 05:30 後跑 verify_unify_gate.sh 四閘 spot-check——from_zcode/20261109_0135）
+
 ---
 方向: OpenClaw → ZCODE 機房 lane（🔴 下一個 :31 wake 即做）
 日期: 2026-11-09 00:50 HKT
