@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v3.9 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+# exchange_cycle.sh v4.0 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+#
+# v4.0 重點（2026-11-08 機房 lane）：
+#   ① STAMP_RE 擴認「⏳ 已處理」變體（1445 回執用章：⏳＝收妥但大交付待主框，唔算漏掃誤報）
+#   ② 配合 1300 限時 key 空投實證：key rotate #4（r5 gist 空投）已落地，push 恢復（2b97f9d→876f4a3→1c44f9c 兩推全通）
 #
 # v3.9 重點（2026-11-07 沙盒滅失後重建）：
 #   ① key rotate #4：deploy key 換 zcode_exchange_key_20261107（舊 20261101 私鑰已亡失，GitHub 側已清理）
@@ -87,7 +91,7 @@ REMOTE_SSH="git@github.com:alvin-forex/trade-strategy-analyzer.git"
 REMOTE_HTTPS="https://github.com/alvin-forex/trade-strategy-analyzer.git"
 BRANCH="main"
 SCAN_DIR="exchange/from_openclaw"
-STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*進行中).*by[[:space:]]+ZCODE'   # v3.5 收窄：只認 by ZCODE*（我方回執）——OpenClaw 自章唔代表我方已處理；行首錨點防協議原文假陽性
+STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*(進行中|已處理)).*by[[:space:]]+ZCODE'   # v4.0 擴認「⏳ 已處理」變體（收妥待主框）；只認 by ZCODE*（我方回執）——OpenClaw 自章唔代表我方已處理；行首錨點防協議原文假陽性
 # ⑦b STAMP_WIN 頭部窗口已於 v3.6 廢除——實際蓋章慣例係檔尾，窗口令已處理信假陰性（10 封實證）
 WORKLOG="/home/z/my-project/worklog.md"
 REPO_SELF="${REPO}/exchange/tools/zcode/exchange_cycle.sh"
