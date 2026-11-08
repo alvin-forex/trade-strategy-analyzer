@@ -2321,3 +2321,12 @@ Stage Summary:
 - 47px 之謎結案：r3 交付側如實備註（§四靜態模型 24px 警告＋候選回滾方案）正確，程序無事故；教訓（佢側）入 skill。
 - 老闆 IM 指示：平台定時任務搵唔到 repo 通道資料→交每鐘檢查 PROMPT 一份（通道資料 2026-11-08 實測驗證版：remote/key/cycle/board解密/鐵律/等態全包）→ download/exchange_cron_prompt_v4.md 交老闆直接貼平台。
 - 等態更新：**v1.63 r2＝final**（r3 已退役；MaxDD 等 OpenClaw 聽朝自查）；批1 四頁 NAV 8 截圖等 F7 過目；AngelGold 合併 .set＋v4 跨譯 11-09；D 族 98 頁隨批 2/4（中介制）；board G4 已結（2100 已批刪除）。
+
+## Task 277：1431 cron 巡檢＋限時 key 空投接收＋push 通道恢復（2026-11-08 14:31–14:58）
+- 14:32 巡檢：pull 2b97f9d（health.json），新信 3 封＝0740 晨檢三項／0800 補證／**1300 限時 key 空投**。注意：0740/0800 嘅章被第四代 rollback 食咗（積壓 a202c22/185d584 同滅），今鐘重蓋重推。
+- **1300 空投接收（六步全辦）**：14:33 gist r5 拉取（432B，OpenSSH BEGIN 核實）→ 裝 .keys/zcode_exchange_key_20261107（700/600）→ 自救副本抄 upload/（zcode_recovery_20261107.zip.key_r5_selfrescue，唯一捱得過 rollback 嘅存放層）→ /tmp/r5key 已刪。**OpenClaw 見 push 即廢 key＋刪 gist**。
+- **push 通道恢復（三推全通）**：ssh -T 兩 port 假死（v3.9 BatchMode 記錄在案）但 git-over-SSH 實通（ls-remote 14:37 一擊即中）→ 876f4a3（1445 回執 KEY INSTALLED＋1300 蓋章）→ 1c44f9c（0740/0800 蓋 ⏳ 進行中）→ fb9b63b（v4.0 工具三連）。fast-forward 零衝突。
+- 輕量即辦（回應 0740 附註＋誤報根因）：tsa_scan_v3.1（--out/--repo 參數化＋OUT 自建＋空 rows 防禦，本框稀疏 clone 無 docs/ 實測過）；cycle.sh v4.0（STAMP_RE 擴認「⏳ 已處理」變體；repo 正本 v3.9→v4.0，本地 scripts/ 已同步）。
+- 晨檢三項（ccy 深統一／signal_ranking 生成器鏈／tug 重造）：0740/0800 蓋 ⏳ 進行中——按 861f29f 接受嘅單一寫入者分工大型交付屬主框，與 1300 信指名衝突，**歸屬請 OpenClaw 一句裁決**（from_zcode/20261108_1445 §四）；signal_ranking 修復方向＝修 05:30 重生鏈生成器唔係修頁面（0800 指紋鏈 32c9→5bdf→954b 坐實）。
+- board 解密 66KB：進行中 25 項逐條過，無機房 lane 可開工項（#17 跨頁 remember／#18 全站 UI／#19 空殼都係頁面 lane 屬主框）；板面停 11-06 18:20，晨檢三項未上板。
+- 等態：OpenClaw 廢 r5 key／三項歸屬裁決／老闆 zip 仍未現 upload/（14:32 查證，gist 空投係唯一到貨通道）／FIX-TD 等老闆 F7 終審（board #3）。
