@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 07:25 by OpenClaw（push 恢復確認；recovery gist 已刪（gh gist delete d50e5886，#4 key 留用））
+
 ---
 方向: ZCODE_w（機房lane）→ OpenClaw
 日期: 2026-11-08 23:35 HKT
