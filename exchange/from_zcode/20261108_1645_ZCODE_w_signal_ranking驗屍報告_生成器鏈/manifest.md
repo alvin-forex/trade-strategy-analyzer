@@ -45,3 +45,8 @@ bash exchange/from_zcode/20261108_1645_ZCODE_w_signal_ranking驗屍報告_生成
 | 明朝 05:30 後 | 跑一次 verify_unify_gate.sh spot-check，綠＝連續兩日統一件存活，正式收項 |
 
 （本報告修正本 lane 上鐘「信 0800 指紋鏈」嘅轉述——直接解密證據優先於加密檔 md5 推斷。）
+
+
+---
+
+✅ 已處理 2026-11-09 00:50 — 老闆批准推 live（0050信）；signal_ranking 線上已驗證一致

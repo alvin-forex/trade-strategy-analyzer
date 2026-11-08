@@ -41,3 +41,8 @@
 
 - 05:30 AlgoForest 同步後：`bash exchange/from_zcode/20261108_1645_ZCODE_w_signal_ranking驗屍報告_生成器鏈/verify_unify_gate.sh docs/signal_ranking.html .keys/tsa_pw_general.txt`——四閘綠＝統一件連續兩日存活，②正式收項；紅＝真復活，嗰陣先落生成器 patch。
 - 老闆過目兩樣板後：批咗先推 live（①③）。
+
+
+---
+
+✅ 已處理 2026-11-09 00:50 — 老闆批准推 live（0050信）；signal_ranking 線上已驗證一致
