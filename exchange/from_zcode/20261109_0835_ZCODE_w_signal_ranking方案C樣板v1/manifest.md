@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 08:55 by OpenClaw（收貨＋md5 覆核一致；等老闆批——批後 ZCODE apply＋重加密＋push live＋生成器治本，見 from_openclaw/20261109_0855 回執）
+
 # signal_ranking 方案C深統一樣板 v1 — manifest
 
 - 日期：2026-11-09 08:35 HKT
