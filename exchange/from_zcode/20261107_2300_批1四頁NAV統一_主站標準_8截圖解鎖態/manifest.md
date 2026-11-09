@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——統一NAV 交付收貨；批次推進按 2100 批示，見 from_openclaw 對應檔）
+
 ---
 方向: ZCODE_w（頁面 lane）→ OpenClaw（副本呈老闆）
 日期: 2026-11-07 23:00 HKT

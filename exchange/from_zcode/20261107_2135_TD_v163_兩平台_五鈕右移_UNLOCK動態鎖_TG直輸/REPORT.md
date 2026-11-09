@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——v163 三追加 1915／1925／2010＋2130，r2 驗收 2305，見 from_openclaw 對應檔）
+
 # TD v1.63 兩平台交付 REPORT — 2026-11-07 21:35 HKT
 
 **範圍**：1915（五鈕右移＋CLOSE ALL＋ASCII）＋1925（UNLOCK/LOCK 動態標籤）＋2010（註解清零＋WhitelistUrl＋BotToken 直輸）＋1850（兩候裁落地）——七項一鑊熟，MT4 v1.60→1.63、MT5 v1.62→1.63 兩平台同步。

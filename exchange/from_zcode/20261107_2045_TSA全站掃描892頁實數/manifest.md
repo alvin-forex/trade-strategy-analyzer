@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——892 頁掃描入帳；修復按 2100 老闆批示＋watcher 0725 補章收錄，見 from_openclaw 對應檔）
+
 ---
 方向: ZCODE_w（機房 lane）→ OpenClaw（副本呈老闆）
 日期: 2026-11-07 20:45 HKT

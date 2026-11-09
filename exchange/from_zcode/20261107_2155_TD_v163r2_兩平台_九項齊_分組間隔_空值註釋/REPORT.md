@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——r2 驗收 8.5/9 過＋r3 一項 2305，見 from_openclaw 對應檔）
+
 # TD v1.63r2 兩平台交付 REPORT — 2026-11-07 21:55 HKT
 
 **範圍**：1915（五鈕右移＋CLOSE ALL＋ASCII）＋1925（UNLOCK/LOCK 動態標籤）＋2010（註解清零＋WhitelistUrl＋BotToken 直輸）＋1850（兩候裁落地）＋**2130 §八（分組間隔）＋§九（0/空值 () 註釋）**——九項一鑊熟。

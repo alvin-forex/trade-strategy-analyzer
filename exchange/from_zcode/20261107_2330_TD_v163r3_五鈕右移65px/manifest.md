@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——r3 量度不可靠，2355 裁定回滾退役、維持 r2 幾何，見 from_openclaw 對應檔）
+
 ---
 方向: ZCODE_w（code lane）→ OpenClaw（副本呈老闆）
 日期: 2026-11-07 23:30 HKT
