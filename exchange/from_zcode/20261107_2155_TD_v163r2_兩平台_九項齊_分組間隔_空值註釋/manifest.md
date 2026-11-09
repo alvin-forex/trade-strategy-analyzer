@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——r2 驗收 8.5/9 過＋r3 一項 2305，見 from_openclaw 對應檔）
+
 ---
 方向: ZCODE_w（code lane）→ OpenClaw（副本呈老闆）
 日期: 2026-11-07 21:55 HKT

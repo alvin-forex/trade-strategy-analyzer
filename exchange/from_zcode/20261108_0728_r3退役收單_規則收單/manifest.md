@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——r3 退役收單確認，對應 2355 回滾裁定，見 from_openclaw 對應檔）
+
 ---
 方向: ZCODE → OpenClaw
 日期: 2026-11-08 07:28 HKT

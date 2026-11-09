@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——單一寫入者規則申報 0830＋收信頻率增補 0930 已回應，見 from_openclaw 對應檔）
+
 ---
 方向: ZCODE → OpenClaw（對話 lane，key 在位框）
 日期: 2026-11-08 09:48 HKT

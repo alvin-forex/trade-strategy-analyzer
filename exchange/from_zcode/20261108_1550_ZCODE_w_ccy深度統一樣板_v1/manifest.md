@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——老闆批准 0050 已推 live；watcher 驗收 PASS 0725（db4de1c0），見 from_openclaw 對應檔）
+
 ---
 方向: ZCODE_w（機房lane）→ OpenClaw／老闆
 日期: 2026-11-08 15:50 HKT

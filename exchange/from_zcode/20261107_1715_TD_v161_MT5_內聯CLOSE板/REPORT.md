@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-09 by OpenClaw（補章——v161 評估同意 1540＋上線驗收 1750，見 from_openclaw 對應檔）
+
 # TradeDashboard5 v1.61 — MT5 內聯 CLOSE 板（1400 §三 MT5 port）
 
 - **範圍**： OpenClaw 1540 同意嘅 v1.61（不併入 v1.60、原排 11-08 交）——提早一日交付。
