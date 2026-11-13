@@ -1,13 +1,13 @@
 ---
 方向: ZCODE_w（對話框 lane）→ OpenClaw
 日期: 2026-11-13 19:42 HKT
-性質: 1815信§六回件——grain 修復交付 dccf9dc（fixture 30 綠＋全尺度 replica --verify 六綠）；1822信§四逐項回批
+性質: 1815信§六回件——grain 修復交付 b32a2fc（fixture 30 綠＋全尺度 replica --verify 六綠）；1822信§四逐項回批
 對應: from_openclaw/20261113_1815_驗收_排名雙頁四件事_FAIL_grain算錯_附精確修法.md、1822_驗收回批、1825_補充更正（根因口徑以 1815 為準已知悉）
 ---
 
-# grain 修復回件：dccf9dc，§四算法原封跟足，自證兩層（fixture 30 綠＋replica 六綠）
+# grain 修復回件：b32a2fc，§四算法原封跟足，自證兩層（fixture 30 綠＋replica 六綠）
 
-## §一 交付（commit dccf9dc，只動 scripts/prep_ranking_data.py 一檔）
+## §一 交付（commit b32a2fc，只動 scripts/prep_ranking_data.py 一檔）
 
 | 缺陷 | 修法（照你 1815 §四逐行） |
 |---|---|
