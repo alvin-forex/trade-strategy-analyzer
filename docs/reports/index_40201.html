@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TSA v2 — Signal 40201 深度分析</title>
+<style>:root{
+  --bg:#0a0e17;--bg2:#0f1320;--card:#111520;--card-h:#161b2d;
+  --border:#1e2433;--border2:#2a3040;
+  --text:#e0e0e0;--text2:#8892a6;--text3:#5a6478;--white:#fff;
+  --pri:#FFD700;--acc:#64b5f6;--acc-dim:rgba(100,181,246,.12);
+  --green:#4CAF50;--green-bg:rgba(76,175,80,.12);
+  --red:#FF5252;--red-bg:rgba(255,82,82,.12);
+  --yellow:#FFC107;--yellow-bg:rgba(255,193,7,.12);
+  --orange:#FF9800;--orange-bg:rgba(255,152,0,.12);
+  --radius:12px;--radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  --mono:'SF Mono','Fira Code',Consolas,monospace;
+}
+[data-theme="light"]{
+  --bg:#f0f2f5;--bg2:#e4e7ec;--card:#ffffff;--card-h:#f0f2f5;
+  --border:#c4c9d0;--border2:#a8afb8;
+  --text:#0d1117;--text2:#3d4452;--text3:#6b7280;--white:#ffffff;
+  --pri:#1a3a6b;--acc:#c81e4a;--acc-dim:rgba(200,30,74,.1);
+  --green:#1a7d32;--green-bg:rgba(26,125,50,.1);
+  --red:#c41e3a;--red-bg:rgba(196,30,58,.1);
+  --yellow:#8a6d00;--yellow-bg:rgba(138,109,0,.12);
+  --orange:#fd7e14;--orange-bg:rgba(253,126,20,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;font-size:14px}
+a{color:var(--acc);text-decoration:none}
+.report-header{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.report-header h1{font-size:1.4em;color:var(--pri);font-weight:800}
+.report-header .sub{color:var(--text2);font-size:.85em;margin-top:2px}
+.report-header .meta{display:flex;gap:12px;flex-wrap:wrap}
+.report-header .meta span{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:.78em;color:var(--text2)}
+.report-header .meta span b{color:var(--text)}
+.main-nav{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-bottom:16px;position:sticky;top:8px;z-index:100;overflow-x:auto;-webkit-overflow-scrolling:touch;box-shadow:var(--shadow)}
+.main-nav::-webkit-scrollbar{height:0}
+.nav-tab{flex:1;min-width:90px;padding:10px 14px;border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:600;border-radius:var(--radius-sm);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.nav-tab:hover{background:var(--bg2);color:var(--text)}
+.nav-tab.active{background:var(--acc-dim);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(100,181,246,.3)}
+.sub-nav{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;align-items:center}
+.sub-nav::-webkit-scrollbar{height:0}
+.sub-tab{padding:8px 14px;border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;border-bottom:2px solid transparent}
+.sub-tab:hover{color:var(--text);background:var(--bg2)}
+.sub-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.card h2{font-size:1.05em;color:var(--white);margin-bottom:12px;display:flex;align-items:center;gap:8px;font-weight:700}
+.card h2 .icon{font-size:1.15em}
+.card h3{font-size:.95em;color:var(--text);margin-bottom:8px;font-weight:600}
+.hero-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.hero-stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 16px;text-align:center;position:relative;overflow:hidden}
+.hero-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.5}
+.hero-stat .val{font-size:28px;font-weight:800;letter-spacing:-1px}
+.hero-stat .val.pos{color:var(--green)}.hero-stat .val.neg{color:var(--red)}.hero-stat .val.gold{color:var(--pri)}
+.hero-stat .lbl{font-size:11px;color:var(--text2);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 10px;text-align:center;transition:all .2s}
+.stat-box:hover{border-color:var(--border2);background:var(--card-h)}
+.stat-box .v{font-size:18px;font-weight:700;color:var(--white)}
+.stat-box .v.pos{color:var(--green)}.stat-box .v.neg{color:var(--red)}.stat-box .v.gold{color:var(--pri)}
+.stat-box .l{font-size:11px;color:var(--text2);margin-top:2px}
+.risk-status{border-radius:var(--radius);padding:14px 20px;display:flex;align-items:center;gap:14px;border-left:4px solid;margin-bottom:16px}
+.risk-status.low{background:var(--green-bg);border-left-color:var(--green)}
+.risk-status.med{background:var(--yellow-bg);border-left-color:var(--yellow)}
+.risk-status.high{background:var(--red-bg);border-left-color:var(--red)}
+.risk-status .ri{font-size:22px}
+.risk-status .rt{font-size:16px;font-weight:700}
+.risk-status.low .rt{color:var(--green)}
+.risk-status.med .rt{color:var(--yellow)}
+.risk-status.high .rt{color:var(--red)}
+.risk-status .rd{color:var(--text2);font-size:.85em}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.tbl{width:100%;border-collapse:collapse;font-size:.85em}
+.tbl th{background:var(--bg2);color:var(--text2);padding:10px 12px;text-align:left;font-weight:600;border-bottom:1px solid var(--border);font-size:.8em;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+.tbl tr:hover td{background:var(--card-h)}
+.tbl .pos{color:var(--green);font-weight:600}
+.tbl .neg{color:var(--red);font-weight:600}
+.tbl .gold{color:var(--pri);font-weight:600}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75em;font-weight:700;letter-spacing:.5px}
+.badge.green{background:var(--green-bg);color:var(--green)}
+.badge.red{background:var(--red-bg);color:var(--red)}
+.badge.yellow{background:var(--yellow-bg);color:var(--yellow)}
+.badge.blue{background:var(--acc-dim);color:var(--acc)}
+.chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;position:relative}
+.equity-chart{width:100%;height:200px;display:block}
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:160px;padding:8px 0}
+.bar{flex:1;border-radius:3px 3px 0 0;min-height:4px;transition:opacity .2s;position:relative;cursor:default}
+.bar:hover{opacity:.8}
+.bar.green{background:linear-gradient(180deg,var(--green),rgba(76,175,80,.4))}
+.bar.red{background:linear-gradient(180deg,var(--red),rgba(255,82,82,.4))}
+.bar.blue{background:linear-gradient(180deg,var(--acc),rgba(100,181,246,.4))}
+.bar.gold{background:linear-gradient(180deg,var(--pri),rgba(255,215,0,.4))}
+.bar.yellow{background:linear-gradient(180deg,var(--yellow),rgba(255,193,7,.4))}
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+@media(max-width:768px){
+  .hero-row{grid-template-columns:1fr}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .two-col{grid-template-columns:1fr}
+  .nav-tab{min-width:70px;font-size:12px;padding:8px 10px}
+  .nav-tab .nav-text{display:none}
+  .report-header{flex-direction:column;align-items:flex-start}
+}
+.grade-display{text-align:center;padding:20px}
+.grade-stars{font-size:36px;letter-spacing:4px}
+.grade-label{font-size:14px;font-weight:700;margin-top:8px;text-transform:uppercase;letter-spacing:2px}
+.grade-desc{font-size:.85em;color:var(--text2);margin-top:4px}
+.mini-stat{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border)}
+.mini-stat .ms-v{font-weight:700;color:var(--white)}
+.mini-stat .ms-l{font-size:.75em;color:var(--text2)}</style>
+</head>
+<body>
+<div class="report-header">
+  <div>
+    <h1>📊 Signal 40201 深度分析</h1>
+    <div class="sub">Dragon Wave AZ0, Dragon Wave AZ1, Dragon Wave AZ2, Dragon Wave AZ3, Dragon Wave AZ4, Dragon Wave BZ0, Dragon Wave BZ1, Dragon Wave BZ2, Dragon Wave BZ3, Dragon Wave CZ0, Dragon Wave CZ1, Dragon Wave CZ2, Dragon Wave CZ3 · AUDUSD/EURAUD/EURCAD/EURNZD/GBPUSD</div>
+  </div>
+  <div class="meta">
+    <span>📅 <b>2026.05.07 – 2026.11.06</b></span>
+    <span>🔄 <b>256 筆交易</b></span>
+    <span>⏱ <b>26 週</b></span>
+  </div>
+</div>
+<div class="main-nav">
+  <button class="nav-tab active" onclick="switchPanel(this,'dash')">📊 <span class="nav-text">儀表板</span></button>
+  <button class="nav-tab" onclick="switchPanel(this,'perf')">📈 <span class="nav-text">表現分析</span></button>
+  <button class="nav-tab" onclick="switchPanel(this,'risk')">⚠️ <span class="nav-text">風險評估</span></button>
+  <button class="nav-tab" onclick="switchPanel(this,'copy')">💡 <span class="nav-text">Copy 決策</span></button>
+  <button class="nav-tab" onclick="switchPanel(this,'data')">📌 <span class="nav-text">數據明細</span></button>
+</div>
+<div class="panel active" id="panel-dash">
+<div class="hero-row">
+    <div class="hero-stat">
+      <div class="val gold">⭐⭐</div>
+      <div class="lbl">Copy 評級 · 推薦 COPY</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val pos">64.8%</div>
+      <div class="lbl">勝率（166W / 90L）</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val pos">+$1,212</div>
+      <div class="lbl">總盈利 USD</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2><span class="icon">📈</span> 收益曲線</h2>
+    <div class="chart-box">
+      <svg class="equity-chart" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#64b5f6" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#64b5f6" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="50" x2="800" y2="50" stroke="#1a1f2e" stroke-width="1"/>
+        <line x1="0" y1="100" x2="800" y2="100" stroke="#1a1f2e" stroke-width="1"/>
+        <line x1="0" y1="150" x2="800" y2="150" stroke="#1a1f2e" stroke-width="1"/>
+        <path d="M0.0,200.0 L3.1,199.3 L6.2,198.6 L9.4,197.5 L12.5,196.7 L15.6,196.0 L18.8,194.7 L21.9,194.0 L25.0,193.4 L28.1,192.1 L31.2,191.6 L34.4,189.1 L37.5,189.0 L40.6,187.6 L43.8,180.4 L46.9,176.9 L50.0,176.7 L53.1,178.0 L56.2,179.2 L59.4,178.6 L62.5,180.3 L65.6,180.2 L68.8,180.7 L71.9,179.9 L75.0,177.0 L78.1,177.1 L81.2,173.8 L84.4,173.7 L87.5,173.0 L90.6,172.6 L93.8,171.9 L96.9,171.4 L100.0,170.1 L103.1,169.3 L106.2,167.5 L109.4,167.4 L112.5,154.3 L115.6,150.4 L118.8,148.7 L121.9,149.9 L125.0,151.7 L128.1,152.7 L131.2,155.6 L134.4,157.1 L137.5,159.0 L140.6,157.7 L143.8,155.9 L146.9,155.0 L150.0,148.1 L153.1,146.2 L156.2,146.4 L159.4,145.6 L162.5,144.9 L165.6,144.4 L168.8,136.7 L171.9,138.0 L175.0,140.8 L178.1,142.3 L181.2,136.8 L184.4,136.1 L187.5,136.7 L190.6,135.8 L193.8,135.2 L196.9,134.8 L200.0,124.9 L203.1,119.8 L206.2,118.5 L209.4,118.8 L212.5,119.7 L215.6,120.8 L218.8,122.1 L221.9,122.2 L225.0,123.8 L228.1,124.1 L231.2,125.6 L234.4,126.1 L237.5,126.7 L240.6,126.0 L243.8,123.6 L246.9,124.6 L250.0,125.7 L253.1,122.9 L256.2,124.1 L259.4,125.3 L262.5,125.0 L265.6,124.2 L268.8,123.7 L271.9,123.6 L275.0,123.1 L278.1,122.9 L281.2,119.0 L284.4,119.4 L287.5,114.7 L290.6,115.1 L293.8,116.3 L296.9,115.8 L300.0,115.6 L303.1,115.1 L306.2,114.4 L309.4,111.2 L312.5,110.7 L315.6,111.0 L318.8,102.8 L321.9,101.0 L325.0,101.3 L328.1,100.0 L331.2,98.0 L334.4,98.1 L337.5,98.8 L340.6,71.6 L343.8,63.6 L346.9,65.5 L350.0,66.0 L353.1,72.4 L356.2,77.4 L359.4,83.6 L362.5,86.5 L365.6,89.5 L368.8,89.4 L371.9,89.1 L375.0,87.7 L378.1,87.7 L381.2,87.1 L384.4,86.9 L387.5,86.8 L390.6,86.5 L393.8,86.3 L396.9,85.4 L400.0,85.7 L403.1,85.6 L406.2,84.4 L409.4,85.4 L412.5,85.0 L415.6,82.3 L418.8,82.2 L421.9,78.8 L425.0,78.3 L428.1,77.7 L431.2,77.3 L434.4,77.1 L437.5,73.3 L440.6,72.5 L443.8,72.6 L446.9,72.3 L450.0,71.9 L453.1,70.6 L456.2,70.7 L459.4,70.4 L462.5,69.5 L465.6,69.9 L468.8,68.9 L471.9,62.7 L475.0,62.5 L478.1,61.8 L481.2,60.6 L484.4,61.7 L487.5,61.0 L490.6,60.4 L493.8,60.9 L496.9,51.0 L500.0,54.0 L503.1,57.8 L506.2,59.9 L509.4,59.6 L512.5,58.8 L515.6,59.4 L518.8,58.8 L521.9,55.0 L525.0,51.1 L528.1,43.4 L531.2,42.9 L534.4,42.5 L537.5,41.1 L540.6,41.5 L543.8,42.3 L546.9,48.0 L550.0,51.1 L553.1,50.6 L556.2,50.3 L559.4,49.4 L562.5,49.6 L565.6,49.3 L568.8,49.2 L571.9,48.3 L575.0,48.8 L578.1,43.8 L581.2,45.8 L584.4,47.7 L587.5,47.4 L590.6,47.2 L593.8,7.9 L596.9,20.0 L600.0,30.3 L603.1,39.0 L606.2,42.5 L609.4,21.8 L612.5,22.1 L615.6,26.2 L618.8,28.5 L621.9,27.8 L625.0,18.9 L628.1,21.5 L631.2,24.8 L634.4,26.5 L637.5,15.1 L640.6,18.5 L643.8,22.6 L646.9,24.7 L650.0,24.1 L653.1,16.1 L656.2,20.4 L659.4,23.2 L662.5,16.6 L665.6,20.8 L668.8,23.4 L671.9,19.0 L675.0,18.5 L678.1,16.7 L681.2,12.1 L684.4,12.0 L687.5,13.2 L690.6,12.8 L693.8,12.2 L696.9,12.1 L700.0,11.9 L703.1,11.7 L706.2,11.6 L709.4,11.5 L712.5,7.5 L715.6,7.7 L718.8,8.3 L721.9,8.7 L725.0,8.6 L728.1,8.3 L731.2,5.2 L734.4,5.2 L737.5,5.6 L740.6,4.0 L743.8,3.9 L746.9,2.5 L750.0,2.5 L753.1,1.4 L756.2,1.9 L759.4,2.3 L762.5,1.9 L765.6,2.2 L768.8,2.0 L771.9,1.9 L775.0,1.8 L778.1,1.3 L781.2,1.4 L784.4,0.8 L787.5,0.9 L790.6,0.6 L793.8,0.5 L796.9,0.1 L800.0,0.0" fill="none" stroke="#64b5f6" stroke-width="2"/>
+        <path d="M0.0,200.0 L3.1,199.3 L6.2,198.6 L9.4,197.5 L12.5,196.7 L15.6,196.0 L18.8,194.7 L21.9,194.0 L25.0,193.4 L28.1,192.1 L31.2,191.6 L34.4,189.1 L37.5,189.0 L40.6,187.6 L43.8,180.4 L46.9,176.9 L50.0,176.7 L53.1,178.0 L56.2,179.2 L59.4,178.6 L62.5,180.3 L65.6,180.2 L68.8,180.7 L71.9,179.9 L75.0,177.0 L78.1,177.1 L81.2,173.8 L84.4,173.7 L87.5,173.0 L90.6,172.6 L93.8,171.9 L96.9,171.4 L100.0,170.1 L103.1,169.3 L106.2,167.5 L109.4,167.4 L112.5,154.3 L115.6,150.4 L118.8,148.7 L121.9,149.9 L125.0,151.7 L128.1,152.7 L131.2,155.6 L134.4,157.1 L137.5,159.0 L140.6,157.7 L143.8,155.9 L146.9,155.0 L150.0,148.1 L153.1,146.2 L156.2,146.4 L159.4,145.6 L162.5,144.9 L165.6,144.4 L168.8,136.7 L171.9,138.0 L175.0,140.8 L178.1,142.3 L181.2,136.8 L184.4,136.1 L187.5,136.7 L190.6,135.8 L193.8,135.2 L196.9,134.8 L200.0,124.9 L203.1,119.8 L206.2,118.5 L209.4,118.8 L212.5,119.7 L215.6,120.8 L218.8,122.1 L221.9,122.2 L225.0,123.8 L228.1,124.1 L231.2,125.6 L234.4,126.1 L237.5,126.7 L240.6,126.0 L243.8,123.6 L246.9,124.6 L250.0,125.7 L253.1,122.9 L256.2,124.1 L259.4,125.3 L262.5,125.0 L265.6,124.2 L268.8,123.7 L271.9,123.6 L275.0,123.1 L278.1,122.9 L281.2,119.0 L284.4,119.4 L287.5,114.7 L290.6,115.1 L293.8,116.3 L296.9,115.8 L300.0,115.6 L303.1,115.1 L306.2,114.4 L309.4,111.2 L312.5,110.7 L315.6,111.0 L318.8,102.8 L321.9,101.0 L325.0,101.3 L328.1,100.0 L331.2,98.0 L334.4,98.1 L337.5,98.8 L340.6,71.6 L343.8,63.6 L346.9,65.5 L350.0,66.0 L353.1,72.4 L356.2,77.4 L359.4,83.6 L362.5,86.5 L365.6,89.5 L368.8,89.4 L371.9,89.1 L375.0,87.7 L378.1,87.7 L381.2,87.1 L384.4,86.9 L387.5,86.8 L390.6,86.5 L393.8,86.3 L396.9,85.4 L400.0,85.7 L403.1,85.6 L406.2,84.4 L409.4,85.4 L412.5,85.0 L415.6,82.3 L418.8,82.2 L421.9,78.8 L425.0,78.3 L428.1,77.7 L431.2,77.3 L434.4,77.1 L437.5,73.3 L440.6,72.5 L443.8,72.6 L446.9,72.3 L450.0,71.9 L453.1,70.6 L456.2,70.7 L459.4,70.4 L462.5,69.5 L465.6,69.9 L468.8,68.9 L471.9,62.7 L475.0,62.5 L478.1,61.8 L481.2,60.6 L484.4,61.7 L487.5,61.0 L490.6,60.4 L493.8,60.9 L496.9,51.0 L500.0,54.0 L503.1,57.8 L506.2,59.9 L509.4,59.6 L512.5,58.8 L515.6,59.4 L518.8,58.8 L521.9,55.0 L525.0,51.1 L528.1,43.4 L531.2,42.9 L534.4,42.5 L537.5,41.1 L540.6,41.5 L543.8,42.3 L546.9,48.0 L550.0,51.1 L553.1,50.6 L556.2,50.3 L559.4,49.4 L562.5,49.6 L565.6,49.3 L568.8,49.2 L571.9,48.3 L575.0,48.8 L578.1,43.8 L581.2,45.8 L584.4,47.7 L587.5,47.4 L590.6,47.2 L593.8,7.9 L596.9,20.0 L600.0,30.3 L603.1,39.0 L606.2,42.5 L609.4,21.8 L612.5,22.1 L615.6,26.2 L618.8,28.5 L621.9,27.8 L625.0,18.9 L628.1,21.5 L631.2,24.8 L634.4,26.5 L637.5,15.1 L640.6,18.5 L643.8,22.6 L646.9,24.7 L650.0,24.1 L653.1,16.1 L656.2,20.4 L659.4,23.2 L662.5,16.6 L665.6,20.8 L668.8,23.4 L671.9,19.0 L675.0,18.5 L678.1,16.7 L681.2,12.1 L684.4,12.0 L687.5,13.2 L690.6,12.8 L693.8,12.2 L696.9,12.1 L700.0,11.9 L703.1,11.7 L706.2,11.6 L709.4,11.5 L712.5,7.5 L715.6,7.7 L718.8,8.3 L721.9,8.7 L725.0,8.6 L728.1,8.3 L731.2,5.2 L734.4,5.2 L737.5,5.6 L740.6,4.0 L743.8,3.9 L746.9,2.5 L750.0,2.5 L753.1,1.4 L756.2,1.9 L759.4,2.3 L762.5,1.9 L765.6,2.2 L768.8,2.0 L771.9,1.9 L775.0,1.8 L778.1,1.3 L781.2,1.4 L784.4,0.8 L787.5,0.9 L790.6,0.6 L793.8,0.5 L796.9,0.1 L800.0,0.0 L800.0,200.0 L0,200.0 Z" fill="url(#eqFill)"/>
+      </svg>
+    </div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="v gold">2.20</div><div class="l">盈虧比 (PF)</div></div>
+    <div class="stat-box"><div class="v neg">3.4%</div><div class="l">最大回撤</div></div>
+    <div class="stat-box"><div class="v">+$238</div><div class="l">最大單筆盈利</div></div>
+    <div class="stat-box"><div class="v neg">$-74</div><div class="l">最大單筆虧損</div></div>
+    <div class="stat-box"><div class="v">24.2%</div><div class="l">總增長率</div></div>
+    <div class="stat-box"><div class="v">6.0d</div><div class="l">平均持倉時間</div></div>
+    <div class="stat-box"><div class="v gold">1</div><div class="l">交易層數</div></div>
+    <div class="stat-box"><div class="v">$6,212</div><div class="l">最終權益</div></div>
+  </div>
+  <div class="risk-status low">
+    <div class="ri">🟢</div>
+    <div>
+      <div class="rt">低風險 · 低風險</div>
+      <div class="rd">最大回撤 3.4% · 最大層數 L1 · 單筆最大虧損 $-74</div>
+    </div>
+    <a href="martin_v4_40201.html" style="margin-left:auto;background:var(--acc-dim);color:var(--acc);padding:8px 16px;border-radius:8px;font-weight:700;font-size:.85em;white-space:nowrap;border:1px solid var(--acc)">🔍 馬丁剖析法 V4 →</a>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h2><span class="icon">💰</span> 方向表現</h2>
+      <table class="tbl">
+        <thead><tr><th>方向</th><th>筆數</th><th>勝率</th><th>盈虧</th></tr></thead>
+        <tbody>
+          <tr><td>🟢 BUY</td><td>120</td><td class="pos">58.3%</td><td class="pos">+$581</td></tr>
+          <tr><td>🔴 SELL</td><td>136</td><td class="pos">70.6%</td><td class="pos">+$631</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2><span class="icon">📚</span> 層數分析</h2>
+      <table class="tbl">
+        <thead><tr><th>層</th><th>筆數</th><th>勝率</th><th>盈虧</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge blue">Other</span></td><td>256</td><td class="pos">64.8%</td><td class="pos">+$1,212</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h2><span class="icon">⏱️</span> 持倉時間分佈</h2>
+    <div class="bar-chart">
+<div class="bar green" style="height:4%" title="<15min: 0筆 (0%)"></div>
+<div class="bar blue" style="height:4%" title="15-60min: 7筆 (3%)"></div>
+<div class="bar gold" style="height:5%" title="1-4hr: 14筆 (5%)"></div>
+<div class="bar yellow" style="height:9%" title="4-12hr: 24筆 (9%)"></div>
+<div class="bar red" style="height:82%" title="12hr+: 211筆 (82%)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.75em;color:var(--text2);margin-top:6px">
+      <span><15min (0%)</span>
+<span>15-60min (3%)</span>
+<span>1-4hr (5%)</span>
+<span>4-12hr (9%)</span>
+<span>12hr+ (82%)</span>
+    </div>
+  </div>
+</div>
+<div class="panel" id="panel-perf">
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'perf-equity')">📈 收益曲線</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-time')">🕐 時段分析</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-hold')">⏱️ 持倉時間</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-dir')">↔️ 方向分析</button>
+  </div>
+  <div id="perf-equity">    <div class="card">
+      <h2><span class="icon">📈</span> 完整收益曲線</h2>
+      <div class="chart-box" style="height:400px">
+        <svg style="display:block" width="100%" height="380" viewBox="0 0 800 380" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="eqFill2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#64b5f6" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#64b5f6" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <g stroke="#1a1f2e" stroke-width="1">
+            <line x1="0" y1="0" x2="800" y2="0" stroke="#1a1f2e" stroke-width="1"/>
+<line x1="0" y1="95" x2="800" y2="95" stroke="#1a1f2e" stroke-width="1"/>
+<line x1="0" y1="190" x2="800" y2="190" stroke="#1a1f2e" stroke-width="1"/>
+<line x1="0" y1="285" x2="800" y2="285" stroke="#1a1f2e" stroke-width="1"/>
+<line x1="0" y1="380" x2="800" y2="380" stroke="#1a1f2e" stroke-width="1"/>
+          </g>
+          <g fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">
+            <text x="8" y="16" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$6.2K</text>
+<text x="8" y="111" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$5.9K</text>
+<text x="8" y="206" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$5.6K</text>
+<text x="8" y="301" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$5.3K</text>
+<text x="8" y="376" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$5.0K</text>
+          </g>
+          <path d="M0.0,380.0 L3.1,378.7 L6.2,377.3 L9.4,375.2 L12.5,373.7 L15.6,372.4 L18.8,370.0 L21.9,368.6 L25.0,367.5 L28.1,364.9 L31.2,364.0 L34.4,359.2 L37.5,359.1 L40.6,356.5 L43.8,342.7 L46.9,336.2 L50.0,335.6 L53.1,338.3 L56.2,340.4 L59.4,339.4 L62.5,342.6 L65.6,342.4 L68.8,343.3 L71.9,341.8 L75.0,336.4 L78.1,336.6 L81.2,330.2 L84.4,330.0 L87.5,328.8 L90.6,328.0 L93.8,326.5 L96.9,325.7 L100.0,323.2 L103.1,321.7 L106.2,318.3 L109.4,318.1 L112.5,293.1 L115.6,285.8 L118.8,282.5 L121.9,284.7 L125.0,288.2 L128.1,290.1 L131.2,295.7 L134.4,298.6 L137.5,302.0 L140.6,299.5 L143.8,296.2 L146.9,294.4 L150.0,281.3 L153.1,277.9 L156.2,278.1 L159.4,276.7 L162.5,275.3 L165.6,274.4 L168.8,259.8 L171.9,262.2 L175.0,267.6 L178.1,270.3 L181.2,259.9 L184.4,258.7 L187.5,259.7 L190.6,258.1 L193.8,257.0 L196.9,256.2 L200.0,237.3 L203.1,227.6 L206.2,225.2 L209.4,225.8 L212.5,227.4 L215.6,229.5 L218.8,232.0 L221.9,232.1 L225.0,235.3 L228.1,235.7 L231.2,238.6 L234.4,239.7 L237.5,240.8 L240.6,239.4 L243.8,234.8 L246.9,236.7 L250.0,238.8 L253.1,233.6 L256.2,235.8 L259.4,238.1 L262.5,237.5 L265.6,236.0 L268.8,235.1 L271.9,234.9 L275.0,233.8 L278.1,233.5 L281.2,226.0 L284.4,226.8 L287.5,218.0 L290.6,218.6 L293.8,220.9 L296.9,220.0 L300.0,219.6 L303.1,218.8 L306.2,217.3 L309.4,211.2 L312.5,210.4 L315.6,210.8 L318.8,195.2 L321.9,191.9 L325.0,192.4 L328.1,189.9 L331.2,186.3 L334.4,186.4 L337.5,187.8 L340.6,136.1 L343.8,120.8 L346.9,124.4 L350.0,125.4 L353.1,137.6 L356.2,147.1 L359.4,158.8 L362.5,164.3 L365.6,170.1 L368.8,169.9 L371.9,169.4 L375.0,166.7 L378.1,166.6 L381.2,165.5 L384.4,165.1 L387.5,165.0 L390.6,164.3 L393.8,164.0 L396.9,162.3 L400.0,162.8 L403.1,162.6 L406.2,160.4 L409.4,162.3 L412.5,161.4 L415.6,156.4 L418.8,156.2 L421.9,149.7 L425.0,148.7 L428.1,147.6 L431.2,146.9 L434.4,146.5 L437.5,139.2 L440.6,137.7 L443.8,137.9 L446.9,137.3 L450.0,136.6 L453.1,134.1 L456.2,134.4 L459.4,133.8 L462.5,132.1 L465.6,132.8 L468.8,130.9 L471.9,119.1 L475.0,118.7 L478.1,117.4 L481.2,115.0 L484.4,117.3 L487.5,115.9 L490.6,114.8 L493.8,115.8 L496.9,96.9 L500.0,102.7 L503.1,109.9 L506.2,113.8 L509.4,113.3 L512.5,111.7 L515.6,112.8 L518.8,111.7 L521.9,104.4 L525.0,97.1 L528.1,82.5 L531.2,81.6 L534.4,80.7 L537.5,78.1 L540.6,78.8 L543.8,80.4 L546.9,91.2 L550.0,97.1 L553.1,96.1 L556.2,95.5 L559.4,93.9 L562.5,94.3 L565.6,93.6 L568.8,93.5 L571.9,91.8 L575.0,92.6 L578.1,83.2 L581.2,87.1 L584.4,90.5 L587.5,90.0 L590.6,89.6 L593.8,15.0 L596.9,38.0 L600.0,57.5 L603.1,74.2 L606.2,80.7 L609.4,41.5 L612.5,42.0 L615.6,49.8 L618.8,54.1 L621.9,52.8 L625.0,36.0 L628.1,40.9 L631.2,47.0 L634.4,50.3 L637.5,28.7 L640.6,35.1 L643.8,42.9 L646.9,46.9 L650.0,45.7 L653.1,30.5 L656.2,38.7 L659.4,44.1 L662.5,31.6 L665.6,39.6 L668.8,44.5 L671.9,36.1 L675.0,35.1 L678.1,31.8 L681.2,23.0 L684.4,22.8 L687.5,25.2 L690.6,24.3 L693.8,23.3 L696.9,22.9 L700.0,22.6 L703.1,22.3 L706.2,22.1 L709.4,21.9 L712.5,14.2 L715.6,14.6 L718.8,15.7 L721.9,16.5 L725.0,16.3 L728.1,15.7 L731.2,9.9 L734.4,9.9 L737.5,10.6 L740.6,7.6 L743.8,7.4 L746.9,4.8 L750.0,4.8 L753.1,2.7 L756.2,3.6 L759.4,4.3 L762.5,3.7 L765.6,4.1 L768.8,3.8 L771.9,3.7 L775.0,3.4 L778.1,2.5 L781.2,2.7 L784.4,1.6 L787.5,1.7 L790.6,1.1 L793.8,0.9 L796.9,0.2 L800.0,0.0" fill="none" stroke="#64b5f6" stroke-width="2"/>
+          <path d="M0.0,380.0 L3.1,378.7 L6.2,377.3 L9.4,375.2 L12.5,373.7 L15.6,372.4 L18.8,370.0 L21.9,368.6 L25.0,367.5 L28.1,364.9 L31.2,364.0 L34.4,359.2 L37.5,359.1 L40.6,356.5 L43.8,342.7 L46.9,336.2 L50.0,335.6 L53.1,338.3 L56.2,340.4 L59.4,339.4 L62.5,342.6 L65.6,342.4 L68.8,343.3 L71.9,341.8 L75.0,336.4 L78.1,336.6 L81.2,330.2 L84.4,330.0 L87.5,328.8 L90.6,328.0 L93.8,326.5 L96.9,325.7 L100.0,323.2 L103.1,321.7 L106.2,318.3 L109.4,318.1 L112.5,293.1 L115.6,285.8 L118.8,282.5 L121.9,284.7 L125.0,288.2 L128.1,290.1 L131.2,295.7 L134.4,298.6 L137.5,302.0 L140.6,299.5 L143.8,296.2 L146.9,294.4 L150.0,281.3 L153.1,277.9 L156.2,278.1 L159.4,276.7 L162.5,275.3 L165.6,274.4 L168.8,259.8 L171.9,262.2 L175.0,267.6 L178.1,270.3 L181.2,259.9 L184.4,258.7 L187.5,259.7 L190.6,258.1 L193.8,257.0 L196.9,256.2 L200.0,237.3 L203.1,227.6 L206.2,225.2 L209.4,225.8 L212.5,227.4 L215.6,229.5 L218.8,232.0 L221.9,232.1 L225.0,235.3 L228.1,235.7 L231.2,238.6 L234.4,239.7 L237.5,240.8 L240.6,239.4 L243.8,234.8 L246.9,236.7 L250.0,238.8 L253.1,233.6 L256.2,235.8 L259.4,238.1 L262.5,237.5 L265.6,236.0 L268.8,235.1 L271.9,234.9 L275.0,233.8 L278.1,233.5 L281.2,226.0 L284.4,226.8 L287.5,218.0 L290.6,218.6 L293.8,220.9 L296.9,220.0 L300.0,219.6 L303.1,218.8 L306.2,217.3 L309.4,211.2 L312.5,210.4 L315.6,210.8 L318.8,195.2 L321.9,191.9 L325.0,192.4 L328.1,189.9 L331.2,186.3 L334.4,186.4 L337.5,187.8 L340.6,136.1 L343.8,120.8 L346.9,124.4 L350.0,125.4 L353.1,137.6 L356.2,147.1 L359.4,158.8 L362.5,164.3 L365.6,170.1 L368.8,169.9 L371.9,169.4 L375.0,166.7 L378.1,166.6 L381.2,165.5 L384.4,165.1 L387.5,165.0 L390.6,164.3 L393.8,164.0 L396.9,162.3 L400.0,162.8 L403.1,162.6 L406.2,160.4 L409.4,162.3 L412.5,161.4 L415.6,156.4 L418.8,156.2 L421.9,149.7 L425.0,148.7 L428.1,147.6 L431.2,146.9 L434.4,146.5 L437.5,139.2 L440.6,137.7 L443.8,137.9 L446.9,137.3 L450.0,136.6 L453.1,134.1 L456.2,134.4 L459.4,133.8 L462.5,132.1 L465.6,132.8 L468.8,130.9 L471.9,119.1 L475.0,118.7 L478.1,117.4 L481.2,115.0 L484.4,117.3 L487.5,115.9 L490.6,114.8 L493.8,115.8 L496.9,96.9 L500.0,102.7 L503.1,109.9 L506.2,113.8 L509.4,113.3 L512.5,111.7 L515.6,112.8 L518.8,111.7 L521.9,104.4 L525.0,97.1 L528.1,82.5 L531.2,81.6 L534.4,80.7 L537.5,78.1 L540.6,78.8 L543.8,80.4 L546.9,91.2 L550.0,97.1 L553.1,96.1 L556.2,95.5 L559.4,93.9 L562.5,94.3 L565.6,93.6 L568.8,93.5 L571.9,91.8 L575.0,92.6 L578.1,83.2 L581.2,87.1 L584.4,90.5 L587.5,90.0 L590.6,89.6 L593.8,15.0 L596.9,38.0 L600.0,57.5 L603.1,74.2 L606.2,80.7 L609.4,41.5 L612.5,42.0 L615.6,49.8 L618.8,54.1 L621.9,52.8 L625.0,36.0 L628.1,40.9 L631.2,47.0 L634.4,50.3 L637.5,28.7 L640.6,35.1 L643.8,42.9 L646.9,46.9 L650.0,45.7 L653.1,30.5 L656.2,38.7 L659.4,44.1 L662.5,31.6 L665.6,39.6 L668.8,44.5 L671.9,36.1 L675.0,35.1 L678.1,31.8 L681.2,23.0 L684.4,22.8 L687.5,25.2 L690.6,24.3 L693.8,23.3 L696.9,22.9 L700.0,22.6 L703.1,22.3 L706.2,22.1 L709.4,21.9 L712.5,14.2 L715.6,14.6 L718.8,15.7 L721.9,16.5 L725.0,16.3 L728.1,15.7 L731.2,9.9 L734.4,9.9 L737.5,10.6 L740.6,7.6 L743.8,7.4 L746.9,4.8 L750.0,4.8 L753.1,2.7 L756.2,3.6 L759.4,4.3 L762.5,3.7 L765.6,4.1 L768.8,3.8 L771.9,3.7 L775.0,3.4 L778.1,2.5 L781.2,2.7 L784.4,1.6 L787.5,1.7 L790.6,1.1 L793.8,0.9 L796.9,0.2 L800.0,0.0 L800.0,380.0 L0,380.0 Z" fill="url(#eqFill2)"/>
+        </svg>
+      </div>
+    </div></div>
+  <div id="perf-time" style="display:none">    <div class="card">
+      <h2><span class="icon">🕐</span> 交易時段分析</h2>
+      <table class="tbl">
+        <thead><tr><th>時段 (UTC)</th><th>筆數</th><th>盈虧</th></tr></thead>
+        <tbody><tr><td>00:00-01:00</td><td>12</td><td class="pos">+$94</td></tr>
+<tr><td>01:00-02:00</td><td>2</td><td class="pos">+$6</td></tr>
+<tr><td>03:00-04:00</td><td>3</td><td class="pos">+$6</td></tr>
+<tr><td>04:00-05:00</td><td>18</td><td class="pos">+$84</td></tr>
+<tr><td>05:00-06:00</td><td>10</td><td class="pos">+$105</td></tr>
+<tr><td>06:00-07:00</td><td>11</td><td class="pos">+$18</td></tr>
+<tr><td>07:00-08:00</td><td>8</td><td class="pos">+$56</td></tr>
+<tr><td>08:00-09:00</td><td>22</td><td class="pos">+$78</td></tr>
+<tr><td>09:00-10:00</td><td>6</td><td class="pos">+$18</td></tr>
+<tr><td>10:00-11:00</td><td>7</td><td class="pos">+$33</td></tr>
+<tr><td>11:00-12:00</td><td>11</td><td class="pos">+$34</td></tr>
+<tr><td>12:00-13:00</td><td>26</td><td class="pos">+$175</td></tr>
+<tr><td>13:00-14:00</td><td>3</td><td class="pos">+$6</td></tr>
+<tr><td>14:00-15:00</td><td>8</td><td class="pos">+$67</td></tr>
+<tr><td>15:00-16:00</td><td>25</td><td class="pos">+$90</td></tr>
+<tr><td>16:00-17:00</td><td>12</td><td class="pos">+$44</td></tr>
+<tr><td>17:00-18:00</td><td>20</td><td class="pos">+$104</td></tr>
+<tr><td>18:00-19:00</td><td>26</td><td class="pos">+$115</td></tr>
+<tr><td>19:00-20:00</td><td>2</td><td class="pos">+$6</td></tr>
+<tr><td>20:00-21:00</td><td>6</td><td class="pos">+$17</td></tr>
+<tr><td>21:00-22:00</td><td>10</td><td class="pos">+$42</td></tr>
+<tr><td>22:00-23:00</td><td>8</td><td class="pos">+$19</td></tr></tbody>
+      </table>
+    </div></div>
+  <div id="perf-hold" style="display:none">    <div class="card">
+      <h2><span class="icon">⏱️</span> 持倉時間分佈</h2>
+      <div class="bar-chart" style="height:240px">
+<div class="bar green" style="height:4%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">0</span></div>
+<div class="bar blue" style="height:4%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">7</span></div>
+<div class="bar gold" style="height:5%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">14</span></div>
+<div class="bar yellow" style="height:9%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">24</span></div>
+<div class="bar red" style="height:82%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">211</span></div>
+      </div>
+    </div></div>
+  <div id="perf-dir" style="display:none">    <div class="two-col">
+      <div class="card">
+        <h2>🟢 BUY 表現</h2>
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-box"><div class="v">120</div><div class="l">筆數</div></div>
+          <div class="stat-box"><div class="v pos">58.3%</div><div class="l">勝率</div></div>
+          <div class="stat-box"><div class="v pos">+$581</div><div class="l">總盈虧</div></div>
+          <div class="stat-box"><div class="v">$4.84</div><div class="l">平均/筆</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>🔴 SELL 表現</h2>
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-box"><div class="v">136</div><div class="l">筆數</div></div>
+          <div class="stat-box"><div class="v pos">70.6%</div><div class="l">勝率</div></div>
+          <div class="stat-box"><div class="v pos">+$631</div><div class="l">總盈虧</div></div>
+          <div class="stat-box"><div class="v">$4.64</div><div class="l">平均/筆</div></div>
+        </div>
+      </div>
+    </div></div>
+</div>
+<div class="panel" id="panel-risk">
+  <div class="risk-status low" style="margin-top:0">
+    <div class="ri">🟢</div>
+    <div>
+      <div class="rt">低風險 · 低風險</div>
+      <div class="rd">最大回撤 3.4% · 單筆最大虧損 $-74 · 建議關注 L3+ 層級風險</div>
+    </div>
+  </div>
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'risk-martin')">🎲 馬丁風險</button>
+    <button class="sub-tab" onclick="switchSub(this,'risk-layer')">📚 層數</button>
+    <button class="sub-tab" onclick="switchSub(this,'risk-vol')">📏 波幅</button>
+    <a href="martin_v4_40201.html" style="margin-left:auto;color:var(--acc);font-size:13px;font-weight:600;padding:8px 14px;white-space:nowrap">🔍 完整馬丁剖析法 V4 →</a>
+  </div>
+  <div id="risk-martin">    <div class="card">
+      <h2><span class="icon">🎲</span> 馬丁風險摘要</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v gold">1</div><div class="l">最大層數</div></div>
+        <div class="stat-box"><div class="v neg">+$74</div><div class="l">最大單筆虧損</div></div>
+        <div class="stat-box"><div class="v">Other</div><div class="l">策略類型</div></div>
+        <div class="stat-box"><div class="v pos">🟢</div><div class="l">破產風險</div></div>
+      </div>
+      <p style="color:var(--text2);font-size:.85em;margin-top:8px">此策略主要使用 1 層（Other），屬於低馬丁風險。大部分虧損可以快速恢復。</p>
+    </div>    <div class="card">
+      <h2><span class="icon">⚠️</span> 黑名單 / 高風險交易</h2>
+      <table class="tbl">
+        <thead><tr><th>時間</th><th>方向</th><th>手數</th><th>盈虧</th><th>持倉</th><th>備註</th></tr></thead>
+        <tbody><tr><td>09.30 12:57</td><td>BUY</td><td>0.16</td><td class="neg">$-73.61</td><td>7.7d</td><td><span class="badge yellow">長持倉虧損</span></td></tr>
+<tr><td>09.30 12:57</td><td>BUY</td><td>0.06</td><td class="neg">$-62.18</td><td>13.6d</td><td><span class="badge yellow">長持倉虧損</span></td></tr>
+<tr><td>09.30 12:57</td><td>BUY</td><td>0.03</td><td class="neg">$-53.07</td><td>13.9d</td><td><span class="badge yellow">長持倉虧損</span></td></tr>
+<tr><td>07.23 08:18</td><td>BUY</td><td>0.06</td><td class="neg">$-38.87</td><td>10.1d</td><td><span class="badge yellow">長持倉虧損</span></td></tr>
+<tr><td>07.23 08:18</td><td>BUY</td><td>0.03</td><td class="neg">$-37.22</td><td>13.6d</td><td><span class="badge yellow">長持倉虧損</span></td></tr></tbody>
+      </table>
+    </div></div>
+  <div id="risk-layer" style="display:none">    <div class="card">
+      <h2><span class="icon">📚</span> 層數分析</h2>
+      <table class="tbl">
+        <thead><tr><th>層</th><th>策略</th><th>筆數</th><th>勝率</th><th>盈虧</th><th>評級</th></tr></thead>
+        <tbody><tr><td>L1</td><td>Other</td><td>256</td><td class="pos">64.8%</td><td class="pos">+$1,212</td><td><span class="badge yellow">B</span></td></tr></tbody>
+      </table>
+    </div></div>
+  <div id="risk-vol" style="display:none">    <div class="card">
+      <h2><span class="icon">📏</span> 波幅分析</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v">$46.7</div><div class="l">平均盈利 Pips</div></div>
+        <div class="stat-box"><div class="v neg">$71.7</div><div class="l">平均虧損 Pips</div></div>
+        <div class="stat-box"><div class="v">1.19</div><div class="l">盈虧比</div></div>
+        <div class="stat-box"><div class="v">3.2d</div><div class="l">盈利平均持倉</div></div>
+        <div class="stat-box"><div class="v">11.0d</div><div class="l">虧損平均持倉</div></div>
+        <div class="stat-box"><div class="v">$2,225</div><div class="l">總盈利</div></div>
+        <div class="stat-box"><div class="v neg">-$1,013</div><div class="l">總虧損</div></div>
+        <div class="stat-box"><div class="v">3.4%</div><div class="l">最大回撤</div></div>
+      </div>
+    </div></div>
+</div>
+<div class="panel" id="panel-copy">
+  <div class="card grade-display">
+    <div class="grade-stars">⭐⭐</div>
+    <div class="grade-label" style="color:var(--acc)">推薦 COPY</div>
+    <div class="grade-desc">高勝率（64.8%）+ PF（2.20）+ 1層 + AUDUSD / EURAUD / EURCAD / EURNZD / GBPUSD</div>
+  </div>
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'copy-tpsl')">📐 TP/SL 建議</button>
+    <button class="sub-tab" onclick="switchSub(this,'copy-score')">🎯 評分詳情</button>
+    <button class="sub-tab" onclick="switchSub(this,'copy-sim')">💰 模擬</button>
+  </div>
+  <div id="copy-tpsl">  <div class="two-col">
+    <div class="card">
+      <h2><span class="icon">📐</span> TP/SL 建議</h2>
+      <table class="tbl">
+        <tbody>
+          <tr><td>🎯 建議止賺 (TP)</td><td class="gold">37-56 pips</td></tr>
+          <tr><td>🛡️ 軟止蝝 (Soft SL)</td><td class="neg">57-86 pips</td></tr>
+          <tr><td>🛡️ 硬止蝝 (Hard SL)</td><td class="neg">107-143 pips</td></tr>
+          <tr><td>📊 平均盈利</td><td class="pos">+$13.40/筆</td></tr>
+          <tr><td>📊 平均虧損</td><td class="neg">$-11.25/筆</td></tr>
+          <tr><td>⚖️ 盈虧比</td><td>1 : 1.19</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2><span class="icon">💰</span> 倉位建議</h2>
+      <table class="tbl">
+        <tbody>
+          <tr><td>💵 建議本金</td><td>$5,000+</td></tr>
+          <tr><td>📊 手數</td><td>0.01 標準</td></tr>
+          <tr><td>⚡ 最大同時持倉</td><td>3 個</td></tr>
+          <tr><td>🔮 預期月增長</td><td class="pos">4.01%</td></tr>
+          <tr><td>📉 預期最大回撤</td><td class="neg">10-3%</td></tr>
+          <tr><td>⏱️ 建議持倉時間</td><td>&lt; 285 小時</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div></div>
+  <div id="copy-score" style="display:none">    <div class="card">
+      <h2><span class="icon">🎯</span> 質量評分（5维度）· 總分 61.7/100</h2>
+      <table class="tbl">
+        <thead><tr><th>维度</th><th>評分</th><th>加權</th><th>得分</th><th>評級</th></tr></thead>
+        <tbody>
+          <tr><td>勝率</td><td>64.8%</td><td>25%</td><td class="pos">16.2</td><td><span class="badge green">A</span></td></tr>
+          <tr><td>盈虧比 (PF)</td><td>2.20</td><td>30%</td><td class="pos">22.0</td><td><span class="badge green">A</span></td></tr>
+          <tr><td>Risk/Reward</td><td>1 : 1.19</td><td>20%</td><td>15.9</td><td><span class="badge yellow">B</span></td></tr>
+          <tr><td>樣本量</td><td>256</td><td>15%</td><td class="pos">7.7</td><td><span class="badge red">C</span></td></tr>
+          <tr><td>持倉效率</td><td>6.0d</td><td>10%</td><td class="pos">0.0</td><td><span class="badge red">C</span></td></tr>
+        </tbody>
+      </table>
+    </div></div>
+  <div id="copy-sim" style="display:none">    <div class="card">
+      <h2><span class="icon">💰</span> Copy 模擬</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v">$1,000</div><div class="l">建議本金</div></div>
+        <div class="stat-box"><div class="v pos">+4.0%</div><div class="l">預期月增長</div></div>
+        <div class="stat-box"><div class="v">$1040</div><div class="l">1個月後</div></div>
+        <div class="stat-box"><div class="v">$1125</div><div class="l">3個月後</div></div>
+        <div class="stat-box"><div class="v">$1266</div><div class="l">6個月後</div></div>
+        <div class="stat-box"><div class="v">$1603</div><div class="l">12個月後</div></div>
+      </div>
+    </div></div>
+</div>
+<div class="panel" id="panel-data">
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'data-pos')">📌 倉位明細</button>
+    <button class="sub-tab" onclick="switchSub(this,'data-set')">⚙️ SET 參數</button>
+    <button class="sub-tab" onclick="switchSub(this,'data-raw')">📄 原始數據</button>
+  </div>
+  <div id="data-pos">    <div class="card">
+      <h2><span class="icon">📌</span> 最近 20 筆交易</h2>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>平倉時間</th><th>方向</th><th>手數</th><th>開倉價</th><th>平倉價</th><th>Pips</th><th>盈虧</th><th>持倉</th><th>Magic</th></tr></thead>
+        <tbody><tr><td>11.06 18:00</td><td>SELL</td><td>0.01</td><td>1.57311</td><td>1.57215</td><td class="pos">+9.6</td><td class="pos">+$0.68</td><td>30min</td><td>1</td></tr>
+<tr><td>11.06 14:20</td><td>SELL</td><td>0.01</td><td>1.57358</td><td>1.57052</td><td class="pos">+30.6</td><td class="pos">+$2.18</td><td>3.92h</td><td>1</td></tr>
+<tr><td>11.06 11:35</td><td>SELL</td><td>0.01</td><td>1.57344</td><td>1.57254</td><td class="pos">+9.0</td><td class="pos">+$0.64</td><td>1.17h</td><td>1</td></tr>
+<tr><td>11.06 09:35</td><td>SELL</td><td>0.01</td><td>1.57361</td><td>1.57077</td><td class="pos">+28.4</td><td class="pos">+$2.02</td><td>7.59h</td><td>1</td></tr>
+<tr><td>11.06 08:50</td><td>SELL</td><td>0.01</td><td>1.57086</td><td>1.57141</td><td class="neg">-5.5</td><td class="neg">$-0.42</td><td>15.01h</td><td>1</td></tr>
+<tr><td>11.06 08:50</td><td>SELL</td><td>0.03</td><td>1.57307</td><td>1.57138</td><td class="pos">+16.9</td><td class="pos">+$3.60</td><td>7.41h</td><td>1</td></tr>
+<tr><td>11.06 03:55</td><td>SELL</td><td>0.01</td><td>1.57077</td><td>1.57173</td><td class="neg">-9.6</td><td class="neg">$-0.71</td><td>10.09h</td><td>1</td></tr>
+<tr><td>11.06 03:55</td><td>SELL</td><td>0.03</td><td>1.57302</td><td>1.57172</td><td class="pos">+13.0</td><td class="pos">+$2.78</td><td>2.49h</td><td>1</td></tr>
+<tr><td>11.05 09:20</td><td>SELL</td><td>0.01</td><td>1.57109</td><td>1.56970</td><td class="pos">+13.9</td><td class="pos">+$1.00</td><td>3.59h</td><td>1</td></tr>
+<tr><td>11.05 09:15</td><td>SELL</td><td>0.01</td><td>1.57073</td><td>1.57017</td><td class="pos">+5.6</td><td class="pos">+$0.40</td><td>3.75h</td><td>1</td></tr>
+<tr><td>11.04 18:00</td><td>SELL</td><td>0.01</td><td>1.56914</td><td>1.56771</td><td class="pos">+14.3</td><td class="pos">+$1.03</td><td>16.16h</td><td>1</td></tr>
+<tr><td>11.04 17:00</td><td>SELL</td><td>0.01</td><td>1.56696</td><td>1.56898</td><td class="neg">-20.2</td><td class="neg">$-1.48</td><td>22.09h</td><td>1</td></tr>
+<tr><td>11.04 17:00</td><td>SELL</td><td>0.03</td><td>1.56994</td><td>1.56898</td><td class="pos">+9.6</td><td class="pos">+$2.07</td><td>14.65h</td><td>1</td></tr>
+<tr><td>11.04 08:26</td><td>SELL</td><td>0.01</td><td>1.56542</td><td>1.56858</td><td class="neg">-31.6</td><td class="neg">$-2.30</td><td>16.67h</td><td>1</td></tr>
+<tr><td>11.04 08:26</td><td>SELL</td><td>0.03</td><td>1.56727</td><td>1.56864</td><td class="neg">-13.7</td><td class="neg">$-3.03</td><td>11.52h</td><td>1</td></tr>
+<tr><td>11.04 08:26</td><td>SELL</td><td>0.06</td><td>1.57018</td><td>1.56861</td><td class="pos">+15.7</td><td class="pos">+$6.75</td><td>6.09h</td><td>1</td></tr>
+<tr><td>11.03 06:35</td><td>SELL</td><td>0.01</td><td>1.56427</td><td>1.56410</td><td class="pos">+1.7</td><td class="pos">+$0.08</td><td>21.50h</td><td>1</td></tr>
+<tr><td>11.03 06:35</td><td>SELL</td><td>0.03</td><td>1.56810</td><td>1.56410</td><td class="pos">+40.0</td><td class="pos">+$8.47</td><td>19.25h</td><td>1</td></tr>
+<tr><td>11.02 17:35</td><td>SELL</td><td>0.01</td><td>1.56436</td><td>1.56376</td><td class="pos">+6.0</td><td class="pos">+$0.43</td><td>8.41h</td><td>1</td></tr>
+<tr><td>11.02 17:35</td><td>SELL</td><td>0.03</td><td>1.56813</td><td>1.56372</td><td class="pos">+44.1</td><td class="pos">+$9.48</td><td>6.24h</td><td>1</td></tr></tbody>
+      </table>
+      </div>
+    </div></div>
+  <div id="data-set" style="display:none">    <div class="card">
+      <h2><span class="icon">⚙️</span> SET 參數</h2>
+      <table class="tbl">
+        <tbody>
+          <tr><td>Magic Number</td><td class="gold">1</td></tr>
+          <tr><td>策略類型</td><td>Dragon Wave AZ0, Dragon Wave AZ1, Dragon Wave AZ2, Dragon Wave AZ3, Dragon Wave AZ4, Dragon Wave BZ0, Dragon Wave BZ1, Dragon Wave BZ2, Dragon Wave BZ3, Dragon Wave CZ0, Dragon Wave CZ1, Dragon Wave CZ2, Dragon Wave CZ3</td></tr>
+          <tr><td>時間框架</td><td>Other</td></tr>
+          <tr><td>交易品種</td><td>AUDUSD / EURAUD / EURCAD / EURNZD / GBPUSD</td></tr>
+          <tr><td>初始本金</td><td>$5,000</td></tr>
+          <tr><td>總交易數</td><td>256 筆</td></tr>
+        </tbody>
+      </table>
+      <p style="color:var(--text2);font-size:.85em;margin-top:8px">⚠️ 完整 SET 參數需從 AlgoForest Settings tab 下載</p>
+    </div></div>
+  <div id="data-raw" style="display:none">    <div class="card">
+      <h2><span class="icon">📄</span> 原始數據</h2>
+      <p style="color:var(--text2);padding:20px 0;text-align:center">📥 <a href="../downloads/40201.csv">下載完整 CSV（256 筆）</a></p>
+    </div></div>
+</div>
+<script>
+function switchPanel(btn,id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+function switchSub(btn,id){
+  var parent=btn.closest('.panel');
+  var prefix=parent.id.replace('panel-','')+'-';
+  parent.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  parent.querySelectorAll('[id]').forEach(function(el){
+    if(el.id.startsWith(prefix)) el.style.display='none';
+  });
+  document.getElementById(id).style.display='block';
+}
+</script>
+</body>
+</html>
