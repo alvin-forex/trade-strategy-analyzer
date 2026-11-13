@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TSA v2 — Signal 31841 深度分析</title>
+<style>:root{
+  --bg:#0a0e17;--bg2:#0f1320;--card:#111520;--card-h:#161b2d;
+  --border:#1e2433;--border2:#2a3040;
+  --text:#e0e0e0;--text2:#8892a6;--text3:#5a6478;--white:#fff;
+  --pri:#FFD700;--acc:#64b5f6;--acc-dim:rgba(100,181,246,.12);
+  --green:#4CAF50;--green-bg:rgba(76,175,80,.12);
+  --red:#FF5252;--red-bg:rgba(255,82,82,.12);
+  --yellow:#FFC107;--yellow-bg:rgba(255,193,7,.12);
+  --orange:#FF9800;--orange-bg:rgba(255,152,0,.12);
+  --radius:12px;--radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  --mono:'SF Mono','Fira Code',Consolas,monospace;
+}
+[data-theme="light"]{
+  --bg:#f0f2f5;--bg2:#e4e7ec;--card:#ffffff;--card-h:#f0f2f5;
+  --border:#c4c9d0;--border2:#a8afb8;
+  --text:#0d1117;--text2:#3d4452;--text3:#6b7280;--white:#ffffff;
+  --pri:#1a3a6b;--acc:#c81e4a;--acc-dim:rgba(200,30,74,.1);
+  --green:#1a7d32;--green-bg:rgba(26,125,50,.1);
+  --red:#c41e3a;--red-bg:rgba(196,30,58,.1);
+  --yellow:#8a6d00;--yellow-bg:rgba(138,109,0,.12);
+  --orange:#fd7e14;--orange-bg:rgba(253,126,20,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;font-size:14px}
+a{color:var(--acc);text-decoration:none}
+.report-header{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.report-header h1{font-size:1.4em;color:var(--pri);font-weight:800}
+.report-header .sub{color:var(--text2);font-size:.85em;margin-top:2px}
+.report-header .meta{display:flex;gap:12px;flex-wrap:wrap}
+.report-header .meta span{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:.78em;color:var(--text2)}
+.report-header .meta span b{color:var(--text)}
+.main-nav{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-bottom:16px;position:sticky;top:8px;z-index:100;overflow-x:auto;-webkit-overflow-scrolling:touch;box-shadow:var(--shadow)}
+.main-nav::-webkit-scrollbar{height:0}
+.nav-tab{flex:1;min-width:90px;padding:10px 14px;border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:600;border-radius:var(--radius-sm);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.nav-tab:hover{background:var(--bg2);color:var(--text)}
+.nav-tab.active{background:var(--acc-dim);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(100,181,246,.3)}
+.sub-nav{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;align-items:center}
+.sub-nav::-webkit-scrollbar{height:0}
+.sub-tab{padding:8px 14px;border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;border-bottom:2px solid transparent}
+.sub-tab:hover{color:var(--text);background:var(--bg2)}
+.sub-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.card h2{font-size:1.05em;color:var(--white);margin-bottom:12px;display:flex;align-items:center;gap:8px;font-weight:700}
+.card h2 .icon{font-size:1.15em}
+.card h3{font-size:.95em;color:var(--text);margin-bottom:8px;font-weight:600}
+.hero-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.hero-stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 16px;text-align:center;position:relative;overflow:hidden}
+.hero-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.5}
+.hero-stat .val{font-size:28px;font-weight:800;letter-spacing:-1px}
+.hero-stat .val.pos{color:var(--green)}.hero-stat .val.neg{color:var(--red)}.hero-stat .val.gold{color:var(--pri)}
+.hero-stat .lbl{font-size:11px;color:var(--text2);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 10px;text-align:center;transition:all .2s}
+.stat-box:hover{border-color:var(--border2);background:var(--card-h)}
+.stat-box .v{font-size:18px;font-weight:700;color:var(--white)}
+.stat-box .v.pos{color:var(--green)}.stat-box .v.neg{color:var(--red)}.stat-box .v.gold{color:var(--pri)}
+.stat-box .l{font-size:11px;color:var(--text2);margin-top:2px}
+.risk-status{border-radius:var(--radius);padding:14px 20px;display:flex;align-items:center;gap:14px;border-left:4px solid;margin-bottom:16px}
+.risk-status.low{background:var(--green-bg);border-left-color:var(--green)}
+.risk-status.med{background:var(--yellow-bg);border-left-color:var(--yellow)}
+.risk-status.high{background:var(--red-bg);border-left-color:var(--red)}
+.risk-status .ri{font-size:22px}
+.risk-status .rt{font-size:16px;font-weight:700}
+.risk-status.low .rt{color:var(--green)}
+.risk-status.med .rt{color:var(--yellow)}
+.risk-status.high .rt{color:var(--red)}
+.risk-status .rd{color:var(--text2);font-size:.85em}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.tbl{width:100%;border-collapse:collapse;font-size:.85em}
+.tbl th{background:var(--bg2);color:var(--text2);padding:10px 12px;text-align:left;font-weight:600;border-bottom:1px solid var(--border);font-size:.8em;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+.tbl tr:hover td{background:var(--card-h)}
+.tbl .pos{color:var(--green);font-weight:600}
+.tbl .neg{color:var(--red);font-weight:600}
+.tbl .gold{color:var(--pri);font-weight:600}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75em;font-weight:700;letter-spacing:.5px}
+.badge.green{background:var(--green-bg);color:var(--green)}
+.badge.red{background:var(--red-bg);color:var(--red)}
+.badge.yellow{background:var(--yellow-bg);color:var(--yellow)}
+.badge.blue{background:var(--acc-dim);color:var(--acc)}
+.chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;position:relative}
+.equity-chart{width:100%;height:200px;display:block}
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:160px;padding:8px 0}
+.bar{flex:1;border-radius:3px 3px 0 0;min-height:4px;transition:opacity .2s;position:relative;cursor:default}
+.bar:hover{opacity:.8}
+.bar.green{background:linear-gradient(180deg,var(--green),rgba(76,175,80,.4))}
+.bar.red{background:linear-gradient(180deg,var(--red),rgba(255,82,82,.4))}
+.bar.blue{background:linear-gradient(180deg,var(--acc),rgba(100,181,246,.4))}
+.bar.gold{background:linear-gradient(180deg,var(--pri),rgba(255,215,0,.4))}
+.bar.yellow{background:linear-gradient(180deg,var(--yellow),rgba(255,193,7,.4))}
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+@media(max-width:768px){
+  .hero-row{grid-template-columns:1fr}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .two-col{grid-template-columns:1fr}
+  .nav-tab{min-width:70px;font-size:12px;padding:8px 10px}
+  .nav-tab .nav-text{display:none}
+  .report-header{flex-direction:column;align-items:flex-start}
+}
+.grade-display{text-align:center;padding:20px}
+.grade-stars{font-size:36px;letter-spacing:4px}
+.grade-label{font-size:14px;font-weight:700;margin-top:8px;text-transform:uppercase;letter-spacing:2px}
+.grade-desc{font-size:.85em;color:var(--text2);margin-top:4px}
+.mini-stat{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border)}
+.mini-stat .ms-v{font-weight:700;color:var(--white)}
+.mini-stat .ms-l{font-size:.75em;color:var(--text2)}</style>
+</head>
+<body>
+<div class="report-header">
+  <div>
+    <h1>📊 Signal 31841 深度分析</h1>
+    <div class="sub">Svr2-7-9 SMAPv5 · AUDCAD/AUDCHF/AUDJPY/AUDNZD/AUDUSD/CADCHF/CADJPY/CHFJPY/EURAUD/EURCAD/EURCHF/EURGBP/EURJPY/EURNZD/EURUSD/GBPAUD/GBPCAD/GBPCHF/GBPJPY/GBPNZD/GBPUSD/NZDCAD/NZDCHF/NZDJPY/NZDUSD/USDCAD/USDCHF/USDJPY</div>
+  </div>
+  <div class="meta">
+    <span>📅 <b>2026.02.11 – 2026.10.19</b></span>
+    <span>🔄 <b>424 筆交易</b></span>
+    <span>⏱ <b>36 週</b></span>
+  </div>
+</div>
+<div class="main-nav">
+  <button class="nav-tab active" onclick="switchPanel(this,'dash')">📊 <span class="nav-text">儀表板</span></button>
+  <button class="nav-tab" onclick="switchPanel(this,'perf')">📈 <span class="nav-text">表現分析</span></button>
+  <button class="nav-tab" onclick="switchPanel(this,'risk')">⚠️ <span class="nav-text">風險評估</span></button>
+  <button class="nav-tab" onclick="switchPanel(this,'copy')">💡 <span class="nav-text">Copy 決策</span></button>
+  <button class="nav-tab" onclick="switchPanel(this,'data')">📌 <span class="nav-text">數據明細</span></button>
+</div>
+<div class="panel active" id="panel-dash">
+<div class="hero-row">
+    <div class="hero-stat">
+      <div class="val gold">⭐⭐</div>
+      <div class="lbl">Copy 評級 · 推薦 COPY</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val pos">58.5%</div>
+      <div class="lbl">勝率（248W / 176L）</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val pos">+$4,497</div>
+      <div class="lbl">總盈利 USD</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2><span class="icon">📈</span> 收益曲線</h2>
+    <div class="chart-box">
+      <svg class="equity-chart" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#64b5f6" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#64b5f6" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="50" x2="800" y2="50" stroke="#1a1f2e" stroke-width="1"/>
+        <line x1="0" y1="100" x2="800" y2="100" stroke="#1a1f2e" stroke-width="1"/>
+        <line x1="0" y1="150" x2="800" y2="150" stroke="#1a1f2e" stroke-width="1"/>
+        <path d="M0.0,200.0 L1.9,199.7 L3.8,199.3 L5.7,199.2 L7.5,199.0 L9.4,198.8 L11.3,198.6 L13.2,191.1 L15.1,191.1 L17.0,191.2 L18.9,191.2 L20.8,188.9 L22.6,188.3 L24.5,189.5 L26.4,189.9 L28.3,190.0 L30.2,189.8 L32.1,189.7 L34.0,189.9 L35.8,188.7 L37.7,187.2 L39.6,184.6 L41.5,182.9 L43.4,183.0 L45.3,183.0 L47.2,180.3 L49.1,177.4 L50.9,169.1 L52.8,168.0 L54.7,168.2 L56.6,168.5 L58.5,169.7 L60.4,174.4 L62.3,173.9 L64.2,174.8 L66.0,172.2 L67.9,170.5 L69.8,168.9 L71.7,165.4 L73.6,166.6 L75.5,168.1 L77.4,167.5 L79.2,167.6 L81.1,166.9 L83.0,164.6 L84.9,162.8 L86.8,147.8 L88.7,146.2 L90.6,141.2 L92.5,141.8 L94.3,140.6 L96.2,142.5 L98.1,144.8 L100.0,154.2 L101.9,157.8 L103.8,158.2 L105.7,155.3 L107.5,156.2 L109.4,153.3 L111.3,150.9 L113.2,157.3 L115.1,144.3 L117.0,142.5 L118.9,141.2 L120.8,142.3 L122.6,136.2 L124.5,138.9 L126.4,138.8 L128.3,140.0 L130.2,141.5 L132.1,144.8 L134.0,143.5 L135.8,144.4 L137.7,146.1 L139.6,147.1 L141.5,145.5 L143.4,142.8 L145.3,141.1 L147.2,140.9 L149.1,139.9 L150.9,139.0 L152.8,136.6 L154.7,134.0 L156.6,131.6 L158.5,130.0 L160.4,126.7 L162.3,130.7 L164.2,131.9 L166.0,133.3 L167.9,133.2 L169.8,136.6 L171.7,123.5 L173.6,118.3 L175.5,120.3 L177.4,120.1 L179.2,118.0 L181.1,118.1 L183.0,118.6 L184.9,118.2 L186.8,119.7 L188.7,125.5 L190.6,122.3 L192.5,122.5 L194.3,123.1 L196.2,124.5 L198.1,130.9 L200.0,128.5 L201.9,126.8 L203.8,125.0 L205.7,122.6 L207.5,123.7 L209.4,122.5 L211.3,121.6 L213.2,122.5 L215.1,122.6 L217.0,120.8 L218.9,118.9 L220.8,119.1 L222.6,120.0 L224.5,111.8 L226.4,111.1 L228.3,112.3 L230.2,112.0 L232.1,111.8 L234.0,113.8 L235.8,111.4 L237.7,109.7 L239.6,107.1 L241.5,104.6 L243.4,103.1 L245.3,99.4 L247.2,99.2 L249.1,99.3 L250.9,97.9 L252.8,102.8 L254.7,94.9 L256.6,94.8 L258.5,94.8 L260.4,95.0 L262.3,95.2 L264.2,100.8 L266.0,105.2 L267.9,104.3 L269.8,106.2 L271.7,104.5 L273.6,104.0 L275.5,101.0 L277.4,88.4 L279.2,87.1 L281.1,86.4 L283.0,86.4 L284.9,86.6 L286.8,89.5 L288.7,87.8 L290.6,86.1 L292.5,83.6 L294.3,82.0 L296.2,81.4 L298.1,79.6 L300.0,77.1 L301.9,75.6 L303.8,82.2 L305.7,69.5 L307.5,67.6 L309.4,68.4 L311.3,66.5 L313.2,66.7 L315.1,71.1 L317.0,70.2 L318.9,69.6 L320.8,71.4 L322.6,71.0 L324.5,73.8 L326.4,71.3 L328.3,73.6 L330.2,74.7 L332.1,74.0 L334.0,67.2 L335.8,63.1 L337.7,64.2 L339.6,63.8 L341.5,63.8 L343.4,65.1 L345.3,64.9 L347.2,63.2 L349.1,62.5 L350.9,60.0 L352.8,51.7 L354.7,50.4 L356.6,52.7 L358.5,51.4 L360.4,50.6 L362.3,50.8 L364.2,53.7 L366.0,54.5 L367.9,56.9 L369.8,55.2 L371.7,52.5 L373.6,49.5 L375.5,47.0 L377.4,45.6 L379.2,38.6 L381.1,34.7 L383.0,34.5 L384.9,34.6 L386.8,35.6 L388.7,35.8 L390.6,39.4 L392.5,38.2 L394.3,39.8 L396.2,40.1 L398.1,37.3 L400.0,38.6 L401.9,38.0 L403.8,36.8 L405.7,43.8 L407.5,45.9 L409.4,57.2 L411.3,71.2 L413.2,74.4 L415.1,78.1 L417.0,83.6 L418.9,81.1 L420.8,79.5 L422.6,78.8 L424.5,77.1 L426.4,74.1 L428.3,73.4 L430.2,73.3 L432.1,73.6 L434.0,75.4 L435.8,75.6 L437.7,63.1 L439.6,65.7 L441.5,70.4 L443.4,72.5 L445.3,75.0 L447.2,79.3 L449.1,73.1 L450.9,72.9 L452.8,72.7 L454.7,72.8 L456.6,74.3 L458.5,71.7 L460.4,70.0 L462.3,67.5 L464.2,67.7 L466.0,61.2 L467.9,60.3 L469.8,59.8 L471.7,60.5 L473.6,62.7 L475.5,63.1 L477.4,63.1 L479.2,63.6 L481.1,61.9 L483.0,59.2 L484.9,57.4 L486.8,58.6 L488.7,60.9 L490.6,54.3 L492.5,54.3 L494.3,54.6 L496.2,56.1 L498.1,55.9 L500.0,55.3 L501.9,54.0 L503.8,53.7 L505.7,55.8 L507.5,54.1 L509.4,51.7 L511.3,49.6 L513.2,49.6 L515.1,47.1 L517.0,44.2 L518.9,41.5 L520.8,41.4 L522.6,41.6 L524.5,40.8 L526.4,42.6 L528.3,38.5 L530.2,39.6 L532.1,39.3 L534.0,39.3 L535.8,41.2 L537.7,38.7 L539.6,38.3 L541.5,37.2 L543.4,35.9 L545.3,34.2 L547.2,40.2 L549.1,47.7 L550.9,57.6 L552.8,60.1 L554.7,58.2 L556.6,63.7 L558.5,62.1 L560.4,64.1 L562.3,68.0 L564.2,72.7 L566.0,78.4 L567.9,84.5 L569.8,82.1 L571.7,81.3 L573.6,78.9 L575.5,76.5 L577.4,76.9 L579.2,76.3 L581.1,74.9 L583.0,76.4 L584.9,72.8 L586.8,69.9 L588.7,68.9 L590.6,68.2 L592.5,69.0 L594.3,59.7 L596.2,59.2 L598.1,57.5 L600.0,55.8 L601.9,55.9 L603.8,57.4 L605.7,55.9 L607.5,56.2 L609.4,48.2 L611.3,45.6 L613.2,49.8 L615.1,49.9 L617.0,50.2 L618.9,52.5 L620.8,46.3 L622.6,46.6 L624.5,47.5 L626.4,49.7 L628.3,60.0 L630.2,58.4 L632.1,56.6 L634.0,57.0 L635.8,54.9 L637.7,53.2 L639.6,50.1 L641.5,48.3 L643.4,46.6 L645.3,43.7 L647.2,41.9 L649.1,38.8 L650.9,26.1 L652.8,25.1 L654.7,27.7 L656.6,29.4 L658.5,32.0 L660.4,40.0 L662.3,41.4 L664.2,42.7 L666.0,44.8 L667.9,43.6 L669.8,47.4 L671.7,50.9 L673.6,47.8 L675.5,45.3 L677.4,42.5 L679.2,42.4 L681.1,42.8 L683.0,43.5 L684.9,43.1 L686.8,40.9 L688.7,38.4 L690.6,36.6 L692.5,34.9 L694.3,32.4 L696.2,33.5 L698.1,31.3 L700.0,29.4 L701.9,29.0 L703.8,28.7 L705.7,29.1 L707.5,28.8 L709.4,27.5 L711.3,27.7 L713.2,31.1 L715.1,33.0 L717.0,32.0 L718.9,34.7 L720.8,33.0 L722.6,31.2 L724.5,28.8 L726.4,28.5 L728.3,26.5 L730.2,24.6 L732.1,18.4 L734.0,15.3 L735.8,15.1 L737.7,15.4 L739.6,15.1 L741.5,15.2 L743.4,18.4 L745.3,18.2 L747.2,19.8 L749.1,20.1 L750.9,20.8 L752.8,20.7 L754.7,22.4 L756.6,23.5 L758.5,26.1 L760.4,24.4 L762.3,21.7 L764.2,19.1 L766.0,19.4 L767.9,18.8 L769.8,19.5 L771.7,19.7 L773.6,18.0 L775.5,16.3 L777.4,14.5 L779.2,9.9 L781.1,7.6 L783.0,5.1 L784.9,5.3 L786.8,0.1 L788.7,0.0 L790.6,1.7 L792.5,2.5 L794.3,2.3 L796.2,2.9 L798.1,6.2 L800.0,4.5" fill="none" stroke="#64b5f6" stroke-width="2"/>
+        <path d="M0.0,200.0 L1.9,199.7 L3.8,199.3 L5.7,199.2 L7.5,199.0 L9.4,198.8 L11.3,198.6 L13.2,191.1 L15.1,191.1 L17.0,191.2 L18.9,191.2 L20.8,188.9 L22.6,188.3 L24.5,189.5 L26.4,189.9 L28.3,190.0 L30.2,189.8 L32.1,189.7 L34.0,189.9 L35.8,188.7 L37.7,187.2 L39.6,184.6 L41.5,182.9 L43.4,183.0 L45.3,183.0 L47.2,180.3 L49.1,177.4 L50.9,169.1 L52.8,168.0 L54.7,168.2 L56.6,168.5 L58.5,169.7 L60.4,174.4 L62.3,173.9 L64.2,174.8 L66.0,172.2 L67.9,170.5 L69.8,168.9 L71.7,165.4 L73.6,166.6 L75.5,168.1 L77.4,167.5 L79.2,167.6 L81.1,166.9 L83.0,164.6 L84.9,162.8 L86.8,147.8 L88.7,146.2 L90.6,141.2 L92.5,141.8 L94.3,140.6 L96.2,142.5 L98.1,144.8 L100.0,154.2 L101.9,157.8 L103.8,158.2 L105.7,155.3 L107.5,156.2 L109.4,153.3 L111.3,150.9 L113.2,157.3 L115.1,144.3 L117.0,142.5 L118.9,141.2 L120.8,142.3 L122.6,136.2 L124.5,138.9 L126.4,138.8 L128.3,140.0 L130.2,141.5 L132.1,144.8 L134.0,143.5 L135.8,144.4 L137.7,146.1 L139.6,147.1 L141.5,145.5 L143.4,142.8 L145.3,141.1 L147.2,140.9 L149.1,139.9 L150.9,139.0 L152.8,136.6 L154.7,134.0 L156.6,131.6 L158.5,130.0 L160.4,126.7 L162.3,130.7 L164.2,131.9 L166.0,133.3 L167.9,133.2 L169.8,136.6 L171.7,123.5 L173.6,118.3 L175.5,120.3 L177.4,120.1 L179.2,118.0 L181.1,118.1 L183.0,118.6 L184.9,118.2 L186.8,119.7 L188.7,125.5 L190.6,122.3 L192.5,122.5 L194.3,123.1 L196.2,124.5 L198.1,130.9 L200.0,128.5 L201.9,126.8 L203.8,125.0 L205.7,122.6 L207.5,123.7 L209.4,122.5 L211.3,121.6 L213.2,122.5 L215.1,122.6 L217.0,120.8 L218.9,118.9 L220.8,119.1 L222.6,120.0 L224.5,111.8 L226.4,111.1 L228.3,112.3 L230.2,112.0 L232.1,111.8 L234.0,113.8 L235.8,111.4 L237.7,109.7 L239.6,107.1 L241.5,104.6 L243.4,103.1 L245.3,99.4 L247.2,99.2 L249.1,99.3 L250.9,97.9 L252.8,102.8 L254.7,94.9 L256.6,94.8 L258.5,94.8 L260.4,95.0 L262.3,95.2 L264.2,100.8 L266.0,105.2 L267.9,104.3 L269.8,106.2 L271.7,104.5 L273.6,104.0 L275.5,101.0 L277.4,88.4 L279.2,87.1 L281.1,86.4 L283.0,86.4 L284.9,86.6 L286.8,89.5 L288.7,87.8 L290.6,86.1 L292.5,83.6 L294.3,82.0 L296.2,81.4 L298.1,79.6 L300.0,77.1 L301.9,75.6 L303.8,82.2 L305.7,69.5 L307.5,67.6 L309.4,68.4 L311.3,66.5 L313.2,66.7 L315.1,71.1 L317.0,70.2 L318.9,69.6 L320.8,71.4 L322.6,71.0 L324.5,73.8 L326.4,71.3 L328.3,73.6 L330.2,74.7 L332.1,74.0 L334.0,67.2 L335.8,63.1 L337.7,64.2 L339.6,63.8 L341.5,63.8 L343.4,65.1 L345.3,64.9 L347.2,63.2 L349.1,62.5 L350.9,60.0 L352.8,51.7 L354.7,50.4 L356.6,52.7 L358.5,51.4 L360.4,50.6 L362.3,50.8 L364.2,53.7 L366.0,54.5 L367.9,56.9 L369.8,55.2 L371.7,52.5 L373.6,49.5 L375.5,47.0 L377.4,45.6 L379.2,38.6 L381.1,34.7 L383.0,34.5 L384.9,34.6 L386.8,35.6 L388.7,35.8 L390.6,39.4 L392.5,38.2 L394.3,39.8 L396.2,40.1 L398.1,37.3 L400.0,38.6 L401.9,38.0 L403.8,36.8 L405.7,43.8 L407.5,45.9 L409.4,57.2 L411.3,71.2 L413.2,74.4 L415.1,78.1 L417.0,83.6 L418.9,81.1 L420.8,79.5 L422.6,78.8 L424.5,77.1 L426.4,74.1 L428.3,73.4 L430.2,73.3 L432.1,73.6 L434.0,75.4 L435.8,75.6 L437.7,63.1 L439.6,65.7 L441.5,70.4 L443.4,72.5 L445.3,75.0 L447.2,79.3 L449.1,73.1 L450.9,72.9 L452.8,72.7 L454.7,72.8 L456.6,74.3 L458.5,71.7 L460.4,70.0 L462.3,67.5 L464.2,67.7 L466.0,61.2 L467.9,60.3 L469.8,59.8 L471.7,60.5 L473.6,62.7 L475.5,63.1 L477.4,63.1 L479.2,63.6 L481.1,61.9 L483.0,59.2 L484.9,57.4 L486.8,58.6 L488.7,60.9 L490.6,54.3 L492.5,54.3 L494.3,54.6 L496.2,56.1 L498.1,55.9 L500.0,55.3 L501.9,54.0 L503.8,53.7 L505.7,55.8 L507.5,54.1 L509.4,51.7 L511.3,49.6 L513.2,49.6 L515.1,47.1 L517.0,44.2 L518.9,41.5 L520.8,41.4 L522.6,41.6 L524.5,40.8 L526.4,42.6 L528.3,38.5 L530.2,39.6 L532.1,39.3 L534.0,39.3 L535.8,41.2 L537.7,38.7 L539.6,38.3 L541.5,37.2 L543.4,35.9 L545.3,34.2 L547.2,40.2 L549.1,47.7 L550.9,57.6 L552.8,60.1 L554.7,58.2 L556.6,63.7 L558.5,62.1 L560.4,64.1 L562.3,68.0 L564.2,72.7 L566.0,78.4 L567.9,84.5 L569.8,82.1 L571.7,81.3 L573.6,78.9 L575.5,76.5 L577.4,76.9 L579.2,76.3 L581.1,74.9 L583.0,76.4 L584.9,72.8 L586.8,69.9 L588.7,68.9 L590.6,68.2 L592.5,69.0 L594.3,59.7 L596.2,59.2 L598.1,57.5 L600.0,55.8 L601.9,55.9 L603.8,57.4 L605.7,55.9 L607.5,56.2 L609.4,48.2 L611.3,45.6 L613.2,49.8 L615.1,49.9 L617.0,50.2 L618.9,52.5 L620.8,46.3 L622.6,46.6 L624.5,47.5 L626.4,49.7 L628.3,60.0 L630.2,58.4 L632.1,56.6 L634.0,57.0 L635.8,54.9 L637.7,53.2 L639.6,50.1 L641.5,48.3 L643.4,46.6 L645.3,43.7 L647.2,41.9 L649.1,38.8 L650.9,26.1 L652.8,25.1 L654.7,27.7 L656.6,29.4 L658.5,32.0 L660.4,40.0 L662.3,41.4 L664.2,42.7 L666.0,44.8 L667.9,43.6 L669.8,47.4 L671.7,50.9 L673.6,47.8 L675.5,45.3 L677.4,42.5 L679.2,42.4 L681.1,42.8 L683.0,43.5 L684.9,43.1 L686.8,40.9 L688.7,38.4 L690.6,36.6 L692.5,34.9 L694.3,32.4 L696.2,33.5 L698.1,31.3 L700.0,29.4 L701.9,29.0 L703.8,28.7 L705.7,29.1 L707.5,28.8 L709.4,27.5 L711.3,27.7 L713.2,31.1 L715.1,33.0 L717.0,32.0 L718.9,34.7 L720.8,33.0 L722.6,31.2 L724.5,28.8 L726.4,28.5 L728.3,26.5 L730.2,24.6 L732.1,18.4 L734.0,15.3 L735.8,15.1 L737.7,15.4 L739.6,15.1 L741.5,15.2 L743.4,18.4 L745.3,18.2 L747.2,19.8 L749.1,20.1 L750.9,20.8 L752.8,20.7 L754.7,22.4 L756.6,23.5 L758.5,26.1 L760.4,24.4 L762.3,21.7 L764.2,19.1 L766.0,19.4 L767.9,18.8 L769.8,19.5 L771.7,19.7 L773.6,18.0 L775.5,16.3 L777.4,14.5 L779.2,9.9 L781.1,7.6 L783.0,5.1 L784.9,5.3 L786.8,0.1 L788.7,0.0 L790.6,1.7 L792.5,2.5 L794.3,2.3 L796.2,2.9 L798.1,6.2 L800.0,4.5 L800.0,200.0 L0,200.0 Z" fill="url(#eqFill)"/>
+      </svg>
+    </div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="v gold">1.54</div><div class="l">盈虧比 (PF)</div></div>
+    <div class="stat-box"><div class="v neg">8.4%</div><div class="l">最大回撤</div></div>
+    <div class="stat-box"><div class="v">+$346</div><div class="l">最大單筆盈利</div></div>
+    <div class="stat-box"><div class="v neg">$-323</div><div class="l">最大單筆虧損</div></div>
+    <div class="stat-box"><div class="v">45.0%</div><div class="l">總增長率</div></div>
+    <div class="stat-box"><div class="v">3.1d</div><div class="l">平均持倉時間</div></div>
+    <div class="stat-box"><div class="v gold">1</div><div class="l">交易層數</div></div>
+    <div class="stat-box"><div class="v">$14,497</div><div class="l">最終權益</div></div>
+  </div>
+  <div class="risk-status low">
+    <div class="ri">🟢</div>
+    <div>
+      <div class="rt">低風險 · 低風險</div>
+      <div class="rd">最大回撤 8.4% · 最大層數 L1 · 單筆最大虧損 $-323</div>
+    </div>
+    <a href="martin_v4_31841.html" style="margin-left:auto;background:var(--acc-dim);color:var(--acc);padding:8px 16px;border-radius:8px;font-weight:700;font-size:.85em;white-space:nowrap;border:1px solid var(--acc)">🔍 馬丁剖析法 V4 →</a>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h2><span class="icon">💰</span> 方向表現</h2>
+      <table class="tbl">
+        <thead><tr><th>方向</th><th>筆數</th><th>勝率</th><th>盈虧</th></tr></thead>
+        <tbody>
+          <tr><td>🟢 BUY</td><td>223</td><td class="pos">57.8%</td><td class="pos">+$1,106</td></tr>
+          <tr><td>🔴 SELL</td><td>201</td><td class="pos">59.2%</td><td class="pos">+$3,391</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2><span class="icon">📚</span> 層數分析</h2>
+      <table class="tbl">
+        <thead><tr><th>層</th><th>筆數</th><th>勝率</th><th>盈虧</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge blue">Other</span></td><td>424</td><td class="pos">58.5%</td><td class="pos">+$4,497</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h2><span class="icon">⏱️</span> 持倉時間分佈</h2>
+    <div class="bar-chart">
+<div class="bar green" style="height:4%" title="<15min: 4筆 (1%)"></div>
+<div class="bar blue" style="height:4%" title="15-60min: 6筆 (1%)"></div>
+<div class="bar gold" style="height:8%" title="1-4hr: 34筆 (8%)"></div>
+<div class="bar yellow" style="height:10%" title="4-12hr: 44筆 (10%)"></div>
+<div class="bar red" style="height:79%" title="12hr+: 336筆 (79%)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.75em;color:var(--text2);margin-top:6px">
+      <span><15min (1%)</span>
+<span>15-60min (1%)</span>
+<span>1-4hr (8%)</span>
+<span>4-12hr (10%)</span>
+<span>12hr+ (79%)</span>
+    </div>
+  </div>
+</div>
+<div class="panel" id="panel-perf">
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'perf-equity')">📈 收益曲線</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-time')">🕐 時段分析</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-hold')">⏱️ 持倉時間</button>
+    <button class="sub-tab" onclick="switchSub(this,'perf-dir')">↔️ 方向分析</button>
+  </div>
+  <div id="perf-equity">    <div class="card">
+      <h2><span class="icon">📈</span> 完整收益曲線</h2>
+      <div class="chart-box" style="height:400px">
+        <svg style="display:block" width="100%" height="380" viewBox="0 0 800 380" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="eqFill2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#64b5f6" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#64b5f6" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <g stroke="#1a1f2e" stroke-width="1">
+            <line x1="0" y1="0" x2="800" y2="0" stroke="#1a1f2e" stroke-width="1"/>
+<line x1="0" y1="95" x2="800" y2="95" stroke="#1a1f2e" stroke-width="1"/>
+<line x1="0" y1="190" x2="800" y2="190" stroke="#1a1f2e" stroke-width="1"/>
+<line x1="0" y1="285" x2="800" y2="285" stroke="#1a1f2e" stroke-width="1"/>
+<line x1="0" y1="380" x2="800" y2="380" stroke="#1a1f2e" stroke-width="1"/>
+          </g>
+          <g fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">
+            <text x="8" y="16" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$14.6K</text>
+<text x="8" y="111" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$13.4K</text>
+<text x="8" y="206" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$12.3K</text>
+<text x="8" y="301" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$11.1K</text>
+<text x="8" y="376" fill="#8892a6" font-size="12" font-family="-apple-system,sans-serif" font-weight="600" text-rendering="optimizeLegibility">$10.0K</text>
+          </g>
+          <path d="M0.0,380.0 L1.9,379.4 L3.8,378.7 L5.7,378.4 L7.5,378.1 L9.4,377.7 L11.3,377.3 L13.2,363.1 L15.1,363.0 L17.0,363.2 L18.9,363.3 L20.8,358.9 L22.6,357.8 L24.5,360.0 L26.4,360.9 L28.3,361.0 L30.2,360.7 L32.1,360.4 L34.0,360.8 L35.8,358.6 L37.7,355.7 L39.6,350.7 L41.5,347.6 L43.4,347.7 L45.3,347.6 L47.2,342.6 L49.1,337.1 L50.9,321.2 L52.8,319.2 L54.7,319.5 L56.6,320.1 L58.5,322.5 L60.4,331.4 L62.3,330.5 L64.2,332.1 L66.0,327.2 L67.9,323.9 L69.8,320.8 L71.7,314.2 L73.6,316.6 L75.5,319.4 L77.4,318.2 L79.2,318.5 L81.1,317.2 L83.0,312.7 L84.9,309.4 L86.8,280.8 L88.7,277.8 L90.6,268.4 L92.5,269.4 L94.3,267.1 L96.2,270.7 L98.1,275.1 L100.0,293.1 L101.9,299.9 L103.8,300.6 L105.7,295.1 L107.5,296.7 L109.4,291.2 L111.3,286.7 L113.2,298.9 L115.1,274.2 L117.0,270.7 L118.9,268.3 L120.8,270.3 L122.6,258.8 L124.5,263.9 L126.4,263.7 L128.3,266.1 L130.2,268.9 L132.1,275.2 L134.0,272.7 L135.8,274.3 L137.7,277.5 L139.6,279.5 L141.5,276.5 L143.4,271.4 L145.3,268.1 L147.2,267.8 L149.1,265.9 L150.9,264.0 L152.8,259.5 L154.7,254.7 L156.6,250.1 L158.5,247.0 L160.4,240.8 L162.3,248.3 L164.2,250.5 L166.0,253.3 L167.9,253.0 L169.8,259.5 L171.7,234.6 L173.6,224.7 L175.5,228.6 L177.4,228.2 L179.2,224.2 L181.1,224.4 L183.0,225.3 L184.9,224.6 L186.8,227.4 L188.7,238.5 L190.6,232.3 L192.5,232.8 L194.3,233.9 L196.2,236.6 L198.1,248.8 L200.0,244.2 L201.9,241.0 L203.8,237.4 L205.7,232.9 L207.5,235.0 L209.4,232.8 L211.3,231.1 L213.2,232.8 L215.1,232.9 L217.0,229.6 L218.9,225.9 L220.8,226.3 L222.6,228.0 L224.5,212.5 L226.4,211.1 L228.3,213.4 L230.2,212.8 L232.1,212.4 L234.0,216.2 L235.8,211.6 L237.7,208.4 L239.6,203.5 L241.5,198.8 L243.4,195.9 L245.3,188.8 L247.2,188.5 L249.1,188.7 L250.9,186.1 L252.8,195.4 L254.7,180.3 L256.6,180.1 L258.5,180.2 L260.4,180.5 L262.3,181.0 L264.2,191.5 L266.0,200.0 L267.9,198.1 L269.8,201.9 L271.7,198.6 L273.6,197.6 L275.5,191.9 L277.4,167.9 L279.2,165.5 L281.1,164.2 L283.0,164.1 L284.9,164.6 L286.8,170.1 L288.7,166.8 L290.6,163.5 L292.5,158.9 L294.3,155.8 L296.2,154.6 L298.1,151.3 L300.0,146.6 L301.9,143.6 L303.8,156.1 L305.7,132.0 L307.5,128.3 L309.4,129.9 L311.3,126.3 L313.2,126.7 L315.1,135.2 L317.0,133.3 L318.9,132.2 L320.8,135.6 L322.6,135.0 L324.5,140.3 L326.4,135.5 L328.3,139.8 L330.2,141.9 L332.1,140.6 L334.0,127.7 L335.8,119.8 L337.7,121.9 L339.6,121.2 L341.5,121.2 L343.4,123.6 L345.3,123.3 L347.2,120.0 L349.1,118.8 L350.9,114.1 L352.8,98.2 L354.7,95.7 L356.6,100.1 L358.5,97.6 L360.4,96.1 L362.3,96.4 L364.2,102.1 L366.0,103.5 L367.9,108.1 L369.8,104.8 L371.7,99.8 L373.6,94.1 L375.5,89.3 L377.4,86.6 L379.2,73.4 L381.1,65.9 L383.0,65.5 L384.9,65.8 L386.8,67.7 L388.7,68.1 L390.6,74.9 L392.5,72.7 L394.3,75.6 L396.2,76.1 L398.1,70.9 L400.0,73.3 L401.9,72.2 L403.8,69.9 L405.7,83.2 L407.5,87.3 L409.4,108.7 L411.3,135.4 L413.2,141.4 L415.1,148.4 L417.0,158.8 L418.9,154.2 L420.8,151.1 L422.6,149.7 L424.5,146.4 L426.4,140.8 L428.3,139.5 L430.2,139.2 L432.1,139.9 L434.0,143.2 L435.8,143.6 L437.7,119.9 L439.6,124.9 L441.5,133.8 L443.4,137.8 L445.3,142.4 L447.2,150.7 L449.1,139.0 L450.9,138.5 L452.8,138.1 L454.7,138.2 L456.6,141.1 L458.5,136.3 L460.4,133.0 L462.3,128.2 L464.2,128.6 L466.0,116.2 L467.9,114.6 L469.8,113.6 L471.7,115.0 L473.6,119.1 L475.5,119.8 L477.4,120.0 L479.2,120.9 L481.1,117.6 L483.0,112.5 L484.9,109.1 L486.8,111.4 L488.7,115.7 L490.6,103.3 L492.5,103.2 L494.3,103.7 L496.2,106.6 L498.1,106.3 L500.0,105.0 L501.9,102.6 L503.8,102.0 L505.7,106.0 L507.5,102.7 L509.4,98.2 L511.3,94.2 L513.2,94.3 L515.1,89.5 L517.0,84.0 L518.9,78.8 L520.8,78.6 L522.6,79.1 L524.5,77.6 L526.4,81.0 L528.3,73.1 L530.2,75.2 L532.1,74.6 L534.0,74.7 L535.8,78.2 L537.7,73.6 L539.6,72.7 L541.5,70.6 L543.4,68.3 L545.3,65.0 L547.2,76.4 L549.1,90.6 L550.9,109.4 L552.8,114.3 L554.7,110.5 L556.6,121.1 L558.5,117.9 L560.4,121.7 L562.3,129.2 L564.2,138.1 L566.0,149.0 L567.9,160.6 L569.8,155.9 L571.7,154.6 L573.6,149.9 L575.5,145.3 L577.4,146.1 L579.2,145.0 L581.1,142.3 L583.0,145.1 L584.9,138.3 L586.8,132.9 L588.7,130.9 L590.6,129.5 L592.5,131.1 L594.3,113.4 L596.2,112.5 L598.1,109.2 L600.0,105.9 L601.9,106.1 L603.8,109.0 L605.7,106.2 L607.5,106.7 L609.4,91.6 L611.3,86.7 L613.2,94.7 L615.1,94.7 L617.0,95.4 L618.9,99.7 L620.8,88.0 L622.6,88.6 L624.5,90.2 L626.4,94.4 L628.3,114.0 L630.2,110.9 L632.1,107.6 L634.0,108.2 L635.8,104.3 L637.7,101.1 L639.6,95.1 L641.5,91.8 L643.4,88.5 L645.3,83.0 L647.2,79.6 L649.1,73.7 L650.9,49.5 L652.8,47.6 L654.7,52.7 L656.6,55.9 L658.5,60.8 L660.4,76.0 L662.3,78.7 L664.2,81.1 L666.0,85.1 L667.9,82.8 L669.8,90.0 L671.7,96.7 L673.6,90.9 L675.5,86.0 L677.4,80.7 L679.2,80.6 L681.1,81.3 L683.0,82.7 L684.9,81.9 L686.8,77.7 L688.7,72.9 L690.6,69.6 L692.5,66.3 L694.3,61.5 L696.2,63.6 L698.1,59.5 L700.0,55.8 L701.9,55.1 L703.8,54.5 L705.7,55.3 L707.5,54.7 L709.4,52.2 L711.3,52.5 L713.2,59.2 L715.1,62.7 L717.0,60.8 L718.9,65.9 L720.8,62.6 L722.6,59.3 L724.5,54.7 L726.4,54.2 L728.3,50.3 L730.2,46.8 L732.1,34.9 L734.0,29.0 L735.8,28.8 L737.7,29.2 L739.6,28.7 L741.5,28.9 L743.4,34.9 L745.3,34.6 L747.2,37.7 L749.1,38.2 L750.9,39.6 L752.8,39.4 L754.7,42.6 L756.6,44.6 L758.5,49.7 L760.4,46.4 L762.3,41.3 L764.2,36.4 L766.0,36.9 L767.9,35.7 L769.8,37.1 L771.7,37.4 L773.6,34.3 L775.5,30.9 L777.4,27.6 L779.2,18.7 L781.1,14.4 L783.0,9.8 L784.9,10.1 L786.8,0.2 L788.7,0.0 L790.6,3.2 L792.5,4.7 L794.3,4.4 L796.2,5.4 L798.1,11.8 L800.0,8.5" fill="none" stroke="#64b5f6" stroke-width="2"/>
+          <path d="M0.0,380.0 L1.9,379.4 L3.8,378.7 L5.7,378.4 L7.5,378.1 L9.4,377.7 L11.3,377.3 L13.2,363.1 L15.1,363.0 L17.0,363.2 L18.9,363.3 L20.8,358.9 L22.6,357.8 L24.5,360.0 L26.4,360.9 L28.3,361.0 L30.2,360.7 L32.1,360.4 L34.0,360.8 L35.8,358.6 L37.7,355.7 L39.6,350.7 L41.5,347.6 L43.4,347.7 L45.3,347.6 L47.2,342.6 L49.1,337.1 L50.9,321.2 L52.8,319.2 L54.7,319.5 L56.6,320.1 L58.5,322.5 L60.4,331.4 L62.3,330.5 L64.2,332.1 L66.0,327.2 L67.9,323.9 L69.8,320.8 L71.7,314.2 L73.6,316.6 L75.5,319.4 L77.4,318.2 L79.2,318.5 L81.1,317.2 L83.0,312.7 L84.9,309.4 L86.8,280.8 L88.7,277.8 L90.6,268.4 L92.5,269.4 L94.3,267.1 L96.2,270.7 L98.1,275.1 L100.0,293.1 L101.9,299.9 L103.8,300.6 L105.7,295.1 L107.5,296.7 L109.4,291.2 L111.3,286.7 L113.2,298.9 L115.1,274.2 L117.0,270.7 L118.9,268.3 L120.8,270.3 L122.6,258.8 L124.5,263.9 L126.4,263.7 L128.3,266.1 L130.2,268.9 L132.1,275.2 L134.0,272.7 L135.8,274.3 L137.7,277.5 L139.6,279.5 L141.5,276.5 L143.4,271.4 L145.3,268.1 L147.2,267.8 L149.1,265.9 L150.9,264.0 L152.8,259.5 L154.7,254.7 L156.6,250.1 L158.5,247.0 L160.4,240.8 L162.3,248.3 L164.2,250.5 L166.0,253.3 L167.9,253.0 L169.8,259.5 L171.7,234.6 L173.6,224.7 L175.5,228.6 L177.4,228.2 L179.2,224.2 L181.1,224.4 L183.0,225.3 L184.9,224.6 L186.8,227.4 L188.7,238.5 L190.6,232.3 L192.5,232.8 L194.3,233.9 L196.2,236.6 L198.1,248.8 L200.0,244.2 L201.9,241.0 L203.8,237.4 L205.7,232.9 L207.5,235.0 L209.4,232.8 L211.3,231.1 L213.2,232.8 L215.1,232.9 L217.0,229.6 L218.9,225.9 L220.8,226.3 L222.6,228.0 L224.5,212.5 L226.4,211.1 L228.3,213.4 L230.2,212.8 L232.1,212.4 L234.0,216.2 L235.8,211.6 L237.7,208.4 L239.6,203.5 L241.5,198.8 L243.4,195.9 L245.3,188.8 L247.2,188.5 L249.1,188.7 L250.9,186.1 L252.8,195.4 L254.7,180.3 L256.6,180.1 L258.5,180.2 L260.4,180.5 L262.3,181.0 L264.2,191.5 L266.0,200.0 L267.9,198.1 L269.8,201.9 L271.7,198.6 L273.6,197.6 L275.5,191.9 L277.4,167.9 L279.2,165.5 L281.1,164.2 L283.0,164.1 L284.9,164.6 L286.8,170.1 L288.7,166.8 L290.6,163.5 L292.5,158.9 L294.3,155.8 L296.2,154.6 L298.1,151.3 L300.0,146.6 L301.9,143.6 L303.8,156.1 L305.7,132.0 L307.5,128.3 L309.4,129.9 L311.3,126.3 L313.2,126.7 L315.1,135.2 L317.0,133.3 L318.9,132.2 L320.8,135.6 L322.6,135.0 L324.5,140.3 L326.4,135.5 L328.3,139.8 L330.2,141.9 L332.1,140.6 L334.0,127.7 L335.8,119.8 L337.7,121.9 L339.6,121.2 L341.5,121.2 L343.4,123.6 L345.3,123.3 L347.2,120.0 L349.1,118.8 L350.9,114.1 L352.8,98.2 L354.7,95.7 L356.6,100.1 L358.5,97.6 L360.4,96.1 L362.3,96.4 L364.2,102.1 L366.0,103.5 L367.9,108.1 L369.8,104.8 L371.7,99.8 L373.6,94.1 L375.5,89.3 L377.4,86.6 L379.2,73.4 L381.1,65.9 L383.0,65.5 L384.9,65.8 L386.8,67.7 L388.7,68.1 L390.6,74.9 L392.5,72.7 L394.3,75.6 L396.2,76.1 L398.1,70.9 L400.0,73.3 L401.9,72.2 L403.8,69.9 L405.7,83.2 L407.5,87.3 L409.4,108.7 L411.3,135.4 L413.2,141.4 L415.1,148.4 L417.0,158.8 L418.9,154.2 L420.8,151.1 L422.6,149.7 L424.5,146.4 L426.4,140.8 L428.3,139.5 L430.2,139.2 L432.1,139.9 L434.0,143.2 L435.8,143.6 L437.7,119.9 L439.6,124.9 L441.5,133.8 L443.4,137.8 L445.3,142.4 L447.2,150.7 L449.1,139.0 L450.9,138.5 L452.8,138.1 L454.7,138.2 L456.6,141.1 L458.5,136.3 L460.4,133.0 L462.3,128.2 L464.2,128.6 L466.0,116.2 L467.9,114.6 L469.8,113.6 L471.7,115.0 L473.6,119.1 L475.5,119.8 L477.4,120.0 L479.2,120.9 L481.1,117.6 L483.0,112.5 L484.9,109.1 L486.8,111.4 L488.7,115.7 L490.6,103.3 L492.5,103.2 L494.3,103.7 L496.2,106.6 L498.1,106.3 L500.0,105.0 L501.9,102.6 L503.8,102.0 L505.7,106.0 L507.5,102.7 L509.4,98.2 L511.3,94.2 L513.2,94.3 L515.1,89.5 L517.0,84.0 L518.9,78.8 L520.8,78.6 L522.6,79.1 L524.5,77.6 L526.4,81.0 L528.3,73.1 L530.2,75.2 L532.1,74.6 L534.0,74.7 L535.8,78.2 L537.7,73.6 L539.6,72.7 L541.5,70.6 L543.4,68.3 L545.3,65.0 L547.2,76.4 L549.1,90.6 L550.9,109.4 L552.8,114.3 L554.7,110.5 L556.6,121.1 L558.5,117.9 L560.4,121.7 L562.3,129.2 L564.2,138.1 L566.0,149.0 L567.9,160.6 L569.8,155.9 L571.7,154.6 L573.6,149.9 L575.5,145.3 L577.4,146.1 L579.2,145.0 L581.1,142.3 L583.0,145.1 L584.9,138.3 L586.8,132.9 L588.7,130.9 L590.6,129.5 L592.5,131.1 L594.3,113.4 L596.2,112.5 L598.1,109.2 L600.0,105.9 L601.9,106.1 L603.8,109.0 L605.7,106.2 L607.5,106.7 L609.4,91.6 L611.3,86.7 L613.2,94.7 L615.1,94.7 L617.0,95.4 L618.9,99.7 L620.8,88.0 L622.6,88.6 L624.5,90.2 L626.4,94.4 L628.3,114.0 L630.2,110.9 L632.1,107.6 L634.0,108.2 L635.8,104.3 L637.7,101.1 L639.6,95.1 L641.5,91.8 L643.4,88.5 L645.3,83.0 L647.2,79.6 L649.1,73.7 L650.9,49.5 L652.8,47.6 L654.7,52.7 L656.6,55.9 L658.5,60.8 L660.4,76.0 L662.3,78.7 L664.2,81.1 L666.0,85.1 L667.9,82.8 L669.8,90.0 L671.7,96.7 L673.6,90.9 L675.5,86.0 L677.4,80.7 L679.2,80.6 L681.1,81.3 L683.0,82.7 L684.9,81.9 L686.8,77.7 L688.7,72.9 L690.6,69.6 L692.5,66.3 L694.3,61.5 L696.2,63.6 L698.1,59.5 L700.0,55.8 L701.9,55.1 L703.8,54.5 L705.7,55.3 L707.5,54.7 L709.4,52.2 L711.3,52.5 L713.2,59.2 L715.1,62.7 L717.0,60.8 L718.9,65.9 L720.8,62.6 L722.6,59.3 L724.5,54.7 L726.4,54.2 L728.3,50.3 L730.2,46.8 L732.1,34.9 L734.0,29.0 L735.8,28.8 L737.7,29.2 L739.6,28.7 L741.5,28.9 L743.4,34.9 L745.3,34.6 L747.2,37.7 L749.1,38.2 L750.9,39.6 L752.8,39.4 L754.7,42.6 L756.6,44.6 L758.5,49.7 L760.4,46.4 L762.3,41.3 L764.2,36.4 L766.0,36.9 L767.9,35.7 L769.8,37.1 L771.7,37.4 L773.6,34.3 L775.5,30.9 L777.4,27.6 L779.2,18.7 L781.1,14.4 L783.0,9.8 L784.9,10.1 L786.8,0.2 L788.7,0.0 L790.6,3.2 L792.5,4.7 L794.3,4.4 L796.2,5.4 L798.1,11.8 L800.0,8.5 L800.0,380.0 L0,380.0 Z" fill="url(#eqFill2)"/>
+        </svg>
+      </div>
+    </div></div>
+  <div id="perf-time" style="display:none">    <div class="card">
+      <h2><span class="icon">🕐</span> 交易時段分析</h2>
+      <table class="tbl">
+        <thead><tr><th>時段 (UTC)</th><th>筆數</th><th>盈虧</th></tr></thead>
+        <tbody><tr><td>00:00-01:00</td><td>10</td><td class="pos">+$265</td></tr>
+<tr><td>01:00-02:00</td><td>7</td><td class="pos">+$135</td></tr>
+<tr><td>02:00-03:00</td><td>1</td><td class="pos">+$57</td></tr>
+<tr><td>03:00-04:00</td><td>20</td><td class="pos">+$253</td></tr>
+<tr><td>04:00-05:00</td><td>34</td><td class="neg">$-94</td></tr>
+<tr><td>05:00-06:00</td><td>37</td><td class="pos">+$347</td></tr>
+<tr><td>06:00-07:00</td><td>7</td><td class="pos">+$252</td></tr>
+<tr><td>07:00-08:00</td><td>8</td><td class="pos">+$345</td></tr>
+<tr><td>08:00-09:00</td><td>12</td><td class="pos">+$99</td></tr>
+<tr><td>09:00-10:00</td><td>22</td><td class="pos">+$43</td></tr>
+<tr><td>10:00-11:00</td><td>8</td><td class="pos">+$369</td></tr>
+<tr><td>11:00-12:00</td><td>14</td><td class="pos">+$697</td></tr>
+<tr><td>12:00-13:00</td><td>30</td><td class="pos">+$473</td></tr>
+<tr><td>13:00-14:00</td><td>16</td><td class="pos">+$88</td></tr>
+<tr><td>14:00-15:00</td><td>22</td><td class="neg">$-838</td></tr>
+<tr><td>15:00-16:00</td><td>36</td><td class="pos">+$602</td></tr>
+<tr><td>16:00-17:00</td><td>32</td><td class="pos">+$661</td></tr>
+<tr><td>17:00-18:00</td><td>48</td><td class="neg">$-432</td></tr>
+<tr><td>18:00-19:00</td><td>15</td><td class="pos">+$94</td></tr>
+<tr><td>19:00-20:00</td><td>9</td><td class="pos">+$349</td></tr>
+<tr><td>20:00-21:00</td><td>11</td><td class="pos">+$111</td></tr>
+<tr><td>21:00-22:00</td><td>3</td><td class="pos">+$107</td></tr>
+<tr><td>22:00-23:00</td><td>10</td><td class="pos">+$257</td></tr>
+<tr><td>23:00-24:00</td><td>12</td><td class="pos">+$257</td></tr></tbody>
+      </table>
+    </div></div>
+  <div id="perf-hold" style="display:none">    <div class="card">
+      <h2><span class="icon">⏱️</span> 持倉時間分佈</h2>
+      <div class="bar-chart" style="height:240px">
+<div class="bar green" style="height:4%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">4</span></div>
+<div class="bar blue" style="height:4%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">6</span></div>
+<div class="bar gold" style="height:8%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">34</span></div>
+<div class="bar yellow" style="height:10%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">44</span></div>
+<div class="bar red" style="height:79%"><span style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2)">336</span></div>
+      </div>
+    </div></div>
+  <div id="perf-dir" style="display:none">    <div class="two-col">
+      <div class="card">
+        <h2>🟢 BUY 表現</h2>
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-box"><div class="v">223</div><div class="l">筆數</div></div>
+          <div class="stat-box"><div class="v pos">57.8%</div><div class="l">勝率</div></div>
+          <div class="stat-box"><div class="v pos">+$1,106</div><div class="l">總盈虧</div></div>
+          <div class="stat-box"><div class="v">$4.96</div><div class="l">平均/筆</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>🔴 SELL 表現</h2>
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-box"><div class="v">201</div><div class="l">筆數</div></div>
+          <div class="stat-box"><div class="v pos">59.2%</div><div class="l">勝率</div></div>
+          <div class="stat-box"><div class="v pos">+$3,391</div><div class="l">總盈虧</div></div>
+          <div class="stat-box"><div class="v">$16.87</div><div class="l">平均/筆</div></div>
+        </div>
+      </div>
+    </div></div>
+</div>
+<div class="panel" id="panel-risk">
+  <div class="risk-status low" style="margin-top:0">
+    <div class="ri">🟢</div>
+    <div>
+      <div class="rt">低風險 · 低風險</div>
+      <div class="rd">最大回撤 8.4% · 單筆最大虧損 $-323 · 建議關注 L3+ 層級風險</div>
+    </div>
+  </div>
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'risk-martin')">🎲 馬丁風險</button>
+    <button class="sub-tab" onclick="switchSub(this,'risk-layer')">📚 層數</button>
+    <button class="sub-tab" onclick="switchSub(this,'risk-vol')">📏 波幅</button>
+    <a href="martin_v4_31841.html" style="margin-left:auto;color:var(--acc);font-size:13px;font-weight:600;padding:8px 14px;white-space:nowrap">🔍 完整馬丁剖析法 V4 →</a>
+  </div>
+  <div id="risk-martin">    <div class="card">
+      <h2><span class="icon">🎲</span> 馬丁風險摘要</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v gold">1</div><div class="l">最大層數</div></div>
+        <div class="stat-box"><div class="v neg">+$323</div><div class="l">最大單筆虧損</div></div>
+        <div class="stat-box"><div class="v">Other</div><div class="l">策略類型</div></div>
+        <div class="stat-box"><div class="v pos">🟢</div><div class="l">破產風險</div></div>
+      </div>
+      <p style="color:var(--text2);font-size:.85em;margin-top:8px">此策略主要使用 1 層（Other），屬於低馬丁風險。大部分虧損可以快速恢復。</p>
+    </div>    <div class="card">
+      <h2><span class="icon">⚠️</span> 黑名單 / 高風險交易</h2>
+      <table class="tbl">
+        <thead><tr><th>時間</th><th>方向</th><th>手數</th><th>盈虧</th><th>持倉</th><th>備註</th></tr></thead>
+        <tbody><tr><td>06.18 14:19</td><td>BUY</td><td>0.51</td><td class="neg">$-323.13</td><td>16.16h</td><td><span class="badge red">大手數虧損</span></td></tr>
+<tr><td>06.18 14:19</td><td>BUY</td><td>0.51</td><td class="neg">$-259.12</td><td>15.91h</td><td><span class="badge red">大手數虧損</span></td></tr>
+<tr><td>08.21 09:13</td><td>SELL</td><td>0.10</td><td class="neg">$-238.14</td><td>18.2d</td><td><span class="badge yellow">長持倉虧損</span></td></tr>
+<tr><td>07.30 17:02</td><td>BUY</td><td>0.51</td><td class="neg">$-227.64</td><td>24min</td><td><span class="badge red">大手數虧損</span></td></tr>
+<tr><td>03.11 20:39</td><td>BUY</td><td>0.10</td><td class="neg">$-217.66</td><td>4.9d</td><td><span class="badge yellow">長持倉虧損</span></td></tr></tbody>
+      </table>
+    </div></div>
+  <div id="risk-layer" style="display:none">    <div class="card">
+      <h2><span class="icon">📚</span> 層數分析</h2>
+      <table class="tbl">
+        <thead><tr><th>層</th><th>策略</th><th>筆數</th><th>勝率</th><th>盈虧</th><th>評級</th></tr></thead>
+        <tbody><tr><td>L1</td><td>Other</td><td>424</td><td class="pos">58.5%</td><td class="pos">+$4,497</td><td><span class="badge red">C</span></td></tr></tbody>
+      </table>
+    </div></div>
+  <div id="risk-vol" style="display:none">    <div class="card">
+      <h2><span class="icon">📏</span> 波幅分析</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v">$49.3</div><div class="l">平均盈利 Pips</div></div>
+        <div class="stat-box"><div class="v neg">$57.7</div><div class="l">平均虧損 Pips</div></div>
+        <div class="stat-box"><div class="v">1.09</div><div class="l">盈虧比</div></div>
+        <div class="stat-box"><div class="v">2.3d</div><div class="l">盈利平均持倉</div></div>
+        <div class="stat-box"><div class="v">4.2d</div><div class="l">虧損平均持倉</div></div>
+        <div class="stat-box"><div class="v">$12,901</div><div class="l">總盈利</div></div>
+        <div class="stat-box"><div class="v neg">-$8,405</div><div class="l">總虧損</div></div>
+        <div class="stat-box"><div class="v">8.4%</div><div class="l">最大回撤</div></div>
+      </div>
+    </div></div>
+</div>
+<div class="panel" id="panel-copy">
+  <div class="card grade-display">
+    <div class="grade-stars">⭐⭐</div>
+    <div class="grade-label" style="color:var(--acc)">推薦 COPY</div>
+    <div class="grade-desc">高勝率（58.5%）+ PF（1.54）+ 1層 + AUDCAD / AUDCHF / AUDJPY / AUDNZD / AUDUSD / CADCHF / CADJPY / CHFJPY / EURAUD / EURCAD / EURCHF / EURGBP / EURJPY / EURNZD / EURUSD / GBPAUD / GBPCAD / GBPCHF / GBPJPY / GBPNZD / GBPUSD / NZDCAD / NZDCHF / NZDJPY / NZDUSD / USDCAD / USDCHF / USDJPY</div>
+  </div>
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'copy-tpsl')">📐 TP/SL 建議</button>
+    <button class="sub-tab" onclick="switchSub(this,'copy-score')">🎯 評分詳情</button>
+    <button class="sub-tab" onclick="switchSub(this,'copy-sim')">💰 模擬</button>
+  </div>
+  <div id="copy-tpsl">  <div class="two-col">
+    <div class="card">
+      <h2><span class="icon">📐</span> TP/SL 建議</h2>
+      <table class="tbl">
+        <tbody>
+          <tr><td>🎯 建議止賺 (TP)</td><td class="gold">39-59 pips</td></tr>
+          <tr><td>🛡️ 軟止蝝 (Soft SL)</td><td class="neg">46-69 pips</td></tr>
+          <tr><td>🛡️ 硬止蝝 (Hard SL)</td><td class="neg">86-115 pips</td></tr>
+          <tr><td>📊 平均盈利</td><td class="pos">+$52.02/筆</td></tr>
+          <tr><td>📊 平均虧損</td><td class="neg">$-47.75/筆</td></tr>
+          <tr><td>⚖️ 盈虧比</td><td>1 : 1.09</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2><span class="icon">💰</span> 倉位建議</h2>
+      <table class="tbl">
+        <tbody>
+          <tr><td>💵 建議本金</td><td>$10,000+</td></tr>
+          <tr><td>📊 手數</td><td>0.01 標準</td></tr>
+          <tr><td>⚡ 最大同時持倉</td><td>3 個</td></tr>
+          <tr><td>🔮 預期月增長</td><td class="pos">5.44%</td></tr>
+          <tr><td>📉 預期最大回撤</td><td class="neg">10-8%</td></tr>
+          <tr><td>⏱️ 建議持倉時間</td><td>&lt; 149 小時</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div></div>
+  <div id="copy-score" style="display:none">    <div class="card">
+      <h2><span class="icon">🎯</span> 質量評分（5维度）· 總分 57.2/100</h2>
+      <table class="tbl">
+        <thead><tr><th>维度</th><th>評分</th><th>加權</th><th>得分</th><th>評級</th></tr></thead>
+        <tbody>
+          <tr><td>勝率</td><td>58.5%</td><td>25%</td><td class="pos">14.6</td><td><span class="badge yellow">B</span></td></tr>
+          <tr><td>盈虧比 (PF)</td><td>1.54</td><td>30%</td><td class="pos">15.4</td><td><span class="badge yellow">B</span></td></tr>
+          <tr><td>Risk/Reward</td><td>1 : 1.09</td><td>20%</td><td>14.5</td><td><span class="badge yellow">B</span></td></tr>
+          <tr><td>樣本量</td><td>424</td><td>15%</td><td class="pos">12.7</td><td><span class="badge yellow">B</span></td></tr>
+          <tr><td>持倉效率</td><td>3.1d</td><td>10%</td><td class="pos">0.0</td><td><span class="badge red">C</span></td></tr>
+        </tbody>
+      </table>
+    </div></div>
+  <div id="copy-sim" style="display:none">    <div class="card">
+      <h2><span class="icon">💰</span> Copy 模擬</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v">$1,000</div><div class="l">建議本金</div></div>
+        <div class="stat-box"><div class="v pos">+5.4%</div><div class="l">預期月增長</div></div>
+        <div class="stat-box"><div class="v">$1054</div><div class="l">1個月後</div></div>
+        <div class="stat-box"><div class="v">$1172</div><div class="l">3個月後</div></div>
+        <div class="stat-box"><div class="v">$1374</div><div class="l">6個月後</div></div>
+        <div class="stat-box"><div class="v">$1887</div><div class="l">12個月後</div></div>
+      </div>
+    </div></div>
+</div>
+<div class="panel" id="panel-data">
+  <div class="sub-nav">
+    <button class="sub-tab active" onclick="switchSub(this,'data-pos')">📌 倉位明細</button>
+    <button class="sub-tab" onclick="switchSub(this,'data-set')">⚙️ SET 參數</button>
+    <button class="sub-tab" onclick="switchSub(this,'data-raw')">📄 原始數據</button>
+  </div>
+  <div id="data-pos">    <div class="card">
+      <h2><span class="icon">📌</span> 最近 20 筆交易</h2>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>平倉時間</th><th>方向</th><th>手數</th><th>開倉價</th><th>平倉價</th><th>Pips</th><th>盈虧</th><th>持倉</th><th>Magic</th></tr></thead>
+        <tbody><tr><td>10.19 11:23</td><td>SELL</td><td>0.10</td><td>0.92732</td><td>0.92390</td><td class="pos">+34.2</td><td class="pos">+$40.10</td><td>3.4d</td><td>1918</td></tr>
+<tr><td>10.15 03:01</td><td>SELL</td><td>0.10</td><td>1.23238</td><td>1.24445</td><td class="neg">-120.7</td><td class="neg">$-76.85</td><td>14.3d</td><td>1918</td></tr>
+<tr><td>10.15 03:01</td><td>SELL</td><td>0.10</td><td>1.24342</td><td>1.24445</td><td class="neg">-10.3</td><td class="neg">$-12.11</td><td>9.6d</td><td>1918</td></tr>
+<tr><td>10.15 03:01</td><td>SELL</td><td>0.10</td><td>1.24605</td><td>1.24445</td><td class="pos">+16.0</td><td class="pos">+$2.65</td><td>9.3d</td><td>1918</td></tr>
+<tr><td>10.15 03:01</td><td>BUY</td><td>0.10</td><td>0.99449</td><td>0.99154</td><td class="neg">-29.5</td><td class="neg">$-17.46</td><td>8.5d</td><td>1919</td></tr>
+<tr><td>10.15 03:01</td><td>BUY</td><td>0.10</td><td>190.34000</td><td>189.84700</td><td class="neg">-49.3</td><td class="neg">$-38.92</td><td>12.3d</td><td>1919</td></tr>
+<tr><td>10.15 03:01</td><td>SELL</td><td>0.10</td><td>1.59145</td><td>1.59102</td><td class="pos">+4.3</td><td class="pos">+$1.94</td><td>12.68h</td><td>1918</td></tr>
+<tr><td>10.15 03:01</td><td>SELL</td><td>0.51</td><td>1.24893</td><td>1.24445</td><td class="pos">+44.8</td><td class="pos">+$120.19</td><td>11.48h</td><td>1918</td></tr>
+<tr><td>10.15 03:01</td><td>SELL</td><td>0.10</td><td>88.60000</td><td>88.56900</td><td class="pos">+3.1</td><td class="neg">$-3.76</td><td>14.3d</td><td>1918</td></tr>
+<tr><td>10.14 18:16</td><td>BUY</td><td>0.10</td><td>0.83515</td><td>0.83899</td><td class="pos">+38.4</td><td class="pos">+$55.78</td><td>13.9d</td><td>1919</td></tr>
+<tr><td>10.14 13:48</td><td>SELL</td><td>0.10</td><td>1.59864</td><td>1.59069</td><td class="pos">+79.5</td><td class="pos">+$52.48</td><td>12.5d</td><td>1918</td></tr>
+<tr><td>10.14 13:48</td><td>SELL</td><td>0.10</td><td>1.60635</td><td>1.59069</td><td class="pos">+156.6</td><td class="pos">+$107.35</td><td>7.9d</td><td>1918</td></tr>
+<tr><td>10.06 15:48</td><td>BUY</td><td>0.10</td><td>1.88494</td><td>1.89051</td><td class="pos">+55.7</td><td class="pos">+$40.20</td><td>5.9d</td><td>1919</td></tr>
+<tr><td>10.02 15:34</td><td>SELL</td><td>0.10</td><td>1.09400</td><td>1.09066</td><td class="pos">+33.4</td><td class="pos">+$40.49</td><td>3.99h</td><td>1918</td></tr>
+<tr><td>09.30 17:47</td><td>SELL</td><td>0.10</td><td>0.85765</td><td>0.85482</td><td class="pos">+28.3</td><td class="pos">+$37.59</td><td>1.1d</td><td>1918</td></tr>
+<tr><td>09.30 17:47</td><td>SELL</td><td>0.10</td><td>109.22700</td><td>109.27200</td><td class="neg">-4.5</td><td class="neg">$-2.87</td><td>12.77h</td><td>1918</td></tr>
+<tr><td>09.30 17:47</td><td>BUY</td><td>0.10</td><td>2.01393</td><td>2.01092</td><td class="neg">-30.1</td><td class="neg">$-17.66</td><td>5.0d</td><td>1919</td></tr>
+<tr><td>09.30 17:47</td><td>BUY</td><td>0.10</td><td>1.41654</td><td>1.41867</td><td class="pos">+21.3</td><td class="pos">+$15.31</td><td>2.1d</td><td>1919</td></tr>
+<tr><td>09.30 17:47</td><td>BUY</td><td>0.10</td><td>0.47179</td><td>0.47120</td><td class="neg">-5.9</td><td class="neg">$-6.87</td><td>1.4d</td><td>1919</td></tr>
+<tr><td>09.30 04:45</td><td>SELL</td><td>0.10</td><td>208.32100</td><td>207.32300</td><td class="pos">+99.8</td><td class="pos">+$60.00</td><td>4.4d</td><td>1918</td></tr></tbody>
+      </table>
+      </div>
+    </div></div>
+  <div id="data-set" style="display:none">    <div class="card">
+      <h2><span class="icon">⚙️</span> SET 參數</h2>
+      <table class="tbl">
+        <tbody>
+          <tr><td>Magic Number</td><td class="gold">1918 / 1919</td></tr>
+          <tr><td>策略類型</td><td>Svr2-7-9 SMAPv5</td></tr>
+          <tr><td>時間框架</td><td>Other</td></tr>
+          <tr><td>交易品種</td><td>AUDCAD / AUDCHF / AUDJPY / AUDNZD / AUDUSD / CADCHF / CADJPY / CHFJPY / EURAUD / EURCAD / EURCHF / EURGBP / EURJPY / EURNZD / EURUSD / GBPAUD / GBPCAD / GBPCHF / GBPJPY / GBPNZD / GBPUSD / NZDCAD / NZDCHF / NZDJPY / NZDUSD / USDCAD / USDCHF / USDJPY</td></tr>
+          <tr><td>初始本金</td><td>$10,000</td></tr>
+          <tr><td>總交易數</td><td>424 筆</td></tr>
+        </tbody>
+      </table>
+      <p style="color:var(--text2);font-size:.85em;margin-top:8px">⚠️ 完整 SET 參數需從 AlgoForest Settings tab 下載</p>
+    </div></div>
+  <div id="data-raw" style="display:none">    <div class="card">
+      <h2><span class="icon">📄</span> 原始數據</h2>
+      <p style="color:var(--text2);padding:20px 0;text-align:center">📥 <a href="../downloads/31841.csv">下載完整 CSV（424 筆）</a></p>
+    </div></div>
+</div>
+<script>
+function switchPanel(btn,id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+function switchSub(btn,id){
+  var parent=btn.closest('.panel');
+  var prefix=parent.id.replace('panel-','')+'-';
+  parent.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  parent.querySelectorAll('[id]').forEach(function(el){
+    if(el.id.startsWith(prefix)) el.style.display='none';
+  });
+  document.getElementById(id).style.display='block';
+}
+</script>
+</body>
+</html>
