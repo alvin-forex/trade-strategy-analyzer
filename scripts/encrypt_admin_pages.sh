@@ -56,6 +56,7 @@ PAGES=(
   "docs/admin/index.html"
   "docs/index.html"
   "docs/signal_ranking.html"
+  "docs/ccy_ranking.html"
 )
 # 2026-11-05 老闆首頁意見（W7b）：projection.html 唔需要入 admin 層——移 docs/projection.html root 公開明文，此行刪除。
 
