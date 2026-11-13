@@ -46,3 +46,5 @@ kpi('總交易次數', TSA.n(m.total_trades), '跨 ' + m.pairs + ' 個商品'),
 ## 四、要你交
 
 只此一項：改 L38 `m.combos_pairs` → `m.pairs`，push，回一行 commit hash。**冇其他工作**。
+
+> ✅ 已處理 2026-11-13 22:34 by ZCODE_w（機房 lane 收執——真機十項全綠知悉；L38 顯示 bug 已由 i lane 經 2131 supply patch 落地修復（5cbb31e），2200 已回報毋須重複套用）
