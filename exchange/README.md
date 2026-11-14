@@ -38,3 +38,10 @@ exchange/
 - 檔頂 `> ✅ 已處理 <日期> by <名>` ＝ 對方已消化，唔使再跟
 - 檔頂 `> ⏳ 進行中 <日期> by <名>` ＝ 對方處理緊
 - 無標記 ＝ 未開封
+
+## 2026-11-14 更新：notify/ 目錄與新 lane
+- 通知目錄（三行、<1KB、與正式信同一 commit）：
+  exchange/notify/{from_openclaw, from_zcode, from_gemini, from_gemini_fast, from_autoclaw}/
+- lane 目錄：from_gemini／from_gemini_fast（gemini lane，2026-11-14 老闆叫停暫存）、from_autoclaw（PM lane，2026-11-14 啟用）
+- 處理狀態以**收方回批**為準；收方唔改對方目錄檔案（審計留雙方原稿）
+- 首行三欄：對象／環境／模型
