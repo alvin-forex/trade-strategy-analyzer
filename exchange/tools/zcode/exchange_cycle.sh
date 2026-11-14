@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-# exchange_cycle.sh v4.0 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+# exchange_cycle.sh v4.1 — exchange 信箱巡檢＋精準 push（ZCODE 收信代表 lane）
+#
+# v4.1 重點（2026-11-14 老闆指示：TG 直通上線）——alarm＋巡查摘要推 TG 群＋tg_poll 拉留言：
+#   ① alarm() 加 TG 通道（token 由 .keys/tg_bot_token.txt 讀，絕不入 commit/worklog/輸出）
+#   ② inspect 結果（無新信／有新信）一行摘要自動推 TG 群（-1003661171194）
+#   ③ tg_poll()：巡檢尾聲拉 TG 群留言印 stdout（排程 agent 跟進回覆）；offset 共用
+#      scripts/tg_offset.txt（同 TG 留言巡檢 job 邊個拉到邊個處理，唔會重複）
+#   全部發送失敗靜默（|| true / return 0），TG 唔通零影響巡檢主流程
 #
 # v4.0 重點（2026-11-08 機房 lane）：
 #   ① STAMP_RE 擴認「⏳ 已處理」變體（1445 回執用章：⏳＝收妥但大交付待主框，唔算漏掃誤報）
@@ -96,6 +103,9 @@ STAMP_RE='^>?[[:space:]]*(✅[[:space:]]*已處理|⏳[[:space:]]*(進行中|已
 WORKLOG="/home/z/my-project/worklog.md"
 REPO_SELF="${REPO}/exchange/tools/zcode/exchange_cycle.sh"
 SCRIPTS_COPY="/home/z/my-project/scripts/exchange_cycle.sh"
+# v4.1 TG 直通常數：token 一律由 .keys 讀（600），絕不寫入 commit／worklog／任何輸出
+TG_TOKEN_FILE="/home/z/my-project/.keys/tg_bot_token.txt"
+TG_CHAT_ID="${TG_CHAT_ID:--1003661171194}"   # 預設老闆群 OpenClaw Management
 
 FORBIDDEN_RE='(^|/)(tsa_pw\.txt|\.env([^/]*)?|.*\.pem|id_rsa[^/]*|.*credentials.*|.*password.*|zcode_exchange_key|zcode_test_key(\.zip)?)(/|$)|(^|/)martin_v4(/|$)'
 
@@ -141,7 +151,25 @@ self_install() {
 }
 self_install
 
-# 警報：寫 worklog（冇就建）＋ stdout——修復①嘅核心：失敗一定有人知
+# ---- v4.1 TG 直通（2026-11-14 老闆指示）----
+# tg_send：推訊息入老闆 TG 群。任何失敗靜默（return 0／|| true），零影響巡檢主流程
+tg_send() {
+  [ -r "$TG_TOKEN_FILE" ] || return 0
+  local token json
+  token="$(tr -d ' \r\n' < "$TG_TOKEN_FILE" 2>/dev/null)" || return 0
+  json="$(python3 -c 'import json,sys; print(json.dumps({"chat_id": sys.argv[1], "text": sys.argv[2]}))' "$TG_CHAT_ID" "$1" 2>/dev/null)" || return 0
+  curl -sS --max-time 15 -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+    -H 'Content-Type: application/json' -d "$json" >/dev/null 2>&1 || true
+}
+# tg_poll：拉 TG 群組留言印到 stdout（排程 agent 照輸出跟進回覆）。
+# offset 共用 scripts/tg_offset.txt——同 TG 留言巡檢 job 邊個拉到邊個處理，唔會重複
+tg_poll() {
+  [ -r "$TG_TOKEN_FILE" ] || return 0
+  [ -f /home/z/my-project/scripts/tg_bot.sh ] || return 0
+  bash /home/z/my-project/scripts/tg_bot.sh poll 20 2>/dev/null || true
+}
+
+# 警報：寫 worklog（冇就建）＋ stdout ＋ TG 直通——失敗一定有人知（v4.1 加 TG 通道）
 alarm() {
   local msg="$1"
   log "⚠️ 警報: $msg"
@@ -152,6 +180,7 @@ alarm() {
     echo "# Worklog — TSA exchange（ZCODE 端）" > "$WORKLOG"
     echo "> ⚠️ **警報 $(hkt_stamp) HKT** — $msg" >> "$WORKLOG"
   }
+  tg_send "⚠️⚠️ ZCODE_w 警報（$(hkt_stamp) HKT）— $msg"
 }
 
 # --- 自癒 1：ssh 客戶端（OS 級冇裝、無 sudo → 無 root 提取 deb）---
@@ -391,6 +420,8 @@ inspect() {
   if [ "$n" -eq 0 ]; then
     echo "$(hkt_now) 巡查完成，無新信，HEAD=$head_short"
     echo "=================================================="
+    tg_send "$(hkt_now) 巡查完成，無新信，HEAD=$head_short（exchange每鐘檢查）"
+    tg_poll
     exit 0
   fi
   echo "有新信 $n 封，HEAD=$head_short（$(hkt_now) HKT）:"
@@ -398,6 +429,11 @@ inspect() {
   echo "--------------------------------------------------"
   echo "目前 HEAD 訊息: $head_sub"
   echo "=================================================="
+  local tg_list; tg_list="$(printf '%s\n' "$unprocessed" | nl -w2 -s' ' | head -10)"
+  tg_send "$(hkt_now) 有新信 $n 封，HEAD=$head_short：
+$tg_list
+（巡檢 turn 跟進處理，完成後照 notify 機制回報）"
+  tg_poll
   exit 10
 }
 
