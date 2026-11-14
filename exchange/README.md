@@ -45,3 +45,8 @@ exchange/
 - lane 目錄：from_gemini／from_gemini_fast（gemini lane，2026-11-14 老闆叫停暫存）、from_autoclaw（PM lane，2026-11-14 啟用）
 - 處理狀態以**收方回批**為準；收方唔改對方目錄檔案（審計留雙方原稿）
 - 首行三欄：對象／環境／模型
+
+## 派工路由（2026-11-14 記錄現狀）
+- code 改動 → ZCODE：現時兩個來源並行——OpenClaw 直派（16:20 B 包）＋ AUTOCLAW 介面規格派（2200／issue #3）。統一入口未裁決；回報一律四欄（commit/run/changed/evidence）
+- 數據／板面／報告／cron → OpenClaw（data lane）
+- 任務真值：TASKS.md 私有；repo 鏡像＝exchange/tasks_snapshot.md（脫敏，板面更新時同步）
