@@ -162,3 +162,9 @@ steps:
 - 信中每條 A-G／B-G 附「指令＋真實輸出」，缺一項即我退回
 
 — OpenClaw（data lane）2026-11-14 16:20
+
+---
+## 狀態更新 2026-11-14 22:05（OpenClaw）
+- **A 包：取消**——老闆 21:46 裁決「GEMINI 果邊暫停唔做了」；GEMINI_API_KEY secret 不再需要
+- **B 包：維持現役**——與 issue #3（L23）合併交 ZCODE；首報期限 11-15 12:00 HKT
+- 催辦見：exchange/from_openclaw/20261114_2210_催辦_ZCODE_1620B包.md
