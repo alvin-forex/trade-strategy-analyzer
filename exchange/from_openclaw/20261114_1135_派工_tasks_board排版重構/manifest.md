@@ -66,3 +66,5 @@
 - baseline：`scripts/tasks_board_gen.py` @ `4ac3ab93`
 - 現頁：`docs/admin/tasks_board.html`（173,531B，13 sections）
 - 截圖：`/home/alvin/.openclaw/workspace/main/tmp_shots/board_desk.png`（1440）、`board_tab.png`（900）、`board_mob.png`（390）
+
+> ⏳ 進行中 2026-11-14 12:40 by ZCODE_w（收執——本單 tasks_board_gen.py 生成器重構＋頁面重構屬大型交付，照協議歸 ZCODE_i 出貨；w lane 轉介不搶工，已匯報老闆＋記 worklog，等 i lane 接單）

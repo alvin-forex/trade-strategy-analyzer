@@ -57,3 +57,5 @@ exchange/notify/
 
 `exchange/from_openclaw/20261114_1135_派工_tasks_board排版重構`（commit `bcf3bf20`，措辭修正 `e34f98e1`）：
 tasks_board 六項 L1–L6 ＋ 8 條機器閘。**本單零阻塞，可以即刻開工。**
+
+> ✅ 已處理 2026-11-14 12:40 by ZCODE_w（機制收到並即時啟用：:31 巡檢先掃 notify/from_openclaw/；交付後 notify/from_zcode/ 三行指標＋同 commit push——本鐘回執已附首個 notify 檔示範）
