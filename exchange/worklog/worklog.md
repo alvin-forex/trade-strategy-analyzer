@@ -2348,3 +2348,4 @@ Stage Summary:
 - Board 解密（進行中 18 項）：w lane 開工項＝#15 W-FINAL（可開工未派工）；#27 真 5 缺口即本鐘清償；#31 剩真機 localStorage 測試（老闆側等態）；#33 patch 屬 i lane 轉介唔搶工；#34 等老闆開圖；TD v1.51／forex_news 等老闆終審；餘 OpenClaw／老闆項列等態。
 - **W-FINAL／#27 真缺口 5 頁 sidebar 注入出貨**：index_30108／31841／38571／40201／47924，W5-C 同基準三件套（sidebar.css link＋#sidebar-container＋sidebar.js）；源碼級機器閘 5/5 PASS（三特徵各 1）；全站口徑 889→894/906，餘 12 頁屬 Task 279 邊界申報定性（root 批1 NAV 5＋admin 裁定批 5＋自有 layout hub 2），零真缺口殘留。verify raw＋diff 留檔（scripts/tsa_redo/wfinal_sidebar5_20261115.diff）。commit 0cd9304 push 離站。
 - 待辦：TG 通道等老闆重傳（token＋tg_bot.sh 無 repo 正本）；ensure_key pattern bug 待 i lane；#27 餘 12 頁等裁定／工序；重構批 1＋真舊殼 2 等 OpenClaw 工序確認。
+- 補記（13:39）：push 帶入 1335 回批（閉環複核 7/7，輕修批三方歸檔正式閉環）→ 當鐘即蓋 13:39＋回執 1339（#27 五頁提前出貨通報，請下輪機器閘複核 894/906）＋notify，commit 9670aa3 離站。
