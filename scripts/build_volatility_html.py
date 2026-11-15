@@ -61,6 +61,9 @@ def load_rows(xlsx_path: str):
             v = ws.cell(row=r, column=c).value
             values.append("" if v is None else str(v).strip())
         groups.append({"owner": pending_owner, "sym": sym, "band": band, "values": values})
+    # 老闆 2026-11-15 指示：負責人欄冇用（唔輸出）；按 CCY 排序（sym 字母序，組內 80/15/5 固定）
+    band_order = {"80%": 0, "15%": 1, "5%": 2}
+    groups.sort(key=lambda g: (g["sym"], band_order.get(g["band"], 9)))
     return headers, groups
 
 
@@ -117,7 +120,6 @@ th{background:var(--bg-card);padding:5px 6px;text-align:center;border-bottom:2px
 td{padding:3px 5px;text-align:center;border-bottom:1px solid var(--border);font-size:0.8em;white-space:nowrap}
 tr:hover{background:var(--bg-card)}
 tr.grp-end td{border-bottom:2px solid var(--primary)}
-.own{font-weight:bold;color:var(--accent);text-align:left!important;padding-left:10px;white-space:nowrap;vertical-align:top;border-right:1px solid var(--border)}
 .sym{text-align:left!important;white-space:nowrap;font-family:'SF Mono',Consolas,monospace}
 .b15 .sym,.b5 .sym{color:var(--text2)}
 .b5 td{opacity:.85}
@@ -149,8 +151,8 @@ function toggleTheme(){
 </head><body>
 <div id="sidebar-container"></div>
 <h1>📊 波幅表</h1>
-<p class="sub">R1 版｜每個貨幣三檔區間（80% / 15% / 5%）× 年份(時段)｜Range = pips｜數據來源：__SOURCE_NAME__（負責人標記）</p>
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:0.82em;color:var(--text2)"><span>__GEN_TIME__</span><span class="info-tip" style="position:relative;display:inline-flex;cursor:pointer"><span style="width:18px;height:18px;border-radius:50%;background:var(--bg-hover);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-style:italic;color:var(--text2)">i</span><span class="info-tip-text" style="display:none;position:absolute;top:24px;left:0;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.82em;line-height:1.6;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,0.3);color:var(--text);max-width:640px;white-space:normal">每個貨幣三行：80% 檔＝大多數交易嘅波幅區間；15%／5% 檔＝漸大波幅。<br>顏色＝每欄上限值三分位熱度：__LEGEND_COLORS__<br>髒數據照錄（如 395=632、52+152、83103、331--1123、146-286.），未經修改。重跑：python scripts/build_volatility_html.py --xlsx "uploads/__SOURCE_NAME__"</span></span></div>
+<p class="sub">R1 版｜每個貨幣三檔區間（80% / 15% / 5%）× 年份(時段)｜Range = pips｜已按 CCY 排序｜數據來源：__SOURCE_NAME__</p>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:0.82em;color:var(--text2)"><span>__GEN_TIME__</span><span class="info-tip" style="position:relative;display:inline-flex;cursor:pointer"><span style="width:18px;height:18px;border-radius:50%;background:var(--bg-hover);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-style:italic;color:var(--text2)">i</span><span class="info-tip-text" style="display:none;position:absolute;top:24px;left:0;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.82em;line-height:1.6;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,0.3);color:var(--text);max-width:640px;white-space:normal">每個貨幣三行：80% 檔＝大多數交易嘅波幅區間；15%／5% 檔＝漸大波幅。<br>顏色＝每欄上限值三分位熱度：__LEGEND_COLORS__<br>髒數據照錄未修改（395=632、52+152、83103、331--1123、146-286.）。第 2 欄標住 2022(M15) 插喺 2020 組入面，疑似標錯，原樣保留。重跑：python scripts/build_volatility_html.py --xlsx "uploads/__SOURCE_NAME__"</span></span></div>
 <div class="legend">
 <span><span class="dot" style="background:var(--green)"></span>該欄細波幅</span>
 <span><span class="dot" style="background:var(--yellow)"></span>中等</span>
@@ -158,7 +160,7 @@ function toggleTheme(){
 <span class="m">三行一組：80% → 15% → 5%</span></div>
 <div style="overflow-x:auto">
 <table>
-<thead><tr><th>負責人</th><th>CCY</th>__HEADER_CELLS__</tr></thead>
+<thead><tr><th>CCY</th>__HEADER_CELLS__</tr></thead>
 <tbody>
 __BODY_ROWS__
 </tbody>
@@ -174,10 +176,9 @@ def build_html(headers: list, groups: list, source_name: str) -> str:
     ths = column_thresholds(groups, len(headers))
     header_cells = "".join(f"<th>{esc(h)}</th>" for h in headers)
 
-    rows, group_idx = [], 0
+    rows = []
     n = len(groups)
     for gi, g in enumerate(groups):
-        is_group_start = (gi % 3 == 0) or (g["owner"] is not None)
         is_group_end = (gi % 3 == 2) or (gi == n - 1)
         band_cls = {"80%": "b80", "15%": "b15", "5%": "b5"}.get(g["band"], "")
         cls = []
@@ -186,10 +187,7 @@ def build_html(headers: list, groups: list, source_name: str) -> str:
         if is_group_end:
             cls.append("grp-end")
         row_cls = f' class="{" ".join(cls)}"' if cls else ""
-        if is_group_start and g["owner"]:
-            rows.append(f'<tr{row_cls}><td class="own" rowspan="3">{esc(g["owner"])}</td>')
-        else:
-            rows.append(f"<tr{row_cls}><td></td>")
+        rows.append(f"<tr{row_cls}>")
         rows.append(f'<td class="sym">{esc(g["sym"])}{" (" + esc(g["band"]) + ")" if g["band"] else ""}</td>')
         for i, v in enumerate(g["values"]):
             if not v:
@@ -198,7 +196,6 @@ def build_html(headers: list, groups: list, source_name: str) -> str:
                 c = heat_class(v, ths[i])
                 rows.append(f'<td class="m {c}">{esc(v)}</td>')
         rows.append("</tr>")
-        group_idx += 1
 
     now = datetime.now(HKT).strftime("%Y-%m-%d %H:%M HKT")
     page = PAGE_TEMPLATE
