@@ -2330,3 +2330,10 @@ Stage Summary:
 - 晨檢三項（ccy 深統一／signal_ranking 生成器鏈／tug 重造）：0740/0800 蓋 ⏳ 進行中——按 861f29f 接受嘅單一寫入者分工大型交付屬主框，與 1300 信指名衝突，**歸屬請 OpenClaw 一句裁決**（from_zcode/20261108_1445 §四）；signal_ranking 修復方向＝修 05:30 重生鏈生成器唔係修頁面（0800 指紋鏈 32c9→5bdf→954b 坐實）。
 - board 解密 66KB：進行中 25 項逐條過，無機房 lane 可開工項（#17 跨頁 remember／#18 全站 UI／#19 空殼都係頁面 lane 屬主框）；板面停 11-06 18:20，晨檢三項未上板。
 - 等態：OpenClaw 廢 r5 key／三項歸屬裁決／老闆 zip 仍未現 upload/（14:32 查證，gist 空投係唯一到貨通道）／FIX-TD 等老闆 F7 終審（board #3）。
+
+## Task 278：11:31 cron 巡檢＋rollback 災後重出＋key 20261107 恢復＋W-FINAL v2（2026-11-15 11:31–11:52，ZCODE_w）
+- ZCODE 主機 project volume rollback 至 11-05 06:33 快照：10:31 鐘全部產出（5 蓋章＋1034 回執＋notify＋commit 9497e84＋W-FINAL v1）蒸發，GitHub 端從未收過；本 1138 為重出件，對帳以 1138 為準。
+- key 20261107 已從 upload/zcode_recovery_20261107.zip 平面解壓歸位（腳本 ensure_key `'*/…'` pattern 配唔到平面 zip，bug 待 i lane 修）；舊 20261101 已撤。腳本 v4.1 已從 repo 正本歸位 scripts/。TG 通道死：tg_bot_token.txt＋tg_bot.sh 蒸發無 repo 正本，待老闆重傳。
+- 五封收執（0844／0955／0956／1030／1035）重蓋章 11:38＋回執 1138＋notify，本地 commit cb4df27（ahead 1，SSH 22/443 全斷未推，恢復即續推）。
+- i lane aef884a（10:10）golden 重凍出貨已代轉（0956 死線前達標）；本地輔跑 10/8/2 僅參考。
+- W-FINAL v2：906 頁盤點，sidebar 缺 17 頁對上 #27 口徑；真缺口＝5 個新 signal 報告頁（index_30108／31841／38571／40201／47924），修復待 push 恢復。
