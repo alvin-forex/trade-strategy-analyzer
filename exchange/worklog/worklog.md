@@ -2349,3 +2349,9 @@ Stage Summary:
 - **W-FINAL／#27 真缺口 5 頁 sidebar 注入出貨**：index_30108／31841／38571／40201／47924，W5-C 同基準三件套（sidebar.css link＋#sidebar-container＋sidebar.js）；源碼級機器閘 5/5 PASS（三特徵各 1）；全站口徑 889→894/906，餘 12 頁屬 Task 279 邊界申報定性（root 批1 NAV 5＋admin 裁定批 5＋自有 layout hub 2），零真缺口殘留。verify raw＋diff 留檔（scripts/tsa_redo/wfinal_sidebar5_20261115.diff）。commit 0cd9304 push 離站。
 - 待辦：TG 通道等老闆重傳（token＋tg_bot.sh 無 repo 正本）；ensure_key pattern bug 待 i lane；#27 餘 12 頁等裁定／工序；重構批 1＋真舊殼 2 等 OpenClaw 工序確認。
 - 補記（13:39）：push 帶入 1335 回批（閉環複核 7/7，輕修批三方歸檔正式閉環）→ 當鐘即蓋 13:39＋回執 1339（#27 五頁提前出貨通報，請下輪機器閘複核 894/906）＋notify，commit 9670aa3 離站。
+
+## Task 281：14:31 cron 巡檢＋三次 rollback 自癒＋1343 收執＋diff 缺件補推（2026-11-15 14:31–14:34，ZCODE_w）
+- 第三次平台 rollback（本地 scripts/ 打回 11-04 快照）：v4.1 腳本退化 v3.x、本地 worklog T280、diff/py 工具、key 20261107、tsa_pw.txt 全蒸發。自癒：key zip 平面解壓歸位＋v4.1 repo 正本歸位 scripts/＋tsa_pw 補回；repo 端貨物零受損（7265c84 等全在）。本地 worklog 已依鏡像重建 T280。
+- 巡檢：pull 95f2841（HTTPS fallback），新信 1 封＝1343 回批（#27 五頁機器閘 PASS 6/7，11-16 ETA 提前收項；第 7 項 diff 留檔缺件）。OpenClaw 已蓋章我方 1331/1339 回執（43ea145）。
+- **diff 缺件補推**：scripts/tsa_redo/wfinal_sidebar5_20261115.diff 改入 repo（git show 7265c84 重生成 141 行），下輪機器閘第 7 項可過；蓋章 14:32＋回執 1432＋notify，commit 0dda0a1 離站。
+- 教訓：留檔聲稱路徑必須與實物同處——今後 diff／verify raw 一律入 repo（本地 scripts/ 僅副本）。等態照排：裁定批 4 等老闆派工令；真舊殼 2 等收項；重構 1＋ensure_key bug 歸 i lane；TG 通道等老闆重傳。
