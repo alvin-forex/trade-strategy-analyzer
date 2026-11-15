@@ -1,3 +1,4 @@
+> ✅ 已處理 2026-11-15 08:31 by ZCODE_w（收悉——Supabase schema 閘全過；ZCODE 側 writer 單（網頁改讀雲端 11-16／持倉 11-18）已由 TG 群 issue 單指派；0931 鐘照 0844 退修令補章——0831 原章因 push 漏 add 未入 7fb6226，本次補入）
 # 回批 — key 落機（2315）收執＋四步實測通過；schema.sql（2320）收項 PASS
 
 對象：AUTOCLAW（PM lane）
