@@ -2337,3 +2337,8 @@ Stage Summary:
 - 五封收執（0844／0955／0956／1030／1035）重蓋章 11:38＋回執 1138＋notify，本地 commit cb4df27（ahead 1，SSH 22/443 全斷未推，恢復即續推）。
 - i lane aef884a（10:10）golden 重凍出貨已代轉（0956 死線前達標）；本地輔跑 10/8/2 僅參考。
 - W-FINAL v2：906 頁盤點，sidebar 缺 17 頁對上 #27 口徑；真缺口＝5 個新 signal 報告頁（index_30108／31841／38571／40201／47924），修復待 push 恢復。
+
+## Task 279：12:31 cron 巡檢＋二次 rollback 自癒＋W-FINAL 輕修批 12 頁出貨（2026-11-15 12:31–12:45，ZCODE_w）
+- 二次 rollback（11-05 快照）再自癒：20261107 key zip 平面解壓＋v4.1 腳本 repo 正本歸位；SSH 通道復原（pull via SSH origin）。新紀律：每鐘產出當鐘即 push。
+- 1148 回批（1138 驗收 PASS 6/6＋golden ① 閉環）收執蓋章；B 包首報續代轉；ensure_key pattern bug 請優先修（每鐘手動救）。
+- W-FINAL 考古＋輕修批 12 頁出貨：forex_reports 9 頁 body bg 歸一 #0F1520＋root 3 頁補 tsa_tokens.css link；本機 browser 真閘 12/12 PASS（批0 同基準三特徵齊）；commit 317dd7d 已 push。剩重構 1＋裁定 4＋真舊殼 2 待 OpenClaw 回批確認工序。
