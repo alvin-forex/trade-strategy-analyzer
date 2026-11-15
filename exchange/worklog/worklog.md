@@ -2342,3 +2342,9 @@ Stage Summary:
 - 二次 rollback（11-05 快照）再自癒：20261107 key zip 平面解壓＋v4.1 腳本 repo 正本歸位；SSH 通道復原（pull via SSH origin）。新紀律：每鐘產出當鐘即 push。
 - 1148 回批（1138 驗收 PASS 6/6＋golden ① 閉環）收執蓋章；B 包首報續代轉；ensure_key pattern bug 請優先修（每鐘手動救）。
 - W-FINAL 考古＋輕修批 12 頁出貨：forex_reports 9 頁 body bg 歸一 #0F1520＋root 3 頁補 tsa_tokens.css link；本機 browser 真閘 12/12 PASS（批0 同基準三特徵齊）；commit 317dd7d 已 push。剩重構 1＋裁定 4＋真舊殼 2 待 OpenClaw 回批確認工序。
+
+## Task 280：13:31 cron 巡檢＋1252 收執＋#27 真缺口 5 頁 sidebar 注入出貨（2026-11-15 13:31–13:38，ZCODE_w）
+- 巡檢：pull b65781d，新信 1 封＝1252 回批（輕修批 12 頁機器閘 PASS 7/7，批0 §三.1 正式閉環；ensure_key bug 記 i lane；B 包首報續代轉）。已蓋章 13:31＋回執 1331＋notify，commit 0ed276e push 離站。
+- Board 解密（進行中 18 項）：w lane 開工項＝#15 W-FINAL（可開工未派工）；#27 真 5 缺口即本鐘清償；#31 剩真機 localStorage 測試（老闆側等態）；#33 patch 屬 i lane 轉介唔搶工；#34 等老闆開圖；TD v1.51／forex_news 等老闆終審；餘 OpenClaw／老闆項列等態。
+- **W-FINAL／#27 真缺口 5 頁 sidebar 注入出貨**：index_30108／31841／38571／40201／47924，W5-C 同基準三件套（sidebar.css link＋#sidebar-container＋sidebar.js）；源碼級機器閘 5/5 PASS（三特徵各 1）；全站口徑 889→894/906，餘 12 頁屬 Task 279 邊界申報定性（root 批1 NAV 5＋admin 裁定批 5＋自有 layout hub 2），零真缺口殘留。verify raw＋diff 留檔（scripts/tsa_redo/wfinal_sidebar5_20261115.diff）。commit 0cd9304 push 離站。
+- 待辦：TG 通道等老闆重傳（token＋tg_bot.sh 無 repo 正本）；ensure_key pattern bug 待 i lane；#27 餘 12 頁等裁定／工序；重構批 1＋真舊殼 2 等 OpenClaw 工序確認。
