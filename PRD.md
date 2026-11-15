@@ -1,8 +1,8 @@
 # PRD：交易策略分析系統（Trade Strategy Analyzer）
 
-> **版本：** v0.9（v5 統一評分 + EA_MAP 去重 + QA 加強）
-> **日期：** 2026-06-19
-> **前一版本：** v0.8（2026-05-25）
+> **版本：** v0.10（待辦狀態同步 + SKILL 入口／覆盤自動化／訊號級 Walk-Forward 三項交付）
+> **日期：** 2026-11-15
+> **前一版本：** v0.9（2026-06-19）
 > **作者：** 丁蟹 + Alvin
 > **狀態：** 已實作，持續迭代中
 
@@ -557,12 +557,12 @@ trade_strategy_analyzer/
 
 | # | 項目 | 狀態 | 備註 |
 |---|------|------|------|
-| 1 | Signal Info Card | 🔜 待開發 | Option A 已確認，加喺 detailed report 頂部 |
-| 2 | .set 版本差異比較 | 🔜 待開發 | 淨列出有差異嘅參數，只比較相同貨幣對 |
-| 3 | SKILL：自動化分析流程 | 🔜 待開發 | "分析 signal {ID}" → scraper → 分析 → Telegram |
-| 4 | CoP/CoL 評分公式改進 | ⏳ 討論中 | 其他 AI 反饋：CoP 勝率永遠 100%（20% 白送），建議改用 Early Efficiency |
-| 5 | Tick Data 精確度 | ⏳ 待確認 | 目前無 Tick Data，可能不準確 |
-| 6 | `UseAISignal=1` 邏輯 | ⚠️ 待確認 | SMA .set 入面嘅 AI 信號，具體邏輯未知 |
+| 1 | Signal Info Card | ✅ 已完成（2026-11-15 狀態同步） | Option A 已確認，加喺 detailed report 頂部；審計核實 v0.9 發布前已上線（≤2026-05-21），57/71 份 detailed report 已渲染，生成器現位 `archive/`（docs/PRD_BACKLOG_AUDIT_20261115.md ①） |
+| 2 | .set 版本差異比較 | ✅ 已完成（2026-11-15 狀態同步） | 淨列出有差異嘅參數，只比較相同貨幣對；審計核實 v0.9 發布前已上線——CLI（`scripts/set_parser.py diff`）＋Info Card 內嵌＋API（`GET /api/compare`）三層齊備（審計②） |
+| 3 | SKILL：自動化分析流程 | 🔶 部分完成 | "分析 signal {ID}" → scraper → 分析 → Telegram；2026-11-15 倉內入口已落地：`scripts/analyze_signal_entry.py` 一鍵鏈＋`docs/SKILL_AUTOMATION_RUNBOOK_20261115.md`（commit `2c50a4d3`）；skill 定義檔屬 AutoClaw 端、尚未建立（見 Section 16.2） |
+| 4 | CoP/CoL 評分公式改進 | 🔶 已於 v5 修復，待 Gemini 確認 | 其他 AI 反饋：CoP 勝率永遠 100%（20% 白送），建議改用 Early Efficiency；2026-11-15 覆核：問題喺 v5 主鏈路已修復（DDE v5 改用真實勝率、權重 15%），只殘留於 archive 棄用腳本——待外部顧問（Gemini）確認後正式關閉（見 Section 16.5） |
+| 5 | Tick Data 精確度 | ⏳ 待確認 | 目前無 Tick Data，可能不準確（2026-11-15 審計未涵蓋，倉內無新證據） |
+| 6 | `UseAISignal=1` 邏輯 | ⚠️ 待確認 | SMA .set 入面嘅 AI 信號，具體邏輯未知（2026-11-15 審計未涵蓋，倉內無新證據） |
 
 ---
 
@@ -937,18 +937,18 @@ Example: WR=60% → P(5連虧) = 1.0%, P(8連虧) = 0.07%
 | Phase | 時間 | 內容 | 優先級 |
 |-------|------|------|--------|
 | **Phase 0A** | ~~已完成 2026-05-25~~ | ✅ 修復 dde_v4_scorer.py LEVEL_RANGES（改 lot-based） | P0 |
-| **Phase 0B** | 待定 | 修復 CoP 勝率計算（改為基於全部交易）— 只影響已壞嘅 generate_symbol_ranking.py | P1 |
+| **Phase 0B** | 🔶 v5 已修復（2026-11-15 覆核） | 修復 CoP 勝率計算（改為基於全部交易）— v5 主鏈路已改用真實勝率（15% 權重），殘留僅 archive 棄用腳本（generate_symbol_ranking.py 等）→ 待 Gemini 確認後正式關閉（見 16.5） | P1 |
 | **Phase 0C** | ~~已完成 2026-05-25~~ | ✅ CCY Ranking 加入 $1K DD 六級制（S/A/B/C/D/F） | P0 |
 | **Phase 0D** | ~~已完成 2026-05-25~~ | ✅ EA 欄位移到 Signal 後面（兩個排名頁） | P0 |
-| **Phase 1** | 3-5 天 | 實作 DDE v5 統一評分 | P0 |
-| **Phase 1** | 3-5 天 | 新增 Max Drawdown Control 維度 | P0 |
-| **Phase 1** | 2-3 天 | EA_MAP 去重（單一 source of truth） | P1 |
-| **Phase 2** | 5-7 天 | 架構重構：模組化 + Jinja2 模板 | P1 |
-| **Phase 2** | 3-5 天 | SQLite 取代 Pickle | P1 |
-| **Phase 2** | 2-3 天 | 投資組合相關性分析 | P1 |
-| **Phase 3** | 5-7 天 | Walk-Forward Analysis | P2 |
-| **Phase 3** | 7-10 天 | 市場狀態偵測 + ML 預測 | P2 |
-| **Phase 4** | 持續 | 自動化 Pipeline + CI/CD | P2 |
+| **Phase 1** | ~~已完成 2026-05-26~~ | ✅ 實作 DDE v5 統一評分（dde_v5_scorer.py＋signal／ccy 兩個 v5 排名頁，見 14.2.2 測試結果） | P0 |
+| **Phase 1** | ~~已完成 2026-05-26~~ | ✅ 新增 Max Drawdown Control 維度（v5 $1K DD% 佔 25% 權重） | P0 |
+| **Phase 1** | ~~已完成（≤2026-06-19）~~ | ✅ EA_MAP 去重（config.py 單一 source of truth，v0.9 已收錄） | P1 |
+| **Phase 2** | 🔶 部分（待方向裁決） | 架構重構：模組化 + Jinja2 模板 — src/ 15 模組但消費者全部喺 archive/；Jinja2 只覆蓋 ccy_ranking 一頁；2026-10~11 新頁面走 JS 動態渲染路線（審計④），待裁決 Jinja2 vs static JSON＋JS | P1 |
+| **Phase 2** | ~~已完成 2026-06-07~~ | ✅ SQLite 取代 Pickle — db_manager.py 主路徑全 SQLite、全倉零 .pkl，僅餘 dde_v5_scorer.py legacy 旁寫死碼（審計⑤） | P1 |
+| **Phase 2** | ~~已完成 2026-07-04~~ | ✅ 投資組合相關性分析 — portfolio_v2_analyzer.py 相關性矩陣＋高相關預警，P1-P10 組合報告全套（審計⑥） | P1 |
+| **Phase 3** | ~~已完成 2026-11-15~~ | ✅ Walk-Forward Analysis — 組合級（2026-06-21，portfolio_v2_analyzer 方案 B）＋訊號級（scripts/signal_walk_forward.py，commit `2c9cbbcf`，預設 6 期、`--periods 12` 對應 PRD 原文，見 16.4） | P2 |
+| **Phase 3** | 🔶 部分 | 市場狀態偵測 — 指標層已落地（adx_regime／volatility_regime 已入深度分析維度，審計⑦）；ML 預測（14.5.3）未做；「組合按市況加權」未做 | P2 |
+| **Phase 4** | 🔶 推進中 | 自動化 Pipeline + CI/CD — 2026-11-15 覆盤排程 wrapper＋SKILL 入口落地（見 16.2／16.3）；CI 得 regression.yml（push/PR 觸發，無 schedule） | P2 |
 
 ### 14.7 關鍵共識同分歧
 
@@ -1156,3 +1156,65 @@ python3 scripts/date_range_review.py --start-date 2026-06-01 --end-date 2026-06-
 ---
 
 *此章節由丁蟹整合老闆指示 + Coder 實現結果。日期：2026-06-21。*
+
+---
+
+## 16. v0.10 更新（2026-11-15）
+
+> **觸發原因**：PRD v0.9（2026-06-19）嘅 Section 10／14.6 狀態標記滯後於倉庫實況。本版依據 `docs/PRD_BACKLOG_AUDIT_20261115.md`（git 記錄＋一手代碼審計，覆核 5,689 個 commit）同步狀態，並收錄 2026-11-15 同日三項新交付：SKILL 自動化入口、覆盤自動化、訊號級 Walk-Forward。
+> **原則**：只改狀態標記同新增本節紀錄，Section 1-15 歷史段落一律不改寫。
+
+### 16.1 待辦狀態同步（Section 10／14.6）
+
+依據 `docs/PRD_BACKLOG_AUDIT_20261115.md` 逐項核實後更新（逐項證據行號見該檔）：
+
+| 待辦 | 舊標記 | 新狀態 | 依據 |
+|------|--------|--------|------|
+| #1 Signal Info Card | 🔜 待開發 | ✅ 已完成（v0.9 發布前已上線） | 審計①：57/71 份 detailed report 已渲染 |
+| #2 .set 版本差異比較 | 🔜 待開發 | ✅ 已完成（v0.9 發布前已上線） | 審計②：CLI＋Info Card＋API 三層齊備 |
+| #3 SKILL 自動化分析流程 | 🔜 待開發 | 🔶 部分完成 | 審計③＋2026-11-15 入口交付（16.2） |
+| #4 CoP/CoL 評分公式改進 | ⏳ 討論中 | 🔶 已於 v5 修復，待 Gemini 確認後正式關閉 | 分析師覆核（16.5） |
+| ⑤ SQLite 取代 pickle（14.6） | 待定 | ✅ 已完成（2026-06-07） | 審計⑤：主路徑全 SQLite、全倉零 .pkl |
+| ⑥ 投資組合相關性分析（14.6） | 待定 | ✅ 已完成（2026-06-21／07-04） | 審計⑥：相關性矩陣＋P1-P10 報告 |
+| ⑦ Walk-Forward（14.6 Phase 3） | 待定 | ✅ 訊號級已交付（2026-11-15） | 審計⑦＋16.4；ML 預測仍屬長期目標 |
+| ⑧ 覆盤自動化（15.6） | 15.6 明言「未來」 | ✅ 倉庫側已落地（2026-11-15） | 16.3；VPS crontab 接線屬營運 lane |
+
+#5 Tick Data 精確度、#6 `UseAISignal=1` 邏輯：2026-11-15 審計未涵蓋、倉內無新證據，維持待確認。
+
+### 16.2 SKILL 自動化入口（待辦③）
+
+- **入口腳本**：`scripts/analyze_signal_entry.py` — 一鍵鏈「下載 CSV（或用現成檔）→ 倉位重構分析 → 存 `data/analysis_history.db` → 寫 TG 通知檔（`logs/trade-analyzer-notify.jsonl`）」，純 Python 標準庫，唔依賴 pandas／fastapi。
+- **運行手冊**：`docs/SKILL_AUTOMATION_RUNBOOK_20261115.md` — 含執行環境核實（WSL 零發行版、8787 埠零 listener、`/tmp` 通知檔機制喺 Windows 冇基礎）同兩信號實測記錄（10437：1,083 倉位｜WR 78.0%｜PF 1.22；11984：967 倉位｜WR 75.7%｜PF 1.88）。
+- **commit**：`2c50a4d3`（同時修復 `ea_name_mapping.json`、調整 `.gitignore`）。
+- **邊界**：skill 定義檔（「分析 signal {ID}」指令接線）屬 AutoClaw 端、尚未建立——待辦③未完全關閉。
+
+### 16.3 覆盤每日／每週自動化（待辦⑧／Section 15.6）
+
+- **Wrapper**：`scripts/run_scheduled_reviews.py` — 串接既有輪：`generate_history_backup.py`（CSV→history JSON）→ `scripts/date_range_review.py`（生成報告）→ 保留策略剪枝（日報 30 日／週報 12 週，index.json 條目同步剪）→ git commit（`--push` 預設關）。
+- **文檔**：`docs/REVIEWS_AUTOMATION.md`（觸發點一覽＋排程時間取捨＋落地驗收紀錄）。
+- **排程**：每日 06:05 日報（crontab `5 6 * * *`）、每週一 06:10 週報（`10 6 * * 1`），VPS crontab。時間由 PRD 15.6 原文 00:05／00:10 後移——排喺 AlgoForest 同步（~04:40）同 ranking 重生成（05:30）之後，否則昨日報告會缺最新交易；取捨記錄於 `docs/REVIEWS_AUTOMATION.md` §2。
+- **實體輸出已落地**：`docs/reviews/daily/review_2026-11-14_*`（2026-11-14 係週六休市，0 交易屬正確輸出）＋`docs/reviews/weekly/review_2026-11-09_2026-11-15_*`；保留清理已刪 6 個 2026-04/05 舊週報。
+- **commits**：`380f45d3`（wrapper＋文檔）、`49c6ea3a`（daily 產出＋保留清理）、`9adbaee8`（weekly 產出）。
+- **邊界**：VPS crontab 兩行接線屬營運 lane 動作，尚未執行；月報 cron 未接（現有月報產物全部喺 12 個月保留期內，暫無需清理）。
+
+### 16.4 訊號級 Walk-Forward（待辦⑦／Section 14.5.1）
+
+- **腳本**：`scripts/signal_walk_forward.py` — 將單一信號歷史按月切 K 個時期，相鄰期做 train/test 對比（Period N 訓練 → Period N+1 測試），量度 PF 保留率、勝率滑落、期望值變號、樣本外 DD 擴張 → **六維過擬合風險評分（0-100）**。
+- **輸出**：`docs/signal_walk_forward.html`（TSA dark theme）＋`data/signal_walk_forward_results.json`（機讀結果）。
+- **commit**：`2c9cbbcf`。
+- **取捨**：預設 6 期——PRD 14.5.1 原文 12 期可用 `--periods 12` 選項；所選信號歷史 21-39 個月，切 12 期單期樣本不足。分析基準係 `downloads/*.csv` 一手來源（`data/history/` 僅作交叉核對）；只做分析，唔掂評分／排名代碼。
+- **關聯**：組合級 Walk-Forward 仍由 `scripts/portfolio_v2_analyzer.py`（方案 B）提供；市場狀態偵測指標層已入深度分析管線（`src/indicators.py` ADX regime）。
+
+### 16.5 未關閉事項（下一步）
+
+| 事項 | 現狀 | 收件條件 |
+|------|------|----------|
+| #4 CoP 修復正式關閉 | v5 主鏈路已修復（真實勝率、15% 權重），殘留僅 archive 棄用腳本 | 外部顧問（Gemini）確認（呼應已確認決策 #10：Scoring 改動前先同 Gemini 討論） |
+| #3 SKILL 定義檔 | 倉內入口已落地、兩信號實測通 | AutoClaw 端建立 skill 定義檔並接線 Telegram |
+| ⑧ VPS crontab | wrapper＋實體輸出已落地 | 營運 lane 喺 VPS `crontab -e` 加兩行、手動各跑一次、翌日查 reviews.log |
+| ML 信號品質預測（14.5.3） | 完全未做 | Phase 3 長期目標，另行派工 |
+| Phase 2 模組化＋Jinja2 | 部分：src/ 消費者全喺 archive/、Jinja2 僅一頁 | 老闆裁決架構方向（Jinja2 服務器渲染 vs static JSON＋JS），裁完先決定重構定收卡 |
+
+---
+
+*此章節由丁蟹整合 2026-11-15 三方並行交付（SKILL 入口／覆盤自動化／訊號級 Walk-Forward）＋ PRD 待辦審計結果。日期：2026-11-15。*

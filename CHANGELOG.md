@@ -4,6 +4,38 @@
 - **Major**：新功能模組 / 架構改動
 - **Minor**：bug fix / 小優化 / UI 調整
 
+## [v5.0] — 2026-11-15
+### 📄 PRD v0.10 狀態同步 + 三項自動化交付
+
+**依據**：`docs/PRD_BACKLOG_AUDIT_20261115.md` 待辦審計（PRD v0.9 狀態標記滯後於倉庫實況）；commits 均喺 `local/alvin` 分支。
+
+#### 🔌 SKILL 自動化入口（待辦③）
+- 新增 `scripts/analyze_signal_entry.py`：「分析 signal {ID}」一鍵鏈——下載 CSV → 倉位重構分析 → 存 `data/analysis_history.db` → 寫 TG 通知檔；純標準庫，唔依賴 pandas／fastapi
+- 新增 `docs/SKILL_AUTOMATION_RUNBOOK_20261115.md` 運行手冊（環境核實＋逐步指令＋實測記錄：10437／11984 兩信號跑通）
+- 同 commit 修復 `ea_name_mapping.json`、調整 `.gitignore`
+- commit：`2c50a4d3`
+- 待辦：skill 定義檔屬 AutoClaw 端、尚未建立
+
+#### 🗓️ 覆盤每日／每週自動化（待辦⑧／PRD 15.6）
+- 新增 `scripts/run_scheduled_reviews.py`：history 備份 → `date_range_review.py` 生成報告 → 保留策略剪枝（日報 30 日／週報 12 週）→ git commit（--push 預設關）
+- 新增 `docs/REVIEWS_AUTOMATION.md`：排程每日 06:05 日報／週一 06:10 週報（VPS crontab；由 PRD 原文 00:05／00:10 後移至數據同步 ~04:40＋ranking 05:30 之後）
+- 實體輸出落地：`docs/reviews/daily/review_2026-11-14_*`、`docs/reviews/weekly/review_2026-11-09_2026-11-15_*`；保留清理刪 6 個 2026-04/05 舊週報
+- commits：`380f45d3`（wrapper＋文檔）、`49c6ea3a`（daily 產出＋保留清理）、`9adbaee8`（weekly 產出）
+- 待辦：VPS crontab 兩行接線（營運 lane）；月報 cron 未接
+
+#### 📈 訊號級 Walk-Forward（待辦⑦／PRD 14.5.1）
+- 新增 `scripts/signal_walk_forward.py`：信號歷史按月切期、相鄰期 train/test 對比，六維過擬合風險評分（0-100）；預設 6 期，`--periods 12` 對應 PRD 原文 12 期
+- 輸出：`docs/signal_walk_forward.html`（TSA dark theme）＋`data/signal_walk_forward_results.json`
+- commit：`2c9cbbcf`
+
+#### 📋 PRD.md v0.9 → v0.10（文檔狀態同步）
+- 檔頭版本升 v0.10（2026-11-15）；新增 Section 16「v0.10 更新（2026-11-15）」：三項交付明細＋commit＋未關閉事項
+- Section 10 待辦表：#1 Info Card、#2 .set 差異改「已完成」（v0.9 發布前已上線）；#3 SKILL 改「部分完成」（倉內入口已落地）；#4 CoP 勝率白送問題改「已於 v5 修復，待 Gemini 確認後正式關閉」；#5／#6 維持待確認
+- Section 14.6 路線圖：Phase 1 標記完成；SQLite（2026-06-07）、相關性分析（2026-07-04）、Walk-Forward（2026-11-15 訊號級）標記完成；Phase 2 架構待方向裁決；ML 預測（14.5.3）未做
+- 歷史段落（Section 1-15）零改寫，只改狀態標記同新增紀錄
+
+---
+
 ## [v4.0] — 2026-05-02
 ### 🔥 DDE v3 Copy Strategy 評分系統
 
@@ -177,4 +209,4 @@
 
 ---
 
-*最後更新：2026-04-25 | 維護者：丁蟹 🦀*
+*最後更新：2026-11-15 | 維護者：丁蟹 🦀*
