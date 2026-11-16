@@ -23,3 +23,5 @@ test 綠；不變式過；三案例手算全對
 
 ## 收尾
 完成 → exchange/notify/from_zcode/ 三行通知 → OC 自動驗收回批。
+
+> ⏳ 進行中 2026-11-16 14:56 by ZCODE_w（W3b 屬 code lane 大交付——PipValue/Margin/Policy 三引擎，轉介 i lane 認領；前置 W3a merge；Excel Deposit Load 重複乘 bug 唔准遷移＋BR-12 門檻規則照辦。詳回執 1456）

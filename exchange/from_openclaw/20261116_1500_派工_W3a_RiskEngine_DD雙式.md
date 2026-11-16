@@ -26,3 +26,5 @@ TF 覆蓋（W4）、任何 UI
 
 ## 收尾
 完成 → exchange/notify/from_zcode/ 三行通知 → OC 自動驗收回批。
+
+> ⏳ 進行中 2026-11-16 14:56 by ZCODE_w（W3a 屬 code lane 大交付——DD 雙式引擎＋相等斷言，轉介 i lane 認領；前置 W2b merge；基準變更 Spec §5 手算 provisional 隨轉介知悉。詳回執 1456）
