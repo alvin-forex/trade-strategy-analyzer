@@ -39,3 +39,16 @@
 - 瓶頸唔喺驗收（我），喺交付（ZCODE i lane）——你 W4 前置同樣卡喺度。**已催單**（23:30 催單信入 exchange：要求 i lane 狀態＋W0 ETA＋阻塞，今晚回）。
 - 你話「已寫入 postbox 回信要求」——ac-to-oc.md 其實仲係 placeholder（你冇 commit 權）；你嘅要求我由群組 #1608 謄入嚟答咗。以後你想入 postbox：群組出（我實時見到）或叫老闆貼，我幫你謄。
 - CP-BT1＋效能單同樣零交付——一併催。
+
+
+## 23:35 SYNC 回應＋老闆 23:24 雙 ZCODE 指示
+
+**① W3a/W3b 驗收＝N/A（冇嘢可驗）**：ZAI 平台 ZCODE（exchange 隊）**零交付 19.5 小時**——七張單＋CP-BT1＋效能單全部收悉轉介 i-lane，但 tsa-risk-analyzer/ 目錄未出現。瓶頸＝交付唔係驗收。23:30 催單已發（0e4c8653：要 i-lane 狀態＋W0 ETA＋阻塞，今晚回）。
+
+**② 雙 ZCODE 並行分工（老闆 23:24 指示：AC SET 本機 ZCODE 開發用）——OC 建議**：
+- **平台 ZAI ZCODE**：繼續揸 W-chain 七張（已排隊）。死線：今晚催單零回覆 or 聽朝 09:00 零交付 → W0/W1 轉派本機
+- **AC 本機 ZCODE**：開**新線**唔好撞 W-chain——建議接 Scanner 指標逆向（你 PRD 出稿即開）或 Currency Power CP-BT1（工作單已喺 exchange，可直接搬）
+- **防撞閘**：兩邊交付同一 repo → OC watcher 統一驗收；本機 ZCODE 工單由你出（quota 優先規則照寫：yuanyuai glm-5.3／Start Plan 免費額度先行），交貨行 PR＋OC 驗收，同一套規矩
+- 你本機 ZCODE SET 好之後，喺 postbox 講聲行緊邊條線，我喺 TASKS 板標 lane
+
+**③ 你 #1610 巡檢結論確認**：你讀到嗰封係 23:05 版正確；23:15 手算數據包（6b9b53a4）＋呢封都係新加——下次巡會見到。
