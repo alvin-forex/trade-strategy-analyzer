@@ -2355,3 +2355,9 @@ Stage Summary:
 - 巡檢：pull 95f2841（HTTPS fallback），新信 1 封＝1343 回批（#27 五頁機器閘 PASS 6/7，11-16 ETA 提前收項；第 7 項 diff 留檔缺件）。OpenClaw 已蓋章我方 1331/1339 回執（43ea145）。
 - **diff 缺件補推**：scripts/tsa_redo/wfinal_sidebar5_20261115.diff 改入 repo（git show 7265c84 重生成 141 行），下輪機器閘第 7 項可過；蓋章 14:32＋回執 1432＋notify，commit 0dda0a1 離站。
 - 教訓：留檔聲稱路徑必須與實物同處——今後 diff／verify raw 一律入 repo（本地 scripts/ 僅副本）。等態照排：裁定批 4 等老闆派工令；真舊殼 2 等收項；重構 1＋ensure_key bug 歸 i lane；TG 通道等老闆重傳。
+
+## Task 282：08:31 cron（11-16）＋第四次 rollback 自癒＋1441 收悉＋W0-W2b 五單 ⏳ 轉介（2026-11-16 08:31–08:36，ZCODE_w）
+- 第四次 rollback（隔夜）：本地 scripts/＋.keys＋repo 工作樹退回舊快照。自癒：key 20261107 zip 平面解壓歸位＋v4.1 正本歸位＋tsa_pw 補回＋本地 worklog 依鏡像重建。**新教訓：rollback 後須先 pull 再取 repo 正本**（本鐘 cp 曾誤取退化 v3.9，pull 後重拷歸位）。
+- 巡檢：pull cd549f8（HTTPS fallback——pull 時 v3.x 未認 .keys key；v4.1 歸位後 push 走 SSH 正常），新信 7 封：1441 回批（diff 缺件清償 7/7 全綠，#27 五頁正式閉環）＋2330 工作交換（AutoClaw 件）＋派工五單 W0（repo 骨架）/W1（波幅管線＋六錯誤碼）/W1.5（ADMIN staticrypt＋公開頁）/W2a（SET＋四 EA adapter）/W2b（TF 解析＋GridSpec）。
+- 處理：1441＋2330 蓋 ✅；五派工單蓋 ⏳ 進行中轉介 ZCODE_i（code lane 大交付，w lane 鐵律不搶工）；合併回執 0833＋notify＋九檔 push（commit 4934cb3）；quota 指示（glm-5.3 Start Plan 先行，老闆 11-15 12:54）隨轉介知悉；依賴鏈 W0→W1→(W1.5 並行)→W2a→W2b 已記。
+- 待辦續列：TG token＋tg_bot.sh 等老闆（OpenClaw 已轉達）；ensure_key pattern bug 歸 i lane；#27 餘 12 頁等裁定工序；W 系列等 i lane 認領開工。
