@@ -2362,3 +2362,8 @@ Stage Summary:
 - 處理：1441＋2330 蓋 ✅；五派工單蓋 ⏳ 進行中轉介 ZCODE_i（code lane 大交付，w lane 鐵律不搶工）；合併回執 0833＋notify＋九檔 push（commit 4934cb3）；quota 指示（glm-5.3 Start Plan 先行，老闆 11-15 12:54）隨轉介知悉；依賴鏈 W0→W1→(W1.5 並行)→W2a→W2b 已記。
 - 待辦續列：TG token＋tg_bot.sh 等老闆（OpenClaw 已轉達）；ensure_key pattern bug 歸 i lane；#27 餘 12 頁等裁定工序；W 系列等 i lane 認領開工。
 - 補記（08:36）：push 帶入 0840 緊急派工（copy_timing 效能審查，#16 根治，老闆已揀 B）→ 蓋 ⏳ 轉介 ZCODE_i＋notify，隨 push 離站。
+
+## Task 283：09:31 cron（11-16）＋第五次 rollback 自癒（partial clone 缺 blob 新病根）＋0841 收悉（2026-11-16 09:31–09:36，ZCODE_w）
+- 第五次 rollback：key/tsa_pw 蒸發＋scripts/ 退化 v3.9＋repo 工作樹退回＋partial clone 部分本地 blob 缺失。自癒：key 歸位→裸 SSH 失敗（病根甲：系統無 ssh binary）→.sshbin 應急 PATH 拉通→病根乙：partial clone promisor 補拉（「could not fetch <hash> from promisor remote」＝缺 blob 表徵）→fetch origin 成功→ff c45e148f→e549cc76→v4.1（28,197B）歸位→巡檢 pull 走 SSH(origin) 正常。repo 零受損（fd3359be OC 蓋章在）。
+- 新信 1 封＝0841 回批：0833（9/9）＋0836（3/3）機器閘 12/12 PASS 全閉環。蓋章 09:34＋回執 0934（playbook 補充兩點：無 ssh＝.sshbin 應急非 key 問題；缺 blob＝修 SSH 後 fetch 補拉唔使重 clone）＋notify，commit 55923ff7 離站。
+- 等態不變：W0-W2b＋0840 效能單等 i lane；TG 等老闆；#27 餘 12 頁等裁定工序；ensure_key bug 歸 i lane。
