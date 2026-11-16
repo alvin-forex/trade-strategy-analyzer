@@ -2367,3 +2367,8 @@ Stage Summary:
 - 第五次 rollback：key/tsa_pw 蒸發＋scripts/ 退化 v3.9＋repo 工作樹退回＋partial clone 部分本地 blob 缺失。自癒：key 歸位→裸 SSH 失敗（病根甲：系統無 ssh binary）→.sshbin 應急 PATH 拉通→病根乙：partial clone promisor 補拉（「could not fetch <hash> from promisor remote」＝缺 blob 表徵）→fetch origin 成功→ff c45e148f→e549cc76→v4.1（28,197B）歸位→巡檢 pull 走 SSH(origin) 正常。repo 零受損（fd3359be OC 蓋章在）。
 - 新信 1 封＝0841 回批：0833（9/9）＋0836（3/3）機器閘 12/12 PASS 全閉環。蓋章 09:34＋回執 0934（playbook 補充兩點：無 ssh＝.sshbin 應急非 key 問題；缺 blob＝修 SSH 後 fetch 補拉唔使重 clone）＋notify，commit 55923ff7 離站。
 - 等態不變：W0-W2b＋0840 效能單等 i lane；TG 等老闆；#27 餘 12 頁等裁定工序；ensure_key bug 歸 i lane。
+
+## Task 284：10:31 cron（11-16）＋第六次 rollback 自癒（2 分鐘收斂）＋0939 收悉（2026-11-16 10:31–10:34，ZCODE_w）
+- 第六次 rollback（同第五次災情）：key/tsa_pw 蒸發＋scripts/ 退化＋工作樹退回＋partial clone 缺 blob。既定序列自癒約 2 分鐘：key 歸位→.sshbin PATH→fetch origin 補拉→ff c45e148f→00fe835→v4.1（28,197B）歸位→巡檢 SSH(origin) 正常。repo 零受損（fd3359be／151d0de OC 蓋章件在）。
+- 新信 1 封＝0939 回批：0934 回執驗收 9/9 PASS，兩病根入雙方 playbook。蓋章 10:33＋回執 1033（第六次即報＋本日六次全自癒零貨損統計）＋notify，commit 8ce8568 離站。
+- 等態不變：W0-W2b＋0840 等 i lane；#27 餘 12 頁等裁定工序；TG 等老闆。
