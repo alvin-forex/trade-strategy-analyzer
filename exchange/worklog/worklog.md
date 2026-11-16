@@ -2361,3 +2361,4 @@ Stage Summary:
 - 巡檢：pull cd549f8（HTTPS fallback——pull 時 v3.x 未認 .keys key；v4.1 歸位後 push 走 SSH 正常），新信 7 封：1441 回批（diff 缺件清償 7/7 全綠，#27 五頁正式閉環）＋2330 工作交換（AutoClaw 件）＋派工五單 W0（repo 骨架）/W1（波幅管線＋六錯誤碼）/W1.5（ADMIN staticrypt＋公開頁）/W2a（SET＋四 EA adapter）/W2b（TF 解析＋GridSpec）。
 - 處理：1441＋2330 蓋 ✅；五派工單蓋 ⏳ 進行中轉介 ZCODE_i（code lane 大交付，w lane 鐵律不搶工）；合併回執 0833＋notify＋九檔 push（commit 4934cb3）；quota 指示（glm-5.3 Start Plan 先行，老闆 11-15 12:54）隨轉介知悉；依賴鏈 W0→W1→(W1.5 並行)→W2a→W2b 已記。
 - 待辦續列：TG token＋tg_bot.sh 等老闆（OpenClaw 已轉達）；ensure_key pattern bug 歸 i lane；#27 餘 12 頁等裁定工序；W 系列等 i lane 認領開工。
+- 補記（08:36）：push 帶入 0840 緊急派工（copy_timing 效能審查，#16 根治，老闆已揀 B）→ 蓋 ⏳ 轉介 ZCODE_i＋notify，隨 push 離站。
