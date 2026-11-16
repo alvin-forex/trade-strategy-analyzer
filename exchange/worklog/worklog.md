@@ -2372,3 +2372,11 @@ Stage Summary:
 - 第六次 rollback（同第五次災情）：key/tsa_pw 蒸發＋scripts/ 退化＋工作樹退回＋partial clone 缺 blob。既定序列自癒約 2 分鐘：key 歸位→.sshbin PATH→fetch origin 補拉→ff c45e148f→00fe835→v4.1（28,197B）歸位→巡檢 SSH(origin) 正常。repo 零受損（fd3359be／151d0de OC 蓋章件在）。
 - 新信 1 封＝0939 回批：0934 回執驗收 9/9 PASS，兩病根入雙方 playbook。蓋章 10:33＋回執 1033（第六次即報＋本日六次全自癒零貨損統計）＋notify，commit 8ce8568 離站。
 - 等態不變：W0-W2b＋0840 等 i lane；#27 餘 12 頁等裁定工序；TG 等老闆。
+
+## Task 285：13:31 cron（11-16）＋沙盒兩鐘故障後第七次 rollback 自癒＋1041 收悉＋CP-BT1 缺件提示（2026-11-16 13:31–13:36，ZCODE_w）
+- 11:31／12:31 兩鐘**平台級 sandbox 啟動失敗**（非 rollback，檔案系統完全無法訪問）：兩鐘零產出零 push，僅向老闆匯報等重啟。13:31 鐘沙盒恢復。
+- 第七次 rollback（11-16 第四次）：key 20261107/tsa_pw 蒸發＋腳本退化 v3.9（25,003B）＋工作樹退回 c45e148。照 playbook 自癒：zip 平面解壓→.sshbin PATH＋GIT_SSH_COMMAND（注意 export 唔可以只用單命令前綴，pull 會跌返冇 key）→fetch 補 promisor blob→pull --ff-only 至 2f03e12→v4.1（28,197B）歸位→巡檢正常，收斂約 3 分鐘，零貨損。a3458966 確認在祖先鏈。
+- 本地 worklog 依 repo 鏡像重建（rollback 曾打回 11-05 Task 246 舊快照）。
+- 新信 1 封＝1041 回批：1033 回執驗收 6/6 PASS 全綠。蓋章 13:34＋回執 1334（第七次即報＋沙盒故障新病根通報入 playbook 建議＋CP-BT1 缺件提示）＋notify。
+- CP-BT1 派工（CurrencyPower v3.10 移植＋parity，68666e1）：notify 在場但**正式信件本體未入 repo**（git log --all 無 add 記錄）——出信請 OC 補件；按內容屬大交付 ⏳ 轉介 i lane。
+- 等態不變：W0-W2b＋0840 等 i lane；#27 餘 12 頁等裁定；TG 等老闆。尾三 Task 283/284/285 狀態：283/284 完成、285 本鐘完成。
