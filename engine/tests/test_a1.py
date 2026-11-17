@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from engine.bar import Bar, load_bars_csv, pip_size, slice_window
 from engine.buckets import compute_buckets, percentile_inc, percentile_nearest_rank, split_counts
-from engine.merge import build_waves, merge_pivots
+from engine.merge import build_waves, merge_pivots, merge_pivots_drop_next
 from engine.zigzag import zigzag
 
 EVID = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "evidence", "a1")
@@ -151,6 +151,56 @@ class TestWaveBuild(unittest.TestCase):
         stats = compute_buckets([x.amplitude_pips for x in waves], [x.bars for x in waves])
         self.assertEqual(sum(s.count for s in stats), len(waves))
         self.assertEqual(sum(s.total_bars for s in stats), sum(x.bars for x in waves))
+
+
+@unittest.skipUnless(os.path.exists(BARS), "MT4 evidence not present")
+class TestPanelParity(unittest.TestCase):
+    """Reproduce the original indicator panel (Alpari, EURUSD H1)."""
+
+    @classmethod
+    def setUpClass(cls):
+        bars = load_bars_csv(BARS)
+        cls.window = slice_window(bars, "2026-09-17T02:00", "2026-11-16T17:00")
+        cls.pivots = zigzag(cls.window, 12, 5, 3, 1e-5)
+        cls.merged = merge_pivots_drop_next(cls.pivots, 35.0)
+        cls.waves = build_waves(cls.merged, 1e-4, "exclusive")
+
+    def test_window_bar_count(self):
+        self.assertEqual(len(self.window), 1023)
+
+    def test_total_swings_matches_panel(self):
+        self.assertEqual(len(self.waves), 49, "panel reports 49 swings")
+
+    def test_class_counts_match_panel(self):
+        stats = compute_buckets(
+            [w.amplitude_pips for w in self.waves], [w.bars for w in self.waves]
+        )
+        self.assertEqual([s.count for s in stats], [39, 7, 3])
+
+    def test_medium_class_matches_panel_exactly(self):
+        """The Medium class reproduces all six panel metrics."""
+        stats = compute_buckets(
+            [w.amplitude_pips for w in self.waves], [w.bars for w in self.waves]
+        )
+        medium = stats[1]
+        self.assertEqual(medium.total_bars, 211)
+        self.assertEqual(medium.total_pips, 831.1)
+        self.assertEqual(medium.average_bars, 30.1)
+        self.assertEqual(medium.longest_bars, 56)
+        self.assertEqual(medium.shortest_bars, 11)
+
+    def test_normal_longest_matches_panel(self):
+        stats = compute_buckets(
+            [w.amplitude_pips for w in self.waves], [w.bars for w in self.waves]
+        )
+        self.assertEqual(stats[0].longest_bars, 48)
+
+    def test_determinism_of_merge(self):
+        again = merge_pivots_drop_next(self.pivots, 35.0)
+        self.assertEqual(
+            [(p.idx, p.price, p.kind) for p in again],
+            [(p.idx, p.price, p.kind) for p in self.merged],
+        )
 
 
 if __name__ == "__main__":
