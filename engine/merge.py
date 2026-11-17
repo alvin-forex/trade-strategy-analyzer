@@ -99,15 +99,51 @@ def merge_pivots_post(
     return chain
 
 
-def merge_pivots(
-    pivots: Sequence[Pivot], pct: float = 35.0, base_mode: str = "post"
+def merge_pivots_drop_next(
+    pivots: Sequence[Pivot], pct: float, max_iter: int = MAX_ITER
 ) -> List[Pivot]:
-    """Dispatch on ``base_mode``: ``"pre"`` or ``"post"``."""
+    """Iterate, deleting the pivot that *ends* a too-shallow retracement.
+
+    Recovered empirically against the real panel (2026-11-18): this reading
+    reproduces 49 swings / 39-7-3 and the whole Medium class exactly
+    (211 bars, 831.1 pips, 30.1 avg, longest 56, shortest 11). Neither ``pre``
+    nor ``post`` can do that — they only reach 55 swings.
+    """
+    if len(pivots) < 3:
+        return list(pivots)
+    ratio = pct / 100.0
+    chain = list(pivots)
+    for _ in range(max_iter):
+        out: List[Pivot] = [chain[0]]
+        k = 1
+        dropped = False
+        while k < len(chain) - 1:
+            leg = abs(chain[k].price - out[-1].price)
+            retrace = abs(chain[k + 1].price - chain[k].price)
+            if leg > 0 and retrace < ratio * leg:
+                k += 2  # absorb: skip the pivot that ended the shallow pullback
+                dropped = True
+                continue
+            out.append(chain[k])
+            k += 1
+        out.extend(chain[k:])
+        chain = out
+        if not dropped:
+            break
+    return chain
+
+
+def merge_pivots(
+    pivots: Sequence[Pivot], pct: float = 35.0, base_mode: str = "drop_next"
+) -> List[Pivot]:
+    """Dispatch on ``base_mode``: ``"drop_next"`` (default), ``"pre"`` or ``"post"``."""
+    if base_mode == "drop_next":
+        return merge_pivots_drop_next(pivots, pct)
     if base_mode == "pre":
         return merge_pivots_pre(pivots, pct)
     if base_mode == "post":
         return merge_pivots_post(pivots, pct)
-    raise ValueError("base_mode must be 'pre' or 'post'")
+    raise ValueError("base_mode must be 'drop_next', 'pre' or 'post'")
 
 
 def build_waves(

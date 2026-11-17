@@ -5,9 +5,12 @@ never defines Deviation units, Depth direction, Backstep meaning, or what the
 Merge Percentage is measured against. This tool enumerates the plausible
 readings and scores each one against the two known ground-truth sets:
 
+  * original indicator panel (Alpari, EURUSD H1, Date Range window):
+        49 swings -> 39 / 7 / 3, Total bars 630 / 211 / 162,
+        Average bars 16.2 / 30.1 / 54.0
   * manual example : 53 swings -> 42 / 8 / 3
-  * AC parity      : 49 swings -> 39 / 7 / 3, Total bars 631 / 210 / 162,
-                     Average bars 16.2 / 30.0 / 54.0
+
+The panel numbers are the authoritative target; see ASSUMPTIONS.md.
 
 Run::
 
@@ -32,8 +35,8 @@ from .zigzag import Pivot, zigzag
 # --- ground truth -----------------------------------------------------------
 PARITY_N = 49
 PARITY_COUNTS = (39, 7, 3)
-PARITY_TOTAL_BARS = (631, 210, 162)
-PARITY_AVG_BARS = (16.2, 30.0, 54.0)
+PARITY_TOTAL_BARS = (630, 211, 162)
+PARITY_AVG_BARS = (16.2, 30.1, 54.0)
 
 MANUAL_N = 53
 MANUAL_COUNTS = (42, 8, 3)
@@ -86,7 +89,7 @@ def apply_merge(pivots: Sequence[Pivot], pct: float, mode: str) -> List[Pivot]:
 
     if mode == "wave":
         return merge_wave_mode(pivots, pct)
-    return merge_pivots(pivots, pct, mode)
+    return merge_pivots(pivots, pct, mode)  # drop_next / pre / post
 
 
 def bucket_bars(
@@ -158,7 +161,7 @@ def sweep(
     out = []
     combos = itertools.product(
         ("points", "pips"),
-        ("pre", "post", "wave"),
+        ("drop_next", "pre", "post", "wave"),
         ("exclusive", "inclusive"),
         ("rank", "inc"),
         depths,

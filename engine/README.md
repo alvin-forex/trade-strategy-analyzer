@@ -21,8 +21,9 @@ python -m engine.extract --bars-csv engine/evidence/a1/mt4_EURUSD_H1_bars.csv \
   --from 2026-09-17T02:00 --to 2026-11-16T17:00 \
   --out waves_offline.csv --no-parity
 
-# 4) 語義掃描（擬合未確認嘅 Merge 讀法）
+# 4) 語義掃描 + 對真面板擬合（研究工具，唔參與出貨）
 python -m engine.sweep --limit 20
+python engine/fit_panel3.py
 
 # 5) 單元測試
 python -m unittest discover -s engine/tests -t . -v
@@ -51,11 +52,11 @@ idx,startTime,endTime,bars,amplitudePips
 |---|---|
 | `bar.py` | `Bar` 容器、CSV 載入、窗口切片、`pip_size()` |
 | `zigzag.py` | MT4 `ZigZag.mq4` 三遍算法嘅逐語句移植 → `Pivot[]` |
-| `merge.py` | Merge Percentage 過濾（`pre` / `post` 兩種基準）→ `Wave[]` |
+| `merge.py` | Merge Percentage 過濾（`drop_next` 預設；另有 `pre` / `post` 對照）→ `Wave[]` |
 | `buckets.py` | 80/15/5 分檔（按條數，round-half-up）、兩種 percentile 法 |
 | `waves.py` | `waves.csv` 寫出／讀回、meta sidecar |
 | `extract.py` | CLI 入口 |
-| `sweep.py` | 語義參數掃描（擬合工具，唔參與出貨路徑） |
+| `sweep.py` / `fit_panel3.py` | 語義參數掃描（擬合工具，唔參與出貨路徑） |
 | `sources/mt5_source.py` | MT5 官方 API：bars、symbol 元數據、時區量測 |
 | `sources/csv_source.py` | 離線 CSV（parity／跨券商比較用） |
 
@@ -70,18 +71,25 @@ idx,startTime,endTime,bars,amplitudePips
 ❌ **Merge Percentage 基準未解**：≥10 種讀法全部對唔到 49 段
 ❌ **原廠面板數字未取得**（GEMS DLL 保護 + chart-global object 讀唔到）
 
-## 現時 parity 狀態（截至 A1）
+## Parity 狀態（對原廠面板實測，Alpari demo）
 
-| 項目 | 目標 | 實測（Alpari demo） | 差 |
+| 項目 | 面板 | 本引擎 | |
 |---|---|---|---|
-| 總段數 | 49 | 55 | +6 |
-| 三檔 | 39/7/3 | 44/8/3 | — |
-| Total bars | 631/210/162 | 658/254/95 | — |
-| Total bars 合計 | 1003 | 1007 | +4 |
-| 窗口 bars | 1023 | 1023 | ✅ |
-| 原始 pivot 數 | ? | 60 | — |
+| 總段數 | 49 | **49** | ✅ |
+| 三檔段數 | 39/7/3 | **39/7/3** | ✅ |
+| Normal longest | 48 | **48** | ✅ |
+| Medium bars | 211 | **211** | ✅ |
+| Medium pips | 831.1 | **831.1** | ✅ |
+| Medium avgB | 30.1 | **30.1** | ✅ |
+| Medium longest | 56 | **56** | ✅ |
+| Medium shortest | 11 | **11** | ✅ |
+| Normal bars | 630 | 611 | −19 |
+| Crazy bars | 162 | 185 | +23 |
+| 幅度上限 | 249.7 | 253.9 | +4.2 |
 
-**未達成 parity。** 唔會為湊 49 段改算法；差異已記錄，等券商確認同 Merge 語義釐清。
+**核心算法已確定**（ZigZag 12/5/3 移植 + merge `drop_next` 35% + round-half-up 分檔）：
+Medium 類六個指標全部精確命中。殘差集中喺 Normal/Crazy 邊界及尾段處理，
+詳見 `ASSUMPTIONS.md` §「仍未完全對齊」。唔會為湊數改算法。
 
 ## 硬性約束遵循
 
