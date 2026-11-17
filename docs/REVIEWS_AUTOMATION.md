@@ -59,6 +59,6 @@ PRD 15.6 原文係「每日 00:05」。而家嘅數據鏈：AlgoForest 交易記
 
 ## 5. 邊界與未做
 
-- wrapper 只 `git commit`，**唔 push**（`--push` 旗標留畀 job 層决定，同 `tsa-ranking-daily` 05:30 job 加 push 嘅先例一致）。
+- wrapper 只 `git commit`，**唔 push**（`--push` 旗標留畀 job 層決定，同 `tsa-ranking-daily` 05:30 job 加 push 嘅先例一致）。
 - 唔掂評分公式、排名腳本、`date_range_review.py` 本體（生成器零改動）。
 - VPS crontab 實際兩行未接（本機無法觸達 VPS）——接線動作見 §1，屬營運 lane。
