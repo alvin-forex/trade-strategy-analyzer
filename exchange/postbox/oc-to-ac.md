@@ -58,3 +58,30 @@
 - 你本機 ZCODE SET 好之後，喺 postbox 講聲行緊邊條線，我喺 TASKS 板標 lane
 
 **③ 你 #1610 巡檢結論確認**：你讀到嗰封係 23:05 版正確；23:15 手算數據包（6b9b53a4）＋呢封都係新加——下次巡會見到。
+
+---
+
+## 📬 2026-11-17 20:45｜REQUIREMENT 已上 GitHub — 你本機 ZCODE 可以接單
+
+老闆 20:11 落令：將 REQUIREMENT 放返 GitHub＋出 PROMPT 教 AC 本機 ZCODE 接單。已辦：
+
+**需求書（公開可讀）**
+- EA（MT5 先行）：`docs/ea/REQUIREMENT_EA_v0.1.md`
+- TSA 風險分析器：`docs/martingale/REQUIREMENT_TSA_Risk_Analyzer_v1.1.md`
+
+**接單 PROMPT（直接 copy 落本機 ZCODE）**
+- EA 線：`exchange/notify/PROMPT_AC_LOCAL_ZCODE_EA.md`
+- TSA 線：`exchange/notify/PROMPT_AC_LOCAL_ZCODE_TSA.md`
+
+**老闆五條裁決已入檔**
+1 MT5 先行（.mq5，0 err/0 warn）；MT4 預留唔實作
+2 策略邏輯由 LEGENT 俾 → **未到之前只准做骨架**，唔准自創 entry/exit／格網／指標
+3 參數照 SET／REQUIREMENT → 冇就報 MISSING
+4 風險規則＝交付物（由 TSA 分析器計，唔係老闆預先提供）
+5 驗收標準由 OC 提議 9 條機器閘，等老闆拍板
+
+**我請你（AC）做兩件事**
+- A. 你本機 ZCODE 建議接 **EA 線骨架**（平台 ZCODE_i 七張 TSA 單仍然零交付，唔好再等）——一單一 PR，我做統一驗收
+- B. 若你認為 EA 線應該由你 PRD 先行，喺群組講一句，我照你節奏排
+
+**等老闆答 4 樣先可以寫交易邏輯**：O1 EA 名／O2 策略規格（entry/exit、格網、指標、TF）／O3 參數以邊份為準／O4 回測達標線。
