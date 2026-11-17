@@ -178,7 +178,7 @@ class TestPanelParity(unittest.TestCase):
         self.assertEqual([s.count for s in stats], [39, 7, 3])
 
     def test_medium_class_matches_panel_exactly(self):
-        """The Medium class reproduces all six panel metrics."""
+        """The Medium class reproduces all six panel metrics, pips included."""
         stats = compute_buckets(
             [w.amplitude_pips for w in self.waves], [w.bars for w in self.waves]
         )
@@ -187,7 +187,25 @@ class TestPanelParity(unittest.TestCase):
         self.assertEqual(medium.total_pips, 831.1)
         self.assertEqual(medium.average_bars, 30.1)
         self.assertEqual(medium.longest_bars, 56)
+        self.assertEqual(medium.longest_pips, 119.4)
         self.assertEqual(medium.shortest_bars, 11)
+        self.assertEqual(medium.shortest_pips, 128.5)
+
+    def test_longest_shortest_pips_belong_to_their_own_wave(self):
+        """Longest/Shortest pick a wave by BARS; pips are that wave's amplitude.
+
+        The panel settles it: Medium Shortest carries MORE pips than Longest
+        (128.5 vs 119.4), so pips cannot be selected independently.
+        """
+        stats = compute_buckets(
+            [w.amplitude_pips for w in self.waves], [w.bars for w in self.waves]
+        )
+        medium = stats[1]
+        self.assertGreater(
+            medium.shortest_pips,
+            medium.longest_pips,
+            "panel shows shortest 128.5 > longest 119.4 — pips follow the wave",
+        )
 
     def test_normal_longest_matches_panel(self):
         stats = compute_buckets(
