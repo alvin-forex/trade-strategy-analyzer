@@ -108,8 +108,8 @@ python scripts\analyze_signal_entry.py 11984
 5. **`scripts/batch_csv_downloader.py` 硬編碼 WSL 路徑**（`OUTPUT_DIR = /home/alvin/.openclaw/...`）而且冇單信號參數——冇改佢，entry 腳本自帶同源下載邏輯（同 URL／UA／內容檢查），輸出採用 `downloads/` 現行 bare-id 命名。
 6. **`analysis_history.db` schema 倉內零 CREATE TABLE**（原 schema 倉外手建）：entry 腳本已自帶 `CREATE TABLE IF NOT EXISTS`（欄位照 `history_manager.py` 實際 INSERT/SELECT），呢個斷點對新機已補。
 7. **`--full` 未驗證**：缺 pandas。裝完後跑 `python scripts\analyze_signal_entry.py 10437 --full` 補驗。
-8. **監看限制（實渐發現）**：AutoClaw `workspace.file_tail` 監看**只收 workspace 內相對路徑**，repo（`C:\Users\alvin\tsa-work`）喺 workspace 外，通知檔唔可以直接 monitor。所以 agent 接線走 stdout（§七），通知檔保留為 api_server 兼容落點。
-9. **數據質量陷阱（實渐撞到）**：algoforest export 嘅 CSV 會喺**檔案中段**滲 BOM 字元（\ufeff）落個別 Open Time 欄，令日期解析失敗。entry 腳本已處理（逐 cell 剝 \ufeff）；若日後用 pandas 管線記住同樣處理。
+8. **監看限制（實踐發現）**：AutoClaw `workspace.file_tail` 監看**只收 workspace 內相對路徑**，repo（`C:\Users\alvin\tsa-work`）喺 workspace 外，通知檔唔可以直接 monitor。所以 agent 接線走 stdout（§七），通知檔保留為 api_server 兼容落點。
+9. **數據質量陷阱（實踐撞到）**：algoforest export 嘅 CSV 會喺**檔案中段**滲 BOM 字元（\ufeff）落個別 Open Time 欄，令日期解析失敗。entry 腳本已處理（逐 cell 剝 \ufeff）；若日後用 pandas 管線記住同樣處理。
 
 ---
 
