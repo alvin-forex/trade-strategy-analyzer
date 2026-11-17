@@ -7,13 +7,32 @@ Run after any change to verify integrity.
 import os, re, glob, csv, json, sys
 from collections import defaultdict
 
-TSA_DIR = "/home/alvin/.openclaw/workspace/trade_strategy_analyzer/docs"
+# 2026-11-17：TSA_DIR 改由腳本位置推算（WSL/Windows 兩邊 repo layout 相同，路徑等價）；
+# SIGNALS_DIR／MT4 base 按平台選路徑（AGENTS.md 環境注意：生產喺 WSL，Windows 只係開發側）。
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TSA_DIR = os.path.join(_REPO_ROOT, "docs")
 ADMIN_DIR = os.path.join(TSA_DIR, "admin")
 REPORTS_DIR = os.path.join(TSA_DIR, "reports")
-SIGNALS_DIR = "/mnt/c/Users/Alvin/Downloads/Set File From Signal Page"
+_ON_WINDOWS = os.name == "nt"
+SIGNALS_DIR = (
+    r"C:\Users\Alvin\Downloads\Set File From Signal Page"
+    if _ON_WINDOWS
+    else "/mnt/c/Users/Alvin/Downloads/Set File From Signal Page"
+)
+MT4_FILES_BASE = (
+    r"C:\Users\Alvin\AppData\Roaming\MetaQuotes\Terminal\A06E6395D71C5597BD3D45E90C51C549\MQL4\Files"
+    if _ON_WINDOWS
+    else "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files"
+)
+OPENCLAW_SCRIPTS_DIR = (
+    None if _ON_WINDOWS else "/home/alvin/.openclaw/workspace/scripts"
+)
 DISABLED_SIGNALS_FILE = os.path.join(TSA_DIR, "disabled_signals.json")
 
 # Expected pages with sidebar
+# 2026-11-01 admin 重組（34b49ae0）後呢批頁移咗去 docs root 層（admin/ 下已刪）；
+# index.html／signal_ranking.html／ccy_ranking.html 係 StatiCrypt 加密頁（內容係密文，
+# grep 唔到 sidebar 字串）→ sidebar 檢查自動 skip。
 EXPECTED_PAGES = [
     "index.html",
     "signal_ranking.html",
@@ -24,42 +43,70 @@ EXPECTED_PAGES = [
 SUBDIR_PAGES = [
     ("ccy_power/index.html", "ccy_power"),
 ]
+# 設計上唔載 TSA sidebar 嘅 standalone 頁（2026-11-17 確認：CCY Power 係全螢幕
+# dashboard 用 Tailwind；forex_news 係獨立新聞頁）——缺 sidebar 降為 warning。
+STANDALONE_PAGES = {
+    "forex_news.html",
+    "ccy_power/index.html",
+}
+
+def _is_encrypted(html):
+    """Detect StatiCrypt encrypted page shell"""
+    return "staticrypt" in html.lower()
 
 def check_sidebar_consistency():
     """Check all pages have sidebar.css and sidebar.js"""
     issues = []
-    
+
     for page in EXPECTED_PAGES:
-        path = os.path.join(ADMIN_DIR, page)
+        path = os.path.join(TSA_DIR, page)
         if not os.path.exists(path):
             issues.append(f"❌ MISSING PAGE: {page}")
             continue
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             html = f.read()
+        if _is_encrypted(html):
+            issues.append(f"ℹ️ SKIP: {page} is StatiCrypt-encrypted — sidebar/content checks not applicable")
+            continue
         if 'sidebar.css' not in html:
-            issues.append(f"❌ NO SIDEBAR CSS: {page}")
+            if page in STANDALONE_PAGES:
+                issues.append(f"⚠️ STANDALONE: {page} has no sidebar.css (standalone page by design)")
+            else:
+                issues.append(f"❌ NO SIDEBAR CSS: {page}")
         if 'sidebar.js' not in html:
-            issues.append(f"❌ NO SIDEBAR JS: {page}")
-    
+            if page in STANDALONE_PAGES:
+                issues.append(f"⚠️ STANDALONE: {page} has no sidebar.js (standalone page by design)")
+            else:
+                issues.append(f"❌ NO SIDEBAR JS: {page}")
+
     for page, subdir in SUBDIR_PAGES:
-        path = os.path.join(ADMIN_DIR, page)
+        path = os.path.join(TSA_DIR, page)
         if not os.path.exists(path):
             issues.append(f"❌ MISSING PAGE: {page}")
             continue
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             html = f.read()
+        if _is_encrypted(html):
+            issues.append(f"ℹ️ SKIP: {page} is StatiCrypt-encrypted — sidebar/content checks not applicable")
+            continue
         if 'sidebar.css' not in html:
-            issues.append(f"❌ NO SIDEBAR CSS: {page}")
+            if page in STANDALONE_PAGES:
+                issues.append(f"⚠️ STANDALONE: {page} has no sidebar.css (standalone page by design)")
+            else:
+                issues.append(f"❌ NO SIDEBAR CSS: {page}")
         if 'sidebar.js' not in html:
-            issues.append(f"❌ NO SIDEBAR JS: {page}")
-    
+            if page in STANDALONE_PAGES:
+                issues.append(f"⚠️ STANDALONE: {page} has no sidebar.js (standalone page by design)")
+            else:
+                issues.append(f"❌ NO SIDEBAR JS: {page}")
+
     return issues
 
 
 def load_disabled_signals():
     """Load disabled signals list from file"""
     if os.path.exists(DISABLED_SIGNALS_FILE):
-        with open(DISABLED_SIGNALS_FILE) as f:
+        with open(DISABLED_SIGNALS_FILE, encoding="utf-8") as f:
             data = json.load(f)
             return data.get("disabled", []), data.get("broken_counts", {})
     return [], {}
@@ -67,7 +114,7 @@ def load_disabled_signals():
 
 def save_disabled_signals(disabled, broken_counts):
     """Save disabled signals list to file"""
-    with open(DISABLED_SIGNALS_FILE, "w") as f:
+    with open(DISABLED_SIGNALS_FILE, "w", encoding="utf-8") as f:
         json.dump({"disabled": disabled, "broken_counts": broken_counts}, f, indent=2)
 
 
@@ -86,17 +133,21 @@ def record_broken_link(sig_id, link_type, disabled, broken_counts):
 def check_signal_links():
     """Check all signal links in signal_ranking.html are valid"""
     issues = []
-    ranking_path = os.path.join(ADMIN_DIR, "signal_ranking.html")
-    
+    ranking_path = os.path.join(TSA_DIR, "signal_ranking.html")
+
     if not os.path.exists(ranking_path):
         return [f"❌ MISSING: signal_ranking.html"]
-    
+
     # Load disabled signals
     disabled, broken_counts = load_disabled_signals()
     newly_disabled = []
-    
-    with open(ranking_path) as f:
+
+    with open(ranking_path, encoding="utf-8") as f:
         html = f.read()
+
+    # 加密頁內容係密文，regex 掃唔出 link——skip 免得得個空 PASS
+    if _is_encrypted(html):
+        return ["ℹ️ SKIP: signal_ranking.html is StatiCrypt-encrypted — link check not applicable on ciphertext"]
     
     # Check AlgoForest links
     algo_links = re.findall(r'href="(https://signals\.algoforest\.com/signals/(\d+))"', html)
@@ -157,10 +208,17 @@ def check_signal_links():
 def check_ea_types():
     """Check no signals have Unknown EA type"""
     issues = []
-    
-    sys.path.insert(0, '/home/alvin/.openclaw/workspace/scripts')
+
+    # 2026-11-17：OpenClaw scripts／MT4 export 目錄只有生產機（WSL）先有；
+    # 開發機搵唔到就降為 warning skip，唔好 crash。
+    if not OPENCLAW_SCRIPTS_DIR or not os.path.isdir(OPENCLAW_SCRIPTS_DIR):
+        return ["⚠️ SKIP: OpenClaw scripts dir not found on this machine — EA type check skipped"]
+    if not os.path.isdir(SIGNALS_DIR):
+        return ["⚠️ SKIP: SIGNALS_DIR not found on this machine — EA type check skipped"]
+
+    sys.path.insert(0, OPENCLAW_SCRIPTS_DIR)
     from signal_analyzer import analyze_signal
-    
+
     for d in sorted(os.listdir(SIGNALS_DIR)):
         full = os.path.join(SIGNALS_DIR, d)
         if not os.path.isdir(full) or not d.isdigit():
@@ -168,7 +226,7 @@ def check_ea_types():
         result = analyze_signal(d)
         if result and result['ea_type'] == 'Unknown':
             issues.append(f"❌ UNKNOWN EA: Signal #{d}")
-    
+
     return issues
 
 
@@ -178,12 +236,13 @@ def check_data_freshness():
     from datetime import datetime, timedelta
     issues = []
 
-    base = "/mnt/c/Users/Alvin/AppData/Roaming/MetaQuotes/Terminal/A06E6395D71C5597BD3D45E90C51C549/MQL4/Files"
+    base = MT4_FILES_BASE
     # Primary source first (feeds the CCY Power pipeline), then EA fallback export
     sources = ["ccy_power_reader.csv", "forex_data.csv"]
     existing = [f for f in sources if os.path.exists(os.path.join(base, f))]
     if not existing:
-        issues.append(f"❌ MISSING: ccy_power_reader.csv and forex_data.csv")
+        # 2026-11-17：開發機冇 MT4／EA export（數據喺生產機先有）→ warning 唔好當 blocker
+        issues.append(f"⚠️ SKIP: {base} has no ccy_power_reader.csv/forex_data.csv — freshness check skipped on this machine")
         return issues
 
     # Weekend closure window: Sat 05:00 HKT → Mon 08:00 HKT (same rule as update_ccy_power.py)
@@ -223,7 +282,7 @@ def check_nav_consistency():
     if not os.path.exists(sidebar_js):
         return [f"❌ MISSING: sidebar.js"]
     
-    with open(sidebar_js) as f:
+    with open(sidebar_js, encoding="utf-8") as f:
         js = f.read()
     
     expected_links = [
