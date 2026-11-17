@@ -134,13 +134,50 @@ amp 用段內 range、minimum bar spacing 1–8、symmetric fractal window、`pr
 
 ## ❌ 仍未證實（已寫入實作但標記 provisional）
 
-### U1. 面板「Range」欄語義
+### U1. 面板「Range」欄語義 — **已破解（2026-11-18）**
 
-面板印 `Normal 12-110 / Medium 110-129 / Crazy 129-250`（三檔首尾相連）。我算出 `16.9-101.2 / 110.8-128.5 / 137.6-253.9`。第二個邊界吻合（128.5≈129），第一個差 8.8。可能係「該檔 min-max」或「分界點」或「含相鄰檔重疊」。AC 已明示**不可作驗收標準**。`buckets.py` 只輸出 min/max，唔宣稱語義。
+面板印 `Normal 12-110 / Medium 110-129 / Crazy 129-250`。四界全部解釋得到：
 
-### U2. Longest / Shortest 定義
+| 邊界 | 面板 | 我嘅計算 | 來源 |
+|---|---|---|---|
+| Normal 下限 | **12** | raw zigzag 最小幅度 **12.4** → 取整 12 | 合併前原始鏈嘅最細段 |
+| Normal 上限 | **110** | 排序第 40 名 = **110.8** → 取整 110 | 下一檔起點（唔係第 39 名 101.2） |
+| Medium 上限 | **129** | 排序第 46 名 = **128.5** → 四捨五入 129 | 下一檔起點 |
+| Crazy 上限 | 250 | merged 最大 = **253.9** | OCR 可能把 253 讀成 250 |
 
-面板有 bars 同 pips 各一組。我用 max/min。Normal longest=48 命中、Medium 56/11 命中，但 Normal shortest 我 2 面板 3、Crazy 最長我 103 面板 99。
+**關鍵驗證**：直接用「幅度門檻 110 / 129」分檔，**正好出 39 / 7 / 3**：
+```
+<= 110       -> 39 段
+(110, 129]   ->  7 段
+> 129        ->  3 段
+```
+若改用實際第 39 名 / 第 46 名作門檻（101.2 / 128.5），會出 **40 / 6 / 3**，同面板唔符。
+
+**結論**：面板 Range 係「**下一檔起點**」式分界（首尾相連），**唔係**該檔實際 min–max。
+呢個亦解釋咗為何手冊例子 Normal 顯示 17–73 但 Longest 只有 61.0 pips —— Range 必定比實際 min–max 寬。
+廠商 AI 嘅判斷（「顯示範圍 ≠ 該檔 min–max」）**正確**。
+
+⚠️ 但要注意：`buckets.py` 仍以**條數**（round-half-up）分檔，唔係以幅度門檻分檔。
+兩種方法喺本窗口得出同一個 39/7/3，但喺極端分佈下可能分歧。此點列入待確認。
+
+### U2. Longest / Shortest 定義 — **已破解（2026-11-18）**
+
+**Longest / Shortest 係「bars 最多／最少嗰段」，其 pips 就係該段本身嘅幅度**，
+唔係該檔幅度嘅 max/min。
+
+決定性證據：面板 Medium 顯示
+```
+Longest  :  56 bars / 119.4 pips
+Shortest :  11 bars / 128.5 pips     <-- pips 反而更大
+```
+若 pips 係獨立取 max/min，「Shortest」唔可能比「Longest」多 9.1 pips。
+唯一解釋：兩者都係「按 bars 揀嗰段，再讀佢嘅 pips」。
+
+修正前 `buckets.py` 錯用 `max(amps)` / `min(amps)`，現已改為
+「bars 極值段所對應嘅幅度」。修正後 Medium 六項**全部精確命中**：
+`211 bars / 831.1 pips / 30.1 avg / longest 56b·119.4p / shortest 11b·128.5p`。
+
+Normal longest（48 bars / 99.9 pips）亦精確命中。
 
 ### U3. 最後一段（未完成）處理
 
