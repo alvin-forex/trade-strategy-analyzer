@@ -38,7 +38,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--deviation", type=int, default=5, help="in points")
     p.add_argument("--backstep", type=int, default=3)
     p.add_argument("--merge-pct", type=float, default=35.0)
-    p.add_argument("--merge-mode", choices=("pre", "post"), default="post")
+    p.add_argument(
+        "--merge-mode",
+        choices=("drop_next", "pre", "post"),
+        default="drop_next",
+        help="merge reading; drop_next reproduces the original panel (default)",
+    )
     p.add_argument("--bar-mode", choices=("exclusive", "inclusive"), default="exclusive")
     p.add_argument("--meta-out", default=None)
     p.add_argument("--bars-csv", default=None, help="offline bars instead of MT5")
