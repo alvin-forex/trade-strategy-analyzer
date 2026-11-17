@@ -10,11 +10,20 @@ MartingaleScanner 波幅引擎嘅 Python 逆向實作。**唔使用任何 MT4/MT
 # 1) 環境自檢（MT5 連線／帳號／伺服器）
 python -m engine.extract --doctor
 
-# 2) 提取波浪（主命令，需求書 §7 A1 CLI 契約）
+# 2) 提取波浪（A1）＋波幅表（A2）
 python -m engine.extract \
   --symbol EURUSD --tf H1 \
   --from 2026-09-17T02:00 --to 2026-11-16T17:00 \
-  --out waves.csv
+  --out waves.csv \
+  --table EURUSD_H1
+#    -> waves.csv              A1 波浪清單（固定五欄）
+#    -> waves.meta.json        溯源十欄 + 分檔統計
+#    -> EURUSD_H1.table.csv    波幅表（§13 九欄）
+#    -> EURUSD_H1.table.json   同上 + detail（給網站／MCP 讀）
+#
+#    A2 選項：
+#      --bucket-method count|rank|inc   分檔推導法（預設 count，唯一有實證）
+#      --table-format  csv|json|both    波幅表格式（預設 both）
 
 # 3) 離線重跑（用已存嘅 MT4 bars，唔連 MT5）
 python -m engine.extract --bars-csv engine/evidence/a1/mt4_EURUSD_H1_bars.csv \
@@ -53,7 +62,8 @@ idx,startTime,endTime,bars,amplitudePips
 | `bar.py` | `Bar` 容器、CSV 載入、窗口切片、`pip_size()` |
 | `zigzag.py` | MT4 `ZigZag.mq4` 三遍算法嘅逐語句移植 → `Pivot[]` |
 | `merge.py` | Merge Percentage 過濾（`drop_next` 預設；另有 `pre` / `post` 對照）→ `Wave[]` |
-| `buckets.py` | 80/15/5 分檔（按條數，round-half-up）、兩種 percentile 法 |
+| `buckets.py` | 80/15/5 分檔（`count`/`rank`/`inc` 三法可切換）＋ Range 四界（floor） |
+| `table.py` | 波幅表輸出（§13 九欄 CSV＋JSON、panel 文字排版） |
 | `waves.py` | `waves.csv` 寫出／讀回、meta sidecar |
 | `extract.py` | CLI 入口 |
 | `sweep.py` / `fit_panel3.py` | 語義參數掃描（擬合工具，唔參與出貨路徑） |
@@ -73,27 +83,36 @@ idx,startTime,endTime,bars,amplitudePips
 
 ## Parity 狀態（對原廠面板實測，Alpari demo）
 
+面板真實數字（2026-11-18 老闆截圖確認）：`12-110 / 110-128 / 128-249`，
+Crazy **162 bars / 551.3 pips**。
+
 | 項目 | 面板 | 本引擎 | |
 |---|---|---|---|
 | 總段數 | 49 | **49** | ✅ |
 | 三檔段數 | 39/7/3 | **39/7/3** | ✅ |
-| Normal longest | 48 | **48** | ✅ |
-| Medium bars | 211 | **211** | ✅ |
-| Medium pips | 831.1 | **831.1** | ✅ |
+| Medium total bars | 211 | **211** | ✅ |
+| Medium total pips | 831.1 | **831.1** | ✅ |
 | Medium avgB | 30.1 | **30.1** | ✅ |
-| Medium longest | 56 | **56** | ✅ |
-| Medium shortest | 11 | **11** | ✅ |
-| Normal bars | 630 | 611 | −19 |
-| Crazy bars | 162 | 185 | +23 |
-| 幅度上限 | 249.7 | 253.9 | +4.2 |
+| Medium longest | 56b / 119.4p | **56b / 119.4p** | ✅ |
+| Medium shortest | 11b / 128.5p | **11b / 128.5p** | ✅ |
+| **Crazy total pips** | **551.3** | **551.3** | ✅ |
+| Normal longest | 48b / 99.9p | **48b / 99.9p** | ✅ |
+| Range b0 (Normal 下限) | 12 | **12** | ✅ |
+| Range b1 (Normal 上限) | 110 | **110** | ✅ |
+| Range b2 (Crazy 下限) | 128 | **128** | ✅ |
+| Normal total bars | 630 | 611 | −19 |
+| Crazy total bars | 162 | 185 | +23 |
+| Range b3 (Crazy 上限) | 249 | 253 | +4 |
 
-**核心算法已確定**（ZigZag 12/5/3 移植 + merge `drop_next` 35% + round-half-up 分檔）：
-Medium 類六個指標全部精確命中。殘差集中喺 Normal/Crazy 邊界及尾段處理，
-詳見 `ASSUMPTIONS.md` §「仍未完全對齊」。唔會為湊數改算法。
+**核心算法已確定**（ZigZag 12/5/3 移植 + merge `drop_next` 35% + round-half-up 分檔
+＋ Range floor 四界）：Medium 全七項、Crazy pips、Normal longest、Range 前三界**全部精確命中**。
+
+殘差全部源自**單一尾段**（最長段 103 vs 99 bars），同 Range b3 嘅 4 pip 差係同一件事。
+詳見 `ASSUMPTIONS.md`。唔會為湊數改算法。
 
 ## 硬性約束遵循
 
 1. ✅ 唔用 MT4/MT5 內建 ZigZag —— 自家移植
-2. ✅ 唔自創算法 —— 全部源碼有據，未證實者入 `ASSUMPTIONS.md`
+2. ✅ 唔自創算法 —— 全部源碼／實測有據，未證實者入 `ASSUMPTIONS.md`
 3. ✅ 只改 `engine/` —— 未動 `docs/`、`exchange/`、`src/`、`mt4/`、`mt5/`
-4. ✅ 每階段一次 commit，前綴 `[A1]`
+4. ✅ 每階段一次 commit，前綴 `[A1]` / `[A2]`

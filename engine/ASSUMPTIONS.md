@@ -15,11 +15,17 @@
 
 | 參數 | 真正語義 | 證據 |
 |---|---|---|
-| `Depth = 12` | 窗口大小，掃 shift `i .. i+11`。**向未來方向** | 源碼 `iLowest(NULL,0,MODE_LOW,InpDepth,i)` |
+| `Depth = 12` | 窗口大小，掃 shift `i .. i+11`（shift 越大越舊）→ **向過去（較舊）方向** | 源碼 `iLowest(NULL,0,MODE_LOW,InpDepth,i)` |
 | `Deviation = 5` | **points**，永遠以 `InpDeviation * Point` 使用 | 源碼 `low[i]-extremum > InpDeviation*Point` |
 | `Backstep = 3` | 確認新極值時**向前清除 3 支已標記極值**。**唔係**最小間距 | 源碼 `for(back=1; back<=InpBackstep; back++){ pos=i+back; ...=0 }` |
 
-推論：Depth 向未來掃 → 最新 `Depth-1` 支永遠唔會確認 pivot，最舊 `Depth-1` 支唔會被掃。呢個就係「Total bars 少過窗口 bars」嘅來源。
+推論（2026-11-18 實測修正）：MQL4 嘅 shift 係「由最新倒數」，所以 `iLowest(...,i)` 掃嘅係 `i..i+11` 即**越來越舊**嘅 bar，
+即 Depth 係向**過去**方向。因此：
+
+- **最新一支（shift 0）可以成為 pivot** —— 實測窗口最後一支 `2026-11-16T17:00` 正是最後一個 raw pivot
+- **最舊 `Depth-1` 支永遠唔會被掃**
+
+所以「Total bars 少過窗口 bars」係來自**最舊**一截冇被掃（唔係最新一截）。
 
 ### 2. Python 移植 = MT4 原生輸出（逐 pivot 對齊）
 
@@ -210,3 +216,57 @@ Normal longest（48 bars / 99.9 pips）亦精確命中。
 | Medium 類全六項 | ✅ 精確命中 |
 | Normal / Crazy bars | ⚠️ 差 4 支（邊界/尾段處理） |
 | 面板「Range」語義 | ❌ 未證實 |
+
+---
+
+# A2 新增（2026-11-18）
+
+## ✅ 已證實
+
+### 10. Range 四界 = floor 截斷（唔係 round）
+
+老闆提供修正後面板數字：`12-110 / 110-128 / 128-249`（原本 OCR 讀成 129，實際 128）。
+
+| 邊界 | 面板 | 公式 | 值 | floor |
+|---|---|---|---|---|
+| b0 Normal 下限 | **12** | min amplitude over **raw** (pre-merge) chain | 12.40 | **12** ✅ |
+| b1 Normal 上限 = Medium 下限 | **110** | merged sorted, index `c0`（第 40 名，Medium 首個） | 110.80 | **110** ✅ |
+| b2 Medium 上限 = Crazy 下限 | **128** | merged sorted, index `c0+c1-1`（第 46 名） | 128.50 | **128** ✅ |
+| b3 Crazy 上限 | 249 | merged sorted, last | 253.90 | 253（差 4） |
+
+**三個界限精確命中**，而且全部係 `floor` 向下截斷 —— 若用 `round`，128.5 會變 129，
+同面板 128 唔符。呢一點由老闆提供嘅新數字直接鎖定。
+
+b3 嘅 4 pip 差同 A1 已知嘅「最長段 103 vs 面板 99 bars」係**同一個尾段問題**，唔係獨立 bug。
+
+### 11. Crazy total pips 完全一致
+
+面板 **551.3 pips**，引擎 **551.3 pips** —— 精確命中。
+（A1 時我誤以為面板 Crazy bars = 185，實為 162；pips 一直係對嘅。）
+
+### 12. 分檔三種方法可切換，只有 `count` 對得上
+
+| method | 段數 | 三檔 | 對面板 |
+|---|---|---|---|
+| `count`（round-half-up 條數） | 49 | **39/7/3** | ✅ |
+| `rank`（nearest-rank 邊界） | 49 | 40/7/2 | ❌ |
+| `inc`（PERCENTILE.INC） | 49 | 39/7/3 | ✅ |
+
+`count` 同 `inc` 喺本窗口都得 39/7/3；`rank` 唔得。需求書要求兩種 percentile 都支援，
+已全部實作並可切換，但預設 `count`（兩組 ground truth 都驗證過）。
+
+### 13. 波幅表 band 命名必須逐字保留
+
+依需求書 §13：`80% Range` / `15% Range` / `5% Range`，**唔准改叫 P80/P95/Pmax**。
+`table.py` 有測試專門攔截任何 P80/P95/Pmax 字串。
+
+### 14. 樣本不足要明確報錯
+
+少於 3 段無法切三檔。`compute_buckets(strict=True)` 拋 `InsufficientSampleError`，
+CLI 回 exit code 7。唔會靜靜出空表。
+
+## ⚠️ 仍需知道
+
+- `--bucket-method rank` 喺本窗口出 40/7/2，唔符面板。保留係為滿足需求書「兩法可切換」，
+  但**唔建議**用作生產預設。
+- Range b3（253 vs 249）同尾段問題同源，未解。

@@ -7,9 +7,23 @@ import sys
 from typing import List, Optional, Sequence
 
 from .bar import Bar, pip_size
-from .buckets import compute_buckets
+from .buckets import (
+    BAND_LABELS,
+    BUCKET_METHODS,
+    SHARES,
+    InsufficientSampleError,
+    compute_buckets,
+    range_bounds,
+)
 from .merge import build_waves, merge_pivots
 from .sources import csv_source, mt5_source
+from .table import (
+    build_records,
+    default_table_path,
+    format_panel,
+    write_csv as write_table_csv,
+    write_json as write_table_json,
+)
 from .version import ENGINE_VERSION, CALC_METHOD_WAVES
 from .waves import build_meta, default_meta_path, write_meta, write_waves_csv
 from .zigzag import zigzag
@@ -20,6 +34,7 @@ EXIT_MT5 = 3
 EXIT_SYMBOL = 4
 EXIT_DATA = 5
 EXIT_PARITY = 6
+EXIT_SAMPLE = 7
 
 PARITY_N = 49
 
@@ -48,6 +63,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--meta-out", default=None)
     p.add_argument("--bars-csv", default=None, help="offline bars instead of MT5")
     p.add_argument("--meta-in", default=None, help="sidecar for --bars-csv")
+    p.add_argument(
+        "--bucket-method",
+        choices=BUCKET_METHODS,
+        default="count",
+        help="class derivation: count (default, evidence-backed), rank or inc",
+    )
+    p.add_argument("--table", default=None, help="also write volatility table (prefix)")
+    p.add_argument(
+        "--table-format", choices=("csv", "json", "both"), default="both",
+        help="volatility table format for --table",
+    )
     p.add_argument("--no-parity", action="store_true", help="skip the 49-wave check")
     p.add_argument("--quiet", action="store_true")
     p.add_argument("--doctor", action="store_true", help="print MT5 diagnostics and exit")
@@ -103,10 +129,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     merged = merge_pivots(pivots, args.merge_pct, args.merge_mode)
     waves = build_waves(merged, pip, args.bar_mode)
 
+    if len(waves) < 3:
+        print(
+            f"error: only {len(waves)} swing(s) in this window; "
+            f"cannot form the 80/15/5 classes",
+            file=sys.stderr,
+        )
+        return EXIT_SAMPLE
+
     sha = write_waves_csv(args.out, waves)
     total_bars = sum(w.bars for w in waves)
+    raw_amps = [
+        round(abs(pivots[i + 1].price - pivots[i].price) / pip, 1)
+        for i in range(len(pivots) - 1)
+    ]
     stats = compute_buckets(
-        [w.amplitude_pips for w in waves], [w.bars for w in waves]
+        [w.amplitude_pips for w in waves],
+        [w.bars for w in waves],
+        method=args.bucket_method,
+        raw_amplitudes=raw_amps,
+        strict=True,
     )
 
     offset = 0.0
@@ -115,6 +157,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             offset = mt5_source.server_utc_offset_hours(args.symbol)
         except Exception:  # pragma: no cover - diagnostic only
             offset = 0.0
+
+    window_year = int(bars[-1].time_label[:4])
 
     meta = build_meta(
         broker=getattr(sym, "broker_company", "") or "",
@@ -132,6 +176,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "merge_mode": args.merge_mode,
             "bar_mode": args.bar_mode,
             "pip_size": pip,
+            "bucket_method": args.bucket_method,
+            "shares": list(SHARES),
         },
         engine_version=ENGINE_VERSION,
         calc_method=CALC_METHOD_WAVES,
@@ -147,22 +193,54 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         extra={
             "pivot_count": len(pivots),
             "merged_pivot_count": len(merged),
+            "range_bounds": list(range_bounds(raw_amps, [w.amplitude_pips for w in waves])),
             "buckets": [
                 {
                     "label": s.label,
+                    "band": BAND_LABELS[i] if i < len(BAND_LABELS) else s.label,
                     "count": s.count,
                     "total_bars": s.total_bars,
                     "average_bars": s.average_bars,
+                    "total_pips": s.total_pips,
                     "average_pips": s.average_pips,
-                    "lower_pips": s.lower_pips,
-                    "upper_pips": s.upper_pips,
+                    "longest_bars": s.longest_bars,
+                    "longest_pips": s.longest_pips,
+                    "shortest_bars": s.shortest_bars,
+                    "shortest_pips": s.shortest_pips,
+                    "lower_display": s.lower_display,
+                    "upper_display": s.upper_display,
                 }
-                for s in stats
+                for i, s in enumerate(stats)
             ],
         },
     )
     meta_path = args.meta_out or default_meta_path(args.out)
     write_meta(meta_path, meta)
+
+    # ---- A2: volatility table side-outputs ----
+    table_shas = {}
+    if args.table:
+        prefix = args.table
+        records = build_records(
+            stats,
+            symbol=args.symbol or getattr(sym, "symbol", "") or "",
+            year=window_year,
+            timeframe=args.tf,
+            scanner_version=ENGINE_VERSION,
+            source_file_hash=sha,
+            dataset_version=f"{args.tf}-{bars[0].time_label}..{bars[-1].time_label}",
+        )
+        if args.table_format in ("csv", "both"):
+            table_shas["csv"] = write_table_csv(
+                default_table_path(prefix, "csv"), records
+            )
+        if args.table_format in ("json", "both"):
+            table_shas["json"] = write_table_json(
+                default_table_path(prefix, "json"),
+                records,
+                meta=meta,
+                stats=stats,
+            )
 
     if not args.quiet:
         print(f"engine     : {ENGINE_VERSION}  ({CALC_METHOD_WAVES})")
@@ -170,13 +248,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"window     : {bars[0].time_label} .. {bars[-1].time_label}  ({len(bars)} bars)")
         print(f"pivots     : raw={len(pivots)}  merged={len(merged)}")
         print(f"waves      : {len(waves)}   total bars={total_bars}")
-        for s in stats:
-            print(
-                f"  {s.label:7s} n={s.count:3d}  bars={s.total_bars:5d}  "
-                f"avgB={s.average_bars:6.1f}  pips={s.lower_pips:7.1f}-{s.upper_pips:7.1f}"
-            )
+        print()
+        print(format_panel(stats))
         print(f"csv        : {args.out}  sha256={sha[:16]}...")
         print(f"meta       : {meta_path}")
+        for fmt, h in table_shas.items():
+            print(f"table.{fmt:<5}: {default_table_path(args.table, fmt)}  sha256={h[:16]}...")
 
     if not args.no_parity and len(waves) != PARITY_N:
         print(
