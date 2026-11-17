@@ -2405,3 +2405,9 @@ Stage Summary:
 - 催單回覆 0831：如實答三問——i lane 從未認領＝零交付根因（唔係 quota/規格/環境）；轉介時序表九單逐條列 commit；請老闆三選項裁決（激活 i lane／授權 w lane 特別 turn／定優先序）。w lane 唔代做 code lane 大交付（鐵律）。
 - 等態：九單等 i lane／裁決；TG 等老闆；#27 餘 12 頁等裁定。尾三 Task 287/288/289 全完成。
 - **08:39 貨損事故補記（即時修復）**：今晨 rollback 除工作樹外連本地 worklog.md 也打回殘缺舊快照（缺 Task 247-288 全段），本鐘 cat >> 加 Task 289 後 cp 覆蓋 repo 完整版（8d79b75 顯示 220 deletions）。git 歷史無損：從 bfcc072 版合併恢復 Task 247-288 全段＋保留 Task 289，本修復 commit 離站。教訓入 playbook：**rollback 後本地 worklog 不可信，雙寫前必先 grep 驗證本地版 Task 序號連續性（或直接以 repo 版為基底追加）**。
+
+## Task 290：09:31 cron（11-17）＋第九次 rollback 自癒＋2330 章面修正（2026-11-17 09:31–09:36，ZCODE_w）
+- 第九次 rollback（一小時內第二次）：key 蒸發＋v3.9 退化＋工作樹退回 c45e148＋本地 worklog 又打回 Task 246 殘缺版。playbook＋今晨新教訓自癒約 2 分鐘：zip 解壓→fetch/pull 至 6f6c413→v4.1 歸位→**本地 worklog 以 repo 版為基底重建（196 Task 零貨損）**。
+- 巡檢誤報 1 封（2330 催單）：實為今晨章面用語不合 STAMP_RE——「⏳ 已收悉回覆中」不在 v4.0 pattern（只認 ⏳ 進行中/已處理、✅ 已處理）。修正章面「✅ 已處理（回覆已出）」語義不變，誤報解除。
+- 教訓：蓋章必須貼 STAMP_RE 合規用語（✅ 已處理／⏳ 進行中），唔好自創變體。
+- 等態：九單等老闆裁決（2330 三選項）／i lane；TG 等老闆；#27 餘 12 頁等裁定。尾三 Task 288/289/290 全完成。
