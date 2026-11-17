@@ -127,6 +127,13 @@ def compute_buckets(
             continue
         amps = [amplitudes[i] for i in idxs]
         brs = [bars[i] for i in idxs]
+        # Longest / Shortest are the waves with the most / fewest *bars*; their
+        # pips are that same wave's amplitude, NOT the class's max/min amplitude.
+        # The panel makes this unambiguous: Medium shows Longest 56 bars / 119.4
+        # pips and Shortest 11 bars / 128.5 pips — the "shortest" wave carries
+        # MORE pips than the "longest" one, so pips are not sorted independently.
+        i_long = max(range(len(idxs)), key=lambda j: brs[j])
+        i_short = min(range(len(idxs)), key=lambda j: brs[j])
         stats.append(
             BucketStat(
                 label=label,
@@ -135,10 +142,10 @@ def compute_buckets(
                 average_bars=round(sum(brs) / len(brs), 1),
                 total_pips=round(sum(amps), 1),
                 average_pips=round(sum(amps) / len(amps), 1),
-                longest_bars=max(brs),
-                shortest_bars=min(brs),
-                longest_pips=round(max(amps), 1),
-                shortest_pips=round(min(amps), 1),
+                longest_bars=brs[i_long],
+                shortest_bars=brs[i_short],
+                longest_pips=round(amps[i_long], 1),
+                shortest_pips=round(amps[i_short], 1),
                 lower_pips=round(min(amps), 1),
                 upper_pips=round(max(amps), 1),
             )
