@@ -270,3 +270,63 @@ CLI 回 exit code 7。唔會靜靜出空表。
 - `--bucket-method rank` 喺本窗口出 40/7/2，唔符面板。保留係為滿足需求書「兩法可切換」，
   但**唔建議**用作生產預設。
 - Range b3（253 vs 249）同尾段問題同源，未解。
+
+---
+
+# A3（MCP server + 每日自動更新）—— 需求書冇寫、由實作者定嘅事項
+
+需求書 §7 A3 只寫「MCP server（`get_rates` / `extract_waves` / `compute_buckets` / `export_table`）」，
+驗收就五個字「每日自動更新跑通」。**冇** tool signature、冇回傳型別、冇錯誤碼、
+冇排程時間／時區／重試／通知規格、冇 `export_table` 輸出格式。以下係實作時嘅決定，
+全部屬於「唔自創算法」範圍以外嘅**接口約定**（唔影響任何計算數字）。
+
+### A1. Tool 簽名 = `engine.api` 嘅函數簽名（單一實作）
+
+四個 tool 係 `engine/api.py` 四個函數嘅薄包裝，同一條 code path 同時服務 CLI、
+每日批次同 MCP client。冇第二份實作可以走樣。
+
+`symbol` 必填；`start`+`end`（server time，`YYYY-MM-DDTHH:MM`）**或** `past_bars`
+二揀一，同時俾會回 `bad_argument`。`export_table` 另需 `out_dir`。
+接受 `YYYY.MM.DD HH:MM` / 純日期（自動補 `T00:00`）—— 方便照抄 MT5 圖表標籤。
+
+### A2. 回傳永遠係 `{"ok": true, ...}` 或 `{"ok": false, "error": {...}}`
+
+可預期嘅失敗（冇終端、冇數據、symbol 唔存在、樣本不足、參數錯、IO 錯）
+**係值唔係 exception**，所以 MCP client 一定收到結構化原因，唔會撞 protocol error。
+錯誤碼係穩定字串：`bad_argument` / `no_terminal` / `unknown_symbol` /
+`no_data` / `insufficient_sample` / `io_error`。有測試鎖住呢六個字串。
+
+### A3. `past_bars` 預設 = 1024（原廠 *Past X Bars* 預設）
+
+每日批次預設用原廠自己嘅 1024 支，令每日跑出嚟嘅數同面板可比，
+唔會因為上次有人手打咗個日期區間而漂移。要固定回補就用 `--from/--to`。
+
+### A4. 每日批次唔負責排程
+
+`engine/daily.py` 只做「跑矩陣 → 寫檔 → exit code」。cron / Windows Task Scheduler /
+OpenClaw 點叫佢係外部事（WSL 生產環境已有 10 條 cron 嘅既有做法）。
+需求書冇規定時區同頻率，所以唔喺程式裡硬編一個。
+
+- 一個 symbol/TF 失敗**唔會**中止其餘 —— 單一隻下架 symbol 唔應該令你損失全日波幅表。
+- exit code：`0` 全成功、`1` 有失敗（細節在 manifest）、`2` 參數錯。
+- `--dry-run` 只出計劃，唔連 MT5、唔寫檔。
+
+### A5. 數據檔冇時間戳，manifest 才有
+
+`<SYMBOL>_<TF>.table.{csv,json}` / `.waves.csv` 同 `.meta.json` 內容**唔含**執行時間，
+所以同一輸入跑兩次係 byte-identical（已用 sha256 實測鎖住）。時間戳只出現在
+`manifest.json` 嘅 `startedAt`/`finishedAt` —— 佢係 log，唔係數據。
+呢個分野令「今日同昨日有冇變」可以直接 diff hash 而唔會假報。
+
+### A6. 傳輸：stdio 預設，另備 sse / streamable-http
+
+本地 MCP client 用 stdio（`python -m engine.mcp_server`）。要跨機／畀網站後端用就
+`--transport streamable-http --port 8765`。stdio 模式下所有診斷資訊走 **stderr**，
+因為 stdout 係 protocol 頻道，印任何字都會破壞 handshake。
+
+### A7. `mcp` 套件係可選依賴
+
+`engine.mcp_server` 才 import `mcp`；`import engine.api` 永遠唔需要它。
+冇裝 `mcp` 時引擎、CLI、每日批次照跑，只有 MCP server 會提示安裝。
+（SDK 2.x 已將 `FastMCP` 改名 `MCPServer`，位置 `mcp.server.mcpserver`。）
+
