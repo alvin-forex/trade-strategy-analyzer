@@ -51,6 +51,7 @@
     </div>
     <div class="sidebar-links">
       <a href="${depth}admin/index.html" class="sidebar-link" data-page="index"><span class="icon">🏠</span>首頁</a>
+      <a href="${depth}shell.html" class="sidebar-link" data-page="shell"><span class="icon">🧭</span>統一導航 Shell</a>
       <a href="${depth}signal_ranking.html" class="sidebar-link" data-page="signal_ranking"><span class="icon">🏆</span>Signal 排名</a>
       <!-- #26 (a) 11-04：CCY 排名改指 root 公開層（老闆裁定公開，admin 副本已刪）；
            43/45/46 行同源死 link 一併修——11-01 重組（34b49ae0）搬走 admin 版後
@@ -143,6 +144,7 @@
   links.forEach(function(link){
     var dp = link.getAttribute('data-page');
     if(dp==='index' && (filename==='index' || filename==='dashboard') && !path.includes('/ccy_power/')) link.classList.add('active');
+    else if(dp==='shell' && filename==='shell') link.classList.add('active');
     else if(dp==='signal_ranking' && filename==='signal_ranking') link.classList.add('active');
     else if(dp==='ccy_ranking' && filename==='ccy_ranking') link.classList.add('active');
     else if(dp==='volatility' && (filename==='volatility' || filename==='ccy_timeframe_volatility')) link.classList.add('active');
