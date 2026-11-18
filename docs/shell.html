@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TSA 統一導航 Shell</title>
+<!--
+  TSA Shell Mode（2026-11-17 老闆拍板試點）
+  ─────────────────────────────────────────────
+  全站唯一 sidebar 實體：本頁負責導航，內容頁載入 iframe。
+  - iframe 內頁面：sidebar.js 偵測 window!==window.top 自動唔注入（原有設計 hook）
+  - standalone 直開頁面（搜索引擎／舊書籤）：照舊自行注入 sidebar，零破壞
+  - Deep link：#/admin/index.html → shell.html#/admin/index.html
+  - 本頁唔載 sidebar.js（佢本身就係 sidebar 持有人）——QA EXPECTED_PAGES 例外項
+  視覺：沿用 docs/sidebar.css 變數（--sidebar-*）同 CLAUDE.md 深色主題。
+-->
+<link rel="stylesheet" href="sidebar.css">
+<style>
+  :root{ --bg-primary:#1a1a2e; --bg-secondary:#16213e; --text:#e2e8f0; --text2:#94a3b8; }
+  [data-theme="light"]{ --bg-primary:#f8fafc; --bg-secondary:#ffffff; --text:#0f172a; --text2:#475569; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; height:100%; }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:var(--bg-primary); color:var(--text);
+  }
+  .shell-layout{ display:flex; height:100vh; }
+  /* sidebar.css 將 #tsa-sidebar 定義做 position:fixed（per-page 模式用）；
+     shell desktop 模式 sidebar 要跟 flex 佈局 — 用更高優先度(#id.class)覆寫返 static。
+     Mobile（≤768px）唔覆寫——sidebar.css 原生 transform 滑入＋漢堡照用 */
+  @media(min-width:769px){
+    #tsa-sidebar.shell-sidebar{
+      position:static !important; height:100vh; overflow-y:auto;
+      flex:0 0 var(--sidebar-w);
+    }
+  }
+  /* 複用 sidebar.css 嘅內部結構樣式（#tsa-sidebar 規則直接套用） */
+  .shell-content{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  #page-frame{ flex:1; width:100%; border:0; background:var(--bg-secondary); }
+  /* 未載入頁面時嘅 landing */
+  .shell-welcome{
+    flex:1; overflow-y:auto; padding:48px 40px;
+  }
+  .shell-welcome h1{ font-size:26px; margin:0 0 8px; }
+  .shell-welcome p.sub{ color:var(--text2); margin:0 0 28px; font-size:14px; }
+  .quick-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; max-width:960px; }
+  .quick-card{
+    display:block; padding:18px 16px; border-radius:12px; text-decoration:none;
+    background:var(--bg-secondary); color:var(--text);
+    border:1px solid var(--sidebar-border);
+  }
+  .quick-card:hover{ border-color:var(--sidebar-active); }
+  .quick-card .qc-title{ font-size:15px; font-weight:600; margin-bottom:4px; }
+  .quick-card .qc-desc{ font-size:12px; color:var(--text2); }
+  /* landing 說明區 */
+  .shell-about{ max-width:960px; margin-top:36px; font-size:14px; line-height:1.75; color:var(--text2); }
+  .shell-about h2{ font-size:16px; color:var(--text); margin:26px 0 8px; }
+  .shell-about p{ margin:0 0 10px; }
+  .shell-about ul{ margin:0 0 10px; padding-left:22px; }
+  .shell-about li{ margin-bottom:6px; }
+  .shell-about code{
+    background:var(--bg-secondary); border:1px solid var(--sidebar-border);
+    border-radius:4px; padding:1px 6px; font-size:12.5px; color:var(--sidebar-active);
+  }
+  /* 載入指示 */
+  .shell-loading{
+    position:absolute; top:10px; right:14px; font-size:12px; color:var(--text2);
+    background:var(--bg-secondary); border:1px solid var(--sidebar-border);
+    border-radius:999px; padding:4px 12px; display:none; z-index:50;
+  }
+  .shell-content{ position:relative; }
+  /* Mobile（≤768px）：交俾 sidebar.css 原生規則——#tsa-sidebar transform 滑入、
+     #tsa-sidebar-toggle 顯示、#tsa-overlay.show 顯示。呢度只保留 body flex 唔受 has-sidebar 影響 */
+  @media(max-width:768px){
+    .shell-layout{ display:block; }
+    .shell-content{ height:100vh; }
+  }
+</style>
+</head>
+<body>
+<div class="shell-layout">
+  <!-- ── 全站唯一 sidebar 實體（結構同 sidebar.js 模板一致，depth=''）── -->
+  <nav class="shell-sidebar" id="tsa-sidebar">
+    <div class="sidebar-logo">
+      <a href="#" id="shell-home-link">🦀 TSA</a>
+      <div class="sub">Trade Strategy Analyzer</div>
+    </div>
+    <div class="sidebar-links" id="shell-links">
+      <a href="#/index.html" class="sidebar-link" data-page="index"><span class="icon">🏠</span>首頁</a>
+      <a href="#/signal_ranking.html" class="sidebar-link" data-page="signal_ranking"><span class="icon">🏆</span>Signal 排名</a>
+      <a href="#/ccy_ranking.html" class="sidebar-link" data-page="ccy_ranking"><span class="icon">💱</span>CCY 排名</a>
+      <a href="#/volatility.html" class="sidebar-link" data-page="volatility"><span class="icon">📊</span>波幅表</a>
+      <a href="#/portfolios/portfolio_master_report_v2.html" class="sidebar-link" data-page="portfolios"><span class="icon">💼</span>Portfolio 統一版</a>
+      <div class="sidebar-sep"></div>
+      <a href="#/reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
+      <a href="#/ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-section-title"><span class="icon">📊</span>外匯分析</div>
+      <a href="#/forex_news.html" class="sidebar-link sub-link" data-page="forex_news"><span class="icon">📄</span>外匯新聞</a>
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-section-title"><span class="icon">🧮</span>工具</div>
+      <a href="#/tug_of_war_calculator.html" class="sidebar-link sub-link" data-page="tug_of_war"><span class="icon">⚔️</span>拔河計算機</a>
+    </div>
+    <div class="sidebar-footer">
+      <button class="sidebar-theme-toggle" id="tsa-theme-btn" title="切換亮/暗模式">
+        <span class="theme-icon">🌙</span>
+        <span class="theme-label">深色模式</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── 內容區 ── -->
+  <div class="shell-content">
+    <div class="shell-loading" id="shell-loading">載入中…</div>
+    <iframe id="page-frame" title="TSA 頁面內容" style="display:none"></iframe>
+    <div class="shell-welcome" id="shell-welcome">
+      <h1>🧭 TSA 統一導航</h1>
+      <p class="sub">揀左邊項目，或者直接改網址：<code>shell.html#/admin/index.html</code></p>
+      <div class="quick-grid">
+        <a class="quick-card" href="#/signal_ranking.html"><div class="qc-title">🏆 Signal 排名</div><div class="qc-desc">64 個 Signal 綜合評分排名</div></a>
+        <a class="quick-card" href="#/ccy_ranking.html"><div class="qc-title">💱 CCY 排名</div><div class="qc-desc">貨幣維度策略表現</div></a>
+        <a class="quick-card" href="#/volatility.html"><div class="qc-title">📊 波幅表</div><div class="qc-desc">負責人×貨幣×三檔波幅區間</div></a>
+        <a class="quick-card" href="#/ccy_power/index.html"><div class="qc-title">⚡ CCY Power</div><div class="qc-desc">每小時自動更新貨幣強弱</div></a>
+        <a class="quick-card" href="#/portfolios/portfolio_master_report_v2.html"><div class="qc-title">💼 Portfolio 統一版</div><div class="qc-desc">組合總覽報告</div></a>
+        <a class="quick-card" href="#/reviews/"><div class="qc-title">📅 覆盤報告</div><div class="qc-desc">每日／每週自動覆盤</div></a>
+      </div>
+
+      <div class="shell-about">
+        <h2>呢個頁面做咩</h2>
+        <p>TSA（Trade Strategy Analyzer）分析 AlgoForest 交易信號，產生馬丁/深度分析報告同排名頁。
+           全站有九百幾個 HTML 頁面，以往每頁各自載入自己嘅側邊欄，深度一改就全站有斷鏈風險。</p>
+        <p>Shell 模式改為「一個側邊欄 + iframe 內容區」：左邊導航只此一份，內容頁載入時唔再重複注入側邊欄，
+           所以行到邊一頁都唔會迷路。直接開舊網址（例如 <code>volatility.html</code>）照樣正常顯示，
+           搜索引擎同舊書籤唔受影響。</p>
+
+        <h2>點用</h2>
+        <ul>
+          <li>撳左邊任何一項 → 右邊載入該頁，網址會變成 <code>shell.html#/頁面路徑</code>，可以直接複製分享。</li>
+          <li>瀏覽器上一頁／下一頁照常運作，因為每次切換都會記錄瀏覽歷史。</li>
+          <li>底部按鈕切換深色／淺色模式，設定會記住，內容頁同側邊欄會同步變色。</li>
+          <li>手機／窄視窗：左上角 ☰ 打開側邊欄，撳外面任何位置收返埋。</li>
+        </ul>
+
+        <h2>加密頁面</h2>
+        <p>Signal 排名、CCY 排名同首頁屬 StatiCrypt 加密頁，揀入去會見到密碼輸入框，
+           解鎖後就可以喺同一個 shell 內瀏覽，側邊欄唔會消失。</p>
+      </div>
+    </div>
+  </div>
+</div>
+<button id="tsa-sidebar-toggle" aria-label="開啟選單">☰</button>
+<div id="tsa-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;"></div>
+
+<script>
+(function(){
+  var frame   = document.getElementById('page-frame');
+  var welcome = document.getElementById('shell-welcome');
+  var loading = document.getElementById('shell-loading');
+  var links   = Array.prototype.slice.call(document.querySelectorAll('#shell-links .sidebar-link'));
+
+  /* ── 主題（localStorage 同 standalone sidebar.js 共用 'tsa-theme' key）── */
+  var themeBtn  = document.getElementById('tsa-theme-btn');
+  var themeIcon = document.querySelector('.theme-icon');
+  var themeLabel = document.querySelector('.theme-label');
+
+  function updateThemeUI(theme){
+    if(theme === 'dark'){ themeIcon.textContent='☀️'; themeLabel.textContent='淺色模式'; }
+    else { themeIcon.textContent='🌙'; themeLabel.textContent='深色模式'; }
+  }
+  function applyThemeToFrame(theme){
+    /* 同源 iframe：直接設 data-theme，頁面 CSS 變數即時響應；
+       加密頁（StatiCrypt 殼）可能蓋返自己樣式——可接受 */
+    try{
+      var doc = frame.contentDocument;
+      if(doc && doc.documentElement) doc.documentElement.setAttribute('data-theme', theme);
+    }catch(e){ /* cross-origin（唔應該發生）靜默 */ }
+  }
+  var savedTheme = localStorage.getItem('tsa-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeUI(savedTheme);
+
+  themeBtn.onclick = function(){
+    var current = document.documentElement.getAttribute('data-theme');
+    var next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('tsa-theme', next);
+    updateThemeUI(next);
+    applyThemeToFrame(next);
+  };
+
+  /* ── hash ↔ iframe 雙向同步 ──
+     格式：#/<docs-root-relative-path>，例 #/admin/index.html
+     - shell 起動／hashchange → 載入 iframe
+     - iframe 內任何導航（頁面連結）→ load 事件 → 讀 contentWindow.location → 同步 hash（pushState，back 掣有效）
+     - 同 hash 唔重複入 history */
+  function normalize(hash){
+    var h = decodeURIComponent(String(hash || '').replace(/^#/, '')).replace(/^\//, '');
+    return h; /* '' = landing */
+  }
+  function currentHashPath(){ return normalize(location.hash); }
+
+  function showFrame(show){
+    frame.style.display  = show ? 'block' : 'none';
+    welcome.style.display = show ? 'none'  : 'block';
+    loading.style.display = show ? 'block' : 'none';
+  }
+
+  function setActiveLink(path){
+    var best = null;
+    links.forEach(function(link){
+      var href = link.getAttribute('href').replace(/^#\//, '');
+      link.classList.remove('active');
+      if(path && (path === href || (href !== '' && path.indexOf(href) === 0))) best = link;
+    });
+    /* 目錄頁（reviews/）後綴匹配 */
+    if(!best){
+      links.forEach(function(link){
+        var href = link.getAttribute('href').replace(/^#\//, '');
+        if(path && href && path.split('/')[0] === href.split('/')[0] && href.slice(-1) === '/') best = link;
+      });
+    }
+    if(best) best.classList.add('active');
+  }
+
+  function syncFromFrame(){
+    try{
+      var loc = frame.contentWindow.location;
+      var path = decodeURIComponent(loc.pathname.replace(/^\//, ''));
+      /* shell.html 自己載入入 iframe → 當 landing */
+      if(path === 'shell.html'){ go(''); return; }
+      /* iframe 內頁面公共收尾：高亮、標題、主題（早期 return 之前做齊）*/
+      setActiveLink(path);
+      loading.style.display = 'none';
+      try{ document.title = frame.contentDocument.title + ' — TSA Shell'; }catch(e){}
+      applyThemeToFrame(document.documentElement.getAttribute('data-theme'));
+      if(path !== currentHashPath()){
+        /* iframe 內部導航（撳頁內連結）→ pushState 令 back 掣有效 */
+        history.pushState({}, '', '#/' + path);
+      }
+    }catch(e){ loading.style.display='none'; }
+  }
+
+  function go(path){
+    if(!path){
+      /* landing：清 iframe，顯示 welcome */
+      frame.removeAttribute('src');
+      showFrame(false);
+      history.replaceState({}, '', location.pathname + (location.search || ''));
+      setActiveLink('');
+      document.title = 'TSA 統一導航 Shell';
+      return;
+    }
+    showFrame(true);
+    loading.style.display = 'block';
+    /* 相對路徑：shell.html 喺 docs root，本地 http.server 同 Pages 子路徑都啱（AGENTS.md：一律 relative）*/
+    frame.src = path;
+    setActiveLink(path);
+  }
+
+  window.addEventListener('hashchange', function(){ go(currentHashPath()); });
+  window.addEventListener('popstate',  function(){ go(currentHashPath()); });
+  frame.addEventListener('load', syncFromFrame);
+
+  /* logo → landing */
+  document.getElementById('shell-home-link').onclick = function(ev){ ev.preventDefault(); go(''); };
+
+  /* sidebar 連結照常走 hash（href="#/..."），browser 自己觸發 hashchange */
+
+  /* Mobile 漢堡 */
+  var toggleBtn = document.getElementById('tsa-sidebar-toggle');
+  var overlay   = document.getElementById('tsa-overlay');
+  var sidebar   = document.getElementById('tsa-sidebar');
+  toggleBtn.onclick = function(){ sidebar.classList.toggle('open'); overlay.classList.toggle('show'); };
+  overlay.onclick = function(){ sidebar.classList.remove('open'); overlay.classList.remove('show'); };
+
+  /* 起動 */
+  go(currentHashPath());
+})();
+</script>
+</body>
+</html>
