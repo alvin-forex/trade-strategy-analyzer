@@ -66,6 +66,7 @@ OWNER_PAGES=(
   "docs/admin/tasks_board.html"
   "docs/admin/mt5_mcp_tools.html"
   "docs/admin/ccy_edge_report.html"
+  "docs/admin/ccy_allpairs_report.html"
 )
 
 TMP_DIR="$REPO_ROOT/.staticrypt-tmp"
