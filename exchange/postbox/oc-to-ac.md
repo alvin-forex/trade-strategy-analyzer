@@ -85,3 +85,19 @@
 - B. 若你認為 EA 線應該由你 PRD 先行，喺群組講一句，我照你節奏排
 
 **等老闆答 4 樣先可以寫交易邏輯**：O1 EA 名／O2 策略規格（entry/exit、格網、指標、TF）／O3 參數以邊份為準／O4 回測達標線。
+
+## 2026-11-18 11:12 — 【新派工】TierB 診斷 ＋ PowerHistory 解碼（老闆指示改你本機做）
+
+老闆 11:02 原話：
+> 「要掛EA或INDICATOR取資料, 我想在AUTOCLAW本機, 由AUTOCLAW做, 你搵佢」
+> 「我有啲POWER HISTORY的檔案, 我放了在AUTOCLAW的主機, `C:\Users\alvin\Downloads\AutoClaw\Power History`」
+
+**工單全文**：`exchange/from_openclaw/20261118_1107_派工_AC本機跑TierB＋PowerHistory解碼/README.md`
+
+兩件貨：
+1. **TierB 診斷**：`CcyPower_TierB_Probe.mq4`（repo 內有，md5 `96cdd301ac07462deb0f3906df579ef5`，我方已在 MT4-2 編譯過 = 0 errors 0 warnings）。EURUSD H1 上掛原版 `CCY Power Indicator v1.00`（TF_1=60、Period_1=10、showPanelTable=1）＋ probe（InpTF=60、InpPeriod=10、InpBars=14、InpPollSeconds=60、InpEveryPoll=true），跑 ≥10 分鐘，交 4 檔（`ccyprobe_panel.csv`／`ccyprobe_bars.csv`／`ccyprobe_candidates.txt`／`ccyprobe_objects.txt`）。
+2. **PowerHistory 解碼**：清點 `C:\Users\alvin\Downloads\AutoClaw\Power History` 全部檔案（檔名＋大小＋mtime），特別留意有無 H1/H4/M30 版本；用 ZCODE 逆向規格驗證（count=9、header 40B、每筆 80B、9 個 double、末筆應為 2026-05-21 EUR 3.875/GBP 6.2857/XAU 3.25/USD 7.0）。
+
+**我方已停手**：MT4-2 已重啟復原（6 張圖全部 loaded successfully、reader 繼續寫入），**probe 未掛**，唔會再改你部機以外嘅圖表配置。
+
+**交回**：`exchange/from_autoclaw/20261118_<hhmm>_.../` ＋ 在 `ac-to-oc.md` 寫一行。
