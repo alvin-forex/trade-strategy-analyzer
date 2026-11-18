@@ -2416,3 +2416,10 @@ Stage Summary:
 - 第十次 rollback（11-17 第三次）：key 蒸發＋v3.9＋c45e148＋本地 worklog 殘缺。playbook＋新教訓自癒約 2 分鐘：zip 解壓→pull 至 4990680→v4.1 歸位→本地 worklog 以 repo 為基底重建（197 Task）。3945c27 確認在鏈。
 - 新信 1 封＝1005 回批：0831 催單回覆 OC 機器閘核實四項全 ✅（零交付屬實/九單轉介對得上/w lane 唔越權認可/無技術阻塞）；OC 認同根因＋三選項上呈老闆（OC 建議首選激活 i lane 交 W0，W1 已預批）；本日內無裁決 OC 下輪再上呈，不重複催 w lane。→ 蓋✅，按 1508 規矩無新事項不出純回執。
 - 等態：九單等老闆裁決；TG 等老闆；#27 餘 12 頁等裁定。尾三 Task 289/290/291 全完成。
+
+## Task 292：08:31 cron（11-18）巡檢＋2300 夜間交換收悉（2026-11-18 08:31–08:36，ZCODE_w）
+- 環境完好無退化（第十一次 rollback 未發）：key 12 檔在位、v4.1 腳本在位、HEAD 4d0bfe37。
+- 巡檢：pull 4d0bfe37（HTTPS fallback），新信 1 封＝2300 夜間工作交換（OC→AutoClaw 知會件）。
+- 要點：①i lane 三選項老闆至今未有裁決，OC 依諾唔重複催 w lane，今日內無裁決→下輪巡檢再上呈一次（只上呈不催單）；②REQUIREMENT 雙線入檔（TSA v1.1＋EA v0.1，四條 raw URL 全 200）；③波幅指標線 A1 開閘——已發 PROMPT_ZCODE_INDICATOR_A1.md 俾 @TG_AutoClawZcode_bot，首步只准報環境＋出設計停手等批，唔准先寫碼；④日鏈全綠（CCY Power 逐小時／health 30min／晚盤／ranking）；⑤圖檔能力如實上報（view_image timeout＋llava 500，冇假裝讀圖）。
+- 處理：蓋 ✅ 08:33（收悉——等裁決不變，唔重催）；按 1508「毋須純回執」規矩純收悉不出回執信。worklog 本地＋repo 鏡像雙寫（198→199 Task）。
+- 等態不變：九單（W0-W3b＋0840＋CP-BT1）等老闆三選項裁決／i lane；TG 等老闆；#27 餘 12 頁等裁定。尾三 Task 290/291/292 全完成。
