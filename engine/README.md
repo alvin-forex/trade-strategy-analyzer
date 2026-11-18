@@ -1,4 +1,4 @@
-# engine — 波幅指標重建（A1：波浪提取）
+# engine — 波幅指標重建（A1 波浪 / A2 波幅表 / A3 MCP＋每日更新）
 
 MartingaleScanner 波幅引擎嘅 Python 逆向實作。**唔使用任何 MT4/MT5 內建 ZigZag 指標**：
 波動偵測係 MetaQuotes 公開 `ZigZag.mq4` 算法嘅逐語句 Python 移植
@@ -34,9 +34,37 @@ python -m engine.extract --bars-csv engine/evidence/a1/mt4_EURUSD_H1_bars.csv \
 python -m engine.sweep --limit 20
 python engine/fit_panel3.py
 
-# 5) 單元測試
+# 5) A3：MCP server（四個 tool，stdio 預設）
+python -m engine.mcp_server                # 畀 MCP client 接
+python -m engine.mcp_server --list         # 印 tool 清單
+python -m engine.mcp_server --transport streamable-http --port 8765
+
+# 6) A3：每日自動更新（排程交外部 cron / Task Scheduler）
+python -m engine.daily --symbols EURUSD,GBPUSD,USDJPY --tf H1,H4
+python -m engine.daily --dry-run           # 只出計劃
+#    -> <out-dir>/<SYMBOL>_<TF>.table.{csv,json}
+#    -> <out-dir>/<SYMBOL>_<TF>.waves.csv (+ .meta.json)
+#    -> <out-dir>/manifest.json            （唯一帶時間戳嘅檔）
+#    exit 0 全成功 / 1 有失敗 / 2 參數錯
+
+# 7) 單元測試
 python -m unittest discover -s engine/tests -t . -v
 ```
+
+## MCP tools（A3）
+
+| tool | 用途 |
+|---|---|
+| `get_rates` | OHLC bars + digits/point/pip + broker/server 溯源 |
+| `extract_waves` | ZigZag＋Merge → 波浪清單（idx/startTime/endTime/bars/amplitudePips/direction）|
+| `compute_buckets` | 80/15/5 統計 ＋ Range 四界；可直接餵 amplitudes 或跑全流程 |
+| `export_table` | 跑流程並落檔，回每個 artefact 嘅 path + sha256 |
+
+回傳永遠係 `{"ok": true, ...}` 或 `{"ok": false, "error": {"code", "message"}}`。
+錯誤碼：`bad_argument` / `no_terminal` / `unknown_symbol` / `no_data` /
+`insufficient_sample` / `io_error`。失敗係值唔係 exception，client 一定收到原因。
+
+`mcp` 套件係**可選**依賴 —— 冇裝它，CLI、每日批次、引擎全部照跑。
 
 ## 輸出契約
 
@@ -66,6 +94,9 @@ idx,startTime,endTime,bars,amplitudePips
 | `table.py` | 波幅表輸出（§13 九欄 CSV＋JSON、panel 文字排版） |
 | `waves.py` | `waves.csv` 寫出／讀回、meta sidecar |
 | `extract.py` | CLI 入口 |
+| `api.py` | 四個操作嘅程式介面（回傳 `{ok, ...}` / `{ok:false, error}`）|
+| `mcp_server.py` | MCP server：`api` 四個函數嘅薄包裝 |
+| `daily.py` | 每日批次：跑 symbol×TF 矩陣、落檔、出 manifest |
 | `sweep.py` / `fit_panel3.py` | 語義參數掃描（擬合工具，唔參與出貨路徑） |
 | `sources/mt5_source.py` | MT5 官方 API：bars、symbol 元數據、時區量測 |
 | `sources/csv_source.py` | 離線 CSV（parity／跨券商比較用） |
@@ -78,8 +109,10 @@ idx,startTime,endTime,bars,amplitudePips
 ✅ **Deviation 單位 = points**（源碼 `InpDeviation*Point`）
 ✅ **Backstep = 清除回看支數，唔係最小間距**（源碼 + 手冊 Shortest=2 bars 反證）
 ✅ **分檔取整 = round-half-up**（手冊 53→42/8/3 與 AC 49→39/7/3 同時符合）
-❌ **Merge Percentage 基準未解**：≥10 種讀法全部對唔到 49 段
-❌ **原廠面板數字未取得**（GEMS DLL 保護 + chart-global object 讀唔到）
+✅ **Merge 基準 = `drop_next`**（真面板 49 段反推，Medium 七項全中）
+✅ **Range 四界 = floor 截斷**（128 唔係 129）
+✅ **Longest/Shortest 嘅 pips 跟 bars 揀出嘅同一段**（唔係 class max/min）
+⚠️ **尾段單一殘差未解**（一段 pivot 面板保留、我方 35% merge 剔除）
 
 ## Parity 狀態（對原廠面板實測，Alpari demo）
 
@@ -115,4 +148,14 @@ Crazy **162 bars / 551.3 pips**。
 1. ✅ 唔用 MT4/MT5 內建 ZigZag —— 自家移植
 2. ✅ 唔自創算法 —— 全部源碼／實測有據，未證實者入 `ASSUMPTIONS.md`
 3. ✅ 只改 `engine/` —— 未動 `docs/`、`exchange/`、`src/`、`mt4/`、`mt5/`
-4. ✅ 每階段一次 commit，前綴 `[A1]` / `[A2]`
+4. ✅ 每階段一次 commit，前綴 `[A1]` / `[A2]` / `[A3]`
+
+## 測試
+
+```
+python -m unittest discover -s engine/tests -t .
+```
+
+A1 22 條、A2 22 條、A3 44 條，共 **88 條全綠**。
+A3 全部用 `evidence/a1/` 嘅 MT4 實錄 CSV 跑，**唔需要 MT5 終端**。
+（另有 `engine/evidence/a3/` 存一次真 MT5 批次嘅產物＋manifest 作實證。）
