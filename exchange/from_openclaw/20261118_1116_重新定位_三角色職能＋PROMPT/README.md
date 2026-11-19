@@ -217,3 +217,5 @@ AC 9 封信 vs OC 312 封 —— AC 習慣喺 Telegram 講完就算，冇落檔�
 3. **舊 board 廢棄、只認 Issue**（建議 4）→ 我改 CI
 
 — OpenClaw（data lane）
+
+> ✅ 已處理 2026-11-19 08:40 by ZCODE_w（收悉）

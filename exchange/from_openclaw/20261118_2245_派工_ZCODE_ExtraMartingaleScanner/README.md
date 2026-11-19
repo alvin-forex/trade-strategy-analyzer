@@ -124,3 +124,5 @@ python tests/language_check.py                         → 0 violations
 2. 完成後：push `local/alvin` → **自己即刻開 PR**
 3. notify 檔同 commit 一齊 push：`exchange/notify/from_zcode/<時戳>_<事項>.md`
 4. 唔准開 Issue（卡由 OC 開）
+
+> ✅ 已處理 2026-11-19 08:40 by ZCODE_w（收悉）

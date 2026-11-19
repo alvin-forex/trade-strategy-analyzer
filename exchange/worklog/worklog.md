@@ -2423,3 +2423,11 @@ Stage Summary:
 - 要點：①i lane 三選項老闆至今未有裁決，OC 依諾唔重複催 w lane，今日內無裁決→下輪巡檢再上呈一次（只上呈不催單）；②REQUIREMENT 雙線入檔（TSA v1.1＋EA v0.1，四條 raw URL 全 200）；③波幅指標線 A1 開閘——已發 PROMPT_ZCODE_INDICATOR_A1.md 俾 @TG_AutoClawZcode_bot，首步只准報環境＋出設計停手等批，唔准先寫碼；④日鏈全綠（CCY Power 逐小時／health 30min／晚盤／ranking）；⑤圖檔能力如實上報（view_image timeout＋llava 500，冇假裝讀圖）。
 - 處理：蓋 ✅ 08:33（收悉——等裁決不變，唔重催）；按 1508「毋須純回執」規矩純收悉不出回執信。worklog 本地＋repo 鏡像雙寫（198→199 Task）。
 - 等態不變：九單（W0-W3b＋0840＋CP-BT1）等老闆三選項裁決／i lane；TG 等老闆；#27 餘 12 頁等裁定。尾三 Task 290/291/292 全完成。
+
+## Task 293：08:31 cron（11-19）＋第十二次 rollback（歷史斷開變種）自癒＋隔夜十信處理＋18頁單開工（2026-11-19 08:31–08:50，ZCODE_w）
+- 第十二次 rollback 變種災情：本地退回 c45e148（11-05 快照）＋rebase 狀態殘留卡死 pull＋**NO_MERGE_BASE**（OC 歷史清瘦化 685MB→245MB 所致，c45e148 不在 origin 歷史）。進化自癒：rebase --abort→fetch origin→**reset --hard origin/main**（非 rebase 非 force，純本地同步）→cbbc4c69 歸位＋v4.1（28,197B）＋1,796 檔全數歸位。本地 worklog 完好（199 Task 零損）。
+- 隔夜 10 封全讀全蓋章：1050 回批（0815 三件貨核實＋PowerHistory 確認＋W-FINAL 卡建議開 Issue）✅；1105 回批（W-FINAL 主體收項＋commit 號引用錯誤教訓：報 commit 前先 git log 對一次）✅；1107 AC 工單 ✅；1115 派工 18 頁 sidebar ⏳ **平台開工**；1116 三角色重新定位 ✅；1152 新分工拍板（三 PM 取消＋ZCODE 分流＋不讀 board）✅；1341 查詢五問 ✅＋回覆；2155 TSA 架構審核（lane:zcode-local）✅＋歸屬請確認；2245 Scanner 派工（lane:zcode-local）✅確認本機執行；2300 夜間交換 ✅。
+- 新分工落地影響：w lane 停用 board 開工令流程（cron 第 6 步被 1152 拍板取代）；平台 ZCODE 只接純文字／純前端；收單只看 from_openclaw 派工單；交貨入 from_zcode＋一個 commit；無 GitHub Issue 寫入權（無 token）→ notify 檔報進度替代。
+- 1341 五問回覆 0842：①身份＝平台 @zc_ops_bot 沙盒（無編譯無終端），0815 件貨係本機側（alvn0808/local/ 分支）非我方出品；②01:00 前後平台側冇記錄（兩鐘無新信巡檢）；③CCY 階段 1 本機工（4 檔到位後 1 工作日）；④Scanner 設計可平台先出（不需 PRD）待 OC 確認；⑤進度報告以 notify 檔＋commit 訊息替代 Issue 留行（無 token）。
+- **18 頁 sidebar 注入開工**（1115，純前端＝1152 平台分流範圍；OC 2300 預告本機未交轉派平台；repo 無本機注入 commit 坐實）：root 5＋admin 5（含 tasks_board 加密頁須重跑加密閘）＋hub 2＋campaign 5＋ccy_power 1；零功能改動、唔准動 sidebar.css/js 本體與其餘 897 頁；CI 重生成覆蓋風險已提示 OC。
+- 待辦：18 頁注入本鐘起做（下鐘續）；2155 歸屬等 OC 一句；2245 本機執行；TG token 等老闆；GitHub Issue token 等老闆批。
