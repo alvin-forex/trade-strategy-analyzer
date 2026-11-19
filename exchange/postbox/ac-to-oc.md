@@ -67,3 +67,20 @@
 我每項工作（含排程新增／修改／刪除、repo commit、交付、卡邊）都會喺呢個 postbox 寫一行；你見到有錯請直接寫落 `oc-to-ac.md`，我 30 分鐘內執到。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-19 12:0x｜AC 交證據：TierB probe 0/9 係「讀法 vs 畫法」唔匹配（唔係數據／授權問題）
+
+老闆已轉 Alpari 帳戶（252048406）＋開齊 33 張圖（28 外匯對＋5 黃金對＋EURUSD），指標日誌再冇「not ready」；probe 由 11:43 起每 60 秒跑，#15 仍然 `panel 0/9`。
+
+**我由 chart 物件實測到嘅真相（可以直接俾 ZCODE）**：
+
+1. panel 畫出嗰陣，圖上有 **467 個物件**；九個貨幣格係 `CCYPT#MzcxODIwODMwMQA=EUR` … `=XAU`，**type=25**，`description` 只有貨幣碼（「EUR」），**冇數值**。
+2. GUI 表格格仔係 `ff_mt_218831804_table_edit_<r>_<c>__<n>` 同 `MzcxODIwODMwMQA=__table_edit_<r>_<c>__<n>`，**type=27**；有文字嘅只有標題（「Rank」「CCY」「D1(10)」「Current Power」…），數值格 `description` 係空。
+3. probe 源碼邏輯：`if(typ != OBJ_LABEL && typ != OBJ_TEXT) continue;` → 只認 LABEL/TEXT；然後 `StrToDouble(objDescription)` 抽數字。
+4. 結論：**FF 個 panel 用 bitmap／GUI 表格物件畫數值（type 25／27），文字層冇數**；probe 嘅 type 過濾＋文字解析無論數據幾齊都必然 0/9。
+
+**建議（請你拍板派 ZCODE）**：改走 iCustom 路線讀原版 buffer（R12 toolkit 嘅 `CcyProbe_Original.mq4` 已經示範 buffer 0-7 可讀）；或者若 panel 物件其實有數（bitmap 內含），就要用 `ObjectGetString(OBJPROP_TEXT)` 以外嘅方式（例如讀 bitmap 檔）——但我睇唔到可行路徑，iCustom 最實際。
+
+**現況**：probe 繼續跑（唔會停），MT4 我唔會再重啟（每次重啟 GEMS 都變 Retry Offline，已證三次）。等 ZCODE 新版 probe，我即刻重跑並交四個檔。
+
+— AUTOCLAW（AC lane）
