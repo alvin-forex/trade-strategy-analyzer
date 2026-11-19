@@ -2452,3 +2452,9 @@ Stage Summary:
 - **跟進 2**：ccy_edge_report/ccy_allpairs_report 加密殼照 tasks_board 手法殼層補注各 +6/−0，密文 payload SHA256 前後一致（0c02094f…／5248484b…）；staticrypt 全站掃描總數 9 頁（2 補注＋7 已注入），補注後全站 920 頁缺 container 只剩 shell.html 豁免＝missing=0；owner PW 解密兩頁 OK，殼層 headless 零 error。
 - 驗證：reviews 6 頁 headless #tsa-sidebar 渲染 6/6＝1、console 零 error；tsa_qa_check Navigation PASS（加密頁 SKIP 同 18 頁輪）；如實申報 staticrypt document.write 解鎖後清殼 sidebar 係 6 加密頁共同機制特性（非本輪引入，留 OC 裁量）。
 - 交付報告 0955 入 from_zcode＋notify 檔；交期 18:00 前完成。等態：#28 架構審核（lane:zcode-platform，死線 11-20 18:00）下一鐘開工。
+
+## Task 297：10:31 cron（11-19）第十四次 rollback 自癒＋卡 #28 TSA 架構審核出貨（2026-11-19 10:31–10:45，ZCODE_w）
+- 第十四次 rollback（同款變種 c45e148f）：fetch→reset --hard origin/main 歸位 7558f58e（我 8fc08b4a 完好＋CCY Power 10:00 數據 commit）；v4.1 在位。巡檢：無新信（0915/0930 已於上鐘處理）。
+- **卡 #28（2155 派工＋0930 裁決判平台，死線 11-20 18:00）本鐘開工並完成出貨**：三份 md 入 docs/admin/——TSA_ARCHITECTURE_AUDIT.md（目錄職責＋生成器活 12/一次性 72＋模板 6 族＋資料鏈＋建議 6 項）、REPORT_TEMPLATE_UNIFICATION.md（6 套風格實測 S1-S6＋收斂裁決 1 token 系統＋2 佈局範本＋存檔族 96 頁零改動＋遷移 P1-P6 成本）、REPORT_SECTION_SPEC.md（sec-<slug> 規則＋#sec-raw 保留錨點＋範本 A/B/覆盤固定節表＋驗收包）。
+- 核實 OC 數字全數獨立重跑吻合（483／169/159/81/71/2/1／token 377+104／style 481）；新發現：5 新 signal 無 Deep/signal_ 頁坐實舊兩族 11-05 停產（活性分族核心證據）；index_ sec-* 覆蓋 147/159；報告生成器真源喺本機分析鏈（52ba9ed9 作者 alvincyleungtw2-beep），repo 側 84 py 有 72 一次性。
+- 驗收：language_check 917 files 0 violations ✅；tsa_qa_check PASS（Data Freshness 沙盒常態 SKIP）✅；零 code 改動 ✅。交付信 1045＋notify 入站，等 OC 複測交老闆裁決遷移路線。
