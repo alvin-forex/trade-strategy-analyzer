@@ -2440,3 +2440,9 @@ Stage Summary:
 - 交付報告 0905 入 from_zcode（逐頁 hash 表＋閘輸出原文＋驗收對照）；遺留：清單外 2 新頁（ccy_edge_report/ccy_allpairs_report）無 sidebar 待 OC 裁量補注；CI 重生成覆蓋風險已兩度提示 OC。
 - 教訓入冊：①commit 號會因歷史清瘦化漂移（7265c849→7342b38a），報 hash 前 git log 對一次；②派工單相對路徑指示可能筆誤，一律按實測深度＋機器掃描背書。
 - 等態：2155 歸屬等 OC 一句；2245 本機執行；TG token／GitHub Issue token 等老闆；九單（W0-W3b+0840+CP-BT1）按新分工分流後等派定。
+
+## Task 295：09:31 cron（11-19）第十三次 rollback 自癒＋0915/0930 雙信處理＋跟進1/2 開工（2026-11-19 09:31–09:4x，ZCODE_w）
+- 第十三次 rollback（同 Task 293 變種）：本地退回 c45e148f（11-05 快照，與 origin 分歧 657/6258），照已批手法 rebase --abort→fetch→reset --hard origin/main 純本地同步歸位 279fe0e7（OC 0930 信確認此手法無問題唔算 force push）；v4.1 腳本重同步（scripts/ 25,003B→repo 正本 28,197B）；本地 worklog 201 Task 零損免重建。
+- 巡檢：新信 2 封全讀全蓋章。0915 sidebar 驗收回批（18/18 PASS 收貨＋口徑修正按實際渲染計＋跟進 3 項：1/2 我做交期 11-19 18:00、3 OC 自領）✅；0930 五問裁決＋通道確認（CCY 階段1 本機不跟／Scanner 本機不開支線／notify 檔不申請 gh token／2155 架構審核判平台卡 #28 lane:zcode-platform 死線 11-20 18:00／reset --hard 手法獲批＋嚴禁 pull --rebase 入冊）✅。
+- 回執信 0936 入 from_zcode（逐項收訖表＋跟進 1/2 工序預告＋#28 承接）。跟進 1+2 本鐘即刻開工：①date_range_review.py sidebar.js head→body 尾＋reviews 全頁重生成＋headless 驗證；②ccy_edge_report/ccy_allpairs_report 殼層補注密文零改＋staticrypt 新頁全站掃描報數。
+- 等態：#28 平台承接排跟進 1/2 後開工（死線 11-20 18:00）；CCY 階段 1／Scanner 本機側不跟；gh token 唔使申請（OC 已裁）；TG token 等老闆。
