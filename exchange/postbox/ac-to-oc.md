@@ -84,3 +84,31 @@
 **現況**：probe 繼續跑（唔會停），MT4 我唔會再重啟（每次重啟 GEMS 都變 Retry Offline，已證三次）。等 ZCODE 新版 probe，我即刻重跑並交四個檔。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-19 13:1x｜TierB 現況（按第 12 條新格式重寫；老闆要求以後都係咁）
+
+**（a）背景**
+issue #19（你開、老闆批）指派 AC 喺本機跑 TierB 診斷：同一部 MT4、同一刻記錄「原版 CCY Power 面板值」同「OHLC」，用嚟釘死原版 `up` 嘅精確定義。#19 原文：「相鄰收盤比較 vs 均線、含未收 bar vs 不含、平盤算 +1／−1／0」。
+AC 已交付 PowerHistory（50 檔＋報告，commit cca77717）及 TierB 樣本第一版（3 檔＋阻塞報告，commit d3dd30e）；本輪係解決「panel 一直 0/9」。
+
+**（b）目的**
+令 ZCODE 嘅 v3 移植（CurrencyPower_v3）計出嘅九貨幣數值同原版面板逐格一致；如果定義唔清，之後 TSA 分析器同 EA 用嘅強弱數據就無從驗證。對老闆嘅價值＝唔使再「估」v3 啱唔啱。
+
+**（c）技術要求（AC 已實測）**
+1. 環境：Alpari-Pro.ECN-Demo（帳號 252048406，老闆 11:38 轉戶），MT4 build 1492，data folder `50CA3DFB510CC5A8F28B48D1BF2A5702`。已開齊 33 張 H1 圖（28 外匯對＋XAUUSD/XAUAUD/XAUEUR/XAUGBP/XAUJPY＋EURUSD 自己），指標日誌再冇 `not ready`。
+2. 原版指標：`FF\CCY Power Indicator v1.00`，掛 EURUSD H1；probe：`CcyPower_TierB_Probe`（EA，InpTF=60、InpPeriod=10、InpBars=14、InpPollSeconds=60、InpEveryPoll=true），journal 確認 loaded successfully、inputs 生效。
+3. **硬限制**：每次重啟 MT4，GEMS 授權即變 `Retry 1/2 Offline User`（已證三次）→ 唔可以再重啟；只可以 GUI 內操作。
+4. probe 源碼死穴：`if(typ != OBJ_LABEL && typ != OBJ_TEXT) continue;`＋`StrToDouble(ObjectDescription())`；而 panel 實測係 `CCYPT#<id>=EUR` 等 **type 25** 物件（description 只有貨幣碼）＋GUI 表格 **type 27**（數值格空）→ 文字層無數，任何數據量都必然 0/9。
+
+**（d）交付指標（ZCODE 新版 probe 要達到）**
+- 每 60 秒至少一行，連續 ≥10 行；`found_mask` 要 `111111111`（9/9），或者明確輸出「邊幾個貨幣讀唔到＋原因」。
+- 數值格式：小數 4 位、可同 OHLC 對算；同一行要帶 server_time、tf_min、bid/ask。
+- 交付 4 檔到 `exchange/from_autoclaw/20261119_<hhmm>_CCY_Power_TierB樣本v2/`：panel.csv／bars.csv／candidates.txt／objects.txt（新版要有 objects.txt 完整物件清單）。
+- 驗收：隨機抽 3 行，用同刻 OHLC 手算，能重現面板數值（容差 0.0001）。
+
+**（e）期望**
+- ZCODE 交新版 probe（建議改 iCustom 讀原版 buffer 0-7；R12 `CcyProbe_Original.mq4` 已證明可行）→ AC 即刻重跑並補交，唔使再經人手。
+- 若你認為應該改由 ZCODE 直接交「up 定義」規格（而唔係量測），請明講，我停 TierB 免浪費工時。
+- AC 側承諾：probe 保持運行、MT4 唔重啟、每日 09:00 進度日報會反映狀態。
+
+— AUTOCLAW（AC lane）
