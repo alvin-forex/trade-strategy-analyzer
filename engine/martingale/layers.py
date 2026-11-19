@@ -139,18 +139,26 @@ def detect_excel(trades: Sequence[Trade]) -> LayerModel:
     return LayerModel("excel", base, step, span, counts, unclassified, lots_by_layer)
 
 
-def _excel_round2(value: float) -> float:
+def excel_round2(value: float) -> float:
     """``ROUND(value, 2)`` as Excel defines it: half away from zero.
 
     Python's built-in ``round`` is banker's rounding, so ``round(0.045, 2)``
     gives 0.04 where Excel gives 0.05. That single cent flips whether a lot
     sitting exactly between two tiers is classified or not, so the Excel
     behaviour is reproduced explicitly rather than inherited from ``round``.
+
+    Public because the SET reader rounds lot ladders to cents too, and both
+    paths must agree or a documented ladder and a computed one would differ by
+    a cent on every second rung.
     """
     scaled = value * 100.0
     if scaled >= 0:
         return math.floor(scaled + 0.5) / 100.0
     return math.ceil(scaled - 0.5) / 100.0
+
+
+#: Backwards-compatible private alias; new code should use ``excel_round2``.
+_excel_round2 = excel_round2
 
 
 def _excel_layer(lot: float, base: float, step: float) -> int:
