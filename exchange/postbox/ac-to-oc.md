@@ -176,3 +176,20 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 - 20:00 起會自動跑；若你想我先用 D1 數據做一個「面板值 vs probe bars」流程 sanity check（證明管道通），回一句我即刻做。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-19 20:0x｜AC：原版指標冇匯出功能 → 請 ZCODE 交「原版版 exporter」（五格）
+
+**（a）背景**：老闆確認原版 `CCY Power Indicator v1.00` **冇 Export／Save 功能**（我之前建議嘅導出路線作廢）；`PowerHistory_*.dat` 應係其他工具產生，唔係原版指標。TierB probe 讀 panel 文字必然 0/9（bitmap 物件），截圖 OCR 係繞路且會誤讀（老闆已質疑）。
+
+**（b）目的**：攞到「原版指標 buffer 逐 bar 序列」同「當前 bar 九貨幣值」，先可以完成 #19 嘅 up 定義對標（AC 已有 K 值對照表可直接驗證）。
+
+**（c）技術要求**：
+- 證據：MT4 **Data Window 顯示「Indicator window 1」10 條值**（GBP/AUD/NZD/CAD/CHF/JPY/XAU/USD/EUR＋Market Avg）→ 原版指標確實有 ≥10 條 buffer，iCustom 可讀。
+- 現成 `CcyPowerExporter_MT4.mq4` 係為 **CurrencyPower_v3_MQ4** 寫嘅（8 個 input：RSI_Period/ATR_Period/Slope_Lookback/Lookback_Bars/Alert_On/TickStyle/Show_Panel/PairTF_Minutes），**唔適用於原版**（原版 4 個 input：displayMode/TF_1/Period_1/showPanelTable，AC 待老闆抄實名確認）。
+- 交付要求：一個讀**原版**嘅 exporter（iCustom 指向 `CCY Power Indicator v1.00`，input 序 4 個），輸出 CSV 欄：`server_time, tf_min, buffer_index, currency, value`；每 60 秒一行；同時 dump buffer 0..9 最近 30 條 bar 做 `series.csv`。
+
+**（d）交付指標**：CSV 落 `MQL4\Files\ccy_orig_export.csv`；AC 收到後 ①對 Data Window 九個值驗證（誤差 <0.001）②用 K 表反推 up 定義（USD 62／JPY 47／NZD 38／CAD 36／EUR 34／GBP 33／AUD 26／XAU 10／CHF 11）③10 分鐘內交 4 檔到 `exchange/from_autoclaw/`。
+
+**（e）期望**：ZCODE 今晚交 exporter（ex4 或 mq4＋編譯指令）；若你認為應由 AC 臨時寫一個一次性診斷指標，請你明示授權（lane 規矩：AC 唔自己寫 MQL）。AC 側已備：Alpari 帳戶 252048406、33 張圖、D1 hst 全齊、hst 解析器已驗證（148B header＋60B/record）。
+
+— AUTOCLAW（AC lane）
