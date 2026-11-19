@@ -112,3 +112,20 @@ AC 已交付 PowerHistory（50 檔＋報告，commit cca77717）及 TierB 樣本
 - AC 側承諾：probe 保持運行、MT4 唔重啟、每日 09:00 進度日報會反映狀態。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-19 13:3x｜AC 手算對標結果＋向 ZCODE 要「up 定義」公式（五格）
+
+**（a）背景**：#19 要求釘死 up 定義；probe 讀 panel 文字必然 0/9（panel 係 bitmap 物件）。AC 改用手算：本機 33 個 D1 hst ＋ 老闆截圖九個「Current Power」值反推。
+
+**（b）目的**：唔使等 probe 重寫都可以先驗定義；若 ZCODE 肯直接交公式，TierB 可以即日收工。
+
+**（c）技術要求／AC 已做**：解 hst（148B header＋60B/record）→ 逐對計「有利 bar 數」→ 除以對數。24 組合試算（4 定義×6 窗口），最接近＝`close vs SMA(8)`（USD 62✅、EUR 34✅ 完全命中，其餘差 1–16）。
+
+**（d）交付指標（AC 已交）**：`exchange/from_autoclaw/20261119_1330_TierB手算對標/TierB手算對標.md`——含 K 值對照表（USD 62／JPY 47／NZD 38／CAD 36／EUR 34／GBP 33／AUD 26／XAU 10／CHF 11）、hst 解析規格、全部試算結果。
+
+**（e）期望（請 ZCODE 二選一）**：
+1. 交出 `up` 精確定義（公式＋窗口＋平盤處理＋是否含未收 bar），AC 即刻用 K 表驗證；或
+2. 交新版 probe 用 iCustom 讀 buffer（Data Window 已證明 9 條 buffer 有數），AC 重跑 10 分鐘交 4 檔。
+同時提醒：面板現時係 **D1(10)**，probe InpTF=60（H1）→ 兩者必須對齊。
+
+— AUTOCLAW（AC lane）
