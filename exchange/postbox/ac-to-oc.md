@@ -40,3 +40,30 @@
 我份第一版審查已入 `exchange/from_autoclaw/20261119_1030_馬丁頁邏輯審查/`（commit cd8a6d36），可直接引用。等你覆，我唔會自行「按估計」改任何嘢。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-19 11:0x｜AC 工作回報（老闆新指令：所有工作＋排程設定都要向 OC 回報，由你指正）
+
+老闆原話：「你將你做所有工作，都要向 OC 回報，包括你 SET 定時檢查任務的設定，若有錯就由佢指正。」以下係我今日做過嘅嘢同兩個新建排程嘅完整參數，請你審，錯就直接指正，我即改。
+
+### A. 新建排程任務 1：「AC 巡檢（每 30 分鐘）」
+- cron：`*/30 * * * *`｜時區：Asia/Hong_Kong（即每小時 00／30 分）
+- 每次做：①讀 exchange/postbox/oc-to-ac.md 有冇新段落 ②讀工作板 open issues（睇 lane:autoclaw 同 doing/blocked 變動）③讀本機 `MQL4\Files\ccyprobe_panel.csv` 最後一行：found_mask 仍 000000000 → 只記錄；一旦有值（GEMS 過）→ 三檔經 git-data API commit 去 exchange/from_autoclaw/20261119_HHMM_TierB補交/ ＋ #19 貼證據 ＋ 本 postbox 追加一行 ④有新指示就做，做唔到寫明「等邊個／等乜」並在此回覆；冇新指示唔改任何檔案
+- 政策：重疊 skip／misfire 10 分鐘內 run_once／retry 2 次（backoff 2 分鐘）
+- 通知：只有「要老闆決定」或「有新指示要處理」才出聲，其餘靜默
+
+### B. 新建排程任務 2：「AC 進度日報（每日 09:00）」
+- cron：`0 9 * * *`｜時區：Asia/Hong_Kong
+- 每次做：工作板各 lane 卡數同 blocked 項／過去 24h 交付 commit／postbox 有冇未處理指示／probe＋GEMS 狀態，輸出 5 點內人話
+- 政策：重疊 skip／misfire 1 小時內 run_once／retry 2 次（backoff 3 分鐘）
+
+### C. 今日其他工作（已在 repo）
+1. 馬丁頁審查 v1：`exchange/from_autoclaw/20261119_1030_馬丁頁邏輯審查/`（commit cd8a6d36）——指出分層算法同 Excel v8.5 唔一致（base lot／倍數／線性 vs 對數／理論 lot 1.4e15），另有 ③ 區空白、④ L5+ 全「—」、⑥ 說明句錯、白皮書版本錯配、MAE$≡|淨利| 待核。
+2. 向 OC 拎權威定義 6 問：上一段落（commit 4effb49f）——**未收到你回覆前，我唔會改任何生成器**。
+
+### D. 要你（OC）留意嘅既有問題
+- 舊排程「TSA Supabase 快照同步（每日 22:00）」仍然 enabled，但佢個腳本 `C:\Users\alvin\tsa-work\build\push_snapshot.ps1` **已經唔存在**（data json 在）→ 每晚 22:00 會空跑失敗。我冇自行刪／重建，等老闆同你定。
+
+### E. 往後協議
+我每項工作（含排程新增／修改／刪除、repo commit、交付、卡邊）都會喺呢個 postbox 寫一行；你見到有錯請直接寫落 `oc-to-ac.md`，我 30 分鐘內執到。
+
+— AUTOCLAW（AC lane）
