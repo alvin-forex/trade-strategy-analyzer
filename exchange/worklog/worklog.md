@@ -2446,3 +2446,9 @@ Stage Summary:
 - 巡檢：新信 2 封全讀全蓋章。0915 sidebar 驗收回批（18/18 PASS 收貨＋口徑修正按實際渲染計＋跟進 3 項：1/2 我做交期 11-19 18:00、3 OC 自領）✅；0930 五問裁決＋通道確認（CCY 階段1 本機不跟／Scanner 本機不開支線／notify 檔不申請 gh token／2155 架構審核判平台卡 #28 lane:zcode-platform 死線 11-20 18:00／reset --hard 手法獲批＋嚴禁 pull --rebase 入冊）✅。
 - 回執信 0936 入 from_zcode（逐項收訖表＋跟進 1/2 工序預告＋#28 承接）。跟進 1+2 本鐘即刻開工：①date_range_review.py sidebar.js head→body 尾＋reviews 全頁重生成＋headless 驗證；②ccy_edge_report/ccy_allpairs_report 殼層補注密文零改＋staticrypt 新頁全站掃描報數。
 - 等態：#28 平台承接排跟進 1/2 後開工（死線 11-20 18:00）；CCY 階段 1／Scanner 本機側不跟；gh token 唔使申請（OC 已裁）；TG token 等老闆。
+
+## Task 296：09:31 鐘續——1115 跟進 1/2 完成出貨（2026-11-19 09:44–09:55，ZCODE_w）
+- **跟進 1**：`scripts/date_range_review.py` sidebar.js `<head>`→`</body>` 前＋body 加 `#sidebar-container`（+9/−1，帶 W-FINAL 註釋與 18 頁基準同款）；reviews 重生成——沙盒無 data/history 原始數據，改由頁面原有 JSON 經修好 generate_html() 重建（數據零漂移），daily/weekly 兩頁各 +4/−1 報表正文 byte 級零變；monthly 3 頁＋index 本已齊套僅掃描複核。
+- **跟進 2**：ccy_edge_report/ccy_allpairs_report 加密殼照 tasks_board 手法殼層補注各 +6/−0，密文 payload SHA256 前後一致（0c02094f…／5248484b…）；staticrypt 全站掃描總數 9 頁（2 補注＋7 已注入），補注後全站 920 頁缺 container 只剩 shell.html 豁免＝missing=0；owner PW 解密兩頁 OK，殼層 headless 零 error。
+- 驗證：reviews 6 頁 headless #tsa-sidebar 渲染 6/6＝1、console 零 error；tsa_qa_check Navigation PASS（加密頁 SKIP 同 18 頁輪）；如實申報 staticrypt document.write 解鎖後清殼 sidebar 係 6 加密頁共同機制特性（非本輪引入，留 OC 裁量）。
+- 交付報告 0955 入 from_zcode＋notify 檔；交期 18:00 前完成。等態：#28 架構審核（lane:zcode-platform，死線 11-20 18:00）下一鐘開工。

@@ -321,7 +321,8 @@ def generate_html(report: dict, output_path: Path) -> None:
     lines.append('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
     lines.append(f'<title>日期覆盤 | {meta["start_date"]} - {meta["end_date"]}</title>')
     lines.append(f'<link rel="stylesheet" href="{sidebar_depth}sidebar.css">')
-    lines.append(f'<script src="{sidebar_depth}sidebar.js"></script>')
+    # W-FINAL 跟進1（2026-11-19）：sidebar.js 由 <head> 移去 </body> 前（同 18 頁基準一致）——
+    # head 內執行時 document.body 尚未建立，appendChild 取 null 拋 TypeError 令頁面零 sidebar。
     lines.append('<style>')
     lines.append('*{margin:0;padding:0;box-sizing:border-box}')
     lines.append('body{font-family:-apple-system,sans-serif;background:#0d1117;color:#c9d1d9}')
@@ -371,6 +372,9 @@ def generate_html(report: dict, output_path: Path) -> None:
     lines.append('</style>')
     lines.append('</head>')
     lines.append('<body>')
+    # W-FINAL：NAV 之 #sidebar-container（18 頁基準三件套 2）
+    lines.append('<!-- W-FINAL：NAV 之 #sidebar-container -->')
+    lines.append('<div id="sidebar-container"></div>')
     lines.append('<div class="container">')
     lines.append('<h1>日期覆盤報告</h1>')
     lines.append(f'<div class="meta-info">期間: {meta["start_date"]} 至 {meta["end_date"]} | Signals: {meta["total_signals"]} | Trades: {meta["total_trades"]}</div>')
@@ -542,6 +546,9 @@ def generate_html(report: dict, output_path: Path) -> None:
     lines.append('  toggle.textContent=isOpen?"▶":"▼";')
     lines.append('}')
     lines.append('</script>')
+    # W-FINAL：NAV 三件 3——sidebar.js（18 頁基準三件套 3，</body> 前執行）
+    lines.append('<!-- W-FINAL：NAV 三件 3——sidebar.js -->')
+    lines.append(f'<script src="{sidebar_depth}sidebar.js"></script>')
     lines.append('</body>')
     lines.append('</html>')
     
