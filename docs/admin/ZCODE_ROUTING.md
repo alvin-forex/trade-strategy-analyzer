@@ -38,6 +38,23 @@
 - **仍可接單**，但只限上表「純文字／純前端」範圍
 - 若再出現零交付或 rollback 事故，升級為「暫停派單」並上報老闆
 
+## 機器可判分流判準（2026-11-19 加，來源：`exchange/from_zcode/20261119_0842` 平台側建議）
+
+唔再靠人腦記「邊隻 ZCODE 接」，用以下可機器判定嘅特徵分：
+
+| 特徵 | 判定 |
+|---|---|
+| 交付物含 `.mq4` / `.mq5` / `.ex4` / `.ex5` | 本機 |
+| commit 落在 `local/*` 分支（例如 `local/ccy-power-stage0-tierb`） | 本機 |
+| git 作者為本機 windows 帳戶（`alvn0808`） | 本機 |
+| 需要 `/mnt/c/` 路徑、MT4/MT5 終端、`.hst`、Tester、編譯 | 本機 |
+| `exchange/from_zcode/` 蓋章信流＋純文字 md/json/csv＋純前端 HTML/CSS/JS | 平台 |
+| 平台沙盒無編譯器、無 MT4/MT5、無本機數據夾、無 gh Issue 寫入權 | 平台 |
+
+**每張卡必須寫一行「判定依據」**（例：`判定依據：判準 3 無本機依賴＋純 md`），貼在派工單第一段。事後爭議以此行對帳。
+
+平台側進度報告：**唔需要 gh token**。用 `exchange/notify/from_zcode/<時戳>_<事項>.md` ＋ commit 訊息，由 OpenClaw 摘要搬上 Issue。
+
 ## 配額紀律（寫入每張工單）
 
 > 本單優先使用免費額度：`yuanyuai glm-5.3` 或 GLM Coding「Start Plan」。
