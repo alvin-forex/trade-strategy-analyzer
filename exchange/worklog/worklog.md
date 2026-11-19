@@ -2431,3 +2431,12 @@ Stage Summary:
 - 1341 五問回覆 0842：①身份＝平台 @zc_ops_bot 沙盒（無編譯無終端），0815 件貨係本機側（alvn0808/local/ 分支）非我方出品；②01:00 前後平台側冇記錄（兩鐘無新信巡檢）；③CCY 階段 1 本機工（4 檔到位後 1 工作日）；④Scanner 設計可平台先出（不需 PRD）待 OC 確認；⑤進度報告以 notify 檔＋commit 訊息替代 Issue 留行（無 token）。
 - **18 頁 sidebar 注入開工**（1115，純前端＝1152 平台分流範圍；OC 2300 預告本機未交轉派平台；repo 無本機注入 commit 坐實）：root 5＋admin 5（含 tasks_board 加密頁須重跑加密閘）＋hub 2＋campaign 5＋ccy_power 1；零功能改動、唔准動 sidebar.css/js 本體與其餘 897 頁；CI 重生成覆蓋風險已提示 OC。
 - 待辦：18 頁注入本鐘起做（下鐘續）；2155 歸屬等 OC 一句；2245 本機執行；TG token 等老闆；GitHub Issue token 等老闆批。
+
+## Task 294：08:31 鐘續——1115 十八頁 sidebar 注入出貨（2026-11-19 08:50–09:10，ZCODE_w）
+- **1115 派工單（W-FINAL 全站 sidebar 一律注入 18 頁）完成出貨，主 commit 60b6a6c9（18 檔 +121/−9）push 離站**。老闆 11-18 11:06「一律要 sidebar」無豁免；OC 2300 預告本機未交轉派平台，repo 實證本機未交，平台即刻承接。
+- 工序：三件套 W5-C 同基準（head sidebar.css＋body #sidebar-container＋</body> 前 sidebar.js），深度實測（root=./、admin=/../、ccy_auto_trader+campaign/legal+campaign/video=../../、forex_reports+ccy_power=../——派工單「campaign/legal 用 ../」係筆誤，兩層目錄實需 ../../）；3 頁殘留導航移除（forex_news/tug_of_war/ccy_power：top-nav＋navDrawer＋burgerBtn，IIFE 保留自動啞火零 error，死 CSS 保留守零功能改動）。
+- 加密頁處理：4 頁（tasks_board=owner PW＋index/ccy_ranking/signal_ranking=general PW）殼層注入密文未動，無需重加密；解密 before/after 對比 **byte 級零變 4/4**。
+- 驗收：自掃全站 920 頁（派工單口徑 915；e0e34fa6 後新增 5 頁）清單內 missing=0、18/18 三件套 PASS；tsa_qa_check Navigation PASS＋Sidebar 對加密頁 SKIP（殼層掃描＋解密補證）；hub 3 頁 headless（agent-browser）console 零 error＋核心功能全數正常（tug 計算按鈕→結果渲染／bot2bot 2 按鈕／auto_trader 3 按鈕+表格）。
+- 交付報告 0905 入 from_zcode（逐頁 hash 表＋閘輸出原文＋驗收對照）；遺留：清單外 2 新頁（ccy_edge_report/ccy_allpairs_report）無 sidebar 待 OC 裁量補注；CI 重生成覆蓋風險已兩度提示 OC。
+- 教訓入冊：①commit 號會因歷史清瘦化漂移（7265c849→7342b38a），報 hash 前 git log 對一次；②派工單相對路徑指示可能筆誤，一律按實測深度＋機器掃描背書。
+- 等態：2155 歸屬等 OC 一句；2245 本機執行；TG token／GitHub Issue token 等老闆；九單（W0-W3b+0840+CP-BT1）按新分工分流後等派定。
