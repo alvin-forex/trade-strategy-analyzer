@@ -2458,3 +2458,14 @@ Stage Summary:
 - **卡 #28（2155 派工＋0930 裁決判平台，死線 11-20 18:00）本鐘開工並完成出貨**：三份 md 入 docs/admin/——TSA_ARCHITECTURE_AUDIT.md（目錄職責＋生成器活 12/一次性 72＋模板 6 族＋資料鏈＋建議 6 項）、REPORT_TEMPLATE_UNIFICATION.md（6 套風格實測 S1-S6＋收斂裁決 1 token 系統＋2 佈局範本＋存檔族 96 頁零改動＋遷移 P1-P6 成本）、REPORT_SECTION_SPEC.md（sec-<slug> 規則＋#sec-raw 保留錨點＋範本 A/B/覆盤固定節表＋驗收包）。
 - 核實 OC 數字全數獨立重跑吻合（483／169/159/81/71/2/1／token 377+104／style 481）；新發現：5 新 signal 無 Deep/signal_ 頁坐實舊兩族 11-05 停產（活性分族核心證據）；index_ sec-* 覆蓋 147/159；報告生成器真源喺本機分析鏈（52ba9ed9 作者 alvincyleungtw2-beep），repo 側 84 py 有 72 一次性。
 - 驗收：language_check 917 files 0 violations ✅；tsa_qa_check PASS（Data Freshness 沙盒常態 SKIP）✅；零 code 改動 ✅。交付信 1045＋notify 入站，等 OC 複測交老闆裁決遷移路線。
+
+## Task 298：08:31 cron（11-20）第十五次 rollback 自癒＋1119 九信處理＋1356 出貨＋CP-BT1 階段 A 出貨（2026-11-20 08:31–09:1x，ZCODE_w）
+- 巡檢積壓申報：11-19 11:31→11-20 07:31 共 21 鐘 cron 冇跑（session context 積壓），08:31 一鐘一次過補跑；信件積壓 9 封（11-19 1301 起）今鐘全數處理，唔影響死線（1356 今日 18:00／CP-BT1 階段 A 11-21 18:00 均提前交）。
+- **第十五次 rollback**（同款 c45e148f 11-05 快照，11-19 信全消失）：fetch 發現 origin/main 已去 3cffdfed（11-20 08:00）＋forced update 標記；照已批手法 reset --hard origin/main 歸位（promisor blob 補抓首試一次失敗重試成功）；exchange_cycle.sh 28,197B 與正本一致。
+- 九信全讀全蓋章＋回執 0848 入 from_zcode（commit 8bec4a7e）：1301 回批＝跟進 1/2＋卡 #28 全 PASS、卡 #20 關、P1–P6 等老闆未批前一頁不動 ✅；1325 裁決＝i lane 取消、兩 lane 分流（本機 @TG_AutoClawZcode_bot／平台 @zc_ops_bot=我）、w lane 照舊巡檢＋平台純文字/前端單即刻接 ✅；1325 本機 W0-W3b 七單+0840+#5+#27＝本機不搶 ✅；1325 平台 CP-BT1＝**接單**；1345 CCYV3（編譯/終端）＝本機 ✅；1350 TierB Probe（.mq4）＝本機 ✅；1356 CI L25＝**平台接**（判準 1/3/4 純 json＋死線今日）；1545 AC 截圖搜索／1830 up 定案第三輪＝知悉 ✅。
+- **1356 出貨（A 案）**：tests/page_quality_baseline.json 加 thin-shell:campaign/video/index.html 條目（owner ZCODE＋reason 332 字屬影片頁設計本意）；本地 L25 gate 實跑 921 頁命中 4/baseline 4/**新違規 0 綠燈 exit=0**；gh run list 驗證 OC 側執行（平台無 gh 權，routing doc 既有安排）；commit 8bec4a7e 隨回執 push。
+- **CP-BT1 階段 A 出貨（死線 11-21 18:00 提前一日）**：新目錄 ccy_backtest/（repo 根，唔混 scripts/）——indicators.py Wilder RSI/ATR（MT4 iRSI/iATR 語義：首值 index=period→Wilder 平滑、avg_loss==0→100、TR=max(h,c_prev)−min(l,c_prev)）＋universe.py 9 幣×36（28 法幣對+8 XAU 交叉，Σ=72 對帳）＋core.py raw=RSI−50/w=ATR%/分解引擎（聚合熱點隔離 aggregate_currency()）＋dataio/series/parity/cli＋README 假設登記 A-1..A-8。
+- 自測：pytest **18/18 PASS**（手算例逐步展開：RSI p2 40→66.667、全平盤=100 MT4 語義、ATR p3 六 bar 4/3→58/45→349/270、兩對分解 EUR+50/USD0/JPY−50、缺料退出、roundtrip）；cli selftest 4/4；repo D1 實跑 32 instruments 1937 row 全覆蓋 1905 行九幣齊；language_check 918 files 0 violations。
+- 缺口申報（交付信 0910）：白皮書 PDF＋audit zip＋已知缺陷清單唔喺 repo（ref/ 等料，.gitignore *.pdf 須 add -f）、H4 全缺、reader csv 未到（11-20 12:00 OC 供）→ 階段 B parity 等料即刻開工（死線 11-23 18:00）。
+- 教訓：①promisor partial clone reset 失敗要重試 fetch 先 reset；②ATR/RSI 手算例兩度計錯（min/max 取前收對位），實現反證手算——手算例都要逐 bar 列明取值對象；③巡檢積壓多鐘時信件按「已蓋章唔重複處理」口徑一次過補跑即可。
+- 等態：白皮書+供料（OC 11-20 12:00）→階段 B parity；P1–P6 遷移（老闆裁決）；跟進 3 CI 模板（OC 自領）；1356 CI 三綠（OC 驗證）；TG token（老闆）。
