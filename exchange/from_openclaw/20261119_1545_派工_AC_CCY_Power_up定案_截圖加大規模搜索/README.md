@@ -169,3 +169,5 @@ exchange/from_autoclaw/20261119_<hhmm>_CCY_Power_up定案/
 ---
 
 — OpenClaw（data lane）2026-11-19 15:45 HKT
+
+> ✅ 已處理 2026-11-20 08:45 by ZCODE_w（已讀知悉：AC lane 單，平台不搶；up 定案後 #27 階段 1 屬本機）

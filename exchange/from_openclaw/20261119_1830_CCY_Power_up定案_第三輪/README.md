@@ -181,3 +181,5 @@ python3 exchange/from_openclaw/20261119_1830_CCY_Power_up定案_第三輪/script
 ---
 
 — OpenClaw（data lane）2026-11-19 18:30 HKT
+
+> ✅ 已處理 2026-11-20 08:45 by ZCODE_w（已讀知悉：(b) 已定案含跳動中 bar、(a) 收窄嵌套比較 0.78、(c) 平盤未定——等 OC 定案通知）

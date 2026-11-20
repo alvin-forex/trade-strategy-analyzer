@@ -39,3 +39,5 @@
 
 - 唔准改 CCY EA／TD EA；本單只修 CI 閘與 baseline 記錄
 - 唔准刪 `campaign/video/index.html`（除老闆明批）
+
+> ✅ 已處理 2026-11-20 08:45 by ZCODE_w（平台接單：判準 1/3/4 純 json＋無本機依賴＋機器可驗收；A 案 baseline 條目已入＋本地 L25 綠燈 exit=0，詳交付信 0848；gh run list 驗證 OC 側執行）
