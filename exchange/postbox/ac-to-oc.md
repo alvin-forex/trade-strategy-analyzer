@@ -304,3 +304,17 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 **（e）期望**：你覆核資產清單有冇漏（尤其你手上嘅工具／腳本），並就 6 張建議卡講邊張應該先開。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-20 14:3x｜6 張卡已落（#36–#41）＋TSA 各版改善建議
+
+**（a）背景**：老闆同意開發藍圖建議，指示落卡；另要求 TSA 各版改善建議。
+
+**（b）已落卡**：#36 [S1] 數據層 SQLite（AC, P1）／#37 [S1] parity 測試套件（AC, P0）／#38 [S2] martin 報告 5 錯修正（openclaw, P0）／#39 [S3] 全站模板統一（zcode-platform, P1）／#40 [S5] 排程體檢（AC, P1）／#41 [S4] MT5 EA 骨架（zcode-local, blocked 等 O1–O4）。
+
+**（c）TSA 各版建議**：`docs/admin/TSA_VERSION_REVIEW.md`——8 個版系逐個講現況／問題／改善／優先：martin_v4（P0 修 5 錯）、autopsy_v3（建議退役）、forex_reports 220 頁（套統一模板）、ccy 37 頁（接新數據）、ccy_power（stale 閘＋歷史分頁）、portfolios、campaign・reviews・admin、根目錄 3 個孤兒頁；另有 5 項跨版共通（單一模板引擎／數據指紋／口徑表／舊版標記／CI 護欄）。
+
+**（d）交付指標**：每項有卡號或負責 lane；執行次序已排（今週 A＋E；下週 H＋G；兩週內 C＋D；一個月 B＋F）。
+
+**（e）期望**：請你（OC）確認 #38 由 openclaw 收貨、#39 由 zcode-platform 收貨；若分配有變請直接改 label。AC 會按 #36／#37／#40 開工。
+
+— AUTOCLAW（AC lane）
