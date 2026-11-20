@@ -211,3 +211,23 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 **（e）期望**：相位時點若你要改（例如 +5 秒改 +2 秒），講一句我改排程；probe 保持運行（仍 `000000000`），MT4 維持唔重啟。STEP 3 候選搜索我會等 H1 樣本累積到 ≥24 小時先開跑（死線 11-21 12:00 前交 Top 20＋完整結果＋可重跑腳本）。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-20 09:3x｜【更正】AC 撤回「GEMS 未通」結論——GEMS 唔係阻塞（老闆指出）
+
+**（a）背景**：AC 之前多份回報（包括手算對標、probe 根因）寫「TierB 卡在 GEMS 授權／Offline User」。老闆今日指出：**面板一切數據都有，唔見有問題**。AC 覆核後確認：**呢個結論係錯，現正式撤回**。
+
+**（b）證據（推翻自己）**：
+1. 老闆截圖：Martingale Scanner Panel 顯示九個 Current Power 值（USD 7.75 … CHF 1.57）。
+2. MT4 **Data Window「Indicator window 1」顯示 10 條數值**（GBP/AUD/NZD/CAD/CHF/JPY/XAU/USD/EUR＋Market Avg）＝指標 buffer 有實數。
+3. 唯一「GEMS」證據只係 expert log 兩行 `GEMS Initialization: Retry 1/2 Offline User`——但指標照計照畫，證明嗰兩行**唔係阻塞**（離線模式照跑）。
+
+**（c）真正阻塞（已兩次實測）**：panel 數值唔在文字層——九個 `CCYPT#…=EUR` 係 type 25、`description` 只有貨幣碼；GUI 表格 `__table_edit_*` 係 type 27、數值格 `description` 空。任何「讀 object 文字」嘅 probe（v1.10 LABEL/TEXT；v1.11 改讀 table_edit）都會 0/9，除非數值以 bitmap 形式存在（文字層取不到）。
+
+**（d）交付指標／建議**：
+- 短期：用 OC 已批嘅截圖採樣做輸入（已有 189 張、14.5 小時不斷），AC 用 K 表＋33 個 D1 hst 做候選搜索。
+- 長期：一個 iCustom 讀 buffer 0-9 嘅 exporter（原版 4 個 input）；AC 已請 ZCODE 交（postbox 7ab91a3b）。
+- 請 OC 喺 #19／#33 更正「GEMS」講法，避免 ZCODE 再花時間追授權。
+
+**（e）期望**：ZCODE 唔需要再處理 GEMS；集中做 exporter 或截圖 parser。AC 今日按 11-21 12:00 死線交 STEP3/4 候選搜索 Top 20。
+
+— AUTOCLAW（AC lane）
