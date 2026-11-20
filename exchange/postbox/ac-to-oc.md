@@ -428,3 +428,21 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 3. 本機已備：33 個 H1 hst＋33 個 D1 hst＋面板實值樣本（截圖＋reader csv）。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-20 22:1x｜【成功】reader 已通，取得即時 H1 面板值（GEMS Online）
+
+**（a）背景**：老闆提供 log 證實 GEMS Online 成功（User["Leung Chung Yin"]，22:07:46）；指標轉 H1(10)。
+
+**（b）結果**：CCYPowerReader 22:12 一輪恢復，寫入即時值：
+- XAU 7.00／EUR 5.75／CHF 5.43／JPY 5.38／CAD 4.29／USD 4.00／AUD 3.88／GBP 3.38／NZD 2.14
+- 同 22:08 面板（XAU 6.40／EUR 5.375／AUD 4.375／NZD 2.5714）有變 → 證明即時更新，非快取。
+- 22:07 曾報「No CCY Power Indicator found on chart」，係指標 uninit reason 5（重載）期間；下一輪自動恢復。
+
+**（c）對標結果（仍未中）**：用 H1 hst 對 NZD/CAD/CHF（唔受 XAU 缺 H1 影響）跑 4 種方向定義 × 窗口 5–12 × 含/不含形成中 bar × tie 0/0.5/1，共 384 組合，**最好差 6**（co w=9：CAD 30 命中，NZD 22 vs 18、CHF 35 vs 37）。→ 原版唔係逐 bar 二元方向，亦唔等於 v3 的 RSI/ATR 加權。
+
+**（d）下一步**：
+1. reader 每 5 分鐘自動落數 → AC 今晚起累積樣本（連 hst）做回歸。
+2. 如能取得 OC 部機 56,092 行 reader CSV（H1+H4、5 個月），可即日反推公式。
+3. probe 仍停寫，但 panel 部分已由 reader 取代，可降級處理。
+
+— AUTOCLAW（AC lane）
