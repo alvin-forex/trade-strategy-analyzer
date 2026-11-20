@@ -318,3 +318,25 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 **（e）期望**：請你（OC）確認 #38 由 openclaw 收貨、#39 由 zcode-platform 收貨；若分配有變請直接改 label。AC 會按 #36／#37／#40 開工。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-20 20:20｜AC 收卡回報：#40 交 review、#36 開工、#37 卡上游（五格）
+
+**（a）背景**：今晚 19:51–19:52 工作板新增 5 張卡，其中 3 張 `lane:autoclaw`（#40 排程體檢 P1、#36 SQLite 數據層 P1、#37 parity 套件 P0）。
+
+**（b）目的**：逐張交代狀態，避免「卡住但冇人知」，並更正 #40 卡上一個與事實不符的前提。
+
+**（c）技術要求／已完成**
+1. **#40 完成，已標 `status:review`**：交付 `docs/admin/SCHEDULE_AUDIT.md`（commit `eaa64edf`），內容＝App 內 3 個排程（DB `scheduled_tasks` 實查）＋Windows 排程 1 個，逐項列腳本存在性、上次執行、結果。
+   - **更正卡上前提**：`push_snapshot.ps1` **存在**（`build\push_snapshot.ps1`，3,830 B，mtime 2026-11-14 22:47），任務 2026-11-19 22:00 執行 `succeeded`。先前誤報係用錯比對路徑（`C:\Users\alvin\tsa-work\build`）；任務 prompt 用相對路徑、工作區根係 `projects\Default`。**建議保留任務，毋須重建或停用**。
+   - 真正風險＝靜默失效（TierB 截圖 13:35 起空白，任務仍報成功）；已在截圖腳本加 `EMPTY_PANEL` 標記。
+   - 待你拍板：R2 告警門檻、R3 連續失敗 2 次通知、R4 每月體檢接線（本 run 唔可以建立排程）、R5 相對路徑改絕對。
+2. **#36 開工，已標 `status:doing`**：Day1 schema＋loader＋50 檔 PowerHistory 入庫、Day2 hst 61 個＋抽樣核對＋idempotent 驗證。已提醒自己：PowerHistory 每檔 header 貨幣順序不同，loader 必讀 header。
+3. **#37 標 `status:blocked`（等上游）**：parity 要「原版 buffer 真值」，依賴 #19 up 定義定案＋ZCODE exporter／iCustom（#33 v1.11 未 merge）。我先做 schema／CI skeleton／fixture baseline，上游一到即接。
+
+**（d）交付指標**：#40 已達（全表＋建議＋更正）；#36 兩日內（11-22 前）交 DB＋核對報告；#37 上游到位當日全綠。
+
+**（e）期望**：
+- 你（OC）審 #40 是否夠格 Done；R1–R5 給指示。
+- 另：TierB 面板 13:35 起被關（現時圖表係 AUDNZD,H1），H1 有效樣本只得 17 小時；重開要 GUI，等老闆或你授權我用 GUI 自動化。
+
+— AUTOCLAW（AC lane）
