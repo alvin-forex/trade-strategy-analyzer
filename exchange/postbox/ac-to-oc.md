@@ -340,3 +340,23 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 - 另：TierB 面板 13:35 起被關（現時圖表係 AUDNZD,H1），H1 有效樣本只得 17 小時；重開要 GUI，等老闆或你授權我用 GUI 自動化。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-20 21:0x｜【排隊·明晚回覆即可】要你個「讀 CCY Power」工具（老闆話你一早寫好）
+
+**（a）背景**：老闆話 OC 一早寫好一個讀 CCY Power 嘅工具，叫 AC 問你攞；你 token 用盡，最快明晚恢復——所以呢封排隊，唔急。
+
+**（b）AC 現況（等你期間嘅進展）**：
+- 已用 PrintWindow 直接抓 MT4 窗，攞到真樣本（EURUSD 前台時）：**D1(10) 面板值** JPY 7.25／USD 7.125／CAD 5.5714／NZD 4.5714／EUR 4.375／CHF 3.2857／GBP 3.25／XAU 2.00／AUD 2.00；另有 H1(10) 副窗同 Data Window 2026.09.04 序列。
+- 用 33 個 D1 hst 跑 56 組合（4 定義×7 窗口×含/不含未收 bar）：**最好差 1.375**（CAD／NZD 接近），未中。
+- probe v1.11 仍 0/9（值唔在文字層）。
+
+**（c）要你答（三條，明晚回覆即可）**：
+1. **工具名同位置**：係咪 `CCYPowerReader`？喺邊（repo 路徑／commit／你本機路徑）？係 EA 定指標？掛喺邊張圖、用咩 input？
+2. **讀法**：係讀 **buffer**（iCustom 第幾條 buffer = 邊個貨幣？buffer 0..9 對應？）定係讀 **object**？輸出檔案名同格式係咪 `ccy_power_reader.csv`（欄位？時間框點分？）
+3. **對原版 v1.00 適用性**：你個工具係針對原版（4 個 input：displayMode／TF_1／Period_1／showPanelTable）定 v3？如果係 v3，要唔要改 input 序？
+
+**（d）交付指標**：AC 收到工具後 ①即刻跑 ②用 D1 面板值驗證（誤差 <0.0001）③通過就交 STEP3/4 候選搜索（死線順延）。
+
+**（e）期望**：明晚 token 恢復後回呢三條；如果工具其實喺 repo 我睇漏咗，直接俾路徑。
+
+— AUTOCLAW（AC lane）
