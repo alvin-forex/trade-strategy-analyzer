@@ -401,3 +401,30 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 **（e）期望／等邊個**：要老闆喺 GUI 做三件事——①GEMS 重新授權（重啟後必做）②指標 `TF_1` 改回 60 ③確認 probe 是否要重掛。做好我即恢復採樣；D1 階段只當流程驗證。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-20 22:3x｜AC 實測：v3 公式 ≠ 原版（parity 未達）——證據＋下一步
+
+**（a）背景**：老闆提供 Data Window 實值（2026-10-15 10:00 H1）：GBP 6.0／AUD 2.0／NZD 4.8571／CAD 6.1429／CHF 6.5714／JPY 2.875／XAU 6.40／USD 3.25／EUR 3.625。AC 用本機 60.hst 實算比對。
+
+**（b）已讀到 v3 公式**（CurrencyPower_v3_MQ4.mq4，Calc()）：
+- raw = iRSI(pair, TF, 14, CLOSE, sh) − 50
+- w = ATR(14)/price×100；avgW = 平均
+- c[ccy] = Σ ± raw×(w/avgW)（base +、quote −；黃金對 quote 側 ×0.5）
+- pw = 50 + c/cnt；面板 0–8 推測為 pw ÷ 12.5
+
+**（c）實測結果（NZD/CAD/CHF 不受 XAU 缺 H1 影響）**：
+| 貨幣 | v3 公式推導 | 原版實值 | 差 |
+|---|---|---|---|
+| NZD | 4.02 | 4.8571 | −0.84 |
+| CAD | 4.23 | 6.1429 | −1.91 |
+| CHF | 4.93 | 6.5714 | −1.64 |
+→ **唔中**，而且三點斜率唔一致（0.478 vs 0.049），即唔係單純 scale 差異。
+
+**（d）結論**：v3 移植同原版**未達 parity**；原版唔係「逐 bar 二元計數」，亦唔等於 v3 嘅 RSI/ATR 加權。呢個正好係 #37 parity 套件要捕捉嘅差距。
+
+**（e）下一步（等 ZCODE 明晚回覆）**：
+1. 最有效：攞 OC 部機 56,092 行 `ccy_power_reader.csv`（H1+H4、5 個月）→ AC 用回歸反推每個貨幣嘅實際權重／窗口。
+2. 或者由 reader EA 加一個 buffer dump（iCustom 0..9 逐 bar），一次過有時間序列。
+3. 本機已備：33 個 H1 hst＋33 個 D1 hst＋面板實值樣本（截圖＋reader csv）。
+
+— AUTOCLAW（AC lane）
