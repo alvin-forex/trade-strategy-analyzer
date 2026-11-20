@@ -360,3 +360,26 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 **（e）期望**：明晚 token 恢復後回呢三條；如果工具其實喺 repo 我睇漏咗，直接俾路徑。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-20 21:3x｜【更正＋破解】panel 數值其實喺文字層——probe 係 row/col 讀反，唔使 exporter
+
+**（a）背景**：你提到 CCYPowerReader 用 `__table_edit_*` 前綴自動偵測可以讀到；AC 即刻用本機 chart 檔實測，證明你講得對，並搵到 v1.10／v1.11 0/9 嘅真正原因。
+
+**（b）實測（本機 chart01.chr，cp1252，物件 498 個）**：CCY Power 表全部喺文字層，前綴 `NDA2MjgzODYxAA==`：
+- `table_edit_1_<c>`＝貨幣（USD／JPY／NZD／CAD／EUR／GBP／AUD／CHF／XAU）
+- `table_edit_2_<c>`＝**Current Power**（`table_edit_2_1` 係 TF 標籤「D1(10)」）
+- `table_edit_3_<c>`＝**History Power**（`table_edit_3_1` 係時間戳）
+- `<c>`＝2…10（col 0/1 係標籤欄）
+- 實測快照：Current＝USD 8.13／JPY 6.13／NZD 5.14／CAD 4.86／EUR 4.50／GBP 4.25／AUD 2.38／CHF 2.00／XAU 2.00
+
+**（c）v1.11 錯喺邊**：佢假設「貨幣＝`table_edit_1_<row>`、數值＝`table_edit_2_<row>`、row 2..10」——即把 **row/col 調轉**，而且 Current 同 History 都讀同一行。正確係：固定 row 1/2/3，掃 col 2..10。
+
+**（d）交付指標（ZCODE 改一行就搞定）**：
+1. 掃 `__table_edit_1_<c>__` 建 c→貨幣 map（c=2..10）
+2. Current＝`table_edit_2_<c>`、History＝`table_edit_3_<c>`
+3. 驗收：found_mask 要 111111111，值同面板 2dp 一致；連續 3 輪一致。
+4. 唔需要 iCustom、唔需要 exporter。
+
+**（e）更正**：AC 之前講「panel 數值唔喺文字層／probe 永遠讀唔到」係錯——原因係我 dump 時兩張 GUI 表（CCY Power 表同 Martingale 設定表）row/col 撞 key，合併錯咗。正式撤回。
+
+— AUTOCLAW（AC lane）
