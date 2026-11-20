@@ -2469,3 +2469,10 @@ Stage Summary:
 - 缺口申報（交付信 0910）：白皮書 PDF＋audit zip＋已知缺陷清單唔喺 repo（ref/ 等料，.gitignore *.pdf 須 add -f）、H4 全缺、reader csv 未到（11-20 12:00 OC 供）→ 階段 B parity 等料即刻開工（死線 11-23 18:00）。
 - 教訓：①promisor partial clone reset 失敗要重試 fetch 先 reset；②ATR/RSI 手算例兩度計錯（min/max 取前收對位），實現反證手算——手算例都要逐 bar 列明取值對象；③巡檢積壓多鐘時信件按「已蓋章唔重複處理」口徑一次過補跑即可。
 - 等態：白皮書+供料（OC 11-20 12:00）→階段 B parity；P1–P6 遷移（老闆裁決）；跟進 3 CI 模板（OC 自領）；1356 CI 三綠（OC 驗證）；TG token（老闆）。
+
+## Task 299：09:31 cron（11-20）第十六次 rollback 自癒＋sparse-checkout 排除 ccy_backtest 修復＋巡檢無新信（2026-11-20 09:31–09:5x，ZCODE_w）
+- 第十六次 rollback（同款 c45e148f 11-05 快照，本地與 origin 分歧 657/6342）：exchange_cycle.sh 首跑 pull 卡 divergent 提示超時；改手動 fetch→評估分歧→**reset --hard origin/main** 歸位 223a6e8b（總計劃表 S1-S6 上線版），backup_local_20261120 分支留底；3 個 untracked 目錄零損。
+- 新病種：reset 後磁碟缺 ccy_backtest/（git ls-tree 在、working tree 無、checkout pathspec 被拒）——坐實 partial clone＋**sparse-checkout cone 只開 .github/docs/exchange/scripts/tests**，階段 A 出貨目錄被排除；`git sparse-checkout add ccy_backtest` 恢復（11 檔＋out＋tests 全歸位）＋pytest 18/18 PASS（0.17s）複驗，階段 B parity 開工條件齊。教訓入冊：rollback 自癒後必查 sparse-checkout list——tree 內有而磁碟無＝被 cone 排除，要 add 而非 checkout。
+- 巡檢：無新信無警報（from_openclaw 315 封全有章；11-05 2148 缺陷派工帶 ZCODE_i 章屬 code lane 已處理）。cycle 腳本 TG 記錄見老闆訊息（#1886–1902 TRADE DASHBOARD 說明書／CCY POWER 報告格式等）均係老闆↔OC 對話，非 from_openclaw 派工，唔搶工。
+- WORK_PLAN.md（AC lane S1-S6 總計劃表 09:21 上線）讀畢：平台 lane 兩卡——S3 #28 模板統一審核（todo，依賴 #34/#35 Scanner 模板定稿）／S3 #4 Supabase 前端（todo，等 Supabase 資料穩定）——依賴均未到，本鐘無可開工項；CP-BT1 階段 B 等料（白皮書 PDF＋audit zip＋reader csv OC 12:00 供）。
+- 等態不變：白皮書+供料（12:00）→階段 B parity（死線 11-23 18:00）；P1–P6（老闆裁決）；#34/#35（本機 PR 待驗）；跟進 3 CI 模板／1356 CI 三綠（OC）；TG token（老闆）。
