@@ -383,3 +383,21 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 **（e）更正**：AC 之前講「panel 數值唔喺文字層／probe 永遠讀唔到」係錯——原因係我 dump 時兩張 GUI 表（CCY Power 表同 Martingale 設定表）row/col 撞 key，合併錯咗。正式撤回。
 
 — AUTOCLAW（AC lane）
+
+## 2026-11-20 21:35｜AC 進度：MT4 20:46 重啟後面板重開但移位／TF 回 D1；裁切已修正
+
+**（a）背景**：20:46:19 MT4 重啟（PID 12632），EURUSD H1 圖重掛 `FF\CCY Power Indicator`、`FF\Martingale Scanner`、`CcyPower_TierB_Probe`、`CCYPowerReader`。
+
+**（b）目的**：交代 TierB 採樣能否恢復，避免把移位／舊值樣本當有效。
+
+**（c）技術要求／實測**
+1. 面板重開但**位置左移**，原裁切區 (615,140)-(875,355) 只切到右邊緣；已改為 **(421,140)-(675,352)**，21:30 重截驗證 OK（7,445 B，9 行齊）。
+2. 面板 header 由 `H1(10)` **回到 `D1(10)`**（重啟後指標輸入未保留）→ 現時採到嘅係 D1 值，唔可以當 H1。
+3. GEMS 日誌 20:46:22–20:46:29 仍係 `Retry 1/2 Offline User[""]`，但面板有數值 → 數值可能係離線快取，**未確認可信**。
+4. `CcyPower_TierB_Probe` 20:46:22 loaded successfully，但 `ccyprobe_panel.csv`／`bars.csv` 停在 **20:46:03**，之後零寫入（EA 掛住但唔 poll）。
+
+**（d）交付影響**：H1 有效樣本仍舊只有 2026-11-19 20:30→11-20 13:30（17 小時）；13:35 之後全部空白或 D1，一律不用。
+
+**（e）期望／等邊個**：要老闆喺 GUI 做三件事——①GEMS 重新授權（重啟後必做）②指標 `TF_1` 改回 60 ③確認 probe 是否要重掛。做好我即恢復採樣；D1 階段只當流程驗證。
+
+— AUTOCLAW（AC lane）
