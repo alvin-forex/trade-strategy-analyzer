@@ -8,7 +8,7 @@
 | 代號 | 系統 | 涉及 EA／指標 | 資料／產物 |
 |---|---|---|---|
 | **S1** | CCY Power（原版指標 ＋ 資料管道） | `CCY Power Indicator v1.00`、`CcyPower_TierB_Probe`、`CcyPowerExporter`、`CurrencyPower_v3` | 面板九貨幣值、PowerHistory .dat、ccy_power 網頁 data.json |
-| **S2** | Martingale Scanner（原版逆向 ＋ 重製） | `Martingale Scanner v1.00`、`Extra Martingale Scanner`（重製） | TradingHistory v8.5 對照、165 頁 martin_v4 報告 |
+| **S2** | Martingale Scanner——**原版行為逆向工程（black-box）＋ 重製**：只複製「輸入→輸出」行為，做到同原版數值一致（parity）；**唔係**研究馬丁格爾理論原理、亦唔涉及策略設計（entry/exit／參數建議屬 LEGEND／老闆） | 原版 `Martingale Scanner v1.00`、重製版 `Extra Martingale Scanner` | TradingHistory v8.5 對照（golden fixture）、165 頁 martin_v4 報告 |
 | **S3** | TSA 網站（報告頁／前端） | — | martin_v4／ccy／ranking 等 900+ 頁 |
 | **S4** | EA（MT5 先行）＋ TSA Risk Analyzer | `REQUIREMENT_EA_v0.1`、`REQUIREMENT_TSA_Risk_Analyzer_v1.1` | MT5 .mq5 骨架、風險分析器 |
 | **S5** | 工作板／CI 基建 | — | Taskboard、regression gate、exchange 通道 |
