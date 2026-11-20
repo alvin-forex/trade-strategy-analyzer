@@ -2476,3 +2476,9 @@ Stage Summary:
 - 巡檢：無新信無警報（from_openclaw 315 封全有章；11-05 2148 缺陷派工帶 ZCODE_i 章屬 code lane 已處理）。cycle 腳本 TG 記錄見老闆訊息（#1886–1902 TRADE DASHBOARD 說明書／CCY POWER 報告格式等）均係老闆↔OC 對話，非 from_openclaw 派工，唔搶工。
 - WORK_PLAN.md（AC lane S1-S6 總計劃表 09:21 上線）讀畢：平台 lane 兩卡——S3 #28 模板統一審核（todo，依賴 #34/#35 Scanner 模板定稿）／S3 #4 Supabase 前端（todo，等 Supabase 資料穩定）——依賴均未到，本鐘無可開工項；CP-BT1 階段 B 等料（白皮書 PDF＋audit zip＋reader csv OC 12:00 供）。
 - 等態不變：白皮書+供料（12:00）→階段 B parity（死線 11-23 18:00）；P1–P6（老闆裁決）；#34/#35（本機 PR 待驗）；跟進 3 CI 模板／1356 CI 三綠（OC）；TG token（老闆）。
+
+## Task 300：10:31 cron（11-20）第十七次 rollback 自癒＋自癒 playbook 兩條新教訓＋巡檢無新信（2026-11-20 10:31–10:4x，ZCODE_w）
+- 第十七次 rollback（同款 c45e148f 11-05 快照，分歧 657/6348）：cycle 腳本首跑又超時；fetch→reset --hard origin/main 歸位 93bc58a9（已過我 fda52c7b）。
+- **教訓入冊（rollback playbook 增補兩步）**：①rollback 連 .git/config 層面 sparse-checkout cone 一齊回退——ccy_backtest 再被排除，`git sparse-checkout add ccy_backtest` 重做（已恢復，pytest 18/18 PASS 複驗）；②cycle 腳本「已同步正本」行為會喺 repo 回退期用舊正本（25,003B）覆蓋 scripts/ v4.1（28,197B）——正確次序係**先手動 fetch→reset 歸位 repo，先至跑 cycle 腳本**（其後腳本自同步攞到嘅先係 v4.1 正本）。
+- 巡檢：無新信無警報（HEAD=93bc58a9）。OC 09:06 ba480513 對我 0910 CP-BT1 階段 A 出貨 notify ack：已收｜PASS 3｜下一步暫存區檢查——無新派工無新料。
+- 等態不變：白皮書 PDF＋audit zip＋reader csv（OC 12:00 供）→ 階段 B parity 即開（死線 11-23 18:00）；#28 模板統一等 #34/#35 定稿；#4 Supabase 等資料穩定；P1–P6 等老闆。
