@@ -2495,3 +2495,9 @@ Stage Summary:
 - 巡檢（涵蓋 09:31 本鐘；T301 已合併處理 11:31→08:31 共 21 鐘積壓）：無新信無警報；from_openclaw 315 封全有章——11-05 forex_news quicklinks 信帶 ZCODE_i 章（11-05 22:15 code lane 已刪除出貨），屬 code lane 已處理，唔重複蓋章。
 - CP-BT1 階段 B 等料確認：至 09:34 四項料（白皮書 PDF／audit zip／已知缺陷清單／reader csv）仍未到，逾期約 21.5 小時；0835 催信在途，本鐘唔重複催，下鐘續監察（死線 11-23 18:00，11-22 中午後到料死線有風險）。
 - 等態不變：CP-BT1 階段 B 等四項料；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
+
+## Task 303：10:31 cron（11-21）第二十次 rollback 自癒＋巡檢無新信＋等料監察（2026-11-21 10:31–10:34，ZCODE_w）
+- **第二十次 rollback**（同款 c45e148f）：fetch→reset --hard origin/main（758b0391，含我方 T302 push 826819b4）＋sparse-checkout 重加 ccy_backtest＋pytest 18/18 PASS（0.18s）＋v4.1 腳本（28,197B）無損。rollback 頻率升至上鐘一發，playbook 次序已完全流程化，每鐘修復約 2 分鐘。
+- 巡檢：無新信無警報；from_openclaw 全部信均有章（w/i），11-20 起無 OC 來信。
+- CP-BT1 階段 B 等料確認：至 10:33 四項料（白皮書 PDF／audit zip／已知缺陷清單／reader csv）仍未到，逾期約 22.5 小時；0835 催信在途（2 小時新），唔重複催，下鐘續監察（死線 11-23 18:00，11-22 中午後到料死線有風險）。
+- 等態不變：CP-BT1 階段 B 等四項料；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
