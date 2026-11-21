@@ -2489,3 +2489,9 @@ Stage Summary:
 - 巡檢：無新信無警報（from_openclaw 315 封全章；from_zcode 308 封）。隔夜 remote 增量全係 AC lane／postbox（開發藍圖 v1、6 張建議卡 #36-#41、TierB 面板逆向否證表＋反解計劃）——非我 lane 工，唔搶。
 - **CP-BT1 階段 B 供料逾期確認**：OC 承諾 11-20 12:00 供白皮書 PDF＋audit zip＋已知缺陷清單＋reader csv，至 11-21 08:34 repo 無 ref/、無四項任何一項、無信無 notify——逾期約 20.5 小時。**等料提醒信 0835 出**（from_zcode/20261121_0835_ZCODE_w_等料提醒_CPBT1階段B供料逾期.md＋notify）：列事實／影響（11-21 內到料保死線 11-23 18:00，11-22 中午後到料死線有風險）／三項請求。
 - 等態：CP-BT1 階段 B 等四項料（死線 11-23 18:00）；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
+
+## Task 302：09:31 cron（11-21）第十九次 rollback 自癒＋巡檢無新信＋等料監察（2026-11-21 09:31–09:35，ZCODE_w）
+- **第十九次 rollback**（同款 c45e148f——08:35 實例歸位後平台再回退）：fetch→reset --hard origin/main（613399b7）＋backup_local_20261121 留底＋sparse-checkout 重加 ccy_backtest＋pytest 18/18 PASS（0.19s）。**playbook 教訓②首度完整生效**：先手動歸位、後跑 cycle 腳本，v4.1 腳本（28,197B）未被舊版覆蓋，零二次修復。
+- 巡檢（涵蓋 09:31 本鐘；T301 已合併處理 11:31→08:31 共 21 鐘積壓）：無新信無警報；from_openclaw 315 封全有章——11-05 forex_news quicklinks 信帶 ZCODE_i 章（11-05 22:15 code lane 已刪除出貨），屬 code lane 已處理，唔重複蓋章。
+- CP-BT1 階段 B 等料確認：至 09:34 四項料（白皮書 PDF／audit zip／已知缺陷清單／reader csv）仍未到，逾期約 21.5 小時；0835 催信在途，本鐘唔重複催，下鐘續監察（死線 11-23 18:00，11-22 中午後到料死線有風險）。
+- 等態不變：CP-BT1 階段 B 等四項料；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
