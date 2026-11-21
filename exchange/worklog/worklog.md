@@ -2482,3 +2482,10 @@ Stage Summary:
 - **教訓入冊（rollback playbook 增補兩步）**：①rollback 連 .git/config 層面 sparse-checkout cone 一齊回退——ccy_backtest 再被排除，`git sparse-checkout add ccy_backtest` 重做（已恢復，pytest 18/18 PASS 複驗）；②cycle 腳本「已同步正本」行為會喺 repo 回退期用舊正本（25,003B）覆蓋 scripts/ v4.1（28,197B）——正確次序係**先手動 fetch→reset 歸位 repo，先至跑 cycle 腳本**（其後腳本自同步攞到嘅先係 v4.1 正本）。
 - 巡檢：無新信無警報（HEAD=93bc58a9）。OC 09:06 ba480513 對我 0910 CP-BT1 階段 A 出貨 notify ack：已收｜PASS 3｜下一步暫存區檢查——無新派工無新料。
 - 等態不變：白皮書 PDF＋audit zip＋reader csv（OC 12:00 供）→ 階段 B parity 即開（死線 11-23 18:00）；#28 模板統一等 #34/#35 定稿；#4 Supabase 等資料穩定；P1–P6 等老闆。
+
+## Task 301：08:31 cron（11-21）第十八次 rollback 自癒＋21 鐘積壓合併巡檢＋CP-BT1 階段 B 供料逾期催信（2026-11-21 08:31–08:4x，ZCODE_w）
+- 積壓申報：11-20 11:31→11-21 08:31 共 21 鐘 cron 一次過到達全部未跑，按既定口徑合併一輪巡檢（信件靠蓋章偵測自然涵蓋）。
+- **第十八次 rollback**（同款 c45e148f，origin forced update 至 26160862）：照 playbook fetch→reset --hard origin/main＋sparse-checkout 重加 ccy_backtest（11 檔歸位）＋v4.1 腳本重同步（28,197B）＋pytest 18/18 PASS 複驗——全流程約 2 分鐘。
+- 巡檢：無新信無警報（from_openclaw 315 封全章；from_zcode 308 封）。隔夜 remote 增量全係 AC lane／postbox（開發藍圖 v1、6 張建議卡 #36-#41、TierB 面板逆向否證表＋反解計劃）——非我 lane 工，唔搶。
+- **CP-BT1 階段 B 供料逾期確認**：OC 承諾 11-20 12:00 供白皮書 PDF＋audit zip＋已知缺陷清單＋reader csv，至 11-21 08:34 repo 無 ref/、無四項任何一項、無信無 notify——逾期約 20.5 小時。**等料提醒信 0835 出**（from_zcode/20261121_0835_ZCODE_w_等料提醒_CPBT1階段B供料逾期.md＋notify）：列事實／影響（11-21 內到料保死線 11-23 18:00，11-22 中午後到料死線有風險）／三項請求。
+- 等態：CP-BT1 階段 B 等四項料（死線 11-23 18:00）；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
