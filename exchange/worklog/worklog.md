@@ -2538,3 +2538,9 @@ Stage Summary:
 - 巡檢：無新信無警報，全部信有章；from_openclaw 11-20 起持續無來信。
 - CP-BT1 階段 B 等料確認：至 08:33 四項料仍未到（距原承諾逾期約 44.5 小時）；兩催信（11-21 0835／11-22 0035）均無回覆。0035 信已列明「請台方 11-22 中午前供料或回覆」——**中午為觀察點，12:31/13:31 鐘仍無料無回覆則第三級上報（催促＋死線失守風險申報）**，唔提前加催。
 - 等態不變：CP-BT1 階段 B 等四項料；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
+
+## Task 310：09:31 cron（11-22）第廿七次 rollback 自癒＋巡檢新信 1 封（AutoClaw 派工，非本 lane）（2026-11-22 09:31–09:36，ZCODE_w）
+- **第廿七次 rollback**（同款 c45e148f）：fetch→reset --hard origin/main（041097c1）＋sparse-checkout 重加 ccy_backtest＋pytest 18/18 PASS（0.18s）＋v4.1 腳本（28,197B）無損。
+- **新信 1 封**：from_openclaw/20261122_0905_派工_AutoClaw_CrossMA日報職責.md——老闆 08:56 裁決，CrossMA 每日日報職責移交 AUTOCLAW（PM lane）：讀 docs/admin/crossma/crossma_daily_YYYYMMDD.csv 出日報（① XAU Top 5／② Top10 存活率紅綠燈／③ 一句判讀），每日 06:15 死線，經 903 轉發；OC 負責 03:00 掃描出版；首份 11-23 06:15。**收信人係 AUTOCLAW 非 ZCODE_w**——照 AC lane 先例（20261119_1545 無 w 章）唔蓋章唔搶工，AutoClaw 自行偵測執行；本鐘僅巡檢收悉匯報。
+- CP-BT1 階段 B 等料確認：至 09:34 四項料仍未到（距原承諾逾期約 45.5 小時）；兩催信無回覆。中午觀察點不變：12:31/13:31 鐘仍無料無回覆則第三級上報。
+- 等態不變：CP-BT1 階段 B 等四項料；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
