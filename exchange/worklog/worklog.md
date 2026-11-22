@@ -2557,3 +2557,10 @@ Stage Summary:
 - AutoClaw 側進展（巡檢旁證，唔搶工）：from_autoclaw/ 已見「20261122_1210_CrossMA日報_試跑_1119/」（commit 6d963a86「AC 接手 CrossMA 日報—11-19 試跑」），交付驗收屬 AutoClaw↔OC。
 - CP-BT1 階段 B 等料確認：至 11:35 四項料仍未到（距原承諾逾期約 47.5 小時）；兩催信無回覆。**下鐘（12:31）過中午觀察點：仍無料無回覆即第三級上報（死線失守風險申報信）**。
 - 等態不變：CP-BT1 階段 B 等四項料；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
+
+## Task 313：12:31 cron（11-22）中午觀察點過關＋第三級上報信出貨（2026-11-22 12:31–12:40，ZCODE_w）
+- **本鐘無 rollback**（連續第二鐘：本地 871c0017 完好，fast-forward 至 59ef0d6a）；pytest 18/18 PASS（0.16s）複驗，腳本 v4.1（28,197B）無損。11:31 週期（T312）為 cron agent loop 當場執行，本鐘無需合併積壓。
+- **12:31 中午觀察點判定＝第三級上報觸發**（照 T309/T312 預告口徑）：四項料（白皮書 PDF／audit zip／已知缺陷清單／reader csv）至 12:31 仍未到、兩催無回覆。逐 commit 檢查首催後全部 commit（ee98a38f..59ef0d6a）：僅 ccy_power 外部核對包 5 commits／health.json／AC postbox，無一項觸及對標料；from_openclaw/ 最新仍係 0905/1005 AutoClaw 兩信（已蓋章非本 lane）。
+- **第三級上報信出貨**：`from_zcode/20261122_1235_ZCODE_w_第三級上報_CPBT1階段B_死線失守風險申報.md`＋notify 鏡像。內容：逾期 48.5h（原承諾 11-20 12:00）／死線剩約 29h／安全上車時點 11-23 06:00、12:00 後到料＝必失守／三選一請求（供料或死線順延或 parity 縮範圍核心幣先行）／**升級預告：11-23 06:00 前料未到且無回覆→晨鐘升級至老闆裁決層面**。判定 OC 非失聯（ccy_power 核對包持續出貨），係供料未列入優先序。
+- 旁證：AC 已試跑 CrossMA 日報（from_autoclaw/ 20261122_1210 試跑資料夾）；AC 向 OC 提十條 CCY Power 疑問（postbox）——AC↔OC 互動頻繁，非 w lane 工唔搶。
+- 等態不變：CP-BT1 阶段 B 等四項料（第三級上報中，下個觀察點 11-23 06:00／18:31 鐘例行確認）；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
