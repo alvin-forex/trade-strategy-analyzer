@@ -2583,3 +2583,11 @@ Stage Summary:
 - **抽樣實測發現**：csv「2011.04.14 16:24」係孤立 1 條（2011→2026.06 之間 15 年零 key，「覆蓋 2011 起」係首尾時戳誤導）——idx 1/23 聲明可選跳過；判斷 A06E 早期測試殘留。
 - 出信：from_zcode/20261122_1440_ZCODE_w_回執_1345方案A批准_OHLC抽樣清單出貨28時點.md＋notify 鏡像；蓋章 1345 信。抽樣器 scripts/cpbt1_sampling.py（本地存檔）。
 - 等態：CP-BT1 階段 B 開工中，**等 OHLC（唯一阻路料，台方 2 小時內供齊目標）**；料到即跑誤差矩陣（≥10 ts × 9 幣＋AVG）；其餘等態不變：#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
+
+## Task 316：15:31 cron（11-22）第31次rollback自癒＋OC批抽樣清單6/6＋供料啟動＋kernel就緒申報（2026-11-22 15:31–15:40，ZCODE_w）
+- **第 31 次 rollback**（HEAD 退回 c45e148f；origin/main=75db564a）：照已批手法 fetch→reset --hard→sparse-checkout add ccy_backtest→pytest 18/18 PASS（0.19s）。
+- **OC 回批 1445 信（驗收 6/6 全過）**：清單兩檔入位／分佈 awk 覆核／邊界時戳／15 年斷層／時點存在性／N=350 python 復算（對白皮書行號 L152-156）全部屬實——雙向覆核閉環；**供料即刻啟動**（A06E 按清單導 ohlc/，2011 兩點 MT4 端無料即跳過唔使回報），死線 11-23 18:00 維持。
+- **台方附帶發現兩點照單全收**：①2011.04.14 實為同 timestamp 4 行（H4/M1/H1/M30）非「1 條」——表述修正；②M30 行 ccy3 起有 BUY/SELL 異形欄序——我方 parser 按 name/power 成對解析自然跳過唔污染，M30 對照點（idx 27）保留作 PairTF 探針。
+- **kernel 就緒申報（本鐘複核）**：indicators（Wilder RSI/ATR）＋core（raw/weight/aggregate/history/display_scale）＋parity（長格式＋error_matrix＋report）＋dataio.load_ohlc_csv（MT4 原生格式直讀）對接面齊備；料到後只欠窗口切分 runner（半日）。工序：26 時點×350 根切窗重算→對齊 reader key→誤差矩陣→報告。
+- 出信：from_zcode/20261122_1535_ZCODE_w_回執_1445驗收收悉_kernel就緒申報.md＋notify 鏡像（單向申報唔佔台方調用）；蓋章 1445 信。
+- 等態：CP-BT1 階段 B 等OHLC（供料中，16:31/17:31 鐘盯料）；其餘不變：#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
