@@ -2564,3 +2564,12 @@ Stage Summary:
 - **第三級上報信出貨**：`from_zcode/20261122_1235_ZCODE_w_第三級上報_CPBT1階段B_死線失守風險申報.md`＋notify 鏡像。內容：逾期 48.5h（原承諾 11-20 12:00）／死線剩約 29h／安全上車時點 11-23 06:00、12:00 後到料＝必失守／三選一請求（供料或死線順延或 parity 縮範圍核心幣先行）／**升級預告：11-23 06:00 前料未到且無回覆→晨鐘升級至老闆裁決層面**。判定 OC 非失聯（ccy_power 核對包持續出貨），係供料未列入優先序。
 - 旁證：AC 已試跑 CrossMA 日報（from_autoclaw/ 20261122_1210 試跑資料夾）；AC 向 OC 提十條 CCY Power 疑問（postbox）——AC↔OC 互動頻繁，非 w lane 工唔搶。
 - 等態不變：CP-BT1 阶段 B 等四項料（第三級上報中，下個觀察點 11-23 06:00／18:31 鐘例行確認）；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
+\n## Task 314：13:31 cron（11-22）第29次rollback自癒＋CP-BT1四項料驗收＋階段B開工＋OHLC缺料清單（2026-11-22 13:31–13:45，ZCODE_w）
+- **第 29 次 rollback**（HEAD 退回 c45e148f；origin/main forced update 至 7db80a95）：照已批手法 fetch→reset --hard→sparse-checkout add ccy_backtest→pytest 18/18 PASS；我方 97e10252／219de2c42 確認在新 history 譜系內無損。
+- **重大進展：OC 回批 1250 信——第三級上報（T313 1235 信）奏效**：OC 獨立複核確認逾期 48.6h 屬實、供料未列入優先序責任在 data lane 並致歉；裁決＝選項一供料（d5ef1e69），死線 11-23 18:00 維持唔順延唔縮範圍；11-23 06:00 升級觸發條件解除。
+- **四項料機器閘驗收全過**：白皮書 PDF 628,833B／md 17,751B（§3 公式＋§8 缺陷清單）／audit zip 702,002B（含 MT4 mq4/ex4＋MT5 mq5/ex5 源碼）／reader csv 11.3MB 95,479 行→解析 94,697 key。
+- **reader csv 實測發現（與 README 有出入）**：實含 6 TF（H1 27,927／H4 29,664／M30 18,160／M1 18,124／M5 784／D1 僅 38）；實際覆蓋 2011.04.14→2026.11.20（非 README 稱 06-12 起）；D1 38 時點全集中 06-12 一日（A06E 快照，抽樣池唔可用）——已喺回執信列明請 OC 知悉。
+- **階段 B 開工（w lane 核心）**：parity.py load_reader_csv 擴長格式支援（timestamp,timeframe,ccyN_name,ccyN_power；key=ts|TF；舊寬格式相容）；自測 reader 同值 10 樣本誤差矩陣全零＋report 輸出正常；pytest 18/18 PASS；§8 缺陷清單讀畢，行為基準鎖定 MT4 v3.07-MQ4。
+- **OHLC 缺料清單出信**（照 1250 信「即刻來信列明」指示）：kernel 重算需同源同期 OHLC（28+1 instrument），repo 內建 D1 只到 2026-04-17 唔到 reader 期；提方案 A（我方出 20-30 timestamp 抽樣清單，台方按清單導 OHLC 滾動窗口）／方案 B（全量 D1+H1 三個月）；OHLC 係唯一阻路料。
+- 出信：from_zcode/20261122_1340_ZCODE_w_回執_1250四項料驗收_階段B開工_OHLC缺料清單.md＋notify 鏡像；蓋章 1250 回批信。
+- 等態：CP-BT1 階段 B **開工中**（等 OHLC 輸入端料——唯一阻路）；其餘等態不變：#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。

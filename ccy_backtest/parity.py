@@ -29,10 +29,15 @@ class ParityPendingError(RuntimeError):
 
 
 def load_reader_csv(path: str) -> Dict[str, Dict[str, float]]:
-    """讀 reader 抽樣 CSV → {timestamp: {currency: value}}。
+    """讀 reader 抽樣 CSV → {key: {currency: value}}。
 
-    期望欄位：timestamp + 9 貨幣名（EUR USD JPY GBP CHF AUD CAD NZD XAU，
-    大小寫不敏感；XAU 可寫 GOLD——自動歸一）。
+    支援兩種格式：
+    - 寬格式（舊）：timestamp + 9 貨幣名欄（EUR USD JPY GBP CHF AUD CAD NZD XAU，
+      大小寫不敏感；XAU 可寫 GOLD——自動歸一）；key＝timestamp。
+    - 長格式（OC 實供 ccy_power_reader.csv）：
+      timestamp,timeframe,ccy1_name,ccy1_power,...,ccy9_name,ccy9_power
+      幣名喺資料值內（每行按 power 降序浮動）；key＝"timestamp|TF"
+      （TF 空白→淨 timestamp；TF 歸一大寫，D1/H1）。
     """
     if not os.path.exists(path):
         raise ParityPendingError(
@@ -40,22 +45,36 @@ def load_reader_csv(path: str) -> Dict[str, Dict[str, float]]:
     alias = {"GOLD": "XAU"}
     out: Dict[str, Dict[str, float]] = {}
     with open(path, encoding="utf-8-sig") as f:
-        for row in csv.DictReader(f):
+        reader = csv.DictReader(f)
+        fieldnames = [fn.strip().lower() if fn else "" for fn in (reader.fieldnames or [])]
+        long_fmt = any(fn.startswith("ccy") and fn.endswith("_name") for fn in fieldnames)
+        for row in reader:
             ts = (row.get("timestamp") or row.get("date") or row.get("time") or "").strip()
             if not ts:
                 continue
             rec = {}
-            for k, v in row.items():
-                if k is None:
-                    continue
-                key = k.strip().upper()
-                if key in ("TIMESTAMP", "DATE", "TIME", "TF", "AVG"):
-                    continue
-                cur = alias.get(key, key)
-                if cur in universe.CURRENCIES_9 and str(v).strip():
-                    rec[cur] = float(v)
+            if long_fmt:
+                tf = (row.get("timeframe") or row.get("tf") or "").strip().upper()
+                key = f"{ts}|{tf}" if tf else ts
+                for i in range(1, 10):
+                    name = (row.get(f"ccy{i}_name") or "").strip().upper()
+                    val = (row.get(f"ccy{i}_power") or "").strip()
+                    cur = alias.get(name, name)
+                    if cur in universe.CURRENCIES_9 and val:
+                        rec[cur] = float(val)
+            else:
+                key = ts
+                for k, v in row.items():
+                    if k is None:
+                        continue
+                    key_u = k.strip().upper()
+                    if key_u in ("TIMESTAMP", "DATE", "TIME", "TF", "AVG"):
+                        continue
+                    cur = alias.get(key_u, key_u)
+                    if cur in universe.CURRENCIES_9 and str(v).strip():
+                        rec[cur] = float(v)
             if rec:
-                out[ts] = rec
+                out[key] = rec
     if len(out) < 10:
         raise ParityPendingError(
             f"reader 抽樣得 {len(out)} 個 timestamp（<10），等 OC 全量供料")
