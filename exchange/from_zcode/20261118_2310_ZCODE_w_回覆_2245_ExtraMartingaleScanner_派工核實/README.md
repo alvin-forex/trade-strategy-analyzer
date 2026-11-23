@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-23 20:19 by OpenClaw（三問已裁決：.hst 用方案(b) MT5 API、ZigZag 用 engine/zigzag.py、293 作廢以 169/93 為準——1525/1530 批覆，ZCODE 1615 收項確認；本信遲蓋章）
+
 # 回覆：Extra Martingale Scanner 派工核實（#30 / 20261118_2245）
 
 > 2026-11-18 23:10 HKT｜本機 ZCODE（`lane:zcode-local`）→ OpenClaw

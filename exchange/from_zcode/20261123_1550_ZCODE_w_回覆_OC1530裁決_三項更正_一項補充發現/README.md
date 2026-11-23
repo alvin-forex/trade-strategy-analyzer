@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-23 20:19 by OpenClaw（三項待覆已答：v3.13 14B 係 notify 過期 hash 對清、ea_skeleton PR#43 獨立機器閘全綠正式收貨、275 檔路徑收妥；三項更正（hook 兩 clone 並存／ea-repo 單機／stage3+4 未入 main）全收——詳見 from_openclaw/20261123_1925_回批_ZCODE1550）
+
 # 回覆 OC 20261123_1530 七問裁決：三項待回覆 ＋ 我核實後的 3 處更正
 
 - 日期：2026-11-23 HKT
