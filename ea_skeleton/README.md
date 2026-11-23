@@ -2,45 +2,66 @@
 
 - 交付：ZCODE（本機 lane）
 - 卡片：`#41 [S4] MT5 EA 骨架（等老闆 O1–O4 策略規格）`
-- 落點：`ea_skeleton/`（OC 2026-11-23 14:45 裁決之過渡方案；`alvin-forex/ea-repo` 仍不可達）
+- 落點：TSA repo `ea_skeleton/`（OC 2026-11-23 21:05 裁決：`ea_skeleton/` 即本機工作位，ea-repo git 通道唔急開）
 - 產物：`ExtraCCYPower_EA.mq5`
+- 版本：**v1.01**（v1.00 為 PR #43 首版；v1.01 按 OC 21:05 丁節三項裁決改 group／banner／縮寫／單位）
 
-## 一、編譯
+## 一、編譯（v1.01）
 
 ```text
-$ MetaEditor64 /compile:ea_skeleton/ExtraCCYPower_EA.mq5
-Result: 0 errors, 0 warnings, 853 ms elapsed, cpu='X64 Regular'
+$ "/c/Program Files/MetaTrader 5/MetaEditor64.exe" /compile:ea_skeleton/ExtraCCYPower_EA.mq5
+Result: 0 errors, 0 warnings, 848 ms elapsed, cpu='X64 Regular'
 ```
 
-- 495 行 / 17,890 bytes
-- sha256 `b7ed0f160966359a6e49d3fc8b1a23cd8592e06dca2fd4f9b8d4b261331370b4`
-- `#property version "1.00"`（初版寫 `0.10` 觸發 warning 68「incompatible with MQL5 Market」，改 `1.00` 後 0/0）
+- 509 行 / 18,811 bytes
+- sha256 `6369c3bdc6a106c4b29f1339ae4785b969b820e3288e46c3a2b1b3e6b11061e4`
+- 版本四處鎖步（AGENTS.md §6）：`#property version "1.01"`｜`#define EA_VERSION "1.01"`（banner 用）｜`#property description`｜本 README
 
-## 二、做了什麼（全部唔涉策略）
+## 二、v1.01 改了什麼（全部按 OC 2026-11-23 21:05 丁節裁決，零策略改動）
 
-| 模組 | 內容 |
-|---|---|
-| input 框架 | 8 個 `input group`、21 個 `input`，全部 `Inp` 前綴＋PascalCase＋英文註解（實測 0 個超過 55 字元） |
-| 手數骨架 | `CalcLayerLot(layer)`＝`base * mult^layer`，再經 `NormalizeLots()` 夾到 broker `VOLUME_MIN/MAX/STEP` |
-| 風控 hook | DD Guard／Symbol Guard／News Guard 三組接口，**全部預設 OFF**（符合 REQUIREMENT 2.4＋驗收 A3） |
-| 日誌 | `MQL5/Files/<base>_skeleton.csv`，10 欄固定表頭；`LogEvent()` 每個事件 flush |
-| 回測入口 | `OnTester()` 寫 `<base>_tester_summary.csv`（11 個結構欄位） |
-| 缺料申報 | `PrintMissingItems()` 逐項印 `MISSING:` |
+| # | 項目 | v1.00 | v1.01 |
+|---|---|---|---|
+| 1 | Group 名對齊 AGENTS.md §3 | `Identity`／`Symbol and Timeframe`／`Risk - Drawdown Guard`／`Risk - Symbol Guard`／`Risk - News Guard`／`Logging`（6 個名全不在 §3） | `General`（Identity＋Symbol and Timeframe 併入）／`DD Guard — Account`／`Symbol Guard`／`News Guard`／`Diagnostics`（原 Logging）—— 全部按 §3 標準名 |
+| 2 | 空組 | — | **唔宣告**（OC D1「有 input 先開組」）：Display／Refresh & Recording／Data Filter／Trade Snapshot／Telegram／Backup & Recovery 一律不開；`DD Guard — Per Symbol` 亦不開（本骨架 DD 只讀 `ACCOUNT_BALANCE`／`ACCOUNT_EQUITY`，屬帳戶層，無逐 symbol DD input） |
+| 3 | `Lot Sizing`／`Backtest` | 原位 | **維持原名原位**（OC D1：兩組不在 §3 十二組，屬「新 group」，§2.3 要老闆批；未批前唔准自行刪改） |
+| 4 | STARTED banner | `SKELETON: v0.10 attached, symbol=... tf=...`（版本字串與 `#property` 不一致） | `PrintFormat("%s STARTED v%s on %s %s", InpEaName, EA_VERSION, symbol, tf)`，只在 `OnInit` 印一次（OC D2）；另加一行 `SKELETON: orders=DISABLED (no O2 spec)` |
+| 5 | 縮寫還原（§1.1） | `InpWorkTF`／`InpHeartbeatSec`／`InpNewsBlockMins` | `InpWorkTimeframe`／`InpHeartbeatSeconds`／`InpNewsBlockMinutes`（引用點一併改，共 6 處） |
+| 6 | 單位記號（§2.6） | 29 行 input 只有 1 行帶單位 | 7 行補 `(lots)`／`(%)`／`($)`／`(count)`／`(min)`／`(sec)`；`InpDdMaxPercent` 的 `percent` 字面改 `(%)` |
 
-## 三、驗收自檢（REQUIREMENT §2.5 A 組）
+**無改動**：手數骨架 `CalcLayerLot`、三組風控 hook 邏輯、CSV 日誌 10 欄、`OnTester` 11 欄、`PrintMissingItems`（除 G3 措辭更新）、`ValidateInputs` 的檢查條件（只改錯誤訊息中的變數名以配合縮寫還原）。
+
+## 三、現時 group 次序與 §3 對照
+
+```
+實測：grep -n '^input group' ea_skeleton/ExtraCCYPower_EA.mq5
+32: input group "General"              ← §3 第 1
+39: input group "Lot Sizing"           ← 不在 §3（§2.3 新 group，待老闆批）
+45: input group "DD Guard — Account"   ← §3 第 6
+50: input group "Symbol Guard"         ← §3 第 8
+55: input group "News Guard"           ← §3 第 9
+59: input group "Diagnostics"          ← §3 第 12
+64: input group "Backtest"             ← 不在 §3（§2.3 新 group，待老闆批）
+```
+
+有 input 的 §3 組按 §3 次序**遞增排列**（1 → 6 → 8 → 9 → 12），中間不插空組。
+
+## 四、驗收自檢（REQUIREMENT §2.5 A 組＋AGENTS.md §8）
 
 | # | 條件 | 實測 |
 |---|---|---|
-| 1 | 編譯 0 errors 0 warnings | ✅（見上） |
-| 2a | 無 `___` 假分隔 | ✅ `grep -c '___'` = 0 |
-| 2b | 無未註解 input | ✅ 21/21 有英文註解 |
-| 2c | `grep -c '^input group'` 與 `grep -cE '^input '` 對得上 | ⚠️ **8 vs 29 — 見第五節缺口 1** |
-| 3 | 風控預設全 OFF | ✅ `InpDdGuardEnable=false`、`InpSymGuardEnable=false`、`InpNewsGuardEnable=false` |
-| 6 | `.set` 可載入 | 未能驗（無真 SET 對應此 input 集，見第五節缺口 2） |
+| 1 | 編譯 0 errors 0 warnings | ✅ `Result: 0 errors, 0 warnings, 848 ms` |
+| 2a | 無 `___` 假分隔 | ✅ `grep -c '___'` = **0** |
+| 2b | 無未註解 input | ✅ **21/21** 有英文註解 |
+| 2c | input 對數 | ✅ `^input` **28** − `input group` **7** = **21** 條真 input（按 OC 21:05 戊節建議的減法口徑） |
+| 2d | comment ≤ 55 字元 | ✅ 0 條超標 |
+| 3 | 風控預設全 OFF | ✅ `InpDdGuardEnable=false`／`InpSymGuardEnable=false`／`InpNewsGuardEnable=false` |
+| 6 | `.set` 可載入 | 未能驗（無真 SET 對應此 input 集，見第六節缺口 2） |
 
-## 四、出貨時請對照的「待填」清單
+**⚠️ AGENTS.md §8 原文自檢式仍有矛盾**（`grep -c '^input group'` 與 `grep -cE '^input '` 「對得上」→ 實測 7 vs 28 永遠對不上，因為 `^input ` 會匹配 group 行）。OC 21:05 戊節同意並已列老闆待辦改原文；本 README 用減法口徑。
 
-`OnInit()` 每次都印以下 `MISSING:` 行（原文）：
+## 五、出貨時請對照的「待填」清單
+
+`OnInit()` 每次都印以下 `MISSING:` 行（v1.01 原文）：
 
 ```text
 MISSING: O1 - EA name is empty, filename and .set name are undecided   ← 僅當 InpEaName 為空
@@ -48,68 +69,57 @@ MISSING: O2 - strategy spec (entry/exit, grid or not, indicators, TF) not suppli
 MISSING: O2 - no order-sending code exists in this build, by design
 MISSING: O3 - parameter list must follow the real .set fields; not supplied yet
 MISSING: O4 - acceptance thresholds (backtest numbers) not settled by owner
-MISSING: G3 - ea-repo AGENTS.md section 1/3 is unreachable, input naming and
-MISSING: G3 - group order below are a placeholder and must be re-ordered after spec lands
+MISSING: G3 - group names now follow ea-repo AGENTS.md section 3 for the groups
+MISSING: G3 - that carry inputs; groups without inputs are not declared (OC 21:05 D1).
+MISSING: G3 - 'Lot Sizing' and 'Backtest' are not among the twelve section 3 groups
+MISSING: G3 - and stay pending the owner's verdict (AGENTS.md section 2.3).
 ```
 
-對應 O1–O4 的現狀（**本卡不自行填任何一項**）：
+| # | 項目 | 現狀 |
+|---|---|---|
+| O1 | EA 名 | ✅ `ExtraCCYPower_EA` |
+| O2 | 策略規格 | ❌ **未見**（`ea_strategy_masterplan.html` 掃 `ExtraCCY`／`POWER DIFF`／`entry`／`假突破`／`SPEC` 全 0 命中；`tsa-risk-analyzer/` 0 檔） |
+| O3 | 參數清單 | ⚠️ 2,861 個 `.set` 無一份對應 ExtraCCY Power；現 21 個 input 為通用框架 |
+| O4 | 達標線 | ⚠️ 一期可判（0/0＋空策略平坦 equity）；二期需 O2 |
+| G3 | AGENTS.md §1/§3 | ✅ 已到手並已按 §3 改名＋§1.1 縮寫還原；餘 `Lot Sizing`／`Backtest` 待老闆批組名 |
 
-| # | 項目 | OC 14:45 宣告 | 實測 |
-|---|---|---|---|
-| O1 | EA 名 | 「CCY POWER 重製版叫 ExtraCCY Power」 | ✅ 已用 `ExtraCCYPower_EA` 作檔名與 `InpEaName` 預設 |
-| O2 | 策略規格 | 「SPEC 由 OC 起草，初版隨骨架交付」 | ❌ **未見**：`grep -icE "STRATEGY_|specs/"` 只命中 2 個 `ea_strategy_masterplan.html`（掃過內容：`ExtraCCY`／`POWER DIFF`／`entry`／`假突破`／`SPEC` 全部 0 命中，唔係 O2 spec）；`tsa-risk-analyzer/` = 0 檔 |
-| O3 | 參數清單 | 「照 SET 檔實際欄位」 | ⚠️ 2,861 個 `.set` 在 repo，但**冇一份對應 ExtraCCY Power**；骨架 input 為通用風控框架，非 SET 對映 |
-| O4 | 達標線 | 「第一期＝工程底線；第二期＝8 年回測 MDD < 100%」 | ⚠️ 第一期可判（0/0＋空策略平坦 equity）；第二期需 O2 策略 |
-| G2 | ea-repo | 「骨架落 `trade-strategy-analyzer/ea_skeleton/`」 | ✅ 已落 |
-| G3 | ea-repo `AGENTS.md` §1/§3（命名硬規則＋group 次序） | 未提供 | ❌ `gh repo view alvin-forex/ea-repo` → `Could not resolve`；本機全碟無此檔；repo 內 `grep -ci ea-repo` 只命中 REQUIREMENT 自身 |
+## 六、缺口（需 OC／老闆裁決，我沒有自行補）
 
-## 五、缺口（需 OC 裁決，我沒有自行補）
+### 缺口 1：`Lot Sizing`／`Backtest` 兩個新 group 的組名
 
-### 缺口 1：驗收 A2 的 `input group` 對數規則本身矛盾
-
-REQUIREMENT §2.5 A2 寫：「`grep -c '^input group'` 與 `grep -cE '^input '` 對得上」。
-
-但 `^input ` 會**同時**匹配 `input group "..."` 那 8 行，所以照字面永遠對不上（8 vs 29）。
-我按「每個 input 都屬於某個 group」的理解做到 21 個 input 分屬 8 個 group。
-**請裁決：A2 改為「無孤兒 input」（即每個 input 前必有 group），定係要求 `group` 數＝`input` 數？**
+OC 21:05 D1 只裁「維持原名原位，未批前唔准自行刪改」，並列老闆待辦。
+**若老闆批准，請給正式組名（例如 `Lot Sizing` 是否改 `Trade Sizing` 之類）**；未批前我不動。
 
 ### 缺口 2：O3 參數對映
 
-骨架的 21 個 input 是**通用 EA 框架**（身份／符號／手數／三組風控／日誌／回測），
-**唔係** ExtraCCY Power 的 SET 欄位。真 SET 欄位要等 OC 提供對應 `.set` 或 REQUIREMENT 參數清單。
-現階段若強行對映，等於自創參數——按 O3「缺欄報 MISSING」的規矩，我報 MISSING 而唔自填。
+現 21 個 input 是**通用 EA 框架**（身份／符號／手數／三組風控／日誌／回測），**唔係** ExtraCCY Power 的 SET 欄位。
+強行對映等於自創參數——按 O3 規矩報 MISSING 唔自填。
 
 ### 缺口 3：News Guard 無資料源
 
-`InpNewsGuardEnable` 已實作接口，但骨架內**冇綁任何財經日曆**（`CalendarValueHistory` 之類一律冇寫）。
-開啟時 `RiskGuardAllow()` 唔會真的擋單，只會在 log 註明。**要不要一期先綁 `CalendarValueHistory`？**
+`InpNewsGuardEnable` 接口已實作，但**冇綁任何財經日曆**（`CalendarValueHistory` 一律冇寫）。
+開啟時 `RiskGuardAllow()` 唔會真的擋單。**要不要一期先綁 `CalendarValueHistory`？**
 
-### 缺口 4：OC 引用的裁決存檔不在 repo
+### 缺口 4：`DD Guard — Per Symbol` 無 input
 
-OC 寫「原答已導出存檔（workspace memory/exports/2026-11-18_General_topic_裁決對話.md）」。
+§3 有第 7 組 `DD Guard — Per Symbol`，但本骨架 DD guard 只讀帳戶層 `ACCOUNT_BALANCE`/`ACCOUNT_EQUITY`，**冇逐 symbol DD 的 input**，故按 OC D1「有 input 先開組」不宣告。
+**若要真做逐 symbol DD，需 O2 或另行派工。**
 
-```
-$ git ls-tree -r --name-only origin/main | grep -c "2026-11-18_General_topic"
-0
-```
-
-該檔在 OC 自己的 workspace，不在 `trade-strategy-analyzer`。**我讀唔到，故此只按 issue #41 留言的摘要落地。** 若原答有更細條款（特別是 O4 二期門檻細節），請把該檔貼出來或貼進 repo。
-
-## 六、紅線自查
+## 七、紅線自查（v1.01 實測）
 
 | 紅線 | 狀態 |
 |---|---|
-| 唔准寫 entry/exit／格網／指標邏輯 | ✅ 全檔 0 個 `OrderSend`／`CTrade`／`iRSI`／`iATR`／`iCustom`／`OnTrade` |
-| 風控預設全 OFF | ✅ |
+| 唔准寫 entry/exit／格網／指標邏輯 | ✅ `OrderSend`=0／`CTrade`=0／`iRSI`=0／`iATR`=0／`iCustom`=0／`OnTrade`=0 |
+| 風控預設全 OFF | ✅ 三組全 `false` |
 | 唔准將帳號／token／密碼寫入源碼 | ✅ 只有 `InpMagicNumber`（用戶自填） |
 | 未能編譯通過＝唔算交付 | ✅ 已 0/0 |
-| 只准改 `ea-repo/MQL5/`… | ⚠️ 本卡按 OC 過渡方案落 `ea_skeleton/`，與 REQUIREMENT §4「只准改 ea-repo」字面有衝突，以 OC 14:45 裁決為準 |
+| 不得同一 commit 混入「改名＋邏輯修改」（§7） | ✅ 本版只改名／改註解／加 banner，**零邏輯改動** |
 
-## 七、未驗（我交唔到）
+## 八、未驗（我交唔到）
 
-- **`.set` 載入測試（A6）**：冇對應 SET 檔，無法驗「改名後值無丟失」。
-- **回測矩陣（A4）**：`ea-test-kit/scripts/run_matrix.py` 不在此 repo、本機亦無；且空策略矩陣無意義（要 O2）。
-- **八年回測（A5）**：同上，需 O2 策略與 8 年 tick/bar 數據源。
-- **人眼閘（B7/B8）**：需在 MT5 終端掛載後人工看參數視窗 group 次序；我本機有 MT5（Alpari `D0E8209F…`）但**未掛載執行**過。
+- **`.set` 載入測試（A6）**：冇對應 SET 檔，無法驗「改名後值無丟失」
+- **回測矩陣（A4）**：`ea-test-kit/scripts/run_matrix.py` 不在此 repo、本機亦無；空策略矩陣無意義（要 O2）
+- **八年回測（A5）**：需 O2 策略與 8 年 tick/bar 數據源
+- **人眼閘（B7/B8）**：需在 MT5 終端掛載後人工看參數視窗 group 次序；本機只有 Alpari `D0E8209F…`，未掛載執行
 
-— ZCODE（本機 lane）2026-11-23
+— ZCODE（本機 lane）2026-11-24
