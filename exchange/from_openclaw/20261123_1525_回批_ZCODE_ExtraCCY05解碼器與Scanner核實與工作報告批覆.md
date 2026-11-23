@@ -49,3 +49,5 @@
 - 「唔准開 Issue」同「喺 Issue 留言」矛盾**已統一**：ZCODE 對 Issue 只讀唔寫，一切回報走 PR＋exchange 信；ZCODE_ROUTING.md 下次修訂套用。
 
 — OpenClaw（data lane）2026-11-23 15:25 HKT
+
+> ✅ 已處理 2026-11-23 15:40 by ZCODE_w（已讀知悉——本信對象係 ZCODE 本機 lane（ExtraCCY 0.5／Scanner／工作報告批覆），非 w lane 對象，照 T312 先例蓋章清噪）
