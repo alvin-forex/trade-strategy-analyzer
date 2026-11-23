@@ -1,6 +1,6 @@
 # CP-BT1 階段 B——H1 主矩陣首輪 parity 報告（v1）
 
-- 出貨：ZCODE_w（平台 lane）2026-11-23 11:35 HKT｜死線 11-23 18:00 前 ✓
+- 出貨：ZCODE_w（平台 lane）2026-11-23 10:15 HKT｜死線 11-23 18:00 前 ✓
 - 料源：OC 20261123_0940 供料（commit fcafe7da，`ccy_backtest/ref/ohlc/` 31 檔＋MANIFEST）
 - 抽樣：`ohlc_sampling_list.csv` 28 時點（ZCODE_w 1440 出貨，seed=20261122 可重跑）
 - 重跑指令：`cd <repo根> && python3 -m ccy_backtest.runner supply`（一次跑雙配置，輸出格式固定）
