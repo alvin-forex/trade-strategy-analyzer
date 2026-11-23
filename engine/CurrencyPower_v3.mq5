@@ -56,7 +56,7 @@ input ENUM_TIMEFRAMES PairTF = PERIOD_H1;
 ENUM_TIMEFRAMES gPairTF = PERIOD_H1;  // Fix-B: resolved PairTF (PERIOD_CURRENT -> chart period)
 input int    TickStyle      = 0;   // 0=[x]/[  ] 1=+ / x  2=● / ○
 input bool   Show_Panel     = true;
-input bool   InpEqualWeight = false;  // true = equal weight (1 vote/pair), false = ATR% weighted (v3 default)
+input int    InpEqualWeight = 0;      // 0 = ATR% weighted (v3 default), 1 = equal weight (1 vote per pair)
 
 string CCY[9] = {"XAU","USD","EUR","JPY","GBP","AUD","CAD","CHF","NZD"};
 bool    Show[9] = {true,true,true,true,true,true,true,true,true};
@@ -176,8 +176,8 @@ int OnInit()
    }
    int revN=0; string rl="";
    for(int r2=0;r2<36;r2++) if(hR[r2]>=0 && gRev[r2]){ revN++; rl+=gS[r2]+" "; }
-   PrintFormat("CP v3.13: majors=%d/28 goldcross=%d/7 XAUUSD=%s reversed=%d -> %s equalWeight=%s",
-               gN-1-gGoldN,gGoldN,gS[28],revN,rl,InpEqualWeight?"true":"false");
+   PrintFormat("CP v3.13: majors=%d/28 goldcross=%d/7 XAUUSD=%s reversed=%d -> %s equalWeight=%d",
+               gN-1-gGoldN,gGoldN,gS[28],revN,rl,InpEqualWeight);
    EventSetTimer(5);
    return(INIT_SUCCEEDED);
 }
@@ -210,7 +210,7 @@ void Calc(int sh, double &pw[])
       raw[p]=b[0]-50.0;
       if(gRev[p]) raw[p]=-raw[p];     // S0 fix
       w[p]=W(p,sh);
-      if(InpEqualWeight) w[p]=1.0;    // A case: equal weight, 1 vote per pair
+      if(InpEqualWeight == 1) w[p]=1.0;   // A case: equal weight, 1 vote per pair
       if(w[p]>0){ sumW+=w[p]; nW++; }
    }
    double avgW = nW>0 ? sumW/nW : 1.0;
