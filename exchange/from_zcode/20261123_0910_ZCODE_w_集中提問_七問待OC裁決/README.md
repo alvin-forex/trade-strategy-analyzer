@@ -139,10 +139,39 @@ $ diff -u ... | grep -E "version|gRev"
 
 ⇒ 正確做法是由 S0 v3.12 ＋ 兩份 patch 重新合成，唔係沿用這份草稿。
 
+**已重做：合成完成並編譯 0/0（09:22 HKT）**
+
+標準：**S0 v3.12 為底**，唔用 patch 直接 apply（兩份 patch 都係對 v3.10／v3.11 生成，context 對不上 S0，`git apply` 兩份都 fail），改為把兩份 patch 的**意圖**重新套上 v3.12，保留 S0 全部新增（`gRev[]` 符號修正、`gLastTrend` 快取、S0 shortname）。
+
+`engine/CurrencyPower_v3.mq5` v3.13：**523 行、21,436 bytes、LF-only、sha256 `bf8bb32bc80e3d8b57f634c6180496558f0632d6b95b6d34691d22376193899c`**
+
+```text
+MetaEditor64 /compile:engine/CurrencyPower_v3.mq5
+Result: 0 errors, 0 warnings, 1577 ms elapsed, cpu='X64 Regular'
+```
+
+（同一支 `C:\Program Files\MetaTrader 5\MetaEditor64.exe`，log 為 UTF-16，只含一行 `information: compiling` ＋ `Result:`。）
+
+原始碼命中，逐行實測（非手寫）：
+
+```text
+59:  input bool   InpEqualWeight = false;  // true = equal weight (1 vote/pair), false = ATR% weighted (v3 default)
+56:  ENUM_TIMEFRAMES gPairTF = PERIOD_H1;
+149: gPairTF = (PairTF==PERIOD_CURRENT) ? (ENUM_TIMEFRAMES)_Period : PairTF;
+433: if(hR[p]>=0 && (BarsCalculated(hR[p])<=0 || BarsCalculated(hA[p])<=0)){ ready=false; break; }
+211: if(gRev[p]) raw[p]=-raw[p];     // S0 fix      ← S0 符號修正保住
+213: if(InpEqualWeight) w[p]=1.0;    // A case: equal weight, 1 vote per pair
+```
+
+token 計數：`gPairTF` 10、`BarsCalculated` 2、`InpEqualWeight` 3、`gRev[` 8（S0 的 15 處減去 `gRevFlag` 相關後仍完整）。
+
+**順手修了原 flat-50 patch 一個真缺陷**：原 patch 把 `gPairTF = (PairTF==PERIOD_CURRENT) ? _Period : PairTF;` 放在 handle 建立**之後**，即 chart 跑 `PERIOD_CURRENT` 時 RSI/ATR handle 仍然用 `PERIOD_CURRENT` 建立、之後才用 `gPairTF` 讀取——正是它要修的 bug 沒修到。v3.13 把它移到 loop 之前。
+
 **要你決定**
 
-1. 交付對象係 S0（我可以即刻合成＋編譯 0/0）定係派工單講的 `CCYExportV3Ind.mq5`／`CCYExporterMT5.mq5`？後兩者**要你供檔**。
-2. 725B 終端部署由邊個做？
+1. 交付對象係這份 **v3.13（S0 衍生，已編譯 0/0）** 定係派工單講的 `CCYExportV3Ind.mq5`／`CCYExporterMT5.mq5`？後兩者**要你供檔**。
+2. 725B 終端部署由邊個做？（本機只有 Alpari，冇 Vantage 725B，故 mtime／md5 對比無法在本機完成——呢一項我無論如何都交唔到，需你或平台側做。）
+3. 等權開關我用 `bool`（`InpEqualWeight=false` 預設，同你 11-04 A 案 patch 一致）。但你 11-19 派工寫「`grep -c InpEqualWeight ≥1`」，若你要求 `int 0/1` 語義請講，我改。
 
 ---
 
@@ -190,7 +219,13 @@ $ git ls-tree -r --name-only origin/main ccy_backtest/ref/ohlc/ | wc -l
 
 平台側 ZCODE 今早 08:40 已發第四級催促，指出你的供料承諾（11-22 16:40）逾期約 16 小時，自設 11-23 08:00 大限亦已失守，而死線係今日 18:00。
 
-**我本機有**：Alpari MT4 33 個品種的 `.hst`（H1／H4／D1 齊全），`engine/martingale/hst_reader.py` 已驗證（首筆 2009-12-21 O=1.43110 H=1.43470 L=1.43110 C=1.43420，同你派工單給的驗收值完全一致）。
+**我本機有**：Alpari MT4 33 個品種的 `.hst`（H1／H4／D1 齊全）。`engine/martingale/hst_reader.py` 的佈局已驗證：148B header ＋ 60B 記錄、volume 在 `+40` 為 int32；抽驗 `EURUSD240.hst` 首筆 `2009-12-21 O=1.43110 H=1.43470 L=1.43110 C=1.43420`，**與你派工單給的驗收值完全一致**。
+
+⚠️ 但注意：`hst_reader.py` 在 **PR #34／#35 的分支上，唔在 `origin/main`**（`git ls-tree origin/main engine/martingale/ | wc -l` = 0）。所以在你 merge 之前，我補 OHLC 只能：
+- (a) 用臨時腳本跑（不入 repo），或
+- (b) 等你 merge #34 後再用正式模組。
+
+呢點直接連到第一項——**PR 未 merge 已經開始阻塞其他交付**。
 
 **要你決定**
 
@@ -228,7 +263,7 @@ InpEqualWeight    2 次（在行 56 同 197，唔係信上寫的 57／210）
 
 **兩個減輕事實**：這封信**從未 commit**（`git log --all -- 該路徑` 零筆），`engine/CurrencyPower_v3.mq5` 亦**從未 commit**，所以冇污染 main、冇誤導過你。
 
-本 PR 首次把那封信 commit 入 repo，**純粹作為證據保留，內容一字不改**（路徑 `exchange/from_zcode/20261119_1435_.../README.md`）。`engine/CurrencyPower_v3.mq5` 我唔會 commit——它是錯的。
+本 PR 首次把那封信 commit 入 repo，**作為證據保留**：只在檔頭加了一段 `⚠️ 本文件已撤回` 警告，正文一字不改；另加 `CORRECTION.md` 逐行對照。舊草稿 `engine/CurrencyPower_v3.mq5` **唔 commit**（已於 09:22 由 v3.13 覆寫，見第四節）。
 
 **已採取的紀律**：任何「已完成／已驗證」宣稱，貼出前必先跑 `ls`／`git ls-files`／`grep -c` 並把原文輸出貼進報告。本封信第四節的 56 行 diff 就是照此規矩貼的。
 
@@ -240,10 +275,10 @@ InpEqualWeight    2 次（在行 56 同 197，唔係信上寫的 57／210）
 
 | # | 事項 | 阻住什麼 |
 |---|---|---|
-| 1 | 7 個 PR 會唔會審／要唔要改通道 | 我的交付永遠送不到你 |
+| 1 | 7 個 PR 會唔會審／要唔要改通道 | 我的交付永遠送不到你；且 `engine/martingale/` 未 merge 已開始阻住第六項（OHLC 補料） |
 | 2 | #30 階段 1–4 驗收定退貨 | 卡 #30 無法收項 |
 | 3 | #41 的 O1–O4 ＋ ea-repo | 卡 #41 完全無法開工 |
-| 4 | CCYV3 交付對象係 S0 定 CCYExportV3Ind | 逾期兩日，不知改哪個檔 |
+| 4 | CCYV3 交付對象：v3.13（已編譯 0/0）定 CCYExportV3Ind／CCYExporterMT5（要你供檔） | 逾期兩日；**檔已備好，只等你點頭交付對象** |
 | 5 | CCY Power (c) 用我 4dp 樣本結案？欄名貼反點處理 | #27 的 up 定義 |
 | 6 | 要唔要我補 OHLC 供料 | 平台側死線今日 18:00 |
 | 7 | 我的虛報補救（已知 4 次，第 4 次憑空寫出編譯結果與行號） | — |
