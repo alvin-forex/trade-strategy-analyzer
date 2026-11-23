@@ -31,6 +31,25 @@ BASE = Path(__file__).resolve().parents[2]
 REPORTS = BASE / 'docs' / 'reports'
 DOWNLOADS = BASE / 'docs' / 'downloads'
 
+# ── SECTION_SPEC（docs/admin/REPORT_SECTION_SPEC.md §2.2 範本 B）──────────
+# martin_v4 頁必須帶嘅六個固定 sec-* 錨點。生成器側一次落地，之後新頁自動合規，
+# 零人工補（卡 #28 P5）。存量 169 頁唔回改（成本 32MB 級），只有新生成嘅頁帶 id。
+SECTION_SPEC = (
+    ('sec-overview', 's1', '① 整倉總覽'),
+    ('sec-detect',   's2', '② 馬丁偵測'),
+    ('sec-pair',     's3', '③ 商品分析器'),
+    ('sec-table',    's4', '④ 商品方向總表'),
+    ('sec-monthly',  's5', '⑤ 月度樞紐'),
+    ('sec-raw',      's7', '⑦ 時間維度＋明細（raw 倉位明細）'),
+)
+# ⑥ MAE/MFE 散點（s6）同 ⑧ 使用說明（s8）唔在固定 id 表內：spec §2.2 只要求
+# 「①-⑥ 保留」編號，sec-raw 另掛倉位明細（＝本頁 ⑦ 區明細表），故 s6/s8 不加 id。
+
+
+def anchor(old_id: str) -> str:
+    """Retired numeric anchor kept alive so old #s1..#s8 links still land."""
+    return f'<a class="anchor" id="{old_id}"></a>'
+
 # ── Muse §1.1 token＋八區版面 ─────────────────────────────────────────
 CSS = """
 /* 2026-11-05 W5-A 後續（0836 回批 §三）：內嵌主題塊同步 canonical——
@@ -357,7 +376,7 @@ def sec_hero(t, m, det):
         rows += f'<tr><td>未分類</td><td class="muted">—</td><td>{det["uncls"]}</td><td class="muted">—</td><td class="muted">—</td></tr>'
     mini = (f'<details><summary>分層摘要（{len(lay)} 層）</summary><table><thead><tr><th>層</th><th>理論 lot</th><th>筆數</th>'
             f'<th>P&amp;L</th><th>佔 P&amp;L%</th></tr></thead><tbody>{rows}</tbody></table></details>')
-    return f'''<section id="s1"><h2>① 整倉總覽 {tt('10 秒結論：賺唔賺、係唔係馬丁。圖例：P&L／勝率按平倉淨值（含 commission+swap）。')}</h2>
+    return f'''<section id="sec-overview"><a class="anchor" id="s1"></a><h2>① 整倉總覽 {tt('10 秒結論：賺唔賺、係唔係馬丁。圖例：P&L／勝率按平倉淨值（含 commission+swap）。')}</h2>
 <div class="hero-grid"><div class="hero-left">{badge}<div class="meta"><b>{len(t)}</b> 筆交易　·　數據範圍 <b>{dmin:%Y-%m-%d} → {dmax:%Y-%m-%d}</b>（按平倉時間）</div></div>
 <div class="six">{six_html}</div></div>
 <div class="narrow">{narrow}</div>{mini}</section>'''
@@ -365,7 +384,7 @@ def sec_hero(t, m, det):
 
 def sec_martin(det, t):
     if not det['layers']:
-        return ('<section id="s2"><h2>② 馬丁偵測 '
+        return ('<section id="sec-detect"><a class="anchor" id="s2"></a><h2>② 馬丁偵測 '
                 + tt('判定章可追溯：基準 lot 點嚟、倍數幾多。\n未有足夠數據分層——唔出膠囊與分佈表。')
                 + '</h2></section>')
     bar_max = max(d['n'] for d in det['layers'].values()) or 1
@@ -380,7 +399,7 @@ def sec_martin(det, t):
     uncls_row = f'<tr class="dim"><td>未分類</td><td class="muted">lot 不符倍數</td><td>{det["uncls"]}</td><td></td><td></td></tr>' if det['uncls'] else ''
     warn = '' if (det['ratio_ok'] or 0) >= 80 else f'<div class="footnote">{tt("⚠ 歸屬比例低於 80%，判定宜保守。", "⚠", "tt-w")}</div>'
     cap = f'基準 lot {det["base"]:.2f}（出現≥2次最小 lot）' + (f'，倍數 ×{det["step"]:g}' if det['step'] else '，單層無倍數')
-    return f'''<section id="s2"><h2>② 馬丁偵測 {tt('判定方法：白皮書 v3.1 §4.3——校準用「出現≥2次嘅最小 lot」做基準。' + cap + '\n六步：① 剔除 balance／未平倉列 → ② 統計實際 lot 分佈 → ③ 基準 lot＝出現≥2次嘅最小 lot → ④ 每筆按 lot/基準 倍數歸層（容差 2%）→ ⑤ 相鄰層比值眾數＝偵測倍數 → ⑥ 最大層≥2 即判馬丁；未分類列於表尾。', 'ℹ️ 判定方法', 'tt-pill')}</h2>
+    return f'''<section id="sec-detect"><a class="anchor" id="s2"></a><h2>② 馬丁偵測 {tt('判定方法：白皮書 v3.1 §4.3——校準用「出現≥2次嘅最小 lot」做基準。' + cap + '\n六步：① 剔除 balance／未平倉列 → ② 統計實際 lot 分佈 → ③ 基準 lot＝出現≥2次嘅最小 lot → ④ 每筆按 lot/基準 倍數歸層（容差 2%）→ ⑤ 相鄰層比值眾數＝偵測倍數 → ⑥ 最大層≥2 即判馬丁；未分類列於表尾。', 'ℹ️ 判定方法', 'tt-pill')}</h2>
 <div class="pills">
 <div class="pill"><div class="k">基準 lot</div><div class="v">{det["base"]:.2f}</div></div>
 <div class="pill"><div class="k">偵測倍數</div><div class="v">{'×%g' % det["step"] if det["step"] else "—（單層）"}</div></div>
@@ -484,7 +503,7 @@ def build_analyzer(t, det):
     options = ''.join(f'<option value="{s}">{s}</option>' for s in order)
     n_mm = sum(1 for x in t if x['mm'])
     mm_tip = (f'⚠ {n_mm} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——相關商品 avg 值顯示「—」、統計分母剔除（冇數≠$0）。') if n_mm else ''
-    return f'''<section id="s3"><h2>③ 商品分析器 {tt('單商品手術台：預設總 P&L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。')}{f' {tt(mm_tip, "⚠", "tt-w")}' if n_mm else ''}</h2>
+    return f'''<section id="sec-pair"><a class="anchor" id="s3"></a><h2>③ 商品分析器 {tt('單商品手術台：預設總 P&L 最高商品。BUY 綠左／SELL 紅右。門檻 slider＝v8.4 入場效益（61 級）web 升級位。')}{f' {tt(mm_tip, "⚠", "tt-w")}' if n_mm else ''}</h2>
 <div class="sel-bar"><label>商品</label><select id="sym-select">{options}</select>
 <label>入場門檻</label><div class="slider-row" style="margin:0;flex:1"><input type="range" id="th-slider" min="0" max="60" step="1" value="20"><span class="slider-val" id="th-out">20 pips</span></div></div>
 <div id="an-note" class="footnote"></div>
@@ -520,7 +539,7 @@ def sec_dir_table(t):
                  f'<td>{format(g["avg_maep"], ".1f") if g["avg_maep"] is not None else "—"}</td>'
                  f'<td>{format(g["avg_mfep"], ".1f") if g["avg_mfep"] is not None else "—"}</td>'
                  f'<td>{g["max_lot"]:.2f}</td><td class="muted">—</td></tr>')
-    return f'''<section id="s4"><h2>④ 商品方向總表 {tt('全場商品×方向成績表，按勝率排序；L5+ 深層馬丁暴露喺深層馬丁帳戶先會有數（本訊號見 ② 區）。零交易子集唔出行（軍規 A④）。')}</h2>
+    return f'''<section id="sec-table"><a class="anchor" id="s4"></a><h2>④ 商品方向總表 {tt('全場商品×方向成績表，按勝率排序；L5+ 深層馬丁暴露喺深層馬丁帳戶先會有數（本訊號見 ② 區）。零交易子集唔出行（軍規 A④）。')}</h2>
 <table><thead><tr><th>商品</th><th>方向</th><th>筆數</th><th>勝率</th><th>P&amp;L</th><th>avg MAE $</th><th>avg MFE $</th><th>avg MAE p</th><th>avg MFE p</th><th>max lot</th><th>L5+ 筆數</th></tr></thead>
 <tbody>{rows}</tbody></table></section>'''
 
@@ -545,7 +564,7 @@ def sec_pivot(t):
         (yy, mm), val = next(iter(by_ym.items()))
         vmax = abs(val) or 1
         bg, _ = heat_color(val, vmax)
-        return f'''<section id="s5"><h2>⑤ 月度樞紐 {tt('年×月 P&L（按平倉月）。圖例：綠贏紅蝕，深淺按 |值| 歸一化。\n「·」＝未覆蓋月份（冇數），唔係 $0。')}</h2>
+        return f'''<section id="sec-monthly"><a class="anchor" id="s5"></a><h2>⑤ 月度樞紐 {tt('年×月 P&L（按平倉月）。圖例：綠贏紅蝕，深淺按 |值| 歸一化。\n「·」＝未覆蓋月份（冇數），唔係 $0。')}</h2>
 <div class="footnote">{tt('⚠ 數據只覆蓋單一月份——熱力表降級做單月 bar。', '⚠', 'tt-w')}</div>
 <div style="display:flex;align-items:center;gap:14px;margin-top:10px"><b>{yy}-{mm:02d}</b>
 <div style="flex:1;background:var(--card2);border-radius:6px;padding:4px"><div style="width:100%;background:{bg};border-radius:4px;padding:6px 10px;font-weight:700">{fmt_money(val)}</div></div></div></section>'''
@@ -566,7 +585,7 @@ def sec_pivot(t):
         bg, _ = heat_color(ytot, vmax)
         cells.append(f'<div class="c" style="background:{bg}">{fmt_money(ytot)}</div>')
     grid = head + ''.join(cells) + '</div>'
-    return f'''<section id="s5"><h2>⑤ 月度樞紐 {tt('年×月 P&L 熱力表（按平倉月）＋全年合計。圖例：綠贏紅蝕，深淺按該表 max|值| 歸一化。\n「·」＝未覆蓋（冇數≠$0），hover 格去睇。')}</h2>
+    return f'''<section id="sec-monthly"><a class="anchor" id="s5"></a><h2>⑤ 月度樞紐 {tt('年×月 P&L 熱力表（按平倉月）＋全年合計。圖例：綠贏紅蝕，深淺按該表 max|值| 歸一化。\n「·」＝未覆蓋（冇數≠$0），hover 格去睇。')}</h2>
 {grid}</section>'''
 
 
@@ -625,7 +644,7 @@ def sec_scatter(t):
         panels.append(f'<div class="svgbox"><b style="color:var(--acc)">{label}</b>{svg}<div class="cap">對角虛線＝MFE=MAE（線上＝入場後唔使挨逆風）；線上比例 {online}%{drop}；綠點贏紅點蝕</div></div>')
     quad = tt('入場質素四象限：MFE＝入場後最大有利偏移、MAE＝最大不利偏移（pips，由入場價起算）。y=x 對角線上＝好單（MFE≥MAE，入場後唔使挨逆風）。綠點贏紅點蝕。')
     mm_note = (f' {tt(f"⚠ {n_mm} 筆 MAE/MFE 欄為 0 值（與淨利矛盾，判定缺欄）——相關點位剔除散點（冇數≠$0）。", "⚠", "tt-w")}') if n_mm else ''
-    return f'''<section id="s6"><h2>⑥ MAE/MFE 散點{mm_note}{quad}</h2>
+    return f'''<section id="sec-scatter"><a class="anchor" id="s6"></a><h2>⑥ MAE/MFE 散點{mm_note}{quad}</h2>
 <div class="two">{''.join(panels)}</div></section>'''
 
 
@@ -677,7 +696,7 @@ def sec_time(t):
                  f'<td><span class="{"buy-h" if x["type"] == "buy" else "sell-h"}"></span>{x["type"].upper()}</td>'
                  f'<td>{x["lots"]:.2f}</td><td class="{"pos" if x["np"] > 0 else "neg"}">{fmt_money(x["np"])}</td>'
                  f'<td class="neg">{mae_cell}</td></tr>')
-    return f'''<section id="s7"><h2>⑦ 時間維度＋明細 {tt('星期×小時 P&L（格色雙向 heat，hover 格去睇精確值；「·」＝冇數，符號本身 hover 也有解釋）＋累計 P&L 走勢＋最近 50 筆明細。時間均按平倉時間。')}</h2>
+    return f'''<section id="sec-raw"><a class="anchor" id="s7"></a><h2>⑦ 時間維度＋明細 {tt('星期×小時 P&L（格色雙向 heat，hover 格去睇精確值；「·」＝冇數，符號本身 hover 也有解釋）＋累計 P&L 走勢＋最近 50 筆明細。時間均按平倉時間。')}</h2>
 <h3 style="color:var(--acc);font-size:.95em;margin:8px 0 6px">星期 × 小時 heatmap</h3>{''.join(g)}
 <h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">累計 P&amp;L（Growth）</h3><div class="svgbox">{s}</div>
 <h3 style="color:var(--acc);font-size:.95em;margin:14px 0 6px">明細（最近 {min(len(t), 50)} 筆／共 {len(t)} 筆）</h3>
@@ -686,7 +705,7 @@ def sec_time(t):
 
 
 def sec_guide():
-    return '''<section id="s8"><h2>⑧ 使用說明</h2><div class="legend">術語、清洗規則、顏色圖例——Excel「說明／匯入說明」兩 sheet 嘅 web 化。</div>
+    return '''<section id="sec-guide"><a class="anchor" id="s8"></a><h2>⑧ 使用說明</h2><div class="legend">術語、清洗規則、顏色圖例——Excel「說明／匯入說明」兩 sheet 嘅 web 化。</div>
 <details><summary>展開說明</summary><dl class="guide">
 <dt>勝率</dt><dd>Net Profit &gt; 0 嘅交易佔比（含 commission＋swap 後淨值）。</dd>
 <dt>盈虧比</dt><dd>平均贏利 ÷ |平均虧損|。</dd>
@@ -702,12 +721,32 @@ def sec_guide():
 
 
 TOC = '''<nav class="toc"><h3>目錄</h3>
-<a href="#s1">① 整倉總覽</a><a href="#s2">② 馬丁偵測</a><a href="#s3">③ 商品分析器</a>
-<a href="#s4">④ 商品方向總表</a><a href="#s5">⑤ 月度樞紐</a><a href="#s6">⑥ MAE/MFE 散點</a>
-<a href="#s7">⑦ 時間維度＋明細</a><a href="#s8">⑧ 使用說明</a></nav>'''
+<a href="#sec-overview">① 整倉總覽</a><a href="#sec-detect">② 馬丁偵測</a><a href="#sec-pair">③ 商品分析器</a>
+<a href="#sec-table">④ 商品方向總表</a><a href="#sec-monthly">⑤ 月度樞紐</a><a href="#sec-scatter">⑥ MAE/MFE 散點</a>
+<a href="#sec-raw">⑦ 時間維度＋明細</a><a href="#sec-guide">⑧ 使用說明</a></nav>'''
+
+ANCHOR_CSS = '.anchor{position:relative;top:-8px}'
 
 
-def build_page(signal_id, csv_path, force=False):
+def sec_ids(html: str) -> list:
+    """Return the sec-* anchors present in a generated page (spec §0 item 4)."""
+    import re as _re
+    return sorted(set(_re.findall(r'id="(sec-[a-z-]*)"', html)))
+
+
+def check_spec(html: str) -> tuple:
+    """Validate a generated page against SECTION_SPEC §2.2 / §3 acceptance."""
+    import re as _re
+    ids = sec_ids(html)
+    missing = [sid for sid, _old, _label in SECTION_SPEC if sid not in ids]
+    dupes = [i for i in ids if len(_re.findall('id="' + i + '"', html)) > 1]
+    report = ('sec-* ids: ' + (', '.join(ids) or '(none)')
+              + '\nmissing: ' + (', '.join(missing) or '(none)')
+              + '\nduplicate: ' + (', '.join(dupes) or '(none)'))
+    return (not missing and not dupes), report
+
+
+def build_page(signal_id, csv_path, force=False, outdir=''):
     trades = load_trades(csv_path)
     if not trades:
         raise SystemExit('清洗後零交易——照規則①應出中央卡；樣本頁唔適用，退出')
@@ -724,7 +763,8 @@ def build_page(signal_id, csv_path, force=False):
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Martin v4 · Signal {signal_id} · TSA</title>
 <link rel="stylesheet" href="../sidebar.css">
-<style>{CSS}</style>
+<style>{CSS}
+{ANCHOR_CSS}</style>
 <link rel="stylesheet" href="../tsa_tokens.css">
 </head>
 <body>
@@ -750,7 +790,11 @@ def build_page(signal_id, csv_path, force=False):
 <script>{js_block}</script>
 </body>
 </html>'''
-    out = REPORTS / f'martin_v4_{signal_id}.html'
+    out = (Path(outdir) if outdir else REPORTS) / f'martin_v4_{signal_id}.html'
+    ok, spec_report = check_spec(html)
+    print('[spec] ' + spec_report.replace('\n', ' | '))
+    if not ok:
+        raise SystemExit('SECTION_SPEC §2.2 不合規——' + spec_report)
     if out.exists() and not force:
         old = hashlib.md5(out.read_bytes()).hexdigest()
         new = hashlib.md5(html.encode()).hexdigest()
@@ -766,11 +810,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--signal', required=True)
     ap.add_argument('--force', action='store_true')
+    ap.add_argument('--outdir', default='',
+                    help='寫去指定目錄（例如 /tmp P5 樣本自證）而唔覆蓋 docs/reports/{signal}')
     a = ap.parse_args()
+    if a.outdir:
+        out_dir = Path(a.outdir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        print(f'[outdir] 輸出改去 {out_dir} —— docs/reports 嘅存量頁唔會被改')
     csv_path = DOWNLOADS / f'forex-forest-signals-page-{a.signal}.csv'
     if not csv_path.exists():
         raise SystemExit(f'CSV 缺：{csv_path}')
-    build_page(a.signal, csv_path, a.force)
+    build_page(a.signal, csv_path, a.force, a.outdir)
 
 
 if __name__ == '__main__':
