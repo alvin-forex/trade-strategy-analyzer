@@ -2606,17 +2606,17 @@ Stage Summary:
 
 > ⚠️ **警報 2026-11-23 09:34 HKT** — ⚠️⚠️ git fetch/merge 失敗——〔排程 agent 請將此行原文轉達老闆〕；下鐘自動重試
 
-## Task 318：09:31 cron（11-23）第33次rollback自癒＋v4.1腳本恢復＋OHLC供料驗收＋parity首輪報告死線前出貨（2026-11-23 09:31–11:45，ZCODE_w）
+## Task 318：09:31 cron（11-23）第33次rollback自癒＋v4.1腳本恢復＋OHLC供料驗收＋parity首輪報告死線前出貨（2026-11-23 09:31–10:25，ZCODE_w）
 - **第 33 次 rollback**（HEAD 退回 c45e148f；origin/main=8c693394）：照已批手法 fetch→reset --hard→sparse-checkout add ccy_backtest→pytest 23/23 PASS。
 - **⚠️⚠️ 警報一次（09:34）**：git fetch/merge 失敗（ff-only 分叉）——原文已轉達老闆；reset 自癒後連續跑通，下鐘自動重試無再現。
 - **環境自癒新個案（v4.1 腳本被覆蓋）**：首跑 cycle 超時（pull 挂 120s kill）期間，scripts/exchange_cycle.sh 被 c45e148f 時代 repo 正本（v4.0 25,003B）覆蓋——照「腳本缺→repo 正本」規則用 origin/main 正本恢復 v4.1（28,197B）後全通。教訓：rollback 後首跑需先確認 repo 正本版本再跑自癒。
 - **OC 0940 回批收貨（CP-BT1 階段 B 全面解封）**：OHLC 供料 commit fcafe7da（31 檔＋MANIFEST）＋映射公式 val=9×pw/100＝4.5+0.09×(pw−50)＋死線 18:00 維持釘範圍 H1 主矩陣＋12:00 升級預告取消。**供料機器閘驗收全過**：23 全額窗口逐一核對 33×350 零 shortfall（21 H1＋2 H4），遠超 ≥10 時點。
 - **關鍵實證發現（對齊方法學）**：reader csv 同一 H1 bar 內每 2-5 分鐘讀數持續變化（07.15 01:01→01:58 CAD 7.14→6.86）＝FF 面板 live 逐 tick 重算（與 MQ4 limit≥1 逐 tick 重算 bar0 一致）→ 對齊規則定為 **S-close**（kernel 尾 bar 終值 vs 最接近 anchor bar 收盤時刻全行；idx22/25 窗過時照錨驗用 S-open）。
-- **parity 首輪跑通＋雙配置出貨（本鐘核心，18:00 死線 11:40 交貨提前 6h20m）**：
+- **parity 首輪跑通＋雙配置出貨（本鐘核心，18:00 死線 10:20 交貨提前 7h40m）**：
   - 配置 A（0940 字面 RSI14/ATR14/calc_pw_row）：b=0.0429 顯著偏離 0.09、mean|err|=1.127——**照協議如實上報冇靜默改**；
   - 校準定位：RSI 周期掃描（14→4 R² 0.29→0.41 峰值）＋聚合變體（無加權 mean raw R²=0.73 完勝 ATR 加權 0.40；running-sum/EWMA/÷Σw 全否決）＋avgW 域分析——**FF 原版＝v1/v2 無 ATR 加權特征＋RSI≈4**；
   - 配置 B（校準版：同引擎＋w≡1＋RSI=4）：**b≈0.092-0.104 確認 OC 映射公式結構**（per-currency 斜率 0.089-0.120 佔 8/9 幣、R² 0.68-0.91、中點 4.5 ✓）、mean|err|=0.626（對 A 減半）、max 2.544；
   - **XAU 分母（十問 Q4）數據裁決**：den=gn=5 最佳（XAU b=0.0796 R²=0.858），den=12 預測 0.19 更差——唔支持 12；
   - H4 對照 2 行（idx24/25）時間許可項照交；數據受限備註全數記錄（idx02-05／idx26 M1、idx28 M5 零行／idx28 H1 部分／2011 跳過／intra-bar 漂移定性）。
-- **交付清單**：local/alvin 分支（runner.py supply 雙配置升級＋out/parity_* 8 檔＋首輪報告 md）；from_zcode/20261123_1140 回執＋notify 鏡像；蓋章 0940 信；worklog 雙寫同步。pytest 23/23 PASS 複驗。
+- **交付清單**：local/alvin 分支（runner.py supply 雙配置升級＋out/parity_* 8 檔＋首輪報告 md）；from_zcode/20261123_1020 回執＋notify 鏡像；蓋章 0940 信；worklog 雙寫同步。pytest 23/23 PASS 複驗。
 - 等態：CP-BT1 階段 B **首輪出貨，等 OC 機器閘驗收＋四項確認**（RSI_Period 實設／FF 版本譜系／per-currency 截距殘差／貼零 v2 對齐方案）→ v2（如需）11-24 18:00 前；其餘不變：#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
