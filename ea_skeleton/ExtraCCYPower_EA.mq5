@@ -14,46 +14,52 @@
 //|  Nothing is silently defaulted to a trading decision.            |
 //+------------------------------------------------------------------+
 #property copyright "ZCODE for Alvin"
-#property version   "1.00"
+#property version   "1.01"
 #property description "MT5 EA skeleton: input frame, risk hooks, logging, lot sizing, backtest entry. No strategy logic."
 
-//--- card #41: risk guards must default OFF (REQUIREMENT 2.4 / acceptance A3)
-//--- group order used here is a PLACEHOLDER: ea-repo AGENTS.md section 3
-//--- (authoritative group order) is not reachable yet - see MISSING: G3.
+//--- version string used by the STARTED banner; keep in lock-step with
+//--- #property version above and with the README (AGENTS.md section 6).
+#define EA_VERSION "1.01"
 
-input group "Identity"
+//--- card #41: risk guards must default OFF (REQUIREMENT 2.4 / acceptance A3)
+//--- Group names and relative order follow ea-repo AGENTS.md section 3 for the
+//--- groups that carry inputs. Groups with no input are NOT declared
+//--- (OC ruling 2026-11-23 21:05, item D1: "有 input 先開組").
+//--- "Lot Sizing" and "Backtest" are not among the section 3 twelve groups;
+//--- they are kept at their original name and position pending the owner's
+//--- verdict (AGENTS.md section 2.3: a new group must be approved).
+
+input group "General"
 input string InpEaName          = "ExtraCCYPower_EA";  // EA identity string (O1)
 input long   InpMagicNumber     = 241123;              // Magic number; 0 = disable filtering
 input string InpLogBaseName     = "ExtraCCYPower_EA";  // Log file base name, no extension
-
-input group "Symbol and Timeframe"
 input string InpWorkSymbol      = "";                  // Working symbol; empty = chart symbol
-input ENUM_TIMEFRAMES InpWorkTF = PERIOD_CURRENT;      // Working timeframe; CURRENT = chart
+input ENUM_TIMEFRAMES InpWorkTimeframe = PERIOD_CURRENT; // Working timeframe; CURRENT = chart
 
 input group "Lot Sizing"
-input double InpBaseLot         = 0.01;                // Base lot for the first layer
+input double InpBaseLot         = 0.01;                // Base lot for the first layer (lots)
 input double InpLotMultiplier   = 1.00;                // Lot multiplier per layer; 1.00 = flat
-input int    InpMaxLayers       = 1;                   // Max layers allowed; 1 = single position
-input double InpMaxLotTotal     = 0.00;                // Max total lots overall; 0.00 = disabled
+input int    InpMaxLayers       = 1;                   // Max layers allowed (count); 1 = single
+input double InpMaxLotTotal     = 0.00;                // Max total lots overall (lots); 0.00 = off
 
-input group "Risk - Drawdown Guard"
-input bool   InpDdGuardEnable   = false;               // Enable drawdown guard
-input double InpDdMaxPercent    = 0.00;                // Max drawdown percent; 0.00 = disabled
-input double InpDdMaxMoney      = 0.00;                // Max drawdown money; 0.00 = disabled
+input group "DD Guard — Account"
+input bool   InpDdGuardEnable   = false;               // Enable account drawdown guard
+input double InpDdMaxPercent    = 0.00;                // Max drawdown (%); 0.00 = disabled
+input double InpDdMaxMoney      = 0.00;                // Max drawdown ($); 0.00 = disabled
 
-input group "Risk - Symbol Guard"
+input group "Symbol Guard"
 input bool   InpSymGuardEnable  = false;               // Enable per-symbol guard
-input int    InpSymMaxPositions = 0;                   // Max open positions on symbol; 0 = disabled
-input double InpSymMaxLots      = 0.00;                // Max lots on symbol; 0.00 = disabled
+input int    InpSymMaxPositions = 0;                   // Max open positions (count); 0 = off
+input double InpSymMaxLots      = 0.00;                // Max lots on symbol (lots); 0.00 = off
 
-input group "Risk - News Guard"
+input group "News Guard"
 input bool   InpNewsGuardEnable = false;               // Enable news guard
-input int    InpNewsBlockMins   = 0;                   // Minutes blocked around news; 0 = disabled
+input int    InpNewsBlockMinutes = 0;                  // Minutes blocked (min); 0 = disabled
 
-input group "Logging"
+input group "Diagnostics"
 input bool   InpLogToFile       = true;                // Write CSV log to MQL5/Files
 input bool   InpLogHeartbeat    = false;               // Print heartbeat line on tick
-input int    InpHeartbeatSec    = 3600;                // Heartbeat interval in seconds
+input int    InpHeartbeatSeconds = 3600;               // Heartbeat interval (sec); 0 = off
 
 input group "Backtest"
 input bool   InpTesterSummary   = true;                // Write tester summary CSV in OnTester
@@ -206,7 +212,7 @@ bool RiskGuardAllow(string &reason)
       }
    }
 
-   if(InpNewsGuardEnable && InpNewsBlockMins > 0)
+   if(InpNewsGuardEnable && InpNewsBlockMinutes > 0)
    {
       //--- no calendar binding in the skeleton: report the hook as unbound
       //--- rather than pretending a news state exists (O2 dependent)
@@ -296,10 +302,12 @@ void PrintMissingItems()
    Print("MISSING: O2 - no order-sending code exists in this build, by design");
    Print("MISSING: O3 - parameter list must follow the real .set fields; not supplied yet");
    Print("MISSING: O4 - acceptance thresholds (backtest numbers) not settled by owner");
-   Print("MISSING: G3 - ea-repo AGENTS.md section 1/3 is unreachable, input naming and");
-   Print("MISSING: G3 - group order below are a placeholder and must be re-ordered after spec lands");
+   Print("MISSING: G3 - group names now follow ea-repo AGENTS.md section 3 for the groups");
+   Print("MISSING: G3 - that carry inputs; groups without inputs are not declared (OC 21:05 D1).");
+   Print("MISSING: G3 - 'Lot Sizing' and 'Backtest' are not among the twelve section 3 groups");
+   Print("MISSING: G3 - and stay pending the owner's verdict (AGENTS.md section 2.3).");
 
-   if(InpNewsGuardEnable && InpNewsBlockMins > 0)
+   if(InpNewsGuardEnable && InpNewsBlockMinutes > 0)
       Print("MISSING: O2 - news guard requested but no news source is bound in the skeleton");
 
    if(InpMaxLayers > 1 || InpLotMultiplier != 1.0)
@@ -338,9 +346,9 @@ bool ValidateInputs(string &why)
       why = "InpMaxLotTotal must not be below InpBaseLot";
       return(false);
    }
-   if(InpHeartbeatSec < 0)
+   if(InpHeartbeatSeconds < 0)
    {
-      why = "InpHeartbeatSec must be >= 0";
+      why = "InpHeartbeatSeconds must be >= 0";
       return(false);
    }
    if(InpLogBaseName == "")
@@ -376,8 +384,14 @@ int OnInit()
 
    OpenLogFile();
 
-   PrintFormat("SKELETON: v0.10 attached, symbol=%s tf=%s, orders=DISABLED (no O2 spec)",
-               g_symbol, EnumToString((ENUM_TIMEFRAMES)Period()));
+   //--- STARTED banner (AGENTS.md section 6: the version string must be in
+   //--- lock-step with #property version, the description and the README).
+   //--- Printed once from OnInit only, never repeated from OnTick
+   //--- (OC ruling 2026-11-23 21:05, item D2).
+   PrintFormat("%s STARTED v%s on %s %s", InpEaName, EA_VERSION,
+               g_symbol, EnumToString(InpWorkTimeframe));
+
+   PrintFormat("SKELETON: orders=DISABLED (no O2 spec)");
 
    PrintFormat("SKELETON: volume spec min=%s max=%s step=%s",
                DoubleToString(g_volMin, 4), DoubleToString(g_volMax, 4), DoubleToString(g_volStep, 4));
@@ -418,7 +432,7 @@ void OnTick()
    if(!InpLogHeartbeat)
       return;
 
-   if(InpHeartbeatSec > 0 && (TimeCurrent() - g_lastBeat) < (datetime)InpHeartbeatSec && g_lastBeat != 0)
+   if(InpHeartbeatSeconds > 0 && (TimeCurrent() - g_lastBeat) < (datetime)InpHeartbeatSeconds && g_lastBeat != 0)
       return;
 
    g_lastBeat = TimeCurrent();
