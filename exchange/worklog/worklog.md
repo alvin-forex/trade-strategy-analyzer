@@ -2591,3 +2591,13 @@ Stage Summary:
 - **kernel 就緒申報（本鐘複核）**：indicators（Wilder RSI/ATR）＋core（raw/weight/aggregate/history/display_scale）＋parity（長格式＋error_matrix＋report）＋dataio.load_ohlc_csv（MT4 原生格式直讀）對接面齊備；料到後只欠窗口切分 runner（半日）。工序：26 時點×350 根切窗重算→對齊 reader key→誤差矩陣→報告。
 - 出信：from_zcode/20261122_1535_ZCODE_w_回執_1445驗收收悉_kernel就緒申報.md＋notify 鏡像（單向申報唔佔台方調用）；蓋章 1445 信。
 - 等態：CP-BT1 階段 B 等OHLC（供料中，16:31/17:31 鐘盯料）；其餘不變：#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆。
+
+## Task 317：08:31 cron（11-23，合併 16 鐘積壓 16:31→07:31）第32次rollback＋OHLC二次超時第四級催促＋A06E映射第5項缺料＋MT4參照實現＋runner全通（2026-11-23 08:31–09:10，ZCODE_w）
+- **第 32 次 rollback**（HEAD 退回 c45e148f；origin/main=2fc16135）：照已批手法修復；pytest 18/18 PASS 複驗。積壓 16 鐘合併一輪巡檢（合併執行原則）。
+- **OC 1540 回批（5/5 全過）＋2300 夜間信（OC→AC）**：夜間信承認 OHLC 供料超時（23:00 自查）＋**自設 11-23 08:00 前補齊——08:31 實查 ref/ohlc/ 仍零檔案，二度失守**（原承諾 11-22 16:40 供齊→逾期約 16h）。2300 係 OC→AC 信照 T312 先例蓋「已讀知悉」清噪。
+- **第四級催促信出貨**：from_zcode/20261123_0840_ZCODE_w_第四級催促_OHLC二次超時_死線失守風險申報.md——時間線五步全佐證／量化風險（料最遲 11:00、13:00 後到＝實質不可達）／二選一請求（即刻供料 H1 主窗口 26 點先到先跑，or 順延縮範）／**12:00 無回覆即升級老闆裁決**。
+- **重大發現：A06E 0..9 映射公式係第 5 項缺料**（已補入 0840 信）：解壓 audit zip 得 MQ4 源碼 395 行逐行核對——indicator buffer B0-B8 直接存 pw=50+c/cnt（白皮書 §3.3 一致、OnCalculate 無映射）；reader csv 實測值域 2.25-7.86（4.5 中點）＝A06E 讀值後自行線性映射（推測 (pw−50)/X+4.5，X 未知）。**無此公式 parity 無法對標——OHLC 到齊都開不成工**，已列台方提供公式／源碼／定義三選一。
+- **重大修正：我方 A-3 假設（÷Σw）確認錯誤**——MT4 實作係 **÷cnt 簡單平均**（w/avgW 歸一後 Σ±v÷N_c）；XAU 段（gx/÷gn＋7 交叉 −v×0.5 半權重即時重算）／RSI≤0 跳過／pw 初始化 50 全數核實。
+- **mt4_ref.py 出貨**（照 MQ4 Calc() 逐行移植參照實現）：＋tests/test_mt4_ref.py 5 測（單對/XAU半權重/avgW÷cnt/無效RSI跳過/36形狀）全過——**pytest 23/23 PASS**。
+- **runner.py 出貨**（parity 主管線）：ref/ohlc/ 掃描（佈局 A/B 兼容）→350 根切窗→indicators RSI/ATR→mt4_ref 單 bar 計算→reader key 對齊→誤差矩陣→報告；PENDING 行為（料唔到唔静默）驗證；**dataio.load_ohlc_csv 補 DATE+TIME 兩欄合併**（MT4 原生導出格式，原三欄測試照過）；E2E 合成自測（4 instrument×400 根×10 時點）**管線全通**——料到即 15 分鐘內出首輪報告。
+- 等態：CP-BT1 階段 B 等 **OHLC＋A06E 映射公式**（並列兩項阻路料，12:00 為升級觀察點）；#28 等 #34/#35 定稿；#4 Supabase 等料穩；P1–P6 等老闆；TG token 等老闆；CCYV3（#33/#36）歸屬未明（夜間信提 OC 擬向 ZCODE 追交付，範圍屬 EA——OC 未正式派工信，唔搶唔判）。

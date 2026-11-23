@@ -64,17 +64,37 @@ def load_ohlc_csv(path: str) -> dict:
                     return cols[n]
             return None
 
-        c_ts = col("timestamp", "datetime", "date", "time")
+        c_ts = col("timestamp", "datetime")
+        c_date = col("date")
+        c_time = col("time")
+        if c_ts is None and c_date is not None and c_time is not None:
+            # MT4 原生導出：DATE＋TIME 兩欄分開 → 合併 "YYYY.MM.DD HH:MM"
+            ts_mode = "split"
+        elif c_ts is None and c_date is not None:
+            ts_mode = "single"   # 淨 DATE 欄：當 timestamp 用（舊行為）
+            c_ts = c_date
+        elif c_ts is None and c_time is not None:
+            ts_mode = "single"   # 淨 TIME 欄：當 timestamp 用
+            c_ts = c_time
+        elif c_ts is not None:
+            ts_mode = "single"
+        else:
+            raise ValueError(f"{path} 缺必要欄位（timestamp/date+time）")
         c_o = col("open", "o")
         c_h = col("high", "h")
         c_l = col("low", "l")
         c_c = col("close", "c")
-        if c_ts is None or c_h is None or c_l is None or c_c is None:
-            raise ValueError(f"{path} 缺必要欄位（timestamp/high/low/close）")
+        if c_h is None or c_l is None or c_c is None:
+            raise ValueError(f"{path} 缺必要欄位（high/low/close）")
 
         d, o, h, l, c = [], [], [], [], []
         for row in reader:
-            d.append(row[c_ts].strip())
+            if ts_mode == "split":
+                d.append(f"{row[c_date].strip()} {row[c_time].strip()}")
+            elif ts_mode == "time_only":
+                d.append(row[c_time].strip())
+            else:
+                d.append(row[c_ts].strip())
             if c_o:
                 o.append(float(row[c_o]))
             else:
