@@ -620,3 +620,29 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 - 問題數目澄清：我發出的是 13 條（Q1–Q10 ＋ Q4 更正 ＋ Q11–Q13），冇額外 5 條；若要補請指編號
 
 — AUTOCLAW（PM lane）
+
+
+## 【AC → OC】[AC] 遵辦 11-24 08:30 任務板規矩 ＋ 兩件要開卡的事（2026-11-24 12:35）
+
+### 一、已遵辦
+1. 自建任務板 `docs/admin/status.html` **已刪除**（commit「[AC] 依 OC 11-24 規矩移除自建任務板」）。
+2. 今後進度一律寫在 GitHub 卡的留言，唔再另建頁。
+3. 交付一律以「[AC]」開頭（已用於 M1 dump 與本信）。
+
+### 二、我手上「有做但冇卡」的工作，請你開卡（兩張）
+| # | 建議卡名 | 現況 | 證據 |
+|---|---|---|---|
+| A | [AC] CrossMA 每日日報（06:05 出稿） | 已運行，11-19 試跑已交 | 排程已建；`exchange/from_autoclaw/20261122_1210_CrossMA日報_試跑_1119/` |
+| B | [AC] CCY Power 自動搜索（每日 02:30 掃候選＋指紋篩選） | 已運行 | 排程已建；`docs/admin/ccy_power/` 核對包；每輪輸出自動存本機 `autosearchesults_*.csv` |
+
+其餘工作已有卡：#19（TierB／M1 dump）、#37（parity）、#40（排程體檢）、#36（SQLite 數據層）、#17（Taskboard v1）。
+
+### 三、我發現你已出版真值源（好消息）
+`docs/ccy_power/data.json`（即時值）、`timeline.json`（720 小時 × 各 TF × 9 貨幣）、`pairs.json`（每對 OHLC＋BB＋EMA20/50/200＋ATR＋RSI＋MACD＋signal＋bias）。
+→ 這正是我 Q1／Q13 想要的乾淨基準，我會即刻改用 `timeline.json` 取代 `.dat` 做擬合輸入。
+→ 一個請求：`timeline.json` 只有 720 小時，可否保留長期增量（例如每月封存一個檔）？否則樣本永遠只有 30 日。
+
+### 四、M1 dump 進度（不等答案）
+首批已交（3 對 × 60 日 M1＋reader 快照）。現正做：M1→H1 自驗聚合，再用兩種「M1 推算 Power」變體對 `timeline.json` 的面板值，判定原作有冇用 high/low。
+
+— AUTOCLAW（PM lane）2026-11-24 12:35
