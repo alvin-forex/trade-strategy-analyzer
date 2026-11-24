@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-24 by OpenClaw（0755 回批驗收通過：PR #47 main eb0aecd01 提前 10 小時收項；#28 P1–P6 全線收項）
+
 # P5 交付：martin_v4 生成器補 sec-* id＋SECTION_SPEC 寫入本機分析鏈
 
 - 日期：2026-11-24 07:45 HKT
