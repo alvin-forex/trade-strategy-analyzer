@@ -1,0 +1,138 @@
+# AGENTS.md — MT4 / MT5 EA 開發規範（唯一真相來源）
+
+> 本檔係 repo 根目錄（與 `MQL5\`、`ea-test-kit\` 同層）嘅開發規範。
+> **任何 MQL4 / MQL5 相關工作，開工前必須先讀本檔並逐條跟足。**
+> 與現有代碼衝突時：先列衝突點問用戶，唔好自行判斷。
+
+---
+
+## 1. Input 命名（Naming）
+
+### 1.1 硬規則
+
+| 規則 | 說明 |
+|---|---|
+| **`Inp` 前綴 + PascalCase** | 所有 `input` 必須以 `Inp` 開頭，之後每個字首大寫，禁止底線、禁止全大寫縮寫 |
+| **禁止 `___XXX___` 假分隔** | 唔准用 `input string ___LABEL___` 扮 group，一律用 `input group "..."` |
+| **變數名唯一** | 不得與 global / 函式名 / 內建函式撞名（MQL4/5 會報 `variable already defined`） |
+| **縮寫要還原** | `Marg` → `Margin`、`Pct` → `Percent`、`Sec` → `Seconds`、`Min` → `Minutes`、`DDPct` → `DdPercent` |
+| **大小寫** | 只寫 `Dd`、`Pnl`、`Id`、`Url`，唔寫 `DD`、`PNL`、`ID`、`URL`（PascalCase 慣例） |
+
+範例：`DDG_MaxDDPct` → `InpDdgAccountMaxPercent`；`TG_MinGapMin` → `InpTelegramMinGapMinutes`；`ShowFreeMarg` → `InpShowFreeMargin`。
+
+### 1.2 為什麼要 `Inp` 前綴（工程理由，非介面理由）
+
+- **`.set` 檔以「變數名」儲存**（實測 `AngelGold_v4.set` 內容為 `SessionClock=0||0||0||1||N`）→ 改名會令 `.set` 失效，改 comment **不會**。有前綴 + PascalCase 的名稱穩定、可讀、跨版本可對照。
+- **防撞名**：EA 動輒 2,000–3,000 行，`Scale` / `View` / `Mode` 這類短名極易與 local/global 衝突。
+- **可機檢**：`grep -E '^input '` 加 `Inp` 後，重構腳本與 CI 可無歧義地識別全部參數。
+
+### 1.3 介面顯示規則（重點）
+
+MQL4 / MT5 參數視窗顯示次序：**有 comment → 顯示 comment；冇 comment → 顯示變數名**。
+所以 `Inp` 前綴**唔會**出現在用戶介面（前提：每個 input 都有 comment，見第 2 節）。
+
+---
+
+## 2. Input 規則（Input Rules）
+
+| # | 規則 |
+|---|---|
+| 2.1 | **每個 `input` 必須有 comment**，該 comment 就是 MT5/MT4 介面顯示名。用英文、首字大寫、不加句號、≤ 55 字元 |
+| 2.2 | **一律用 `input group "..."`** 分組，group 名為英文短語 |
+| 2.3 | **Group 固定次序**（見第 3 節），不得任意加插；新 group 要問用戶 |
+| 2.4 | **預設值必須安全**：所有風控／會發單的功能預設 `false` 或 `0 = OFF` |
+| 2.5 | **`0` = 關閉**：數值型上限參數（money / percent / count）一律以 `0` 代表「不啟用」，保留向後兼容 |
+| 2.6 | **單位寫入 comment**：`(sec)` / `(min)` / `(%)` / `($)`，唔靠參數名暗示 |
+| 2.7 | **範圍寫入 comment**：如 `0=Hour 1=Day 2=Week 3=Month` |
+| 2.8 | **不得刪除既有 input**（會令用戶圖表 reset）；要淘汰就保留並在 comment 標 `(deprecated, ignored)` |
+
+---
+
+## 3. Group 固定次序
+
+```
+1. General
+2. Display
+3. Refresh & Recording
+4. Data Filter
+5. Trade Snapshot
+6. DD Guard — Account
+7. DD Guard — Per Symbol
+8. Symbol Guard
+9. News Guard
+10. Telegram
+11. Backup & Recovery
+12. Diagnostics
+```
+
+---
+
+## 4. 檔案佈局
+
+```
+repo_root\
+├── AGENTS.md              ← 本檔
+├── MQL5\
+│   ├── Experts\           ← .mq5 源碼（唯一真相）
+│   ├── Include\           ← .mqh 共用模組
+│   └── Profiles\Tester\   ← .set 參數檔
+├── MQL4\
+│   ├── Experts\           ← .mq4 源碼
+│   └── Include\
+├── ea-test-kit\           ← 編譯 + 回測自動化
+├── build\                 ← 編譯 log（gitignore）
+├── runs\                  ← tester ini（gitignore）
+└── reports\               ← 回測報告（gitignore）
+```
+
+**硬規則**：永遠改 repo 內 `MQL5\Experts\` / `MQL4\Experts\`，再由 `ea-test-kit\scripts` 部署到 terminal 數據夾。**永不直接編輯 terminal 數據夾內的 `.mq5` / `.mq4`**。
+
+---
+
+## 5. 改名／重構程序（Refactor Procedure）
+
+改名會令 `.set` 失效、令掛住的圖表 reset，所以必須按序做：
+
+1. **盤點**：列出全部 `input`（名 / 類型 / 預設 / comment），存成 `specs\<EA>_inputs_before.md`。
+2. **出對照表**：舊名 → 新名 → 新 comment → 新 group → 新次序，交用戶確認。**未確認唔准動手**。
+3. **備份現值**：若任何 `.set` 引用此 EA，或任何圖表掛住此 EA，先抄出全部參數值，存成 `specs\<EA>_values_before.md`；並記錄 `MQL5\Profiles\Charts\*\*.chr` 命中清單。
+4. **改名**：一次性替換宣告 + 全部引用點（用 word-boundary 正則，如 `\bOldName\b`），確認引用數＝改動數。
+5. **重排**：按第 3 節次序重寫 input 區塊，刪除全部假分隔字串。
+6. **編譯**：`ea-test-kit` 編譯，必須 `0 errors, 0 warnings`。
+7. **回填值**：把步驟 3 抄出的值套回新 `.set`，並重新掛圖表確認參數正確。
+8. **出改動摘要**：列出改名數、新增/刪除數、group 變動、編譯結果。
+
+**每次只做一個維度**：改名就只改名，唔順便改邏輯、唔順便改版面。
+
+---
+
+## 6. 版本與交付
+
+- 版本號四處鎖步：`#property version`、`#property description`、`STARTED` 啟動 banner、對外說明文件。
+- MT4 與 MT5 版本**同名同版本**：參數名、group、次序、預設值全部一致；平台差異（如 WebRequest / DLL）寫在對應註解，不反映在參數名。
+- 交付物：`.mq4/.mq5` 源碼 + 編譯後 `.ex4/.ex5` + `README` + 改動摘要。
+
+---
+
+## 7. 禁止事項
+
+- 未經用戶確認，不得改動入金／手數／加倉層數／SL-TP 計算／風控邏輯。
+- 不得把帳號號碼、token、密碼寫入源碼或 commit（token 只放 `MQL5\Files\tg_token.txt`，且列入 `.gitignore`）。
+- 不得在同一 commit 混入「改名 + 邏輯修改」。
+- 不得刪除既有 input（見 2.8）。
+- 不得用假分隔字串扮 group。
+
+---
+
+## 8. 驗證
+
+```powershell
+# 編譯
+powershell -File ea-test-kit\scripts\compile_all.py
+
+# 單檔
+powershell -File scripts\compile.ps1 -File src\MyEA.mq5
+```
+
+- 編譯必須 `0 errors, 0 warnings`（警告只可接受為改動前已存在，並要在摘要列明）。
+- 交付前自檢：`grep -c '^input group'` 與 `grep -cE '^input '` 對得上；無 `___` 字串；無未註解 input。
