@@ -1,0 +1,269 @@
+diff --git a/scripts/copytrade_v13/ingest.py b/scripts/copytrade_v13/ingest.py
+index 21cdf2972..0f949af10 100644
+--- a/scripts/copytrade_v13/ingest.py
++++ b/scripts/copytrade_v13/ingest.py
+@@ -118,34 +118,75 @@ def _qc_flag(t, verify_fn):
+         return "MISSING_SPEC"
+ 
+ 
+-def ingest(conn: sqlite3.Connection, paths, verify_fn=None):
++def ingest(conn: sqlite3.Connection, paths, verify_fn=None, replace_cycles: bool = True):
+     """CSV→trades/cycles/layers 三表入庫；verify_fn 做兩式交叉驗證（§6.3，有 specs 先跑）。
+ 
++    Idempotent (OC dispatch 2026-11-24 21:15): ``trades`` upserts on its natural
++    key and ``cycles`` on ``(signal_id, symbol, direction, open_time)``, so
++    re-running the same CSV does not double the table. Before this the module
++    used plain ``INSERT`` and a second run duplicated 271 rows into 542.
++
++    ``layers`` is rewritten per cycle (``replace_cycles=True``) rather than
++    upserted row by row: a CSV refresh can change a layer's ``lots`` or ``pnl``,
++    and the layer count can shrink, so stale rows would otherwise linger.
++
++    ``source_row`` is stored but takes no part in the key — a refreshed export
++    shifts row numbers, and keying on them would resurrect the old rows.
++
+     D4 性能：trades／layers 改 executemany 批次（26 萬筆全量逐句 INSERT 係瓶頸）。
+     """
+     n_tr = n_cy = n_ly = 0
++    inserted_tr = updated_tr = 0
+     for pi, p in enumerate(paths, 1):
+         trades = load_signal_csv(p)
+         cycles = group_cycles(trades)
+-        conn.executemany(
+-            "INSERT INTO trades(signal_id,symbol,typ,lots,open_time,close_time,open_price,"
+-            "close_price,net_pips,net_profit,max_profit,max_loss,magic,comment,source_file,"
+-            "source_row,qc_flag) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+-            [(t["signal_id"], t["symbol"], t["typ"], t["lots"], t["open_time"], t["close_time"],
+-              t["open_price"], t["close_price"], t["net_pips"], t["net_profit"], t["max_profit"],
+-              t["max_loss"], t["magic"], t["comment"], t["source_file"], t["source_row"],
+-              _qc_flag(t, verify_fn)) for t in trades])
++        # Trades: upsert on the full content key. `changes` tells us insert (1)
++        # vs update (0) so the caller sees real growth, not row count.
++        before = conn.total_changes
++        for t in trades:
++            cur = conn.execute(
++                "INSERT INTO trades(signal_id,symbol,typ,lots,open_time,close_time,"
++                "open_price,close_price,net_pips,net_profit,max_profit,max_loss,"
++                "magic,comment,source_file,source_row,qc_flag) "
++                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
++                "ON CONFLICT(signal_id,symbol,typ,lots,open_time,close_time,"
++                "open_price,close_price,net_pips,net_profit,max_profit,max_loss,"
++                "magic,comment) DO UPDATE SET "
++                "source_file=excluded.source_file, source_row=excluded.source_row,"
++                "qc_flag=excluded.qc_flag",
++                (t["signal_id"], t["symbol"], t["typ"], t["lots"], t["open_time"],
++                 t["close_time"], t["open_price"], t["close_price"], t["net_pips"],
++                 t["net_profit"], t["max_profit"], t["max_loss"], t["magic"],
++                 t["comment"], t["source_file"], t["source_row"],
++                 _qc_flag(t, verify_fn)))
++            inserted_tr += cur.rowcount
++        updated_tr += len(trades) - (conn.total_changes - before)
+         n_tr += len(trades)
+         for c in cycles:
+-            cur = conn.execute(
+-                "INSERT INTO cycles(signal_id,symbol,direction,open_time,close_time,layers_n,"
+-                "lots_total,pnl_total,data_grade) VALUES(?,?,?,?,?,?,?,?,?)",
+-                (c["signal_id"], c["symbol"], c["direction"], c["open_time"], c["close_time"],
+-                 c["layers_n"], c["lots_total"], c["pnl_total"], c["data_grade"]))
+-            cid = cur.lastrowid
++            # Cycles: upsert on the identity key so an extended cycle updates
++            # in place instead of spawning a second row.
++            row = conn.execute(
++                "INSERT INTO cycles(signal_id,symbol,direction,open_time,close_time,"
++                "layers_n,lots_total,pnl_total,data_grade) VALUES(?,?,?,?,?,?,?,?,?) "
++                "ON CONFLICT(signal_id,symbol,direction,open_time) DO UPDATE SET "
++                "close_time=excluded.close_time, layers_n=excluded.layers_n,"
++                "lots_total=excluded.lots_total, pnl_total=excluded.pnl_total,"
++                "data_grade=excluded.data_grade "
++                "RETURNING cycle_id",
++                (c["signal_id"], c["symbol"], c["direction"], c["open_time"],
++                 c["close_time"], c["layers_n"], c["lots_total"], c["pnl_total"],
++                 c["data_grade"]),
++            ).fetchone()
++            cid = row[0]
++            if replace_cycles:
++                conn.execute("DELETE FROM layers WHERE cycle_id=?", (cid,))
+             conn.executemany(
+                 "INSERT INTO layers(cycle_id,layer_no,lots,open_time,open_price,pnl,lots_cum)"
+-                " VALUES(?,?,?,?,?,?,?)",
++                " VALUES(?,?,?,?,?,?,?) "
++                "ON CONFLICT(cycle_id, layer_no) DO UPDATE SET "
++                "lots=excluded.lots, open_time=excluded.open_time,"
++                "open_price=excluded.open_price, pnl=excluded.pnl,"
++                "lots_cum=excluded.lots_cum",
+                 [(cid, L["layer_no"], L["lots"], L["open_time"], L["open_price"],
+                   L["net_profit"], L["lots_cum"]) for L in c["layers"]])
+             n_ly += len(c["layers"])
+diff --git a/scripts/copytrade_v13/schema.py b/scripts/copytrade_v13/schema.py
+index dbc7b399f..293454925 100644
+--- a/scripts/copytrade_v13/schema.py
++++ b/scripts/copytrade_v13/schema.py
+@@ -147,6 +147,161 @@ DDL = [
+     )""",
+ ]
+ 
++# Natural keys for the three ingestion tables (OC dispatch 2026-11-24 21:15).
++#
++# Before this existed ``ingest()`` used plain ``INSERT``, so every ``--all`` run
++# re-inserted the same rows: one file ingested twice produced 271 → 542 trades
++# and 542 cycles in isolation. The key is content-based (never ``source_row``)
++# because a refreshed CSV shifts row numbers, which would resurrect the old
++# rows as "new" ones.
++#
++# ``cycles`` deliberately keys on ``(signal_id, symbol, direction, open_time)``
++# rather than the full content: a CSV refresh can extend a still-open cycle, and
++# that must UPDATE the existing row (layers_n / lots_total / pnl_total) instead
++# of inserting a second copy.
++NATURAL_KEYS = [
++    (
++        "ux_trades_natural",
++        "trades",
++        ("signal_id", "symbol", "typ", "lots", "open_time", "close_time",
++         "open_price", "close_price", "net_pips", "net_profit",
++         "max_profit", "max_loss", "magic", "comment"),
++    ),
++    (
++        "ux_cycles_natural",
++        "cycles",
++        ("signal_id", "symbol", "direction", "open_time"),
++    ),
++]
++
++#: Audit trail for collapsed duplicates — the dispatch asks for "安全剔重、留審計".
++DEDUPE_LOG_DDL = """CREATE TABLE IF NOT EXISTS dedupe_log (
++    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
++    ran_at TEXT NOT NULL,
++    table_name TEXT NOT NULL,
++    kept_id INTEGER NOT NULL,
++    dropped_ids TEXT NOT NULL,
++    dropped_rows INTEGER NOT NULL,
++    note TEXT
++)"""
++
++
++def _table_exists(conn, name: str) -> bool:
++    row = conn.execute(
++        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
++    ).fetchone()
++    return row is not None
++
++
++def index_exists(conn, name: str) -> bool:
++    row = conn.execute(
++        "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?", (name,)
++    ).fetchone()
++    return row is not None
++
++
++def _collapse_duplicates(conn, table: str, cols, note: str = "") -> int:
++    """Keep the lowest rowid per natural key, log one audit row per table.
++
++    Returns the number of rows removed. Idempotent: a second call removes 0.
++
++    The audit row records how many rows went and up to 200 of the dropped ids —
++    enough to reconstruct what happened without making ``dedupe_log`` bigger
++    than the tables it describes.
++    """
++    if not _table_exists(conn, table):
++        return 0
++    pk = "trade_id" if table == "trades" else "cycle_id"
++    col_sql = ", ".join(cols)
++    groups = conn.execute(
++        f"SELECT {col_sql}, COUNT(*) AS n, MIN({pk}) AS keep_id, "
++        f"GROUP_CONCAT({pk}) AS ids FROM {table} "
++        f"GROUP BY {col_sql} HAVING n > 1"
++    ).fetchall()
++    if not groups:
++        return 0
++    from datetime import datetime, timezone
++
++    ran_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++    dropped = 0
++    all_doomed: list = []
++    kept_ids: list = []
++    for g in groups:
++        keep_id = g[len(cols) + 1]
++        ids = [int(x) for x in str(g[len(cols) + 2]).split(",")]
++        doomed = [i for i in ids if i != keep_id]
++        if not doomed:
++            continue
++        placeholders = ",".join("?" * len(doomed))
++        conn.execute(f"DELETE FROM {table} WHERE {pk} IN ({placeholders})", doomed)
++        all_doomed.extend(doomed)
++        kept_ids.append(keep_id)
++        dropped += len(doomed)
++    if dropped:
++        sample = ",".join(str(i) for i in all_doomed[:200])
++        if len(all_doomed) > 200:
++            sample += f",...(+{len(all_doomed) - 200} more)"
++        conn.execute(
++            "INSERT INTO dedupe_log(ran_at, table_name, kept_id, dropped_ids,"
++            " dropped_rows, note) VALUES(?,?,?,?,?,?)",
++            (ran_at, table, kept_ids[0] if len(kept_ids) == 1 else -1, sample,
++             dropped, (note + f" [groups={len(groups)}]").strip()),
++        )
++    return dropped
++
++
++def dedupe_all(conn, note: str = "") -> dict:
++    """Collapse duplicates in trades/cycles/layers, returning per-table counts.
++
++    ``layers`` needs no natural-key index (its PK is already
++    ``(cycle_id, layer_no)``), but orphan layers must go when a cycle row is
++    dropped — that is handled here rather than by SQLite cascade, because the
++    schema has no ``ON DELETE CASCADE`` and changing that would rewrite the
++    table.
++    """
++    conn.execute(DEDUPE_LOG_DDL)
++    removed = {
++        "trades": _collapse_duplicates(conn, "trades", NATURAL_KEYS[0][2], note),
++        "cycles": _collapse_duplicates(conn, "cycles", NATURAL_KEYS[1][2], note),
++    }
++    # Orphan layers (their cycle no longer exists).
++    if _table_exists(conn, "layers"):
++        cur = conn.execute(
++            "DELETE FROM layers WHERE cycle_id NOT IN (SELECT cycle_id FROM cycles)"
++        )
++        removed["orphan_layers"] = cur.rowcount
++    conn.commit()
++    return removed
++
++
++def ensure_natural_keys(conn, allow_dedupe: bool = True) -> dict:
++    """Create the unique natural-key indexes, collapsing duplicates first.
++
++    A unique index cannot be created over a table that still holds duplicates,
++    so ``allow_dedupe=True`` (the default) clears them first and records every
++    collapse in ``dedupe_log``. With ``allow_dedupe=False`` the function instead
++    reports what *would* be collapsed and raises, letting an operator inspect
++    before anything is deleted.
++    """
++    report = {}
++    conn.execute(DEDUPE_LOG_DDL)
++    for name, table, cols in NATURAL_KEYS:
++        if index_exists(conn, name) or not _table_exists(conn, table):
++            report[name] = "already"
++            continue
++        dupes = _collapse_duplicates(conn, table, cols, note="ensure_natural_keys")
++        if dupes and not allow_dedupe:
++            raise RuntimeError(
++                f"{table}: {dupes} duplicate row(s) must be collapsed before the "
++                f"unique index {name} can be created; re-run init_db() (which "
++                f"dedupes and logs to dedupe_log) or call dedupe_all() first."
++            )
++        cols_sql = ", ".join(cols)
++        conn.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS {name} ON {table}({cols_sql})")
++        report[name] = "created" if not dupes else f"created_after_dropping_{dupes}"
++    conn.commit()
++    return report
++
+ 
+ def init_db(conn):
+     """建九張表（冪等）＋ copy_sims v1.3.1 四欄遷移（D3 補完：§11.6 avg_win/avg_loss/layers_filtered/monthly_pnl）。"""
+@@ -162,4 +317,6 @@ def init_db(conn):
+     have_sym = {r[1] for r in conn.execute("PRAGMA table_info(symbols)")}
+     if "fx_at_export" not in have_sym:
+         conn.execute("ALTER TABLE symbols ADD COLUMN fx_at_export REAL")
++    # v1.3.3（OC 2026-11-24 21:15）：自然鍵唯一索引——冪等入庫的前提。
++    ensure_natural_keys(conn)
+     conn.commit()
