@@ -25,9 +25,13 @@ from engine.m1_aggregation import (
     usable_buckets,
 )
 
-MT4_HISTORY = (
+# Path is overridable so the suite is a real gate on both the Windows clone and
+# the WSL box (OpenClaw review 2026-11-24 14:10, note a): a hard-coded Windows
+# path silently skips the broker cross-check everywhere else.
+MT4_HISTORY = os.environ.get(
+    "M1_HISTORY_DIR",
     r"C:\Users\alvin\AppData\Roaming\MetaQuotes\Terminal"
-    r"\50CA3DFB510CC5A8F28B48D1BF2A5702\history\Alpari-Pro.ECN-Demo"
+    r"\50CA3DFB510CC5A8F28B48D1BF2A5702\history\Alpari-Pro.ECN-Demo",
 )
 HAVE_HISTORY = os.path.isdir(MT4_HISTORY)
 
