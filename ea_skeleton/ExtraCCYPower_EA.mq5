@@ -14,20 +14,21 @@
 //|  Nothing is silently defaulted to a trading decision.            |
 //+------------------------------------------------------------------+
 #property copyright "ZCODE for Alvin"
-#property version   "1.01"
+#property version   "1.02"
 #property description "MT5 EA skeleton: input frame, risk hooks, logging, lot sizing, backtest entry. No strategy logic."
 
 //--- version string used by the STARTED banner; keep in lock-step with
 //--- #property version above and with the README (AGENTS.md section 6).
-#define EA_VERSION "1.01"
+#define EA_VERSION "1.02"
 
 //--- card #41: risk guards must default OFF (REQUIREMENT 2.4 / acceptance A3)
 //--- Group names and relative order follow ea-repo AGENTS.md section 3 for the
 //--- groups that carry inputs. Groups with no input are NOT declared
 //--- (OC ruling 2026-11-23 21:05, item D1: "有 input 先開組").
-//--- "Lot Sizing" and "Backtest" are not among the section 3 twelve groups;
-//--- they are kept at their original name and position pending the owner's
-//--- verdict (AGENTS.md section 2.3: a new group must be approved).
+//--- Owner ruling 2026-11-24 08:15 (via OC 0825 item D1): "Lot Sizing" and
+//--- "Backtest" are group 13 and 14, i.e. they come AFTER "Diagnostics".
+//--- They therefore now sit in section 3 order instead of the placeholder
+//--- positions they held while the names were still awaiting approval.
 
 input group "General"
 input string InpEaName          = "ExtraCCYPower_EA";  // EA identity string (O1)
@@ -35,12 +36,6 @@ input long   InpMagicNumber     = 241123;              // Magic number; 0 = disa
 input string InpLogBaseName     = "ExtraCCYPower_EA";  // Log file base name, no extension
 input string InpWorkSymbol      = "";                  // Working symbol; empty = chart symbol
 input ENUM_TIMEFRAMES InpWorkTimeframe = PERIOD_CURRENT; // Working timeframe; CURRENT = chart
-
-input group "Lot Sizing"
-input double InpBaseLot         = 0.01;                // Base lot for the first layer (lots)
-input double InpLotMultiplier   = 1.00;                // Lot multiplier per layer; 1.00 = flat
-input int    InpMaxLayers       = 1;                   // Max layers allowed (count); 1 = single
-input double InpMaxLotTotal     = 0.00;                // Max total lots overall (lots); 0.00 = off
 
 input group "DD Guard — Account"
 input bool   InpDdGuardEnable   = false;               // Enable account drawdown guard
@@ -60,6 +55,12 @@ input group "Diagnostics"
 input bool   InpLogToFile       = true;                // Write CSV log to MQL5/Files
 input bool   InpLogHeartbeat    = false;               // Print heartbeat line on tick
 input int    InpHeartbeatSeconds = 3600;               // Heartbeat interval (sec); 0 = off
+
+input group "Lot Sizing"
+input double InpBaseLot         = 0.01;                // Base lot for the first layer (lots)
+input double InpLotMultiplier   = 1.00;                // Lot multiplier per layer; 1.00 = flat
+input int    InpMaxLayers       = 1;                   // Max layers allowed (count); 1 = single
+input double InpMaxLotTotal     = 0.00;                // Max total lots overall (lots); 0.00 = off
 
 input group "Backtest"
 input bool   InpTesterSummary   = true;                // Write tester summary CSV in OnTester
@@ -304,8 +305,6 @@ void PrintMissingItems()
    Print("MISSING: O4 - acceptance thresholds (backtest numbers) not settled by owner");
    Print("MISSING: G3 - group names now follow ea-repo AGENTS.md section 3 for the groups");
    Print("MISSING: G3 - that carry inputs; groups without inputs are not declared (OC 21:05 D1).");
-   Print("MISSING: G3 - 'Lot Sizing' and 'Backtest' are not among the twelve section 3 groups");
-   Print("MISSING: G3 - and stay pending the owner's verdict (AGENTS.md section 2.3).");
 
    if(InpNewsGuardEnable && InpNewsBlockMinutes > 0)
       Print("MISSING: O2 - news guard requested but no news source is bound in the skeleton");
