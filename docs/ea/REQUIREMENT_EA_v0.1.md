@@ -1,5 +1,5 @@
 # REQUIREMENT — EA 開發需求書 v0.1（MT5 先行）
-n- **已被 v0.2 取代（2026-11-24）**：O1–O4 已決，見 docs/ea/REQUIREMENT_EA_v0.2.md
+- **已被 v0.2 取代（2026-11-24）**：O1–O4 已決，見 docs/ea/REQUIREMENT_EA_v0.2.md
 
 - 版本：v0.1（2026-11-17 20:25 HKT）
 - 狀態：**OPEN — 5 項中 3 項待補，見第 3 節「未決清單」**
