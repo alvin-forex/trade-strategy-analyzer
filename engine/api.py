@@ -76,6 +76,17 @@ def _resolve_label(value: Optional[str], default: Optional[str] = None) -> Optio
     return f"{date}T00:00"
 
 
+def _dedupe_sorted(bars: Sequence[Bar]) -> List[Bar]:
+    """Sort by time label, keeping the last bar for each duplicated timestamp."""
+    out: List[Bar] = []
+    for b in sorted(bars, key=lambda x: x.time_label):
+        if out and out[-1].time_label == b.time_label:
+            out[-1] = b
+        else:
+            out.append(b)
+    return out
+
+
 def _bars_payload(bars: Sequence[Bar]) -> List[Dict[str, Any]]:
     return [
         {
@@ -143,30 +154,24 @@ def _window(
             bars, sym = csv_source.fetch_bars(bars_csv, None, None, meta_path=meta_in)
             bars = bars[-int(past_bars) :]
         else:
-            from .sources import mt5_source
-
-            mt5_source.connect()
-            sym = mt5_source.symbol_meta(symbol)
-            tf_const = mt5_source.TIMEFRAMES.get(tf)
-            if tf_const is None:
-                return None, None, _err(E_BAD_ARG, f"unsupported timeframe {tf}")
-            mt5 = mt5_source._mt5()  # noqa: SLF001 - intentional thin reuse
-            rates = mt5.copy_rates_from_pos(symbol, getattr(mt5, f"TIMEFRAME_{tf}"), 0, int(past_bars))
-            if rates is None:
-                return None, sym, _err(E_NO_DATA, f"copy_rates_from_pos returned None: {mt5.last_error()}")
-            bars = []
-            for row in rates:
-                label = dt.datetime.fromtimestamp(int(row["time"]), dt.timezone.utc)
-                bars.append(
-                    Bar(
-                        time_label=label.strftime("%Y-%m-%dT%H:%M"),
-                        open=float(row["open"]),
-                        high=float(row["high"]),
-                        low=float(row["low"]),
-                        close=float(row["close"]),
-                        tick_volume=int(row["tick_volume"]),
-                    )
-                )
+            # copy_rates_from_pos(..., 0, N) is banned: it can return rows whose
+            # timestamps do not line up with the requested window (OC 11-19).
+            # Fetch a wide window through copy_rates_range (which _load uses),
+            # then trim to the last N. Labels are built from the UTC clock so
+            # the tz-aware rule in mt5_source holds.
+            tf_minutes = int(mt5_source.TIMEFRAMES[tf])
+            end_dt = dt.datetime.now(dt.timezone.utc)
+            span_minutes = max(tf_minutes * int(past_bars) * 2, tf_minutes * 100)
+            start_dt = end_dt - dt.timedelta(minutes=span_minutes)
+            start_label = start_dt.strftime("%Y-%m-%dT%H:%M")
+            end_label = end_dt.strftime("%Y-%m-%dT%H:%M")
+            try:
+                bars, sym = _load(symbol, tf, start_label, end_label, None, None)
+            except Exception as exc:  # MT5Error, ValueError
+                return None, None, _err(E_NO_TERMINAL, str(exc))
+            if not bars:
+                return None, sym, _err(E_NO_DATA, "copy_rates_range returned no bars")
+            bars = _dedupe_sorted(bars)[-int(past_bars) :]
         if not bars:
             return None, sym, _err(E_NO_DATA, "no bars returned")
         return bars, sym, None
