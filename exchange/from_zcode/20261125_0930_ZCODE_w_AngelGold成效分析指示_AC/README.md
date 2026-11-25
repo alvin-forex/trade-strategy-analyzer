@@ -124,6 +124,22 @@ c1 < g_sma 且 g_sma < 前 6 根 SMA 均值 且 RSI<50 → −1（空）
 
 ---
 
+## 七、老闆 09:27 裁示：本單交 OC 轉 AC 做；ZCODE 停止自行跟進（09:30 補記）
+
+老闆 09:27 明確：「58 透過 OC 俾 AC 做，可提佢不要重複」。即係：
+
+- **ZCODE 本機 lane 停止自行跟進呢單**，唔再當自己做交付方；供料信（本檔）＋ PR #58 由 OC 接收後**轉交 AC** 執行，最終報告仍由 AC 出。
+- **請 OC 轉告 AC：以下三項 ZCODE 已做過，唔好重複掘／重算**，直接由 A1 補源開始：
+  1. **本機數據源盤點已完成**（§1）：AngelGold magic `20260919/20260920` 全 repo／terminal 零命中；無 MT4/MT5 statement；`data/copytrade.db` 不存在；`account_monitor.db` 只有 Vantage Live 11（magic 12345、comment `CCY Power`），非 AngelGold。AC 唔使再喺本機重搵一次。
+  2. **3 份 sample trades 已清洗並算好統計**（§二，共 6,426 筆，已剔 balance 行）：#13732 4,978 筆 WR 60.4%／PF 1.04／MDD −16,197；#17962 547 筆 WR 90.7%／PF 2.70；#14581 901 筆 WR 71.1%／PF 1.47；連蝕／時段／品種／方向弱點已列。AC 可直接引用，唔好重算。
+  3. **AngelGold v4.17 源碼已拆**（§三）：44 input、SMA20+RSI bias、SL 1.8/1.6 ATR、TP1 1.5／TP2 3.0 ATR、`RiskPercent=5` 係按金 % 唔係風險 %、5 個假設 H1–H5。AC 唔使再逐行讀 1,188 行源碼。
+- AC 第一步應該係 **A1 補源**：由 AC 部機／VPS／broker 後台 export AngelGold H1+M15（magic 20260919/20）嘅 demo/sim statement；本機 lane 無呢啲資料，再掘都係零。
+- ⚠️ **PR #58 未 merge 則 OC watcher 睇唔到本檔**（notify 喺 PR 分支）。要 OC 收到，請老闆 merge #58，或由 OC 直接講一聲我補落 `origin/main`。
+
+— ZCODE（本機 lane）2026-11-25 09:30 HKT（依老闆 09:27 裁示補記）
+
+---
+
 ## 六、我唔做嘅嘢（紀律）
 
 - 唔冒充 AC 交貨（派工對象係 AC）；本信只供料＋指示，最終報告由 AC 出。
