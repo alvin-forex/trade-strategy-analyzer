@@ -253,6 +253,81 @@ def write_outputs(result: MatrixResult, out_dir: str) -> Dict[str, str]:
     return paths
 
 
+def pip_size_for_symbol(symbol: str) -> float:
+    """Conventional pip size by quote, for the 29-symbol default universe.
+
+    OC's 2026-11-25 18:15 supply note requires per-symbol pip size: JPY-quoted
+    pairs and XAUUSD use 0.01, all others 0.0001. A single global ``--pip-size``
+    must never be applied to all 29 symbols -- it silently mis-scales the JPY
+    and gold step distances against the wave bands.
+    """
+    s = symbol.upper()
+    if s.endswith("JPY") or s.startswith("XAU"):
+        return 0.01
+    return 0.0001
+
+
+def load_step_pips(path: str) -> Dict[str, float]:
+    """Load OC's step-pips supply: a JSON mapping or a CSV with symbol + step.
+
+    JSON is the direct shape for ``scan_matrix(step_pips_by_symbol=...)``. CSV
+    accepts either ``step_pips_median`` or ``suggest_rounded`` so both columns
+    of OC's supply file can be used without preprocessing.
+    """
+    if path.lower().endswith(".json"):
+        with open(path, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+        return {str(k): float(v) for k, v in raw.items()}
+    out: Dict[str, float] = {}
+    with open(path, "r", encoding="utf-8-sig", newline="") as fh:
+        for row in csv.DictReader(fh):
+            sym = (row.get("symbol") or "").strip()
+            if not sym:
+                continue
+            val = row.get("step_pips_median") or row.get("suggest_rounded") or row.get("step_pips")
+            if val not in (None, ""):
+                out[sym] = float(val)
+    return out
+
+
+def load_pip_sizes(path: Optional[str], symbols: Sequence[str]) -> Dict[str, float]:
+    """Per-symbol pip sizes: explicit JSON when given, else the quote rule."""
+    if path:
+        with open(path, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+        return {s: float(raw[s]) for s in symbols if s in raw}
+    return {s: pip_size_for_symbol(s) for s in symbols}
+
+
+def hst_bars_loader(
+    history_dir: str,
+    tf_suffix: Optional[Mapping[str, str]] = None,
+) -> BarsLoader:
+    """Build a loader over MT4 ``<SYMBOL><suffix>.hst`` files.
+
+    ``tf_suffix`` maps a canonical TF (``M5``) to the HST filename suffix
+    (``5``). When a symbol/timeframe file is absent the loader returns no bars
+    and the matrix records ``NO_DATA`` for that cell rather than crashing.
+    """
+    from .hst_reader import load_hst_bars
+
+    suffixes = dict(tf_suffix or {
+        "M1": "1", "M5": "5", "M15": "15", "M30": "30",
+        "H1": "60", "H4": "240", "D1": "1440",
+    })
+
+    def load(symbol: str, tf: str) -> Sequence[Bar]:
+        suffix = suffixes.get(tf)
+        if suffix is None:
+            return []
+        path = os.path.join(history_dir, f"{symbol}{suffix}.hst")
+        if not os.path.exists(path):
+            return []
+        return load_hst_bars(path)
+
+    return load
+
+
 def csv_bars_loader(directory: str) -> BarsLoader:
     """Build a loader over ``<symbol>_<tf>.csv`` files in ``directory``."""
     def load(symbol: str, tf: str) -> Sequence[Bar]:
@@ -263,25 +338,49 @@ def csv_bars_loader(directory: str) -> BarsLoader:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Scan the pair x timeframe fit matrix")
-    parser.add_argument("--bars-dir", required=True, help="directory of <SYMBOL>_<TF>.csv bars")
+    src = parser.add_mutually_exclusive_group(required=True)
+    src.add_argument("--bars-dir", help="directory of <SYMBOL>_<TF>.csv bars")
+    src.add_argument("--history-dir", help="MT4 directory of <SYMBOL><suffix>.hst files")
     parser.add_argument("--out", required=True, help="output directory")
     parser.add_argument("--pairs", default=",".join(DEFAULT_PAIRS))
     parser.add_argument("--tfs", default=",".join(DEFAULT_TFS))
     parser.add_argument("--years", type=int, default=fit.DEFAULT_YEARS)
-    parser.add_argument("--pip-size", type=float, default=0.0001)
-    parser.add_argument("--step-pips", type=float, default=None)
+    parser.add_argument("--pip-size", type=float, default=None,
+                        help="legacy global pip size (overrides per-symbol rule for all)")
+    parser.add_argument("--pip-sizes", default=None,
+                        help="optional JSON {symbol: pip_size}; else inferred by quote")
+    parser.add_argument("--step-pips", type=float, default=None,
+                        help="legacy global step pips (overrides the per-symbol file)")
+    parser.add_argument("--step-pips-file", default=None,
+                        help="OC supply: step_pips_by_symbol.json or .csv")
     args = parser.parse_args(argv)
 
     pairs = [p.strip() for p in args.pairs.split(",") if p.strip()]
     tfs = [t.strip() for t in args.tfs.split(",") if t.strip()]
+    steps = load_step_pips(args.step_pips_file) if args.step_pips_file else {}
+    if args.step_pips is not None:
+        steps = {s: args.step_pips for s in pairs}
+    pips = load_pip_sizes(args.pip_sizes, pairs)
+    if args.pip_size is not None:
+        pips = {s: args.pip_size for s in pairs}
+
+    if args.bars_dir:
+        loader = csv_bars_loader(args.bars_dir)
+    else:
+        loader = hst_bars_loader(args.history_dir)
+
     result = scan_matrix(
         pairs, tfs,
         years=args.years,
-        default_pip_size=args.pip_size,
-        default_step_pips=args.step_pips,
-        bars_loader=csv_bars_loader(args.bars_dir),
+        pip_size_by_symbol=pips,
+        step_pips_by_symbol=steps,
+        bars_loader=loader,
     )
     paths = write_outputs(result, args.out)
+    print(f"rows={len(result.rows)} signals={len(result.signals)} errors={len(result.errors)}")
+    for path in paths.values():
+        print(path)
+    return 0
     print(f"rows={len(result.rows)} signals={len(result.signals)} errors={len(result.errors)}")
     for path in paths.values():
         print(path)
