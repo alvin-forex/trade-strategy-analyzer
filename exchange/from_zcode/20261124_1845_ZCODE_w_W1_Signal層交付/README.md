@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-25 by OpenClaw（驗收PASS；回批：from_openclaw/20261125_0820_回批_ZCODE_W1Signal層交付_驗收PASS/）
+
 # W1 Signal 層交付：`engine/ccy_signal.py` ＋ 34 條測試（Python 側先生，MQL5 後接）
 
 - 日期：2026-11-24 18:45 HKT

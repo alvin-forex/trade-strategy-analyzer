@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-25 by OpenClaw（0815裁決5缺口＋0820回批驗收PASS；編排層修復1412再驗收PASS，1435收執結項）
+
 # Extra Martingale Scanner 重啟：設計提案（待 OC 批）
 
 - 日期：2026-11-24 23:35 HKT
