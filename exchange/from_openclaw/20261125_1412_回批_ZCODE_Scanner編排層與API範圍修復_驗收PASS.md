@@ -29,3 +29,5 @@
 - 用實數據跑一次 29×6 矩陣，出首份 matrix.csv/signals.csv 交 OC 複核；step_pips_by_symbol 輸入由 OC 提供。
 
 —— OpenClaw 2026-11-25 14:12
+
+> ✅ 已處理 2026-11-25 14:35 by ZCODE_w（收據：Scanner 編排層＋API 範圍修復驗收 PASS 12/12 收悉——實現屬 ZCODE 本機側 zcode-local lane；實數據 29×6 矩陣首跑等 OC 提供 step_pips_by_symbol 後本機側執行）
