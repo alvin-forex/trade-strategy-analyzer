@@ -4,17 +4,17 @@
 - 卡片：`#41 [S4] MT5 EA 骨架（等老闆 O1–O4 策略規格）`
 - 落點：TSA repo `ea_skeleton/`（OC 2026-11-23 21:05 裁決：`ea_skeleton/` 即本機工作位，ea-repo git 通道唔急開）
 - 產物：`ExtraCCYPower_EA.mq5`
-- **版本（目前）：v1.03**（策略填肉，SPEC v0.1／OC 2026-11-25 0815 裁決）——v1.00 PR #43 首版；v1.01 OC 21:05 丁節三裁決；v1.02 老闆 11-24 08:15 `Lot Sizing`／`Backtest` 排 §3 第 13／14 位；**v1.03＝按 SPEC v0.1 填 entry/exit：假突破 fade＋快慢 power 雙過濾、R=1×ATR(14)、SL=0.5R／TP=1R、日蝕 3R、CTrade 落單、外部 power CSV reader（A1）；三 Guard 仍預設 OFF**
+- **版本（目前）：v1.04**（v1.03b 補丁：日蝕 3R 熔斷接線；OC 2026-11-25 2038 FAIL 1/12 要求）——v1.00 PR #43 首版；v1.01 OC 21:05 丁節三裁決；v1.02 老闆 11-24 08:15 `Lot Sizing`／`Backtest` 排 §3 第 13／14 位；**v1.03＝按 SPEC v0.1 填 entry/exit：假突破 fade＋快慢 power 雙過濾、R=1×ATR(14)、SL=0.5R／TP=1R、日蝕 3R、CTrade 落單、外部 power CSV reader（A1）；三 Guard 仍預設 OFF**
 
-## 一、編譯（v1.03）
+## 一、編譯（v1.04）
 
 ```text
 $ MetaEditor64.exe /compile:...\MQL5\Experts\ExtraCCYPower_EA.mq5 /log
-Result: 0 errors, 0 warnings, 1327 ms elapsed, cpu='X64 Regular'
+Result: 0 errors, 0 warnings, 1355 ms elapsed, cpu='X64 Regular'
 ```
 
-- 817 行 / 29,862 bytes
-- sha256 `f730413cb9cb07e3aa5c37a8d7bc80eb25df3374d8c74b2b1377d3a3e5d11187`
+- 834 行 / 29,827 bytes
+- sha256 `fd70a657b62ddb69c42d19faa18c8e3892fc9672d858c49540491ddd733fcb1c`
 - 版本四處鎖步（AGENTS.md §6）：`#property version "1.03"`｜`#define EA_VERSION "1.03"`（banner 用）｜`#property description`（含 SPEC v0.1）｜本 README
 - §8 自檢：`^input ` 42 − `input group` 9 ＝ **33 真 input**（v1.02 既有 21 ＋ 新增 12：Signal 8＋Exit 4；OC 0815 明列 9 個必備 input 全數在內）；`___` 零命中
 
