@@ -118,34 +118,75 @@ def _qc_flag(t, verify_fn):
         return "MISSING_SPEC"
 
 
-def ingest(conn: sqlite3.Connection, paths, verify_fn=None):
+def ingest(conn: sqlite3.Connection, paths, verify_fn=None, replace_cycles: bool = True):
     """CSV→trades/cycles/layers 三表入庫；verify_fn 做兩式交叉驗證（§6.3，有 specs 先跑）。
+
+    Idempotent (OC dispatch 2026-11-24 21:15): ``trades`` upserts on its natural
+    key and ``cycles`` on ``(signal_id, symbol, direction, open_time)``, so
+    re-running the same CSV does not double the table. Before this the module
+    used plain ``INSERT`` and a second run duplicated 271 rows into 542.
+
+    ``layers`` is rewritten per cycle (``replace_cycles=True``) rather than
+    upserted row by row: a CSV refresh can change a layer's ``lots`` or ``pnl``,
+    and the layer count can shrink, so stale rows would otherwise linger.
+
+    ``source_row`` is stored but takes no part in the key — a refreshed export
+    shifts row numbers, and keying on them would resurrect the old rows.
 
     D4 性能：trades／layers 改 executemany 批次（26 萬筆全量逐句 INSERT 係瓶頸）。
     """
     n_tr = n_cy = n_ly = 0
+    inserted_tr = updated_tr = 0
     for pi, p in enumerate(paths, 1):
         trades = load_signal_csv(p)
         cycles = group_cycles(trades)
-        conn.executemany(
-            "INSERT INTO trades(signal_id,symbol,typ,lots,open_time,close_time,open_price,"
-            "close_price,net_pips,net_profit,max_profit,max_loss,magic,comment,source_file,"
-            "source_row,qc_flag) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            [(t["signal_id"], t["symbol"], t["typ"], t["lots"], t["open_time"], t["close_time"],
-              t["open_price"], t["close_price"], t["net_pips"], t["net_profit"], t["max_profit"],
-              t["max_loss"], t["magic"], t["comment"], t["source_file"], t["source_row"],
-              _qc_flag(t, verify_fn)) for t in trades])
+        # Trades: upsert on the full content key. `changes` tells us insert (1)
+        # vs update (0) so the caller sees real growth, not row count.
+        before = conn.total_changes
+        for t in trades:
+            cur = conn.execute(
+                "INSERT INTO trades(signal_id,symbol,typ,lots,open_time,close_time,"
+                "open_price,close_price,net_pips,net_profit,max_profit,max_loss,"
+                "magic,comment,source_file,source_row,qc_flag) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(signal_id,symbol,typ,lots,open_time,close_time,"
+                "open_price,close_price,net_pips,net_profit,max_profit,max_loss,"
+                "magic,comment) DO UPDATE SET "
+                "source_file=excluded.source_file, source_row=excluded.source_row,"
+                "qc_flag=excluded.qc_flag",
+                (t["signal_id"], t["symbol"], t["typ"], t["lots"], t["open_time"],
+                 t["close_time"], t["open_price"], t["close_price"], t["net_pips"],
+                 t["net_profit"], t["max_profit"], t["max_loss"], t["magic"],
+                 t["comment"], t["source_file"], t["source_row"],
+                 _qc_flag(t, verify_fn)))
+            inserted_tr += cur.rowcount
+        updated_tr += len(trades) - (conn.total_changes - before)
         n_tr += len(trades)
         for c in cycles:
-            cur = conn.execute(
-                "INSERT INTO cycles(signal_id,symbol,direction,open_time,close_time,layers_n,"
-                "lots_total,pnl_total,data_grade) VALUES(?,?,?,?,?,?,?,?,?)",
-                (c["signal_id"], c["symbol"], c["direction"], c["open_time"], c["close_time"],
-                 c["layers_n"], c["lots_total"], c["pnl_total"], c["data_grade"]))
-            cid = cur.lastrowid
+            # Cycles: upsert on the identity key so an extended cycle updates
+            # in place instead of spawning a second row.
+            row = conn.execute(
+                "INSERT INTO cycles(signal_id,symbol,direction,open_time,close_time,"
+                "layers_n,lots_total,pnl_total,data_grade) VALUES(?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(signal_id,symbol,direction,open_time) DO UPDATE SET "
+                "close_time=excluded.close_time, layers_n=excluded.layers_n,"
+                "lots_total=excluded.lots_total, pnl_total=excluded.pnl_total,"
+                "data_grade=excluded.data_grade "
+                "RETURNING cycle_id",
+                (c["signal_id"], c["symbol"], c["direction"], c["open_time"],
+                 c["close_time"], c["layers_n"], c["lots_total"], c["pnl_total"],
+                 c["data_grade"]),
+            ).fetchone()
+            cid = row[0]
+            if replace_cycles:
+                conn.execute("DELETE FROM layers WHERE cycle_id=?", (cid,))
             conn.executemany(
                 "INSERT INTO layers(cycle_id,layer_no,lots,open_time,open_price,pnl,lots_cum)"
-                " VALUES(?,?,?,?,?,?,?)",
+                " VALUES(?,?,?,?,?,?,?) "
+                "ON CONFLICT(cycle_id, layer_no) DO UPDATE SET "
+                "lots=excluded.lots, open_time=excluded.open_time,"
+                "open_price=excluded.open_price, pnl=excluded.pnl,"
+                "lots_cum=excluded.lots_cum",
                 [(cid, L["layer_no"], L["lots"], L["open_time"], L["open_price"],
                   L["net_profit"], L["lots_cum"]) for L in c["layers"]])
             n_ly += len(c["layers"])
