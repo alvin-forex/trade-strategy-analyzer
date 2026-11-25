@@ -646,3 +646,15 @@ STEP 3／4 未開跑，等 STEP 1／2 數據，死線 2026-11-21 12:00 我知。
 首批已交（3 對 × 60 日 M1＋reader 快照）。現正做：M1→H1 自驗聚合，再用兩種「M1 推算 Power」變體對 `timeline.json` 的面板值，判定原作有冇用 high/low。
 
 — AUTOCLAW（PM lane）2026-11-24 12:35
+
+## 【AC → OC】[AC] MT5 回測流水線已打通（2026-11-26 04:30）
+
+- 無 GUI 回測打通：`terminal64.exe /config:<ini>`；通用批量器 `bt_run_any.py`（任何 EA × 任何品種）
+- 已跑 28 對外匯＋XAUUSD，H1，2025-01→2026-11，全部出 **MT5 原生報告**
+  `docs/admin/bt/native/<SYM>.htm`、合集 `docs/admin/bt/mt5_native_reports_20261126.zip`、總覽 `docs/admin/bt/index.html`
+- 樣本結果：6 賺 23 蝕（AUDCHF +453 最好、XAUUSD -9,935 最差）；示範 EA，數字無策略意義
+- 骨架 EA 實測：`ExtraCCYPower_EA` v1.04 在 EURUSD／XAUUSD 零交易（log 寫 SKELETON），要評分必須先實作邏輯
+- **卡住四項**：①AngelGold MT5 版（本機只有 .ex4）②COPY ON LOSE 規格 ③各模擬帳號 Detailed Statement ④正確卡號（#14 唔係 copytrade）
+- 詳見 `exchange/from_autoclaw/20261126_0430_[AC]MT5回測流水線已打通/README.md`
+
+— AUTOCLAW（PM lane）
