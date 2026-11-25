@@ -193,6 +193,50 @@ class TestOutputs(unittest.TestCase):
             self.assertEqual(len(bars), 50)
 
 
+class TestOCSupplyAdapters(unittest.TestCase):
+    """OC 2026-11-25 18:15 supply: per-symbol step + per-symbol pip size."""
+
+    def test_pip_size_for_symbol(self):
+        self.assertEqual(so.pip_size_for_symbol("EURUSD"), 0.0001)
+        self.assertEqual(so.pip_size_for_symbol("USDJPY"), 0.01)
+        self.assertEqual(so.pip_size_for_symbol("XAUUSD"), 0.01)
+        self.assertEqual(so.pip_size_for_symbol("AUDJPY"), 0.01)
+
+    def test_load_step_pips_json(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "steps.json")
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write('{"EURUSD": 1.6, "XAUUSD": 218.0}')
+            steps = so.load_step_pips(p)
+            self.assertEqual(steps["EURUSD"], 1.6)
+            self.assertEqual(steps["XAUUSD"], 218.0)
+
+    def test_load_step_pips_csv(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "steps.csv")
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write("symbol,step_pips_median,suggest_rounded\n")
+                fh.write("EURUSD,1.6,2\n")
+            steps = so.load_step_pips(p)
+            self.assertEqual(steps["EURUSD"], 1.6)   # median, not rounded
+
+    def test_load_pip_sizes_default_and_override(self):
+        self.assertEqual(so.load_pip_sizes(None, ["EURUSD", "USDJPY", "XAUUSD"]),
+                         {"EURUSD": 0.0001, "USDJPY": 0.01, "XAUUSD": 0.01})
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "pips.json")
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write('{"USDJPY": 0.001}')
+            self.assertEqual(so.load_pip_sizes(p, ["USDJPY", "EURUSD"]),
+                             {"USDJPY": 0.001})
+
+    def test_hst_loader_missing_file_is_no_data_not_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            loader = so.hst_bars_loader(d)
+            self.assertEqual(list(loader("EURUSD", "M5")), [])
+            self.assertEqual(list(loader("EURUSD", "BAD")), [])
+
+
 class TestApiRangeFix(unittest.TestCase):
     def test_no_copy_rates_from_pos_in_api(self):
         path = os.path.join(os.path.dirname(api.__file__), "api.py")
