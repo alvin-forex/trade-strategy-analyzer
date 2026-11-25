@@ -74,6 +74,8 @@
 | `sec-pair`（逐對卡加 `sec-pair-<slug>` 子錨，例 `sec-pair-audcad`） | 逐貨幣對分析（新代有 `group-<CCY>` 錨點並存，唔改佢） | 逐對分析 |
 | `sec-week` | 舊代「下週重點關注」／新代併入結論節（無則免掛，唔准虛掛） | 前瞻節 |
 | `sec-opps` | 舊代「潛在交易機會」／新代併入結論節（無則免掛，唔准虛掛） | 機會清單 |
+| `sec-events` | 新代「重要事件日程」（舊代無則免掛） | 事件日程 |
+| `sec-conclusion` | 新代「新聞 vs 技術 對比結論」（W1 頁 2 實測增補，非虛掛——新代結論節實存） | 對比結論 |
 | `sec-raw`（有 raw 表時） | 原始數據表 | 照 §1.4 保留錨點規則 |
 
 - 形態：摺疊卡 `<details class="card" id="sec-<slug>" open>`（W1 頁 1 實測形態）；token link 已由 W3/REG-187 批次注入殼頁（inert），統一轉換後同頁生效。
