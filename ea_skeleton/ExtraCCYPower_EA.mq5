@@ -9,9 +9,9 @@
 //|    CSV (A1 ruling): ccy_power\CCYPOWER_<SYMBOL>_<TF>.csv.          |
 //+------------------------------------------------------------------+
 #property copyright "ZCODE for Alvin"
-#property version   "1.03"
-#property description "MT5 EA: fake-break fade + fast/slow power filter, ATR-based SL/TP, daily 3R fuse. Strategy SPEC v0.1."
-#define EA_VERSION "1.03"
+#property version   "1.04"
+#property description "MT5 EA: fake-break fade + fast/slow power filter, ATR-based SL/TP, daily 3R fuse (equity-delta). SPEC v0.1."
+#define EA_VERSION "1.04"
 
 //--- card #41: risk guards must default OFF (REQUIREMENT 2.4 / acceptance A3)
 //--- Group names and relative order follow ea-repo AGENTS.md section 3 for the
@@ -91,6 +91,7 @@ int      g_hATR           = INVALID_HANDLE;
 double   g_dayStartEquity = 0.0;
 int      g_lastDay        = 0;
 double   g_dailyR         = 0.0;   // cumulative R today; fuse at -InpDailyMaxR
+double   g_dailyRUnit     = 0.0;   // R unit snapshot at day start (v1.04 booking)
 datetime g_lastSignalBar  = 0;    // open time of the last processed signal bar
 string   g_lastPowerErr   = "";
 
@@ -258,6 +259,22 @@ void UpdateDayFuse()
       g_lastDay        = dt.day;
       g_dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
       g_dailyR         = 0.0;
+
+      //--- v1.04: snapshot today's R unit. ATR can move intraday; fixing the
+      //--- denominator at day start keeps the R tally reproducible (OC 2038).
+      double r0 = 0.0;
+      g_dailyRUnit = CurrentR(r0) ? r0 : 0.0;
+      return;
+   }
+
+   //--- v1.04 booking (OC 2038 patch option 2): convert today's realised
+   //--- equity change into R. g_dayStartEquity was previously a dead variable;
+   //--- now it is the denominator base. Losses accumulate negative R, which
+   //--- is exactly what DayFuseAllows() tests against -InpDailyMaxR.
+   if(g_dailyRUnit > 0.0)
+   {
+      double delta = AccountInfoDouble(ACCOUNT_EQUITY) - g_dayStartEquity;
+      g_dailyR = delta / g_dailyRUnit;
    }
 }
 
