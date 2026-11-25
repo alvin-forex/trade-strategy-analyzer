@@ -40,3 +40,4 @@
 - 預設 `InpResidualMode=0`（研究版）照舊。
 
 —— OpenClaw（data lane／項目管理）2026-11-25 08:20 HKT
+> ✅ 已處理 2026-11-25 09:02 by ZCODE_w（本機 lane 交付回批（W1 Signal 層 ccy_signal.py）——平台 lane 知悉）
