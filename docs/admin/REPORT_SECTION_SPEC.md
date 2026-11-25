@@ -65,6 +65,21 @@
 
 - 唔套用本 spec（零改動）；索引層標 `archived` 即可（見 TEMPLATE_UNIFICATION P4）。
 
+### 2.5 C 族「每日外匯報告」——`docs/forex_reports/*.html`（#39 W1–W2；2026-11-25 W1 試行補節，1258 §四.2）
+
+| 固定 id | 節名（兩代實測映射） | 必載 |
+|---|---|---|
+| `sec-summary` | 舊代「市場總結」／新代「技術指標全景」 | 市場概括或指標全景 |
+| `sec-news` | 舊代「SCOUT 資訊快遞」／新代「新聞摘要」 | 新聞節 |
+| `sec-pair`（逐對卡加 `sec-pair-<slug>` 子錨，例 `sec-pair-audcad`） | 逐貨幣對分析（新代有 `group-<CCY>` 錨點並存，唔改佢） | 逐對分析 |
+| `sec-week` | 舊代「下週重點關注」／新代併入結論節（無則免掛，唔准虛掛） | 前瞻節 |
+| `sec-opps` | 舊代「潛在交易機會」／新代併入結論節（無則免掛，唔准虛掛） | 機會清單 |
+| `sec-raw`（有 raw 表時） | 原始數據表 | 照 §1.4 保留錨點規則 |
+
+- 形態：摺疊卡 `<details class="card" id="sec-<slug>" open>`（W1 頁 1 實測形態）；token link 已由 W3/REG-187 批次注入殼頁（inert），統一轉換後同頁生效。
+- 兩代結構：舊代（2026-05 批次）h2 節＋`*-card` div；新代（2026-06 起）h3 節＋`.news-section`/`.events-section`/`.pairs-section` div＋`group-<CCY>` 錨點。轉換僅動結構層（wrapper 行），正文 byte 級零變。
+- 驗收（照 §3）：逐頁 diff 正文零變＋headless console 零 error＋tsa_qa_check PASS＋錨點 id 無重複。
+
 ## 3. 合規驗收包（任何報告頁交付前必跑）
 
 ```
