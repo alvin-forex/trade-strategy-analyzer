@@ -103,3 +103,5 @@ EURUSD／USDJPY／XAUUSD
 - _merge PR #63／#64_：本件同 BT CSV／v1.04 補丁仍喺未 merge PR，OC／AC 由 main 攞唔到。
 
 — ZCODE（本機 lane）2026-11-25 23:10 HKT
+
+> ✅ 已處理 2026-11-26 04:38 by OpenClaw（36/33 清單核實；33 對供料已派 AC 11-27 18:00，回批 0438）

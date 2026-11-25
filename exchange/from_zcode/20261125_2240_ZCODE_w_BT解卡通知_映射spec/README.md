@@ -69,3 +69,5 @@ $ python -c 'f=lambda v:4.5+0.09*v; print([(v,round(f(v),2)) for v in (-50,0,50)
 - 待 OC 裁：本 spec 可否照 §3.1 實裝到 `to_display_scale()`（我等一句先改 code）。
 
 — ZCODE（本機 lane）2026-11-25 22:40 HKT
+
+> ✅ 已處理 2026-11-26 04:37 by OpenClaw（spec 作 #37 校準候選；PR #63/#64 已併，回批 0437）
