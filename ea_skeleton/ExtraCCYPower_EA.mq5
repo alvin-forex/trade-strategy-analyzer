@@ -2,24 +2,16 @@
 //|                                        ExtraCCYPower_EA.mq5      |
 //|  MT5 EA SKELETON - card #41 (S4), lane zcode-local               |
 //|                                                                  |
-//|  SCOPE (per docs/ea/REQUIREMENT_EA_v0.1.md section 2.2):         |
-//|    input frame / risk-control hooks / logging / lot sizing       |
-//|    skeleton / backtest entry                                     |
-//|                                                                  |
-//|  HARD EXCLUSION: no entry logic, no exit logic, no grid,         |
-//|    no indicator calls, no order sending of any kind.             |
-//|    Strategy spec is O2 (still pending) - MUST NOT be invented.   |
-//|                                                                  |
-//|  Unresolved items are reported at OnInit as "MISSING:" lines.    |
-//|  Nothing is silently defaulted to a trading decision.            |
+//|  SCOPE (OC ruling 2026-11-25 08:15, SPEC v0.1 signed 01:52):      |
+//|    strategy layer: fake-break fade + fast/slow power filter,      |
+//|    ATR(14) risk units (R=1ATR), CTrade entry/exit, daily 3R fuse.  |
+//|    Risk guards remain OFF by default; power comes from external    |
+//|    CSV (A1 ruling): ccy_power\CCYPOWER_<SYMBOL>_<TF>.csv.          |
 //+------------------------------------------------------------------+
 #property copyright "ZCODE for Alvin"
-#property version   "1.02"
-#property description "MT5 EA skeleton: input frame, risk hooks, logging, lot sizing, backtest entry. No strategy logic."
-
-//--- version string used by the STARTED banner; keep in lock-step with
-//--- #property version above and with the README (AGENTS.md section 6).
-#define EA_VERSION "1.02"
+#property version   "1.03"
+#property description "MT5 EA: fake-break fade + fast/slow power filter, ATR-based SL/TP, daily 3R fuse. Strategy SPEC v0.1."
+#define EA_VERSION "1.03"
 
 //--- card #41: risk guards must default OFF (REQUIREMENT 2.4 / acceptance A3)
 //--- Group names and relative order follow ea-repo AGENTS.md section 3 for the
@@ -65,6 +57,22 @@ input double InpMaxLotTotal     = 0.00;                // Max total lots overall
 input group "Backtest"
 input bool   InpTesterSummary   = true;                // Write tester summary CSV in OnTester
 
+input group "Signal"
+input int    InpFakeBreakBars   = 3;                   // Fake breakout: reclaim within N bars
+input int    InpPivotK          = 3;                   // Pivot confirmation neighbours (k)
+input double InpAtrTol          = 0.10;                // Fake break must exceed level by ATR x this
+input int    InpFastPowerTF     = PERIOD_H1;           // Fast power timeframe (SPEC: H1)
+input int    InpSlowPowerTF     = PERIOD_H4;           // Slow power timeframe (SPEC: H4)
+input int    InpFastPowerPeriod = 10;                  // Fast power period (research H4_10)
+input int    InpSlowPowerPeriod = 120;                 // Slow power period (research H4_120)
+input string InpPowerDir        = "ccy_power";         // CSV dir under MQL5/Files
+
+input group "Exit"
+input double InpSlR             = 0.5;                 // Stop loss in R (R = 1 x ATR(14))
+input double InpTpR             = 1.0;                 // Take profit in R
+input double InpDailyMaxR       = 3.0;                 // Daily loss fuse in R
+input bool   InpCompareTp2Sl1    = false;              // Backtest-only: TP=2ATR / SL=1ATR control group
+
 //--- resolved runtime state (never a trading decision)
 string   g_symbol      = "";
 string   g_logPath     = "";
@@ -75,6 +83,190 @@ int      g_logHandle   = INVALID_HANDLE;
 bool     g_logEnabled  = false;   // runtime mirror of InpLogToFile (inputs are read-only)
 datetime g_lastBeat    = 0;
 long     g_initErrors  = 0;
+
+//--- strategy runtime state (SPEC v0.1, OC ruling 2026-11-25 08:15)
+#include <Trade\Trade.mqh>
+CTrade   g_trade;
+int      g_hATR           = INVALID_HANDLE;
+double   g_dayStartEquity = 0.0;
+int      g_lastDay        = 0;
+double   g_dailyR         = 0.0;   // cumulative R today; fuse at -InpDailyMaxR
+datetime g_lastSignalBar  = 0;    // open time of the last processed signal bar
+string   g_lastPowerErr   = "";
+
+//+------------------------------------------------------------------+
+//| R unit: 1 x ATR(14) on the entry TF. Returns false (r untouched)  |
+//| when the indicator is not ready -- an unpriced risk unit is not   |
+//| a tradable quantity, mirroring W1 atr() warm-up = None.            |
+//+------------------------------------------------------------------+
+bool CurrentR(double &r)
+{
+   r = 0.0;
+   if(g_hATR == INVALID_HANDLE)
+      return(false);
+   double buf[1];
+   if(CopyBuffer(g_hATR, 0, 1, 1, buf) != 1)
+      return(false);
+   if(buf[0] <= 0.0)
+      return(false);
+   r = buf[0];
+   return(true);
+}
+
+//+------------------------------------------------------------------+
+//| Power CSV reader (A1 path locked by OC 1815):                     |
+//|   <InpPowerDir>\CCYPOWER_<SYMBOL>_<TF>.csv ; header time,power    |
+//| Returns the two newest values strictly before `beforeTime`, so a  |
+//| caller can build slope = now - prev (OC 0120 item 1: NOT a linear |
+//| regression). EA reads only; it never writes the file.             |
+//+------------------------------------------------------------------+
+bool ReadPowerDiff(string tfName, datetime beforeTime, double &diff, string &why)
+{
+   diff = 0.0;
+   why  = "";
+   string path = InpPowerDir + "\\CCYPOWER_" + g_symbol + "_" + tfName + ".csv";
+   int h = FileOpen(path, FILE_READ | FILE_CSV | FILE_ANSI, ',');
+   if(h == INVALID_HANDLE)
+   {
+      why = StringFormat("power file missing: %s (err=%d)", path, GetLastError());
+      return(false);
+   }
+   if(!FileIsEnding(h))
+   {
+      string hdr = FileReadString(h);   // header: time,power; discard
+      hdr = "";
+   }
+
+   datetime newestTs = 0, prevTs = 0;
+   double   newestV = 0.0, prevV = 0.0;
+   while(!FileIsEnding(h))
+   {
+      string t = FileReadString(h);
+      if(FileIsEnding(h))
+         break;
+      string p = FileReadString(h);
+      if(StringLen(t) < 16 || p == "")
+         continue;
+      datetime ts = StringToTime(StringSubstr(t, 0, 16));
+      if(ts <= 0 || ts >= beforeTime)
+         continue;
+      double v = StringToDouble(p);
+      if(ts > newestTs)
+      {
+         prevTs = newestTs; prevV = newestV;
+         newestTs = ts;     newestV = v;
+      }
+      else if(ts > prevTs && ts < newestTs)
+      {
+         prevTs = ts; prevV = v;
+      }
+   }
+   FileClose(h);
+   if(newestTs == 0 || prevTs == 0)
+   {
+      why = StringFormat("power file has <2 rows before %s: %s",
+                         TimeToString(beforeTime), path);
+      return(false);
+   }
+   diff = newestV - prevV;
+   return(true);
+}
+
+//+------------------------------------------------------------------+
+//| Fast/slow power agreement, verbatim from W1 power_agrees(): both  |
+//| spreads must have the same sign as the intended fade direction.   |
+//+------------------------------------------------------------------+
+bool PowerAgrees(double fastDiff, double slowDiff, int direction)
+{
+   bool up = (direction > 0);
+   return(((fastDiff > 0) == up) && ((slowDiff > 0) == up));
+}
+
+//+------------------------------------------------------------------+
+//| Fake-break detection on closed bars, port of W1 pivots()+         |
+//| fake_breaks(). shift 1 = last closed bar. A resistance fake means |
+//| price traded above level+tol then closed back below -> fade short;|
+//| a support fake is the mirror -> fade long. Returns the reclaim    |
+//| bar's close time in `signalTime` (enter on the next open).         |
+//+------------------------------------------------------------------+
+bool DetectFakeBreak(int k, double atrTol, int lookback,
+                     int &direction, double &level, datetime &signalTime)
+{
+   direction  = 0;
+   level      = 0.0;
+   signalTime = 0;
+
+   int need = k + 2;
+   if(BarsCalculated(g_hATR) < need)
+      return(false);
+
+   MqlRates rates[];
+   int copied = CopyRates(g_symbol, PERIOD_CURRENT, 0, lookback, rates);
+   if(copied < need)
+      return(false);
+   ArraySetAsSeries(rates, true);   // rates[0] = newest closed bar
+
+   double atrBuf[1];
+   for(int idx = k; idx < copied - k; idx++)
+   {
+      double hi = rates[idx].high, lo = rates[idx].low;
+      bool isR = true, isS = true;
+      for(int d = -k; d <= k; d++)
+      {
+         if(d == 0)
+            continue;
+         if(rates[idx + d].high > hi) isR = false;
+         if(rates[idx + d].low  < lo) isS = false;
+      }
+      if(!isR && !isS)
+         continue;
+
+      int kind = isR ? 1 : -1;   // +1 = resistance (fade short), -1 = support (fade long)
+      double lvl = isR ? hi : lo;
+      for(int j = idx - k; j >= 1 && j >= idx - lookback; j--)
+      {
+         if(CopyBuffer(g_hATR, 0, j, 1, atrBuf) != 1 || atrBuf[0] <= 0.0)
+            continue;
+         double tol = atrTol * atrBuf[0];
+         bool fake = false;
+         if(kind > 0 && rates[j].high > lvl + tol && rates[j].close < lvl)
+            fake = true;
+         if(kind < 0 && rates[j].low  < lvl - tol && rates[j].close > lvl)
+            fake = true;
+         if(fake)
+         {
+            direction  = (kind > 0) ? -1 : 1;
+            level      = lvl;
+            signalTime = rates[j].time;
+            return(true);
+         }
+      }
+   }
+   return(false);
+}
+
+//+------------------------------------------------------------------+
+//| Daily R accounting. Resets at each new server day; when cumulative|
+//| R losses reach -InpDailyMaxR no new entry is allowed that day.     |
+//+------------------------------------------------------------------+
+void UpdateDayFuse()
+{
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   if(dt.day != g_lastDay)
+   {
+      g_lastDay        = dt.day;
+      g_dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
+      g_dailyR         = 0.0;
+   }
+}
+
+bool DayFuseAllows()
+{
+   if(InpDailyMaxR <= 0.0)
+      return(true);
+   return(g_dailyR > -InpDailyMaxR);
+}
 
 //+------------------------------------------------------------------+
 //| Resolve the working symbol (chart symbol when input is empty)     |
@@ -294,23 +486,19 @@ void CloseLogFile()
 //+------------------------------------------------------------------+
 void PrintMissingItems()
 {
-   if(InpEaName == "")
-      Print("MISSING: O1 - EA name is empty, filename and .set name are undecided");
-   else
-      PrintFormat("SKELETON: O1 accepted, EA name = %s", InpEaName);
-
-   Print("MISSING: O2 - strategy spec (entry/exit, grid or not, indicators, TF) not supplied");
-   Print("MISSING: O2 - no order-sending code exists in this build, by design");
-   Print("MISSING: O3 - parameter list must follow the real .set fields; not supplied yet");
-   Print("MISSING: O4 - acceptance thresholds (backtest numbers) not settled by owner");
-   Print("MISSING: G3 - group names now follow ea-repo AGENTS.md section 3 for the groups");
-   Print("MISSING: G3 - that carry inputs; groups without inputs are not declared (OC 21:05 D1).");
+   //--- v1.03: SPEC v0.1 signed 01:52, strategy layer filled per OC 0815.
+   //--- O2/O3/O4 are no longer MISSING: entry/exit, parameter list and
+   //--- acceptance numbers are all settled in SPEC v0.1.
+   PrintFormat("EAMLFILL: strategy=SPEC v0.1 fake-break fade + fast/slow power");
+   PrintFormat("EAMLFILL: R=1xATR(14), SL=%.2fR TP=%.2fR, daily fuse=%.2fR",
+               InpSlR, InpTpR, InpDailyMaxR);
+   PrintFormat("EAMLFILL: power CSV dir=%s (read-only, A1 format)", InpPowerDir);
 
    if(InpNewsGuardEnable && InpNewsBlockMinutes > 0)
-      Print("MISSING: O2 - news guard requested but no news source is bound in the skeleton");
+      Print("MISSING: O2 - news guard requested but no news calendar source is bound");
 
-   if(InpMaxLayers > 1 || InpLotMultiplier != 1.0)
-      Print("MISSING: O2 - lot ladder inputs set above 1 layer but no ladder logic exists");
+   if(InpCompareTp2Sl1)
+      Print("EAMLFILL: backtest control group enabled: TP=2ATR / SL=1ATR");
 }
 
 //+------------------------------------------------------------------+
@@ -356,6 +544,38 @@ bool ValidateInputs(string &why)
       return(false);
    }
 
+   //--- v1.03 strategy inputs
+   if(InpFakeBreakBars < 1)
+   {
+      why = "InpFakeBreakBars must be >= 1";
+      return(false);
+   }
+   if(InpPivotK < 1)
+   {
+      why = "InpPivotK must be >= 1";
+      return(false);
+   }
+   if(InpAtrTol <= 0.0)
+   {
+      why = "InpAtrTol must be > 0";
+      return(false);
+   }
+   if(InpSlR <= 0.0 || InpTpR <= 0.0)
+   {
+      why = "InpSlR and InpTpR must be > 0";
+      return(false);
+   }
+   if(InpDailyMaxR < 0.0)
+   {
+      why = "InpDailyMaxR must be >= 0";
+      return(false);
+   }
+   if(InpPowerDir == "")
+   {
+      why = "InpPowerDir must not be empty";
+      return(false);
+   }
+
    return(true);
 }
 
@@ -374,10 +594,18 @@ int OnInit()
 
    LoadVolumeSpec();
 
+   //--- ATR(14) handle for the R unit (SPEC: R = 1 x ATR(14), entry TF)
+   g_hATR = iATR(g_symbol, PERIOD_CURRENT, 14);
+   if(g_hATR == INVALID_HANDLE)
+   {
+      PrintFormat("EAMLFILL: iATR(14) handle failed, err=%d", GetLastError());
+      return(INIT_FAILED);
+   }
+
    string why = "";
    if(!ValidateInputs(why))
    {
-      PrintFormat("SKELETON: input validation failed, %s", why);
+      PrintFormat("EAMLFILL: input validation failed, %s", why);
       return(INIT_PARAMETERS_INCORRECT);
    }
 
@@ -390,18 +618,20 @@ int OnInit()
    PrintFormat("%s STARTED v%s on %s %s", InpEaName, EA_VERSION,
                g_symbol, EnumToString(InpWorkTimeframe));
 
-   PrintFormat("SKELETON: orders=DISABLED (no O2 spec)");
+   PrintFormat("EAMLFILL: orders=ENABLED per SPEC v0.1 (guards default OFF)");
 
-   PrintFormat("SKELETON: volume spec min=%s max=%s step=%s",
+   PrintFormat("EAMLFILL: volume spec min=%s max=%s step=%s",
                DoubleToString(g_volMin, 4), DoubleToString(g_volMax, 4), DoubleToString(g_volStep, 4));
 
-   PrintFormat("SKELETON: base lot=%s cap=%s layers=%d multiplier=%s",
+   PrintFormat("EAMLFILL: base lot=%s cap=%s layers=%d multiplier=%s",
                DoubleToString(InpBaseLot, 2), DoubleToString(TotalLotsCap(), 2),
                InpMaxLayers, DoubleToString(InpLotMultiplier, 3));
 
    PrintMissingItems();
+   g_trade.SetExpertMagicNumber(InpMagicNumber);
+   UpdateDayFuse();
 
-   LogEvent("init", "skeleton ready, trading disabled");
+   LogEvent("init", "strategy v1.03 ready, SPEC v0.1");
    g_lastBeat = TimeCurrent();
 
    return(INIT_SUCCEEDED);
@@ -415,41 +645,120 @@ void OnDeinit(const int reason)
    LogEvent("deinit", StringFormat("reason=%d errors=%d", reason, g_initErrors));
    CloseLogFile();
 
-   PrintFormat("SKELETON: detached, reason=%d, log=%s", reason,
+   PrintFormat("EAMLFILL: detached, reason=%d, log=%s", reason,
                (InpLogToFile ? g_logPath : "disabled"));
+   if(g_hATR != INVALID_HANDLE)
+   {
+      IndicatorRelease(g_hATR);
+      g_hATR = INVALID_HANDLE;
+   }
 }
 
 //+------------------------------------------------------------------+
-//| OnTick - deliberately performs NO trading action.                 |
-//| Only the risk-hook evaluation and optional heartbeat are wired.   |
+//| OnTick - SPEC v0.1 strategy evaluation on each newly closed bar.  |
+//|  1. fake break on closed bars -> fade direction                   |
+//|  2. fast/slow power must agree (both CSV read-only)               |
+//|  3. three risk guards (default OFF) must allow                    |
+//|  4. daily 3R fuse must allow                                      |
+//|  5. enter with CTrade at R-based SL/TP; only one open position    |
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   UpdateDayFuse();
+
+   //--- only act once per newly closed bar
+   datetime closedBarTime = iTime(g_symbol, PERIOD_CURRENT, 1);
+   if(closedBarTime == 0 || closedBarTime == g_lastSignalBar)
+      return;
+
    string blockReason = "";
    bool   allowed     = RiskGuardAllow(blockReason);
 
-   if(!InpLogHeartbeat)
+   int    dir = 0;
+   double lvl = 0.0;
+   datetime sigTime = 0;
+   if(!DetectFakeBreak(InpPivotK, InpAtrTol, InpFakeBreakBars, dir, lvl, sigTime))
+      return;
+   if(sigTime != closedBarTime)
+      return;   //--- signal is from an older bar; never act late
+
+   //--- fast/slow power filter; TF names are the MT5 period enum names
+   string fastTf = EnumToString((ENUM_TIMEFRAMES)InpFastPowerTF);
+   string slowTf = EnumToString((ENUM_TIMEFRAMES)InpSlowPowerTF);
+   double fastDiff = 0.0, slowDiff = 0.0, junk = 0.0;
+   if(!ReadPowerDiff(fastTf, closedBarTime, fastDiff, g_lastPowerErr) ||
+      !ReadPowerDiff(slowTf, closedBarTime, slowDiff, g_lastPowerErr))
+   {
+      LogEvent("signal_skip", "power unavailable: " + g_lastPowerErr);
+      return;
+   }
+   if(!PowerAgrees(fastDiff, slowDiff, dir))
+   {
+      LogEvent("signal_skip", "power divergence");
+      return;
+   }
+   if(!allowed || !DayFuseAllows())
+   {
+      LogEvent("signal_skip", "gate/fuse blocked: " + blockReason);
+      return;
+   }
+
+   //--- one position at a time
+   int posCount = 0;
+   double posLots = 0.0;
+   if(CountSymbolPositions(posCount, posLots))
       return;
 
-   if(InpHeartbeatSeconds > 0 && (TimeCurrent() - g_lastBeat) < (datetime)InpHeartbeatSeconds && g_lastBeat != 0)
+   double r = 0.0;
+   if(!CurrentR(r))
+      return;
+   double slDist = InpSlR * r;
+   double tpDist = InpTpR * r;
+   if(InpCompareTp2Sl1)
+   {
+      slDist = 1.0 * r;   //--- backtest control group: SL=1ATR, TP=2ATR
+      tpDist = 2.0 * r;
+   }
+   if(slDist <= 0.0 || tpDist <= 0.0)
       return;
 
-   g_lastBeat = TimeCurrent();
+   double lot = NormalizeLots(InpBaseLot);
+   double ask = SymbolInfoDouble(g_symbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(g_symbol, SYMBOL_BID);
+   bool ok = false;
+   if(dir > 0)
+      ok = g_trade.Buy(lot, g_symbol, ask,
+                       NormalizeDouble(ask - slDist, _Digits),
+                       NormalizeDouble(ask + tpDist, _Digits),
+                       "SPECv0.1 fade long");
+   else if(dir < 0)
+      ok = g_trade.Sell(lot, g_symbol, bid,
+                        NormalizeDouble(bid + slDist, _Digits),
+                        NormalizeDouble(bid - tpDist, _Digits),
+                        "SPECv0.1 fade short");
+   if(!ok)
+   {
+      LogEvent("order_fail", StringFormat("retcode=%d comment=%s",
+               g_trade.ResultRetcode(), g_trade.ResultRetcodeDescription()));
+      return;
+   }
 
-   int    posCount = 0;
-   double posLots  = 0.0;
-   CountSymbolPositions(posCount, posLots);
+   g_lastSignalBar = closedBarTime;
+   LogEvent("entry", StringFormat("dir=%d lot=%s sl=%s tp=%s R=%s",
+            dir, DoubleToString(lot, 2),
+            DoubleToString(slDist, _Digits), DoubleToString(tpDist, _Digits),
+            DoubleToString(r, _Digits)));
 
-   PrintFormat("SKELETON: heartbeat symbol=%s equity=%s dd=%s%% pos=%d lots=%s gate=%s%s",
-               g_symbol,
-               DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2),
-               DoubleToString(CurrentDrawdownPercent(), 3),
-               posCount,
-               DoubleToString(posLots, 2),
-               (allowed ? "allow" : "block"),
-               (allowed ? "" : (" (" + blockReason + ")")));
-
-   LogEvent("heartbeat", (allowed ? "gate allow" : ("gate block: " + blockReason)));
+   //--- heartbeat (unchanged structural telemetry)
+   if(InpLogHeartbeat && (TimeCurrent() - g_lastBeat) >= (datetime)InpHeartbeatSeconds)
+   {
+      g_lastBeat = TimeCurrent();
+      PrintFormat("EAMLFILL: heartbeat %s equity=%s dd=%s%% gate=%s",
+                  g_symbol,
+                  DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2),
+                  DoubleToString(CurrentDrawdownPercent(), 3),
+                  (allowed ? "allow" : "block"));
+   }
 }
 
 //+------------------------------------------------------------------+
