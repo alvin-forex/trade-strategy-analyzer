@@ -4,20 +4,45 @@
 - 卡片：`#41 [S4] MT5 EA 骨架（等老闆 O1–O4 策略規格）`
 - 落點：TSA repo `ea_skeleton/`（OC 2026-11-23 21:05 裁決：`ea_skeleton/` 即本機工作位，ea-repo git 通道唔急開）
 - 產物：`ExtraCCYPower_EA.mq5`
-- 版本：**v1.02**（v1.00＝PR #43 首版；v1.01＝按 OC 21:05 丁節三裁決改 group／banner／縮寫／單位；**v1.02＝按老闆 11-24 08:15 D1 裁決把 `Lot Sizing`／`Backtest` 排到 §3 第 13／14 位**）
+- **版本（目前）：v1.03**（策略填肉，SPEC v0.1／OC 2026-11-25 0815 裁決）——v1.00 PR #43 首版；v1.01 OC 21:05 丁節三裁決；v1.02 老闆 11-24 08:15 `Lot Sizing`／`Backtest` 排 §3 第 13／14 位；**v1.03＝按 SPEC v0.1 填 entry/exit：假突破 fade＋快慢 power 雙過濾、R=1×ATR(14)、SL=0.5R／TP=1R、日蝕 3R、CTrade 落單、外部 power CSV reader（A1）；三 Guard 仍預設 OFF**
 
-## 一、編譯（v1.02）
+## 一、編譯（v1.03）
 
 ```text
-$ "/c/Program Files/MetaTrader 5/MetaEditor64.exe" /compile:ea_skeleton/ExtraCCYPower_EA.mq5
-Result: 0 errors, 0 warnings, 948 ms elapsed, cpu='X64 Regular'
+$ MetaEditor64.exe /compile:...\MQL5\Experts\ExtraCCYPower_EA.mq5 /log
+Result: 0 errors, 0 warnings, 1327 ms elapsed, cpu='X64 Regular'
 ```
 
-- 508 行 / 18,700 bytes
-- sha256 `b057904f8cfd382aff373153b472cc919c552bfb57667de70359d0b74bd388f8`
-- 版本四處鎖步（AGENTS.md §6）：`#property version "1.02"`｜`#define EA_VERSION "1.02"`（banner 用）｜`#property description`｜本 README
+- 817 行 / 29,862 bytes
+- sha256 `f730413cb9cb07e3aa5c37a8d7bc80eb25df3374d8c74b2b1377d3a3e5d11187`
+- 版本四處鎖步（AGENTS.md §6）：`#property version "1.03"`｜`#define EA_VERSION "1.03"`（banner 用）｜`#property description`（含 SPEC v0.1）｜本 README
+- §8 自檢：`^input ` 42 − `input group` 9 ＝ **33 真 input**（v1.02 既有 21 ＋ 新增 12：Signal 8＋Exit 4；OC 0815 明列 9 個必備 input 全數在內）；`___` 零命中
 
-## 二、版本沿革（零策略改動；§7 禁止同一 commit 混入改名＋邏輯修改）
+### v1.03 新增 input（照 OC 0815 裁決）
+
+| group | input | 預設 | 來源 |
+|---|---|---|---|
+| Signal | `InpFakeBreakBars` | 3 | 假突破 N 根收回 |
+| Signal | `InpPivotK` | 3 | W1 `pivots(k=3)` |
+| Signal | `InpAtrTol` | 0.10 | W1 `DEFAULT_ATR_TOL` |
+| Signal | `InpFastPowerTF` | `PERIOD_H1` | SPEC 快=H1 |
+| Signal | `InpSlowPowerTF` | `PERIOD_H4` | SPEC 慢=H4 |
+| Signal | `InpFastPowerPeriod` | 10 | 研究 H4_10 |
+| Signal | `InpSlowPowerPeriod` | 120 | 研究 H4_120 |
+| Signal | `InpPowerDir` | `ccy_power` | A1 路徑 `CCYPOWER_<SYM>_<TF>.csv` |
+| Exit | `InpSlR` | 0.5 | R=1ATR，SL=0.5R |
+| Exit | `InpTpR` | 1.0 | TP=1R |
+| Exit | `InpDailyMaxR` | 3.0 | 日蝕 3R |
+| Exit | `InpCompareTp2Sl1` | false | 回測對照組 TP=2ATR/SL=1ATR |
+
+### 與 W1 Python 對拍（一對一移植，零新邏輯）
+
+- `atr()` → `iATR(14)` + `CopyBuffer`（暖期未就緒回 false，唔回 0，對應 W1 `None`）
+- `pivots(k)`／`fake_breaks()` → `DetectFakeBreak()`（k 根 neighbours、收回確認、`atr_tol`）
+- `power_agrees()` → `PowerAgrees()`（同號才入，背離唔入）
+- slope = `power_now − power_prev`（OC 0120 逐字：唔係迴歸）→ `ReadPowerDiff()` 讀 A1 CSV 最近兩行
+
+## 二、版本沿革（v1.00→v1.02 零策略改動；v1.03 首次填策略，分開 commit 原則照舊）
 
 | # | 項目 | v1.00 | v1.01 |
 |---|---|---|---|
