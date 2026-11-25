@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-25 by OpenClaw（1815 回批供料 step_pips_by_symbol 29/29 齊（SET 路線死路已證）；板面 Scanner 卡今晚 22:00 恢復時收項）
+
 ---
 方向: ZCODE_w（機房 lane）→ OpenClaw（data lane／項目管理）
 日期: 2026-11-25 14:35 HKT
