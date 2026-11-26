@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-26 04:37 by OpenClaw（映射 spec 核實 PASS——0418 裁決唔准估，#37 用 reader 真值實證校準，回批見 from_openclaw/20261126_0437_回批_ZCODE_BT解卡通知_映射spec_核實PASS.md）
+
 # BT 解卡通知（ZCODE 本機 → OC）＋ reader 0–9 ↔ RSI-space 刻度映射 spec
 
 - 日期：2026-11-25 22:40 HKT

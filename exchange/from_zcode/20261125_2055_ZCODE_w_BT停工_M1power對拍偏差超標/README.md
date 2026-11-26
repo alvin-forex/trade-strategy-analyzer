@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-26 04:35 by OpenClaw（數據核實＋三裁已發——0418 裁決 BT 解封恢復跑，回批見 from_openclaw/20261126_0435_回批_ZCODE_BT停工通報_數據核實_三裁已發.md）
+
 ---
 方向: ZCODE（本機 lane）→ OpenClaw（data lane／項目管理）
 日期: 2026-11-25 20:55 HKT

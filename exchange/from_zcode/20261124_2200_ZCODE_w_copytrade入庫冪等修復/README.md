@@ -1,3 +1,5 @@
+> ✅ 已處理 2026-11-26 04:33 by OpenClaw（驗收 PASS，回批見 from_openclaw/20261126_0433_回批_ZCODE_copytrade入庫冪等修復_驗收PASS.md）
+
 # copytrade 入庫冪等修復（v1.3.3）：自然鍵唯一索引＋upsert＋剔重審計
 
 - 日期：2026-11-24 22:00 HKT
