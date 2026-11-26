@@ -503,7 +503,30 @@ function secDelay(){
     <td class="n">${pct(b.trig)}</td><td class="n">${pct(b.wr)}</td><td class="n">${isFinite(b.odds)?fmt(b.odds,2):'∞'}</td>
     <td class="n ${b.exp>=0?'pos':'neg'}">${fmt(b.exp,1)}</td><td class="n">${fmt(base,1)}</td><td class="n">${b.n}</td></tr>`;});
   h+=`</table></div>`;
-  h+=`<div class="card"><h2>⑬ 資金曲線：原策略 vs 延遲</h2><canvas id="cvEq" width="1150" height="300" style="width:100%;height:auto"></canvas></div>`;
+  h+=`<div class="card" id="s13"><h2>⑬ 資金曲線：原策略 vs 延遲（含每層對照）</h2>
+  <div class="mut" style="margin-bottom:8px">
+   <b>計算口徑（圖上亦會標示）</b>：
+   ① <b>D</b>＝延遲點數：價格由原入場價逆走 D 點才入場；未觸及就<b>不入場</b>（盈虧當 0）。
+   ② <b>SL</b>＝由<b>新入場價</b>再逆走 S 點止蝕。
+   ③ <b>TP</b>＝回到<b>原入場價</b>再順走 T 點止賺（所以新入場到 TP 的距離＝D＋T）。
+   ④ 先觸及哪一個就以哪一個出場；兩者同一根 K 棒都觸及時，<b>保守當作先中 SL</b>。
+   ⑤ 到期仍未觸及 TP／SL，就以原平倉時間的價格結算（標「時間到」）。
+   ⑥ <b>近似模式</b>（未上載分鐘資料）只做「原淨點數 ＋ D」的位移，<b>沒有真正模擬路徑</b>，只可作方向參考。
+  </div>
+  <canvas id="cvEq" width="1150" height="300" style="width:100%;height:auto"></canvas>
+  <h3>每層對照（原來 vs 最佳組合）</h3>
+  <table><tr><th>層</th><th class="n">原筆數</th><th class="n">原淨 $</th><th class="n">最佳 D/S/T</th><th class="n">觸發</th><th class="n">最佳淨 $</th><th class="n">Δ $</th></tr>
+  ${layers.map(L=>{ const b=BEST[L]; const arr=base0.filter(t=>t.layer===L);
+     const oM=arr.reduce((s,t)=>s+t.profit,0);
+     if(!b) return `<tr><td>L${L}</td><td class="n">${arr.length}</td><td class="n">${money(oM)}</td><td class="n mut" colspan="4">樣本不足</td></tr>`;
+     const pps=arr.map(t=>t.pp).filter(v=>v!==null&&isFinite(v));
+     const avgPP=pps.length?pps.reduce((a,b2)=>a+b2,0)/pps.length:0;
+     let dM=0; b.detail.forEach(d=>dM+=d.pips*(d.t.pp!==null&&isFinite(d.t.pp)?d.t.pp:avgPP));
+     return `<tr><td>L${L}</td><td class="n">${arr.length}</td><td class="n ${oM>=0?'pos':'neg'}">${money(oM)}</td>
+      <td class="n">D${b.D}/S${b.S}/T${b.T}</td><td class="n">${b.detail.length}</td>
+      <td class="n ${dM>=0?'pos':'neg'}">${money(dM)}</td>
+      <td class="n ${(dM-oM)>=0?'pos':'neg'}">${money(dM-oM)}</td></tr>`; }).join('')}
+  </table></div>`;
   h+=`<div class="card"><h2>⑭ 逐筆明細</h2><div class="scroll"><table><tr><th>時間</th><th>商品</th><th>方向</th><th class="n">層</th>
   <th class="n">原淨點</th><th class="n">最佳D</th><th class="n">延遲後</th><th>出場</th></tr><tbody>`;
   const rows=[];
@@ -615,6 +638,8 @@ function drawEquity(){
   line(s1,'#5aa9e6'); line(s2,'#39b785');
   ctx.fillStyle='#8fa4b8';ctx.font='12px sans-serif';
   ctx.fillText('藍＝原策略（$）　綠＝延遲策略（pips 累加，僅相對比較）',pad,18);
+  ctx.fillStyle='#6f8598';ctx.font='11px sans-serif';
+  ctx.fillText('D＝由原入場價逆走 D 點才入場；SL＝新入場價再逆走 S 點；TP＝原入場價順走 T 點；未觸及 D 不入場；同棒雙觸及當先中 SL',pad,H-8);
 }
 
 /* ⑮ 原始紀錄 */
