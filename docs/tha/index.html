@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Trading History Analyzer — 獨立分析頁 v2</title>
+<title>Trading History Analyzer — 獨立分析頁 v3</title>
 <style>
 :root{--bg:#0f1720;--card:#17222e;--line:#243343;--ink:#e6eef7;--mut:#8fa4b8;--good:#39b785;--bad:#d9534f;--acc:#5aa9e6;--warn:#e0a13c}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 "Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif}
-.wrap{max-width:1240px;margin:0 auto;padding:18px}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:18px}
 h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 10px;color:var(--acc)}
 h3{font-size:13px;margin:14px 0 6px;color:var(--mut)}
 .sub{color:var(--mut);font-size:12px;margin-bottom:14px}
@@ -17,36 +17,38 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;font-variant-numeric:tabular-nums}
 th{color:var(--mut);font-size:12px}.n{text-align:right}
 .pos{color:var(--good)}.neg{color:var(--bad)}
-.drop{border:2px dashed #3a4c60;border-radius:10px;padding:20px;text-align:center;color:var(--mut)}
+.drop{border:2px dashed #3a4c60;border-radius:10px;padding:18px;text-align:center;color:var(--mut)}
 .kpis{display:flex;gap:10px;flex-wrap:wrap}
 .kpi{flex:1;min-width:140px;background:#0f1a24;border:1px solid var(--line);border-radius:8px;padding:10px}
 .kpi b{display:block;font-size:18px}.kpi span{font-size:11px;color:var(--mut)}
 .tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:700;color:#08131c;background:var(--warn)}
 input[type=number],select{background:#0f1a24;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px}
-button{background:var(--acc);border:0;color:#08131c;font-weight:700;border-radius:6px;padding:7px 14px;cursor:pointer}
+button{background:var(--acc);border:0;color:#08131c;font-weight:700;border-radius:6px;padding:6px 12px;cursor:pointer}
 .mut{color:var(--mut);font-size:12px}
-.heat td{text-align:center;font-size:12px;border:1px solid #1d2a38}
+table.heat td{text-align:center;font-size:12px;border:1px solid #1d2a38}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.scroll{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.legend span{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Trading History Analyzer — 獨立分析頁 <span class="tag">v2</span></h1>
+  <h1>Trading History Analyzer — 獨立分析頁 <span class="tag">v3</span></h1>
   <div class="sub">上載交易紀錄即時計算；可選上載分鐘資料做「精確延遲入場」。全部在你瀏覽器內運算，不上傳任何資料。</div>
 
   <div class="card">
     <h2>① 上載交易紀錄（必需）</h2>
     <input type="file" id="file" accept=".csv,.txt">
     <div class="drop" id="drop" style="margin-top:10px">把交易紀錄 CSV 拖到這裡</div>
-    <div class="mut" style="margin-top:8px">欄位：Open Time、Type、Lots、Symbol、Open Price、Close Time、Close Price、Net Pips、Net Profit、Max Pips、Max Loss Pips、Magic Number、Comment。</div>
+    <div class="mut" style="margin-top:8px">欄位：Open Time／Type／Lots／Symbol／Open Price／Close Time／Close Price／Net Pips／Net Profit／Max Pips／Max Loss Pips／Magic Number／Comment</div>
   </div>
 
   <div class="card">
     <h2>② 分鐘資料（選填，做精確延遲入場）</h2>
     <input type="file" id="m1" accept=".csv" multiple>
-    <div class="mut" style="margin-top:8px">每支商品一個 CSV，檔名要含商品名（例：XAUUSD_M1.csv）。欄位：time（Unix 秒）或 iso_utc，open,high,low,close。</div>
-    <div style="margin-top:8px">時間校正（小時）：<input type="number" id="tzoff" value="0" step="1" style="width:80px"> <span class="mut">交易紀錄的當地時間相對 UTC 的差距；例如伺服器時間比 UTC 快 2 小時就填 2。</span></div>
+    <div style="margin-top:8px">時間校正（小時）：<input type="number" id="tzoff" value="0" step="1" style="width:76px">
+      <span class="mut">交易紀錄當地時間相對 UTC 的差距；伺服器快 UTC 2 小時就填 2。</span></div>
     <div class="mut" id="m1stat" style="margin-top:6px"></div>
   </div>
 
@@ -57,7 +59,7 @@ button{background:var(--acc);border:0;color:#08131c;font-weight:700;border-radiu
 const $=s=>document.querySelector(s);
 const fmt=(x,d=2)=>(x===null||x===undefined||isNaN(x))?'-':Number(x).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct=x=>isNaN(x)?'-':(x*100).toFixed(1)+'%';
-let TRADES=[], M1={}, LOTMAP=[];
+let TRADES=[], M1={}, LOTMAP=[], BEST={}, FILTER={layer:'all', onlyTrig:false};
 
 $('#file').addEventListener('change',e=>{ if(e.target.files[0]) readTrades(e.target.files[0]); });
 $('#m1').addEventListener('change',e=>{ loadM1Files([...e.target.files]); });
@@ -68,15 +70,9 @@ drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) readTrades(e.dataT
 
 function splitLine(line){const out=[];let cur='',q=false;for(let i=0;i<line.length;i++){const c=line[i];
  if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}else if(c===','&&!q){out.push(cur);cur='';}else cur+=c;}out.push(cur);return out;}
+const num=v=>{const x=parseFloat(String(v||'').replace(/,/g,''));return isNaN(x)?0:x;};
 
-function num(v){const x=parseFloat(String(v||'').replace(/,/g,''));return isNaN(x)?0:x;}
-
-function readTrades(f){
-  const r=new FileReader();
-  r.onload=()=>{ try{ parseTrades(r.result); }catch(err){ alert('解析失敗：'+err.message); } };
-  r.readAsText(f,'utf-8');
-  drop.textContent='已載入：'+f.name;
-}
+function readTrades(f){const r=new FileReader();r.onload=()=>{try{parseTrades(r.result);}catch(err){alert('解析失敗：'+err.message);}};r.readAsText(f,'utf-8');drop.textContent='已載入：'+f.name;}
 
 function parseTrades(text){
   text=text.replace(/^\uFEFF/,'');
@@ -88,33 +84,25 @@ function parseTrades(text){
     p0:find('Open Price','Price'),t1:find('Close Time'),p1:find('Close Price'),pips:find('Net Pips','Pips'),
     profit:find('Net Profit','Profit'),mfe:find('Max Pips','Max Profit Pips'),mae:find('Max Loss Pips','Min Pips'),
     magic:find('Magic Number','Magic'),comment:find('Comment')};
-  if(ci.t0<0||ci.type<0||ci.lots<0||ci.sym<0||ci.pips<0){ alert('缺少必要欄位（Open Time／Type／Lots／Symbol／Net Pips）'); return; }
+  if(ci.t0<0||ci.type<0||ci.lots<0||ci.sym<0||ci.pips<0){alert('缺少必要欄位');return;}
   TRADES=[];
   for(let i=1;i<lines.length;i++){
-    const c=splitLine(lines[i]);
-    const t=(c[ci.type]||'').trim().toLowerCase();
+    const c=splitLine(lines[i]); const t=(c[ci.type]||'').trim().toLowerCase();
     if(t!=='buy'&&t!=='sell') continue;
-    TRADES.push({t0:(c[ci.t0]||'').trim(),t1:ci.t1>=0?(c[ci.t1]||'').trim():'',dir:t,lots:num(c[ci.lots]),
-      sym:(c[ci.sym]||'').trim(),p0:ci.p0>=0?num(c[ci.p0]):0,p1:ci.p1>=0?num(c[ci.p1]):0,
-      pips:num(c[ci.pips]),profit:ci.profit>=0?num(c[ci.profit]):0,
+    const t0s=(c[ci.t0]||'').trim(), t1s=ci.t1>=0?(c[ci.t1]||'').trim():'';
+    TRADES.push({t0:t0s,t1:t1s,dir:t,lots:num(c[ci.lots]),sym:(c[ci.sym]||'').trim(),
+      p0:ci.p0>=0?num(c[ci.p0]):0,p1:ci.p1>=0?num(c[ci.p1]):0,pips:num(c[ci.pips]),
+      profit:ci.profit>=0?num(c[ci.profit]):0,
       mfe:Math.abs(ci.mfe>=0?num(c[ci.mfe]):0),mae:Math.abs(ci.mae>=0?num(c[ci.mae]):0),
-      magic:ci.magic>=0?(c[ci.magic]||'').trim():'',comment:ci.comment>=0?(c[ci.comment]||'').trim():''});
+      magic:ci.magic>=0?(c[ci.magic]||'').trim():'',comment:ci.comment>=0?(c[ci.comment]||'').trim():'',
+      ts:parseTime(t0s), ts1:parseTime(t1s)});
   }
-  if(!TRADES.length){ alert('沒有可分析交易（Type 只有 buy／sell 才計）'); return; }
+  if(!TRADES.length){alert('沒有可分析交易');return;}
   assignLayers(); render();
-}
-
-function assignLayers(){
-  const lots=[...new Set(TRADES.map(t=>t.lots))].sort((a,b)=>a-b);
-  const map=new Map(lots.map((v,i)=>[v,i+1]));
-  TRADES.forEach((t,i)=>{t.layer=map.get(t.lots); t.order=i;});
-  LOTMAP=lots;
-  TRADES.forEach(t=>{ const d=parseTime(t.t0); t.ts=d; });
 }
 
 function parseTime(s){
   if(!s) return null;
-  // 支援 dd/mm/yyyy hh:mm:ss 與 yyyy.mm.dd hh:mm:ss
   let m=s.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if(m) return Date.UTC(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+(m[6]||0))/1000;
   m=s.match(/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
@@ -132,44 +120,44 @@ function loadM1Files(files){
       const head=splitLine(lines[0]).map(h=>h.trim().toLowerCase());
       const it=head.findIndex(h=>h==='time'||h==='iso_utc'||h.includes('time'));
       const io=head.indexOf('open'),ih=head.indexOf('high'),il=head.indexOf('low'),ic=head.indexOf('close');
-      if(it<0||io<0||ic<0){ alert('分鐘檔缺欄位：'+f.name); return; }
+      if(it<0||io<0||ic<0){alert('分鐘檔缺欄位：'+f.name);return;}
       const arr=[];
       for(let i=1;i<lines.length;i++){
-        const c=splitLine(lines[i]);
-        let t=c[it].trim();
-        let ts = /^\d+$/.test(t) ? +t : (parseTime(t)||null);
-        arr.push([ts, num(c[io]), num(c[ih]!==undefined?c[ih]:c[io]), num(c[il]!==undefined?c[il]:c[io]), num(c[ic])]);
+        const c=splitLine(lines[i]); let t=c[it].trim();
+        let ts=/^\d+$/.test(t)?+t:parseTime(t);
+        if(!ts) continue;
+        arr.push([ts,num(c[io]),(ih>=0?num(c[ih]):num(c[io])),(il>=0?num(c[il]):num(c[io])),num(c[ic])]);
       }
       arr.sort((a,b)=>a[0]-b[0]);
-      // 由檔名猜商品
       const nm=f.name.toUpperCase().replace(/[^A-Z]/g,'');
       const symCands=[...new Set(TRADES.map(t=>t.sym.toUpperCase()))].filter(s=>nm.includes(s));
-      const key = symCands.length? symCands[0] : nm.slice(0,6);
-      M1[key]={ts:arr.map(r=>r[0]),o:arr.map(r=>r[1]),h:arr.map(r=>r[2]),l:arr.map(r=>r[3]),c:arr.map(r=>r[4])};
-      loaded.push(key+'（'+arr.length+' 根）');
-      if(++done===files.length){ $('#m1stat').textContent='已載入分鐘資料：'+loaded.join('、'); render(); }
+      const key=symCands.length?symCands[0]:nm.slice(0,6);
+      M1[key]={ts:arr.map(r=>r[0]),h:arr.map(r=>r[2]),l:arr.map(r=>r[3]),c:arr.map(r=>r[4])};
+      loaded.push(key+'（'+arr.length+'）');
+      if(++done===files.length){ $('#m1stat').textContent='已載入：'+loaded.join('、'); render(); }
     };
     r.readAsText(f,'utf-8');
   });
 }
 
+function assignLayers(){
+  const lots=[...new Set(TRADES.map(t=>t.lots))].sort((a,b)=>a-b);
+  const map=new Map(lots.map((v,i)=>[v,i+1]));
+  TRADES.forEach((t,i)=>{t.layer=map.get(t.lots);t.order=i;});
+  LOTMAP=lots;
+}
+
 function stats(arr){
-  const n=arr.length, wins=arr.filter(t=>t.pips>0), loss=arr.filter(t=>t.pips<=0);
-  const gp=wins.reduce((s,t)=>s+t.pips,0), gl=loss.reduce((s,t)=>s+Math.abs(t.pips),0);
-  const netPips=arr.reduce((s,t)=>s+t.pips,0), netMoney=arr.reduce((s,t)=>s+t.profit,0);
+  const n=arr.length,wins=arr.filter(t=>t.pips>0),loss=arr.filter(t=>t.pips<=0);
+  const gp=wins.reduce((s,t)=>s+t.pips,0),gl=loss.reduce((s,t)=>s+Math.abs(t.pips),0);
   let cum=0,peak=0,dd=0;
   [...arr].sort((a,b)=>a.order-b.order).forEach(t=>{cum+=t.pips;peak=Math.max(peak,cum);dd=Math.min(dd,cum-peak);});
-  return {n,wr:n?wins.length/n:NaN,pf:gl?gp/gl:(gp?Infinity:NaN),netPips,netMoney,
-          avgW:wins.length?gp/wins.length:0,avgL:loss.length?gl/loss.length:0,dd};
+  return {n,wr:n?wins.length/n:NaN,pf:gl?gp/gl:(gp?Infinity:NaN),
+    netPips:arr.reduce((s,t)=>s+t.pips,0),netMoney:arr.reduce((s,t)=>s+t.profit,0),dd};
 }
+const pipSize=sym=>{const s=(sym||'').toUpperCase();if(s.startsWith('XAU'))return 0.1;if(s.endsWith('JPY'))return 0.01;return 0.0001;};
 
-function pipSize(sym){
-  const s=(sym||'').toUpperCase();
-  if(s.startsWith('XAU')) return 0.1;
-  if(s.endsWith('JPY')) return 0.01;
-  return 0.0001;
-}
-
+/* ============ 主渲染 ============ */
 function render(){
   if(!TRADES.length) return;
   const all=stats(TRADES), h=[];
@@ -181,158 +169,268 @@ function render(){
     <div class="kpi"><b>${isFinite(all.pf)?fmt(all.pf,2):'∞'}</b><span>盈利因子</span></div>
     <div class="kpi"><b class="neg">${fmt(all.dd,1)}</b><span>最大回撤（pips）</span></div>
   </div></div>`);
+  h.push(renderLayers(all));
+  h.push(renderSymTab(all));
+  h.push(renderHeat());
+  h.push(renderMFE());
+  h.push(renderDelay());
+  h.push(renderTrades());
+  h.push(`<div class="card"><div class="mut">v3：Excel 各頁（總覽／分層／商品方向／月度熱力／MAE-MFE 分方向）＋ 延遲入場（矩陣、最佳組合、資金曲線、逐筆明細）。</div></div>`);
+  $('#out').innerHTML=h.join('');
+  drawMFE(); drawEquity();
+}
 
-  // 分層
+function renderLayers(all){
   const layers=[...new Set(TRADES.map(t=>t.layer))].sort((a,b)=>a-b);
-  h.push(`<div class="card"><h2>④ 手數分層（L1＝最細手數，白皮書 §3.1）</h2><table>
-    <tr><th>層</th><th class="n">手數</th><th class="n">筆數</th><th class="n">佔比</th><th class="n">淨點數</th><th class="n">勝率</th><th class="n">每筆平均</th></tr>`);
+  let h=`<div class="card"><h2>④ 手數分層（L1＝最細手數）</h2><table>
+  <tr><th>層</th><th class="n">手數</th><th class="n">筆數</th><th class="n">佔比</th><th class="n">淨點數</th><th class="n">勝率</th><th class="n">每筆平均</th></tr>`;
   layers.forEach(L=>{const arr=TRADES.filter(t=>t.layer===L),s=stats(arr);
-    h.push(`<tr><td>L${L}</td><td class="n">${LOTMAP[L-1]}</td><td class="n">${s.n}</td><td class="n">${pct(s.n/all.n)}</td>
+    h+=`<tr><td>L${L}</td><td class="n">${LOTMAP[L-1]}</td><td class="n">${s.n}</td><td class="n">${pct(s.n/all.n)}</td>
       <td class="n ${s.netPips>=0?'pos':'neg'}">${fmt(s.netPips,1)}</td><td class="n">${pct(s.wr)}</td>
-      <td class="n ${(s.netPips/s.n)>=0?'pos':'neg'}">${fmt(s.netPips/s.n,1)}</td></tr>`);});
-  h.push(`</table></div>`);
+      <td class="n ${(s.netPips/s.n)>=0?'pos':'neg'}">${fmt(s.netPips/s.n,1)}</td></tr>`;});
+  return h+`</table></div>`;
+}
 
-  // 商品 × 方向
+function renderSymTab(all){
   const syms=[...new Set(TRADES.map(t=>t.sym))].sort();
-  h.push(`<div class="card"><h2>⑤ 商品 × 方向總表</h2><table>
-    <tr><th>商品</th><th>方向</th><th class="n">筆數</th><th class="n">淨點數</th><th class="n">勝率</th><th class="n">盈利因子</th><th class="n">每筆平均</th></tr>`);
+  let h=`<div class="card"><h2>⑤ 商品 × 方向</h2><table>
+  <tr><th>商品</th><th>方向</th><th class="n">筆數</th><th class="n">淨點數</th><th class="n">勝率</th><th class="n">盈利因子</th><th class="n">每筆平均</th></tr>`;
   syms.forEach(sym=>['buy','sell'].forEach(d=>{
     const arr=TRADES.filter(t=>t.sym===sym&&t.dir===d); if(!arr.length) return;
     const s=stats(arr);
-    h.push(`<tr><td>${sym}</td><td>${d.toUpperCase()}</td><td class="n">${s.n}</td>
+    h+=`<tr><td>${sym}</td><td>${d.toUpperCase()}</td><td class="n">${s.n}</td>
       <td class="n ${s.netPips>=0?'pos':'neg'}">${fmt(s.netPips,1)}</td><td class="n">${pct(s.wr)}</td>
-      <td class="n">${isFinite(s.pf)?fmt(s.pf,2):'∞'}</td><td class="n ${(s.netPips/s.n)>=0?'pos':'neg'}">${fmt(s.netPips/s.n,1)}</td></tr>`);}));
-  h.push(`</table></div>`);
-
-  // 月度熱力
-  h.push(renderHeat());
-  // MAE/MFE 散點
-  h.push(`<div class="card"><h2>⑦ MAE / MFE 散點（每點＝一筆交易）</h2>
-    <div class="mut">橫軸＝最大不利幅度（MAE pips），縱軸＝最大有利幅度（MFE pips）。綠點＝賺錢、紅點＝蝕錢。右上角＝大波動可雙向走。</div>
-    <canvas id="scatter" width="1100" height="380" style="width:100%;height:auto;margin-top:10px"></canvas></div>`);
-
-  // 延遲入場
-  h.push(renderDelay());
-
-  h.push(`<div class="card"><div class="mut">v2：Excel 頁面（總覽／分層／商品方向／月度熱力／MAE-MFE 散點）＋ 延遲入場（近似與精確）。精確模式需要分鐘資料。</div></div>`);
-  $('#out').innerHTML=h.join('');
-  drawScatter();
+      <td class="n">${isFinite(s.pf)?fmt(s.pf,2):'∞'}</td><td class="n ${(s.netPips/s.n)>=0?'pos':'neg'}">${fmt(s.netPips/s.n,1)}</td></tr>`;}));
+  return h+`</table></div>`;
 }
 
 function renderHeat(){
   const rows={};
-  TRADES.forEach(t=>{
-    if(t.ts===null) return;
-    const d=new Date(t.ts*1000);
+  TRADES.forEach(t=>{ if(t.ts===null) return; const d=new Date(t.ts*1000);
     const y=d.getUTCFullYear(), m=d.getUTCMonth()+1;
-    rows[y]=rows[y]||Array(12).fill(0);
-    rows[y][m-1]+=t.pips;
-  });
+    (rows[y]=rows[y]||Array(12).fill(0))[m-1]+=t.pips; });
   const ys=Object.keys(rows).sort();
-  let h=`<div class="card"><h2>⑥ 月度熱力表（按平倉月，單位：pips）</h2><table class="heat"><tr><th>年</th>`;
+  let h=`<div class="card"><h2>⑥ 月度熱力表（按平倉月，單位 pips）</h2><table class="heat"><tr><th>年</th>`;
   for(let m=1;m<=12;m++) h+=`<th>${m}月</th>`;
   h+=`<th class="n">合計</th></tr>`;
-  ys.forEach(y=>{
-    const tot=rows[y].reduce((a,b)=>a+b,0);
+  ys.forEach(y=>{const tot=rows[y].reduce((a,b)=>a+b,0);
     h+=`<tr><td>${y}</td>`;
-    rows[y].forEach(v=>{
-      const bg = v>0 ? `rgba(57,183,133,${Math.min(0.75,Math.abs(v)/2000)})` : v<0 ? `rgba(217,83,79,${Math.min(0.75,Math.abs(v)/2000)})` : 'transparent';
-      h+=`<td style="background:${bg}">${v?fmt(v,0):''}</td>`;
-    });
-    h+=`<td class="n ${tot>=0?'pos':'neg'}">${fmt(tot,0)}</td></tr>`;
-  });
-  h+=`</table></div>`;
-  return h;
+    rows[y].forEach(v=>{const bg=v>0?`rgba(57,183,133,${Math.min(0.7,Math.abs(v)/2500)})`:v<0?`rgba(217,83,79,${Math.min(0.7,Math.abs(v)/2500)})`:'transparent';
+      h+=`<td style="background:${bg}">${v?fmt(v,0):''}</td>`;});
+    h+=`<td class="n ${tot>=0?'pos':'neg'}">${fmt(tot,0)}</td></tr>`;});
+  return h+`</table></div>`;
 }
 
-function drawScatter(){
-  const cv=$('#scatter'); if(!cv) return;
-  const ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=36;
-  ctx.clearRect(0,0,W,H);
-  const xs=TRADES.map(t=>t.mae), ys=TRADES.map(t=>t.mfe);
-  const xmax=Math.max(10,...xs)*1.05, ymax=Math.max(10,...ys)*1.05;
-  const X=v=>pad+(v/xmax)*(W-pad*2), Y=v=>H-pad-(v/ymax)*(H-pad*2);
-  ctx.strokeStyle='#243343'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(pad,pad); ctx.lineTo(pad,H-pad); ctx.lineTo(W-pad,H-pad); ctx.stroke();
-  ctx.fillStyle='#8fa4b8'; ctx.font='12px sans-serif';
-  ctx.fillText('MAE (pips) →', W/2, H-10);
-  ctx.save(); ctx.translate(12,H/2); ctx.rotate(-Math.PI/2); ctx.fillText('MFE (pips) →',0,0); ctx.restore();
-  TRADES.forEach(t=>{
-    ctx.fillStyle = t.pips>0 ? 'rgba(57,183,133,0.65)' : 'rgba(217,83,79,0.65)';
-    ctx.beginPath(); ctx.arc(X(Math.min(t.mae,xmax)), Y(Math.min(t.mfe,ymax)), 2.4, 0, Math.PI*2); ctx.fill();
+/* ============ MAE/MFE：分方向 ============ */
+function renderMFE(){
+  const tps=document.querySelector('#refTP')?.value||50, sls=document.querySelector('#refSL')?.value||20;
+  return `<div class="card"><h2>⑦ MAE／MFE（已分方向）</h2>
+  <div class="mut">每個點＝一筆交易。橫軸＝最大不利幅度（MAE，向右越大代表越逆水）；縱軸＝最大有利幅度（MFE）。
+  綠色＝賺錢交易、紅色＝蝕錢。虛線＝你設定的止賺／止蝕參考（吸一口氣就知有幾多交易在 SL 之前已到 TP）。</div>
+  <div style="margin:8px 0">止賺參考 <input type="number" id="refTP" value="${tps}" style="width:70px"> pips　止蝕參考 <input type="number" id="refSL" value="${sls}" style="width:70px"> pips
+    <button onclick="render()">更新</button></div>
+  <div class="grid2">
+    <div><h3>BUY 單</h3><canvas id="cvBuy" width="560" height="330" style="width:100%;height:auto"></canvas></div>
+    <div><h3>SELL 單</h3><canvas id="cvSell" width="560" height="330" style="width:100%;height:auto"></canvas></div>
+  </div></div>`;
+}
+function drawMFE(){
+  const tp=+(document.querySelector('#refTP')?.value||50), sl=+(document.querySelector('#refSL')?.value||20);
+  [['buy','cvBuy'],['sell','cvSell']].forEach(([d,id])=>{
+    const cv=$('#'+id); if(!cv) return;
+    const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,pad=40;
+    ctx.clearRect(0,0,W,H);
+    const arr=TRADES.filter(t=>t.dir===d);
+    const xmax=Math.max(20,...arr.map(t=>t.mae))*1.05, ymax=Math.max(20,...arr.map(t=>t.mfe))*1.05;
+    const X=v=>pad+(v/xmax)*(W-pad*1.2), Y=v=>H-pad-(v/ymax)*(H-pad*1.4);
+    // 參考線
+    ctx.strokeStyle='#3a4c60'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(X(sl),pad*0.4); ctx.lineTo(X(sl),H-pad); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad,Y(tp)); ctx.lineTo(W-pad*0.6,Y(tp)); ctx.stroke();
+    ctx.setLineDash([]);
+    // 軸
+    ctx.strokeStyle='#243343'; ctx.beginPath(); ctx.moveTo(pad,pad*0.4); ctx.lineTo(pad,H-pad); ctx.lineTo(W-pad*0.6,H-pad); ctx.stroke();
+    ctx.fillStyle='#8fa4b8'; ctx.font='11px sans-serif';
+    ctx.fillText('MAE (pips) →',W/2,H-8);
+    ctx.save(); ctx.translate(12,H/2); ctx.rotate(-Math.PI/2); ctx.fillText('MFE (pips) →',0,0); ctx.restore();
+    ctx.fillText('SL '+sl, X(sl)+4, H-pad-6);
+    ctx.fillText('TP '+tp, pad+4, Y(tp)-6);
+    arr.forEach(t=>{ ctx.fillStyle=t.pips>0?'rgba(57,183,133,0.6)':'rgba(217,83,79,0.6)';
+      ctx.beginPath(); ctx.arc(X(Math.min(t.mae,xmax)),Y(Math.min(t.mfe,ymax)),2.3,0,Math.PI*2); ctx.fill(); });
   });
 }
 
-function renderDelay(){
-  const hasM1 = Object.keys(M1).length>0;
-  const XS=[0,10,20,30,40,50,60], SS=[10,15,20], TS=[50,100];
-  const layers=[...new Set(TRADES.map(t=>t.layer))].sort((a,b)=>a-b);
-  let h=`<div class="card"><h2>⑧ 延遲入場（${hasM1?'精確：用分鐘路徑':'近似：用 MFE/MAE'}）</h2>
-   <div class="mut">口徑：由原入場價逆走 D 點入場；由新入場價再逆走 S 點止蝕；目標回到原入場價 ±T 點。期望以「該層全部原始交易」為分母（未觸發視為沒有交易）。</div>
-   <table style="margin-top:8px"><tr><th>層</th><th class="n">最佳 D</th><th class="n">S</th><th class="n">T</th><th class="n">觸發率</th><th class="n">勝率</th><th class="n">賠率</th><th class="n">每筆期望(pips)</th><th class="n">D=0 對照</th><th class="n">樣本</th></tr>`;
-  const tzoff = +(document.querySelector('#tzoff')?.value||0)*3600;
-
-  layers.forEach(L=>{
-    const arr=TRADES.filter(t=>t.layer===L);
-    if(arr.length<10) return;
-    let best=null;
-    XS.forEach(D=>SS.forEach(S=>TS.forEach(T=>{
-      let trig=0,sum=0,wins=0,gp=0,gl=0;
-      arr.forEach(t=>{
-        let res=null;
-        if(hasM1) res=simulateExact(t,D,S,T,tzoff);
-        else {
-          if(t.mae+1e-9<D) return;
-          res={pips:t.pips+D};
-        }
-        if(res===null) return;
-        trig++; sum+=res.pips;
-        if(res.pips>0){wins++;gp+=res.pips;} else gl+=Math.abs(res.pips);
-      });
-      if(trig<10) return;
-      const cand={D,S,T,trig:trig/arr.length,wr:wins/trig,odds:(gl&&wins)?(gp/wins)/(gl/(trig-wins||1)):Infinity,exp:sum/arr.length,n:trig};
-      if(!best||cand.exp>best.exp) best=cand;
-    })));
-    if(!best){ h+=`<tr><td>L${L}</td><td colspan="9" class="mut">樣本不足</td></tr>`; return; }
-    const base=arr.reduce((s,t)=>s+t.pips,0)/arr.length;
-    h+=`<tr><td>L${L}</td><td class="n">${best.D}</td><td class="n">${best.S}</td><td class="n">${best.T}</td>
-      <td class="n">${pct(best.trig)}</td><td class="n">${pct(best.wr)}</td><td class="n">${isFinite(best.odds)?fmt(best.odds,2):'∞'}</td>
-      <td class="n ${best.exp>=0?'pos':'neg'}">${fmt(best.exp,1)}</td><td class="n">${fmt(base,1)}</td><td class="n">${best.n}</td></tr>`;
-  });
-  h+=`</table></div>`;
-  return h;
-}
-
-// 精確模擬：用分鐘 OHLC 路徑
-function simulateExact(t,D,S,T,tzoff){
-  const m=M1[(t.sym||'').toUpperCase()]; if(!m) return null;
-  const pip=pipSize(t.sym);
-  const t0=(t.ts||0)+tzoff, t1=(t.ts?(t.ts+ (parseDur(t.t1,t.t0)) ):0)+tzoff;
-  if(!t0) return null;
-  const d = t.dir==='buy'?1:-1;
-  const lvl=t.p0 - d*D*pip, sl=lvl - d*S*pip, tp=t.p0 + d*T*pip;
-  let i=lowerBound(m.ts, t0);
-  let entered=false;
-  const end=Math.min(m.ts.length, i+ 20000);
-  for(; i<end; i++){
-    const lo=m.l[i], hi=m.h[i];
-    if(!entered){
-      if((d>0&&lo<=lvl)||(d<0&&hi>=lvl)) entered=true; else continue;
-    }
-    if((d>0&&lo<=sl)||(d<0&&hi>=sl)) return {pips:-S};
-    if((d>0&&hi>=tp)||(d<0&&lo<=tp)) return {pips:D+T};
-    if(t1 && m.ts[i]>t1) break;
+/* ============ 延遲入場 ============ */
+function simExact(t,D,S,T,tzoff){
+  const m=M1[(t.sym||'').toUpperCase()]; if(!m||t.ts===null) return null;
+  const pip=pipSize(t.sym), d=t.dir==='buy'?1:-1;
+  const lvl=t.p0-d*D*pip, sl=lvl-d*S*pip, tp=t.p0+d*T*pip;
+  let i=lowerBound(m.ts,t.ts+tzoff);
+  const end=Math.min(m.ts.length,i+20000);
+  let entered=false, seg=[];
+  for(;i<end;i++){
+    const lo=m.l[i],hi=m.h[i],ts=m.ts[i];
+    if(!entered){ if((d>0&&lo<=lvl)||(d<0&&hi>=lvl)){entered=true;seg.push({i,ts,px:lvl});} else continue; }
+    if((d>0&&lo<=sl)||(d<0&&hi>=sl)) return {pips:-S,trig:true,exitTs:ts,exitPx:sl,reason:'SL'};
+    if((d>0&&hi>=tp)||(d<0&&lo<=tp)) return {pips:D+T,trig:true,exitTs:ts,exitPx:tp,reason:'TP'};
+    if(t.ts1 && ts>t.ts1+tzoff) break;
   }
   if(!entered) return null;
   const last=m.c[Math.min(i,m.c.length-1)];
-  return {pips:(last-lvl)*d/pip};
+  return {pips:(last-lvl)*d/pip,trig:true,exitTs:m.ts[Math.min(i,m.c.length-1)],exitPx:last,reason:'時間到'};
 }
-function parseDur(t1s,t0s){
-  const a=parseTime(t1s), b=parseTime(t0s);
-  if(a===null||b===null) return 0;
-  return Math.max(0,a-b);
+const lowerBound=(arr,x)=>{let lo=0,hi=arr.length;while(lo<hi){const m=(lo+hi)>>1;if(arr[m]<x)lo=m+1;else hi=m;}return lo;};
+
+function renderDelay(){
+  const hasM1=Object.keys(M1).length>0;
+  const XS=[0,10,20,30,40,50,60], SS=[10,15,20], TS=[50,100];
+  const layers=[...new Set(TRADES.map(t=>t.layer))].sort((a,b)=>a-b);
+  const tzoff=+(document.querySelector('#tzoff')?.value||0)*3600;
+  BEST={};
+  const matrix={}; // layer -> D -> exp
+  layers.forEach(L=>{
+    const arr=TRADES.filter(t=>t.layer===L); if(arr.length<10) return;
+    let best=null; matrix[L]={};
+    XS.forEach(D=>{
+      let bestAtD=null;
+      SS.forEach(S=>TS.forEach(T=>{
+        let trig=0,sum=0,wins=0,gp=0,gl=0,detail=[];
+        arr.forEach(t=>{
+          let r=null;
+          if(hasM1) r=simExact(t,D,S,T,tzoff);
+          else { if(t.mae+1e-9<D) return; r={pips:t.pips+D,trig:true,reason:'近似'}; }
+          if(!r) return;
+          trig++; sum+=r.pips;
+          if(r.pips>0){wins++;gp+=r.pips;} else gl+=Math.abs(r.pips);
+          detail.push({t,pips:r.pips,reason:r.reason});
+        });
+        if(trig<10) return;
+        const cand={D,S,T,trig:trig/arr.length,wr:wins/trig,
+          odds:(gl&&wins)?(gp/wins)/(gl/(trig-wins||1)):Infinity,
+          exp:sum/arr.length,n:trig,detail};
+        if(!best||cand.exp>best.exp) best=cand;
+        if(!bestAtD||cand.exp>bestAtD.exp) bestAtD=cand;
+      }));
+      if(bestAtD) matrix[L][D]=bestAtD.exp;
+    });
+    if(best) BEST[L]=best;
+  });
+
+  // 矩陣熱力
+  let h=`<div class="card"><h2>⑧ 延遲入場 — 期望值矩陣（層 × 延遲 D）</h2>
+  <div class="mut">格＝「每筆原始交易」的期望 pips（未觸發當作沒有交易）。${hasM1?'<b>精確模式</b>：用你上載的分鐘路徑。':'<b>近似模式</b>：用 MFE/MAE 推算，僅供方向參考。'}</div>
+  <table class="heat" style="margin-top:8px"><tr><th>層</th>`;
+  XS.forEach(D=>h+=`<th>D=${D}</th>`);
+  h+=`</tr>`;
+  layers.forEach(L=>{
+    if(!matrix[L]) return;
+    h+=`<tr><td>L${L}</td>`;
+    XS.forEach(D=>{
+      const v=matrix[L][D];
+      if(v===undefined){ h+=`<td class="mut">-</td>`; return; }
+      const a=Math.min(0.75,Math.abs(v)/120);
+      const bg=v>0?`rgba(57,183,133,${a})`:`rgba(217,83,79,${a})`;
+      h+=`<td style="background:${bg}">${fmt(v,0)}</td>`;
+    });
+    h+=`</tr>`;
+  });
+  h+=`</table></div>`;
+
+  // 最佳組合
+  h+=`<div class="card"><h2>⑨ 每層最佳組合</h2><table>
+  <tr><th>層</th><th class="n">D</th><th class="n">止蝕</th><th class="n">止賺</th><th class="n">觸發率</th><th class="n">勝率</th><th class="n">賠率</th><th class="n">每筆期望</th><th class="n">D=0 對照</th><th class="n">樣本</th></tr>`;
+  layers.forEach(L=>{
+    const b=BEST[L]; if(!b) return;
+    const arr=TRADES.filter(t=>t.layer===L);
+    const base=arr.reduce((s,t)=>s+t.pips,0)/arr.length;
+    h+=`<tr><td>L${L}</td><td class="n">${b.D}</td><td class="n">${b.S}</td><td class="n">${b.T}</td>
+      <td class="n">${pct(b.trig)}</td><td class="n">${pct(b.wr)}</td><td class="n">${isFinite(b.odds)?fmt(b.odds,2):'∞'}</td>
+      <td class="n ${b.exp>=0?'pos':'neg'}">${fmt(b.exp,1)}</td><td class="n">${fmt(base,1)}</td><td class="n">${b.n}</td></tr>`;
+  });
+  h+=`</table></div>`;
+
+  // 資金曲線
+  h+=`<div class="card"><h2>⑩ 資金曲線：原策略 vs 延遲策略</h2>
+  <div class="mut">藍＝原策略（每筆按時間累加）；綠＝用每層最佳組合後的累加。若綠線長期高於藍線，代表延遲有價值。</div>
+  <canvas id="cvEq" width="1120" height="300" style="width:100%;height:auto;margin-top:10px"></canvas></div>`;
+
+  // 逐筆明細
+  h+=`<div class="card"><h2>⑪ 逐筆明細（可查交易紀錄）</h2>
+  <div style="margin-bottom:8px">層：<select id="fLayer" onchange="applyFilter()">
+    <option value="all">全部</option>${layers.map(L=>`<option value="${L}">L${L}</option>`).join('')}</select>
+    　<input type="checkbox" id="fTrig" onchange="applyFilter()"> 只顯示有觸發
+    <span class="mut">（最多顯示 300 筆）</span></div>
+  <div class="scroll"><table id="tblTrades"><thead><tr>
+    <th>時間</th><th>商品</th><th>方向</th><th class="n">層</th><th class="n">手數</th>
+    <th class="n">原淨點</th><th class="n">最佳 D</th><th class="n">觸發後結果</th><th>出場原因</th></tr></thead><tbody></tbody></table></div></div>`;
+  setTimeout(applyFilter,0);
+  return h;
 }
-function lowerBound(arr,x){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid]<x)lo=mid+1;else hi=mid;}return lo;}
+
+function applyFilter(){
+  const lb=document.querySelector('#fLayer'), cb=document.querySelector('#fTrig');
+  const tv=document.querySelector('#tblTrades tbody'); if(!tv) return;
+  const L=lb?lb.value:'all', onlyTrig=cb?cb.checked:false;
+  const rows=[];
+  Object.keys(BEST).forEach(k=>{
+    if(L!=='all' && String(k)!==String(L)) return;
+    const b=BEST[k];
+    b.detail.forEach(d=>{
+      if(onlyTrig && !d.trig) return;
+      rows.push({...d,layer:k,D:b.D});
+    });
+  });
+  rows.sort((a,b)=>a.t.order-b.t.order);
+  const shown=rows.slice(0,300);
+  tv.innerHTML=shown.map(r=>`<tr>
+    <td>${r.t.t0}</td><td>${r.t.sym}</td><td>${r.t.dir.toUpperCase()}</td>
+    <td class="n">L${r.layer}</td><td class="n">${r.t.lots}</td>
+    <td class="n ${r.t.pips>=0?'pos':'neg'}">${fmt(r.t.pips,1)}</td>
+    <td class="n">${r.D}</td>
+    <td class="n ${r.pips>=0?'pos':'neg'}">${fmt(r.pips,1)}</td>
+    <td>${r.reason||'-'}</td></tr>`).join('') ||
+    `<tr><td colspan="9" class="mut">沒有符合條件的交易</td></tr>`;
+}
+
+function drawEquity(){
+  const cv=document.querySelector('#cvEq'); if(!cv) return;
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,pad=40;
+  ctx.clearRect(0,0,W,H);
+  const arr=[...TRADES].sort((a,b)=>a.order-b.order);
+  // 原策略累加
+  let c1=0; const s1=arr.map(t=>c1+=t.pips);
+  // 延遲：用該層最佳組合
+  const map=new Map(arr.map(t=>[t,t]));
+  let c2=0; const s2=arr.map(t=>{
+    const b=BEST[t.layer];
+    if(!b) return c2+=t.pips;
+    const d=b.detail.find(x=>x.t===t);
+    return c2 += d? d.pips : 0;
+  });
+  const ymin=Math.min(0,...s1,...s2), ymax=Math.max(0,...s1,...s2);
+  const X=i=>pad+(i/(arr.length-1||1))*(W-pad*1.2);
+  const Y=v=>H-pad-((v-ymin)/(ymax-ymin||1))*(H-pad*1.5);
+  ctx.strokeStyle='#243343'; ctx.beginPath(); ctx.moveTo(pad,Y(0)); ctx.lineTo(W-pad*0.6,Y(0)); ctx.stroke();
+  const draw=(arr2,color)=>{ ctx.strokeStyle=color; ctx.lineWidth=1.6; ctx.beginPath();
+    arr2.forEach((v,i)=>{ i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)); }); ctx.stroke(); };
+  draw(s1,'#5aa9e6'); draw(s2,'#39b785');
+  ctx.fillStyle='#8fa4b8'; ctx.font='12px sans-serif';
+  ctx.fillText('藍：原策略　綠：延遲策略（每層最佳）', pad, 20);
+  ctx.fillText(fmt(s1[s1.length-1]||0,0), W-pad*0.55, Y(s1[s1.length-1]||0));
+  ctx.fillText(fmt(s2[s2.length-1]||0,0), W-pad*0.55, Y(s2[s2.length-1]||0)+14);
+}
+
+function renderTrades(){
+  return `<div class="card"><h2>⑫ 全部交易紀錄（原始）</h2>
+  <div class="scroll"><table><thead><tr><th>開倉時間</th><th>商品</th><th>方向</th><th class="n">層</th><th class="n">手數</th>
+  <th class="n">淨點</th><th class="n">金額</th><th class="n">MAE</th><th class="n">MFE</th><th>註解</th></tr></thead><tbody>
+  ${TRADES.slice(0,400).map(t=>`<tr><td>${t.t0}</td><td>${t.sym}</td><td>${t.dir.toUpperCase()}</td>
+    <td class="n">L${t.layer}</td><td class="n">${t.lots}</td>
+    <td class="n ${t.pips>=0?'pos':'neg'}">${fmt(t.pips,1)}</td>
+    <td class="n ${t.profit>=0?'pos':'neg'}">${fmt(t.profit,2)}</td>
+    <td class="n">${fmt(t.mae,1)}</td><td class="n">${fmt(t.mfe,1)}</td><td class="mut">${t.comment}</td></tr>`).join('')}
+  </tbody></table></div><div class="mut" style="margin-top:6px">最多顯示 400 筆（按檔案順序）。</div></div>`;
+}
 </script>
 </body>
 </html>
