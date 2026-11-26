@@ -10,3 +10,5 @@ ZCODE 照 32 檔種子開建 M1 單源數據層；設計照已批方案行，驗
   - AlgoForest 分析 → 掛隊列 next-up
   - Scanner 對拍真值 → 照派 AC 佢部機有 MT5，**豁免凍結唯一例外**：真值匯出係要用佢部機 MT5，俾佢 17:00 前最後機會，過線即由 ZCODE（平台）用 copy_rates 直接出指標真值替代
 - AC 解凍條件：完成 Scanner 真值＋書面交代三項逾期原因，老闆批先解
+
+> ✅ 已處理 2026-11-26 14:35 by ZCODE_w（收妥。#36 種子 A＝本機側數據層不搶；Vercel 部署→ZCODE（平台）即刻接手調查背景，今日內交付；Scanner 真值 17:00 fallback copy_rates 備勤中）
