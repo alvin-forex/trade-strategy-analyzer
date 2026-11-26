@@ -647,87 +647,111 @@ function simExact(t,D,S,T,tzoff){
 const lowerBound=(a,x)=>{let lo=0,hi=a.length;while(lo<hi){const m=(lo+hi)>>1;if(a[m]<x)lo=m+1;else hi=m;}return lo;};
 
 function drawEquity(){
-  const cv=document.querySelector('#cvEq'); if(!cv)return;
+  const cv=document.querySelector('#cvEq'); if(!cv) return;
+  const ctx=cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+
   const GRP=SEL.grp;
   const pool=TRADES.filter(t=>(t.magic||'（無 Magic）')===GRP);
-  const selLayer = SEL.eqLayer || 'ALL';
-  const mode = SEL.eqMode || 'both';
-  const arr=(selLayer==='ALL'?pool.filter(t=>t.layer):pool.filter(t=>t.layer===Number(selLayer)))
-            .sort((a,b)=>a.order-b.order);
-  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,pad=46;
-  ctx.clearRect(0,0,W,H);
-  if(!arr.length){ctx.fillStyle='#8fa4b8';ctx.font='12px sans-serif';ctx.fillText('此層沒有交易',pad,40);return;}
+  const selLayer=SEL.eqLayer||'ALL';
+  const mode=SEL.eqMode||'both';
+  let arr;
+  if(selLayer==='ALL') arr=pool.filter(t=>t.layer);
+  else arr=pool.filter(t=>t.layer===Number(selLayer));
+  arr=arr.slice().sort((a,b)=>a.order-b.order);
 
-  let c1=0,c2=0; const s1=[],s2=[];
+  const L=48, R=W-26;
+  if(arr.length<2){ ctx.fillStyle='#8fa4b8'; ctx.font='12px sans-serif'; ctx.fillText('此層交易不足，無法畫線', L, 40); return; }
+
+  // 兩條曲線
+  const s1=[], s2=[];
+  let a1=0, a2=0;
   arr.forEach(t=>{
-    c1+=t.profit; s1.push(c1);
+    a1+=t.profit; s1.push(a1);
     let d=null;
-    if(selLayer==='ALL'){const bb=BEST[t.layer]; d=bb?bb.detail.find(x=>x.t===t):null;}
-    else {const bb=BEST[Number(selLayer)]; d=bb?bb.detail.find(x=>x.t===t):null;}
-    c2 += d? d.pips*(t.pp!==null&&isFinite(t.pp)?t.pp:1) : 0;
-    s2.push(c2);
+    const bb = (selLayer==='ALL') ? BEST[t.layer] : BEST[Number(selLayer)];
+    if(bb) d=bb.detail.find(x=>x.t===t);
+    const ppv=(t.pp!==null && isFinite(t.pp)) ? t.pp : 1;
+    a2 += d ? d.pips*ppv : 0;
+    s2.push(a2);
   });
-  const ddOf=(s)=>{let pk=-1e15,out=[];s.forEach(v=>{pk=Math.max(pk,v);out.push(v-pk);});return out;};
-  const d1=ddOf(s1), d2=ddOf(s2);
 
-  const topPad=30, leftPad=pad, rightPad=W-pad*0.6;
-  const eqH = mode==='both'? Math.floor((H-70)*0.56) : (H-80);
-  const ddH = mode==='both'? (H-70-eqH-30) : (H-80);
-  const eqTop = topPad, eqBot = topPad+eqH;
-  const ddTop = eqBot+22, ddBot = ddTop+ddH;
+  const dd=(s)=>{ let pk=-1e15, out=[]; for(const v of s){ pk=Math.max(pk,v); out.push(v-pk); } return out; };
+  const d1=dd(s1), d2=dd(s2);
 
-  const drawEq=()=>{
-    const ymin=Math.min(0,...s1,...s2), ymax=Math.max(0,...s1,...s2);
-    const X=i=>leftPad+(i/(arr.length-1||1))*(rightPad-leftPad);
-    const Y=v=>eqBot-((v-ymin)/((ymax-ymin)||1))*(eqH-14);
-    ctx.strokeStyle='#243343';ctx.beginPath();ctx.moveTo(leftPad,Y(0));ctx.lineTo(rightPad,Y(0));ctx.stroke();
-    const line=(a,c)=>{ctx.strokeStyle=c;ctx.lineWidth=1.7;ctx.beginPath();a.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));ctx.stroke();};
-    line(s1,'#5aa9e6'); line(s2,'#39b785');
-    ctx.font='12px sans-serif';
-    ctx.fillStyle='#5aa9e6'; ctx.fillText('原策略 $'+fmt(s1[s1.length-1],0),leftPad,eqTop+12);
-    ctx.fillStyle='#39b785'; ctx.fillText('最佳組合 $'+fmt(s2[s2.length-1],0),leftPad+190,eqTop+12);
-    return {X};
-  };
+  const PAD_T=28;
+  const eqTop=PAD_T;
+  const eqBot = (mode==='both') ? Math.round(H*0.56) : (H-24);
+  const ddTop = eqBot+26;
+  const ddBot = H-14;
+  const X=i=>L+(i/(arr.length-1))*(R-L);
 
-  const drawDD=(X)=>{
-    const maxAbs=Math.max(1,...d1.map(Math.abs),...d2.map(Math.abs));
-    const Yd=v=>ddTop+(Math.abs(v)/maxAbs)*(ddH-4);
-    // 基準線（0）
-    ctx.strokeStyle='#243343';ctx.beginPath();ctx.moveTo(leftPad,ddTop);ctx.lineTo(rightPad,ddTop);ctx.stroke();
-    const area=(a,fill,stroke)=>{
-      ctx.beginPath(); ctx.moveTo(X(0),ddTop);
-      a.forEach((v,i)=>ctx.lineTo(X(i),Yd(v)));
-      ctx.lineTo(X(a.length-1),ddTop); ctx.closePath();
-      ctx.fillStyle=fill; ctx.fill();
-      ctx.strokeStyle=stroke; ctx.lineWidth=1.3; ctx.stroke();
-    };
-    area(d1,'rgba(90,169,230,0.25)','#5aa9e6');
-    area(d2,'rgba(57,183,133,0.25)','#39b785');
+  function drawPanelEquity(){
+    let ymin=0, ymax=0;
+    for(const v of s1){ if(v<ymin)ymin=v; if(v>ymax)ymax=v; }
+    for(const v of s2){ if(v<ymin)ymin=v; if(v>ymax)ymax=v; }
+    if(ymax===ymin){ ymax=ymin+1; }
+    const Y=v=>eqBot-((v-ymin)/(ymax-ymin))*(eqBot-eqTop);
+    // 0 線
+    ctx.strokeStyle='#243343'; ctx.lineWidth=1; ctx.beginPath();
+    ctx.moveTo(L,Y(0)); ctx.lineTo(R,Y(0)); ctx.stroke();
     // 刻度
-    ctx.fillStyle='#8fa4b8'; ctx.font='11px sans-serif';
-    ctx.fillText('0', leftPad-18, ddTop+4);
-    ctx.fillText('-'+fmt(maxAbs,0), leftPad-38, ddTop+ddH);
-    ctx.fillText('回撤 $　原 '+fmt(Math.min(...d1),0)+'　最佳 '+fmt(Math.min(...d2),0), leftPad, ddTop-7);
-  };
-
-  // 畫
-  if(mode==='dd'){
-    const X=i=>leftPad+(i/(arr.length-1||1))*(rightPad-leftPad);
-    drawDD(X);
-  } else {
-    const {X}=drawEq();
-    if(mode==='both') drawDD(X);
+    ctx.fillStyle='#6f8598'; ctx.font='11px sans-serif';
+    ctx.fillText(fmt(ymax,0), 4, eqTop+10);
+    ctx.fillText(fmt(ymin,0), 4, eqBot-2);
+    // 曲線
+    const plot=(s,color,w)=>{
+      ctx.strokeStyle=color; ctx.lineWidth=w; ctx.beginPath();
+      for(let i=0;i<s.length;i++){ const x=X(i), y=Y(s[i]); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+      ctx.stroke();
+    };
+    plot(s1,'#5aa9e6',1.8);
+    plot(s2,'#39b785',1.8);
+    // 標籤
+    ctx.font='12px sans-serif';
+    ctx.fillStyle='#5aa9e6'; ctx.fillText('原策略  $'+fmt(s1[s1.length-1],0), L, eqTop+12);
+    ctx.fillStyle='#39b785'; ctx.fillText('最佳組合  $'+fmt(s2[s2.length-1],0), L+200, eqTop+12);
   }
+
+  function drawPanelDD(){
+    let mx=1;
+    for(const v of d1) mx=Math.max(mx,Math.abs(v));
+    for(const v of d2) mx=Math.max(mx,Math.abs(v));
+    const Y=v=>ddTop+(Math.abs(v)/mx)*(ddBot-ddTop);
+    // 基準
+    ctx.strokeStyle='#243343'; ctx.lineWidth=1; ctx.beginPath();
+    ctx.moveTo(L,ddTop); ctx.lineTo(R,ddTop); ctx.stroke();
+    // 面積
+    const area=(s,fill,stroke)=>{
+      ctx.beginPath(); ctx.moveTo(X(0),ddTop);
+      for(let i=0;i<s.length;i++) ctx.lineTo(X(i),Y(s[i]));
+      ctx.lineTo(X(s.length-1),ddTop); ctx.closePath();
+      ctx.fillStyle=fill; ctx.fill();
+      ctx.strokeStyle=stroke; ctx.lineWidth=1.2; ctx.stroke();
+    };
+    area(d1,'rgba(90,169,230,0.28)','#5aa9e6');
+    area(d2,'rgba(57,183,133,0.28)','#39b785');
+    // 刻度
+    ctx.fillStyle='#6f8598'; ctx.font='11px sans-serif';
+    ctx.fillText('0', L-16, ddTop+4);
+    ctx.fillText('-'+fmt(mx,0), L-40, ddBot);
+    ctx.fillText('回撤 $　原 '+fmt(Math.min(...d1),0)+'　最佳 '+fmt(Math.min(...d2),0), L+2, ddTop-8);
+  }
+
+  if(mode==='eq'){ drawPanelEquity(); }
+  else if(mode==='dd'){ drawPanelDD(); }
+  else { drawPanelEquity(); drawPanelDD(); }
 
   const p=document.querySelector('#eqParams');
   if(p){
     if(selLayer==='ALL'){
-      const parts=[...new Set(arr.map(t=>t.layer))].sort((a,b2)=>a-b2)
-        .map(L=>BEST[L]?('L'+L+' D'+BEST[L].D+'/SL'+BEST[L].S+'/TP'+BEST[L].T):null).filter(Boolean);
+      const parts=[...new Set(arr.map(t=>t.layer))].sort((a,b)=>a-b)
+        .map(k=>BEST[k]?('L'+k+' D'+BEST[k].D+'/SL'+BEST[k].S+'/TP'+BEST[k].T):null).filter(Boolean);
       p.textContent='（目前：全部層；各層參數 → '+parts.join('、')+'）';
     } else {
       const b=BEST[Number(selLayer)];
-      p.textContent=b?('（目前：L'+selLayer+'；D='+b.D+'、SL='+b.S+'、TP='+b.T+'；觸發 '+b.detail.length+' 筆）'):'（此層樣本不足，未有最佳組合）';
+      p.textContent=b?('（目前：L'+selLayer+'；D='+b.D+'、SL='+b.S+'、TP='+b.T+'；觸發 '+b.detail.length+' 筆）'):'（此層樣本不足）';
     }
   }
 }
