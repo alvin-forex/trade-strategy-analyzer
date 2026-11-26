@@ -24,6 +24,9 @@ th{color:var(--mut);font-size:12px}.n{text-align:right}
 input[type=number],select{background:#0f1a24;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px}
 button{background:var(--acc);border:0;color:#08131c;font-weight:700;border-radius:6px;padding:6px 12px;cursor:pointer}
 .mut{color:var(--mut);font-size:12px}
+.nav{position:sticky;top:0;z-index:9;background:#0f1720;border-bottom:1px solid #243343;padding:8px 0;margin-bottom:10px;display:flex;gap:14px;flex-wrap:wrap}
+.nav a{color:#8fa4b8;text-decoration:none;font-size:13px}.nav a:hover{color:#5aa9e6}
+.card{scroll-margin-top:54px}
 table.heat td{text-align:center;font-size:12px;border:1px solid #1d2a38}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:900px){.grid2{grid-template-columns:1fr}}
@@ -108,22 +111,15 @@ function parseTrades(text){
 function tiersFor(arr){
   const cnt={}; arr.forEach(t=>cnt[t.lots]=(cnt[t.lots]||0)+1);
   const lots=Object.keys(cnt).map(Number).sort((a,b)=>a-b);
+  // 基準 lot＝出現次數最多（同頻取最細）
   let base=lots[0], best=-1;
   lots.forEach(l=>{ if(cnt[l]>best){best=cnt[l];base=l;} });
-  const ge2=lots.filter(l=>cnt[l]>=2);
-  const calib=ge2.length?Math.max(...ge2):base;
-  // 階梯候選：出現次數 >= max(3, 基準次數 20%) 的 lot
-  const th=Math.max(3, best*0.2);
-  const ladder=lots.filter(l=>cnt[l]>=th);
-  const ratios=[];
-  for(let i=1;i<ladder.length;i++){ const r=ladder[i]/ladder[i-1]; if(r>1.05) ratios.push(r); }
-  ratios.sort((a,b)=>a-b);
-  const m0 = ratios.length? ratios[Math.floor(ratios.length/2)] : 1;
-  let gap=0, mult=1;
-  if(base>0 && calib>base*1.05 && m0>1.0001){
-    gap=Math.max(1,Math.round(Math.log(calib/base)/Math.log(m0)));
-    mult=Math.pow(calib/base,1/gap);
-  }
+  // 階梯 lot＝出現 ≥2 次者；高於基準者為上層
+  const ladder=lots.filter(l=>cnt[l]>=2);
+  const above=ladder.filter(l=>l>base*1.05);
+  const steps=above.length;
+  const calib=above.length?above[above.length-1]:base;
+  const mult=steps?(Math.pow(calib/base,1/steps)):1;   // 幾何平均倍數
   let ok=0, un=0;
   arr.forEach(t=>{
     if(mult<=1.0001){ t.layer=1; ok++; return; }
@@ -132,9 +128,10 @@ function tiersFor(arr){
     if(lv>=1 && lv<=60 && Math.abs(exp-t.lots)/t.lots<=0.15){ t.layer=lv; ok++; }
     else { t.layer=null; un++; }
   });
-  return {base,calib,m0,gap,mult,lots,cnt,ladder,classified:ok,unclassified:un,
+  const used=new Set(arr.filter(t=>t.layer).map(t=>t.layer));
+  return {base,calib,m0:mult,gap:steps,mult,lots,cnt,ladder,above,classified:ok,unclassified:un,
     ratio:arr.length?ok/arr.length:0, n:arr.length,
-    judged:(mult>1.05 && new Set(arr.filter(t=>t.layer).map(t=>t.layer)).size>=2)?'有馬丁':'無馬丁／未偵測到'};
+    judged:(mult>1.05 && used.size>=2)?'有馬丁':'無馬丁／未偵測到'};
 }
 
 function computeTiers(){
@@ -195,6 +192,7 @@ function stat(arr){
 function render(){
   if(!TRADES.length)return;
   const all=stat(TRADES), h=[];
+  h.push(`<div class="nav"><a href="#s3">總覽</a><a href="#s4">馬丁分層</a><a href="#s5">商品×方向</a><a href="#s6">散點</a><a href="#s8">商品分析器</a><a href="#s9">樞紐</a><a href="#s10">月度</a><a href="#s11">延遲入場</a><a href="#s15">原始紀錄</a></div>`);
   h.push(secOverview(all));
   h.push(secTiers());
   h.push(secSymDir());
@@ -213,7 +211,7 @@ function render(){
 
 /* ③ 整倉總覽 */
 function secOverview(s){
-  return `<div class="card"><h2>③ 整倉總覽（對照 Excel 整倉總覽）</h2><div class="kpis">
+  return `<div class="card" id="s3"><h2>③ 整倉總覽（對照 Excel 整倉總覽）</h2><div class="kpis">
   <div class="kpi"><b>${s.n}</b><span>交易筆數</span></div>
   <div class="kpi"><b>${pct(s.wr)}</b><span>勝率</span></div>
   <div class="kpi"><b class="${s.netMoney>=0?'pos':'neg'}">${money(s.netMoney)}</b><span>總 P&L（$）</span></div>
@@ -231,7 +229,7 @@ function secOverview(s){
 /* ④ LotTiers（逐程式） */
 function secTiers(){
   const keys=Object.keys(TIERS);
-  let h=`<div class="card"><h2>④ 馬丁偵測（逐程式，對照 Excel LotTiers）</h2>
+  let h=`<div class="card" id="s4"><h2>④ 馬丁偵測（逐程式，對照 Excel LotTiers）</h2>
   <div class="mut">同一份紀錄可能混有多支程式（以 Magic Number 區分）。每支程式的馬丁手數階梯唔同，所以逐支分開偵測。表格可點程式名切換下方詳情。</div>
   <table style="margin-top:8px"><tr><th>程式（Magic）</th><th class="n">筆數</th><th class="n">基準 lot</th><th class="n">校準 lot</th>
   <th class="n">偵測倍數</th><th class="n">層差</th><th class="n">歸層比例</th><th>判定</th></tr>`;
@@ -266,7 +264,7 @@ function secTiers(){
 /* ⑥ 商品 × 方向（含 MAE/MFE 四欄） */
 function secSymDir(){
   const syms=[...new Set(TRADES.map(t=>t.sym))].sort();
-  let h=`<div class="card"><h2>⑤ 商品 × 方向總表（含 MAE／MFE 四欄）</h2>
+  let h=`<div class="card" id="s5"><h2>⑤ 商品 × 方向總表（含 MAE／MFE 四欄）</h2>
   <div class="scroll"><table><tr><th>商品</th><th>方向</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L $</th>
   <th class="n">avg MAE $</th><th class="n">avg MFE $</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>`;
   syms.forEach(sym=>['buy','sell'].forEach(d=>{
@@ -282,7 +280,7 @@ function secSymDir(){
 /* ⑦ ScatData */
 function secScat(){
   const unit=SEL.mfeUnit;
-  return `<div class="card"><h2>⑦ MAE／MFE 散點（對照 ScatData，已分 BUY／SELL）</h2>
+  return `<div class="card" id="s6"><h2>⑦ MAE／MFE 散點（對照 ScatData，已分 BUY／SELL）</h2>
   <div style="margin-bottom:8px">單位：
     <select id="mfeUnit" onchange="SEL.mfeUnit=this.value;render()">
       <option value="pips" ${unit==='pips'?'selected':''}>pips</option>
@@ -330,7 +328,7 @@ function secAnalyzer(){
   const syms=[...new Set(TRADES.map(t=>t.sym))].sort();
   const byPnl=[...syms].sort((a,b)=>TRADES.filter(t=>t.sym===b).reduce((s,t)=>s+t.profit,0)-TRADES.filter(t=>t.sym===a).reduce((s,t)=>s+t.profit,0));
   if(!SEL.sym) SEL.sym=byPnl[0];
-  return `<div class="card"><h2>⑧ 商品分析器（對照 Excel 商品分析器）</h2>
+  return `<div class="card" id="s8"><h2>⑧ 商品分析器（對照 Excel 商品分析器）</h2>
   <div>揀商品：<select id="symSel" onchange="SEL.sym=this.value;renderAnalyzer()">
    ${byPnl.map(s=>`<option value="${s}" ${SEL.sym===s?'selected':''}>${s}</option>`).join('')}
   </select> <span class="mut">（預設按總 P&L 排序）</span></div>
@@ -359,24 +357,68 @@ function renderAnalyzer(){
     <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n">${money(st.avgMAE)}</td>
     <td class="n">${money(st.avgMFE)}</td><td class="n">${fmt(st.avgMAEp,1)}</td><td class="n">${fmt(st.avgMFEp,1)}</td></tr>`).join('')}
   </table>
-  <h3>C. 分層（${sym}）</h3><table><tr><th>層</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
+  <h3>C. 分層（${sym}）— 圖表</h3><canvas id="cvLayer" width="900" height="240" style="width:100%;height:auto"></canvas>
+  <table style="margin-top:8px"><tr><th>層</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
   ${Object.keys(layerRows).map(Number).sort((a,b)=>a-b).map(L=>{const st=stat(layerRows[L]);
     return `<tr><td>L${L}</td><td class="n">${st.n}</td><td class="n">${pct(st.wr)}</td>
     <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n">${fmt(st.avgMAEp,1)}</td><td class="n">${fmt(st.avgMFEp,1)}</td></tr>`;}).join('')}
   </table>
-  <h3>D. 時間分佈（${sym}）</h3>
+  <h3>D. 時間分佈（${sym}）— 圖表</h3><canvas id="cvTime" width="900" height="240" style="width:100%;height:auto"></canvas>
+  <div class="grid2" style="margin-top:8px"><div>
   <table><tr><th>星期</th><th class="n">BUY P&L</th><th class="n">BUY n</th><th class="n">SELL P&L</th><th class="n">SELL n</th></tr>
   ${['一','二','三','四','五','六','日'].map((n,i)=>`<tr><td>${n}</td>${cell(wd[i].b)}${cell(wd[i].s)}</tr>`).join('')}
   </table>
-  <table style="margin-top:8px"><tr><th>小時(UTC)</th><th class="n">BUY P&L</th><th class="n">BUY n</th><th class="n">SELL P&L</th><th class="n">SELL n</th></tr>
+  </div><div><table><tr><th>小時(UTC)</th><th class="n">BUY P&L</th><th class="n">BUY n</th><th class="n">SELL P&L</th><th class="n">SELL n</th></tr>
   ${hr.map((o,i)=>`<tr><td>${String(i).padStart(2,'0')}</td>${cell(o.b)}${cell(o.s)}</tr>`).join('')}
-  </table>`;
+  </table></div></div>`;
   box.innerHTML=h;
+  drawAnalyzerCharts(sym, layerRows, wd, hr);
+}
+
+function drawAnalyzerCharts(sym, layerRows, wd, hr){
+  const cs=document.querySelector('#cvLayer'); 
+  if(cs){
+    const ctx=cs.getContext('2d'),W=cs.width,H=cs.height,pad=44;
+    ctx.clearRect(0,0,W,H);
+    const Ls=Object.keys(layerRows).map(Number).sort((a,b)=>a-b);
+    const vals=Ls.map(L=>layerRows[L].reduce((s,t)=>s+t.profit,0));
+    const ymin=Math.min(0,...vals), ymax=Math.max(0,...vals);
+    const bw=(W-pad*1.4)/Math.max(1,Ls.length);
+    const Y=v=>H-pad-((v-ymin)/((ymax-ymin)||1))*(H-pad*1.6);
+    ctx.strokeStyle='#243343';ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(W-pad*.4,Y(0));ctx.stroke();
+    Ls.forEach((L,i)=>{const v=vals[i],x=pad+i*bw;
+      ctx.fillStyle=v>=0?'rgba(57,183,133,.8)':'rgba(217,83,79,.8)';
+      const y0=Y(0),y1=Y(v); ctx.fillRect(x+bw*0.18,Math.min(y0,y1),bw*0.64,Math.abs(y1-y0));
+      ctx.fillStyle='#8fa4b8';ctx.font='11px sans-serif';
+      ctx.fillText('L'+L, x+bw*0.3, H-pad+14);
+      ctx.fillText(fmt(v,0), x+bw*0.12, v>=0? y1-4 : y1+12);});
+    ctx.fillStyle='#8fa4b8';ctx.fillText(sym+' 各層淨 P&L（$）',pad,16);
+  }
+  const ct=document.querySelector('#cvTime');
+  if(ct){
+    const ctx=ct.getContext('2d'),W=ct.width,H=ct.height,pad=40;
+    ctx.clearRect(0,0,W,H);
+    const series=[];
+    for(let d=0;d<2;d++){ const arr=d===0?'b':'s';
+      series.push(hr.map(o=>o[arr].reduce((s,t)=>s+t.profit,0))); }
+    const ymin=Math.min(0,...series[0],...series[1]), ymax=Math.max(0,...series[0],...series[1]);
+    const bw=(W-pad*1.4)/24;
+    const Y=v=>H-pad-((v-ymin)/((ymax-ymin)||1))*(H-pad*1.6);
+    ctx.strokeStyle='#243343';ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(W-pad*.4,Y(0));ctx.stroke();
+    for(let i=0;i<24;i++){
+      const x=pad+i*bw;
+      const b=series[0][i], s=series[1][i];
+      ctx.fillStyle='rgba(90,169,230,.75)'; const y0=Y(0),yb=Y(b); ctx.fillRect(x+bw*0.08,Math.min(y0,yb),bw*0.38,Math.abs(yb-y0));
+      ctx.fillStyle='rgba(224,161,60,.8)'; const ys=Y(s); ctx.fillRect(x+bw*0.52,Math.min(y0,ys),bw*0.38,Math.abs(ys-y0));
+      if(i%3===0){ctx.fillStyle='#8fa4b8';ctx.font='11px sans-serif';ctx.fillText(String(i).padStart(2,'0'),x,H-pad+14);}
+    }
+    ctx.font='11px sans-serif';ctx.fillText('藍＝BUY　橙＝SELL　按開倉小時（UTC）淨 P&L（$）',pad,16);
+  }
 }
 
 /* ⑨ 樞紐（g_DASH） */
 function secPivots(){
-  return `<div class="card"><h2>⑨ 樞紐分析（對照 g_DASH：日／月／星期／小時／商品）</h2>
+  return `<div class="card" id="s9"><h2>⑨ 樞紐分析（對照 g_DASH：日／月／星期／小時／商品）</h2>
    <div class="mut">下表為各維度的 BUY／SELL 分佈（金額 $）。圖表見下。</div>
    <canvas id="cvPivot" width="1150" height="260" style="width:100%;height:auto;margin-top:8px"></canvas></div>`;
 }
@@ -403,7 +445,7 @@ function secMonth(){
   TRADES.forEach(t=>{ if(t.ts===null)return; const d=new Date(t.ts*1000);
     const y=d.getUTCFullYear(),m=d.getUTCMonth()+1; (rows[y]=rows[y]||Array(12).fill(0))[m-1]+=t.profit;});
   const ys=Object.keys(rows).sort();
-  let h=`<div class="card"><h2>⑩ 月度 P&L（年 × 月，$）</h2><table class="heat"><tr><th>年</th>`;
+  let h=`<div class="card" id="s10"><h2>⑩ 月度 P&L（年 × 月，$）</h2><table class="heat"><tr><th>年</th>`;
   for(let m=1;m<=12;m++)h+=`<th>${m}月</th>`; h+=`<th class="n">合計</th></tr>`;
   ys.forEach(y=>{const tot=rows[y].reduce((a,b)=>a+b,0); h+=`<tr><td>${y}</td>`;
     rows[y].forEach(v=>{const bg=v>0?`rgba(57,183,133,${Math.min(0.7,Math.abs(v)/3000)})`:v<0?`rgba(217,83,79,${Math.min(0.7,Math.abs(v)/3000)})`:'transparent';
@@ -442,7 +484,7 @@ function secDelay(){
       if(bd)mat[L][D]=bd.exp;});
     if(best)BEST[L]=best;
   });
-  let h=`<div class="card"><h2>⑪ 延遲入場（程式：${GRP}；層＝LotTiers 判定；${hasM1?'精確：用分鐘路徑':'近似：用 MFE/MAE'}）</h2>
+  let h=`<div class="card" id="s11"><h2>⑪ 延遲入場（程式：${GRP}；層＝LotTiers 判定；${hasM1?'精確：用分鐘路徑':'近似：用 MFE/MAE'}）</h2>
   <div class="mut">口徑：由原入場價逆走 D 點入場；新入場價再逆走 S 點止蝕；目標回到原入場價 ±T 點。期望以該層全部原始交易為分母。</div>
   <table class="heat" style="margin-top:8px"><tr><th>層</th>${XS.map(D=>`<th>D=${D}</th>`).join('')}</tr>`;
   layers.forEach(L=>{ if(!mat[L])return; h+=`<tr><td>L${L}</td>`;
@@ -507,7 +549,7 @@ function drawEquity(){
 
 /* ⑮ 原始紀錄 */
 function secRaw(){
-  return `<div class="card"><h2>⑮ 原始交易紀錄（前 300 筆）</h2><div class="scroll"><table>
+  return `<div class="card" id="s15"><h2>⑮ 原始交易紀錄（前 300 筆）</h2><div class="scroll"><table>
   <tr><th>開倉</th><th>商品</th><th>方向</th><th class="n">lot</th><th class="n">層</th><th class="n">淨pips</th>
   <th class="n">淨$</th><th class="n">MAE pips</th><th class="n">MFE pips</th><th>註解</th></tr>
   ${TRADES.slice(0,300).map(t=>`<tr><td>${t.t0}</td><td>${t.sym}</td><td>${t.dir.toUpperCase()}</td>
