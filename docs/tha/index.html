@@ -24,6 +24,9 @@ th{color:var(--mut);font-size:12px}.n{text-align:right}
 input[type=number],select{background:#0f1a24;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px}
 button{background:var(--acc);border:0;color:#08131c;font-weight:700;border-radius:6px;padding:6px 12px;cursor:pointer}
 .mut{color:var(--mut);font-size:12px}
+.pills{display:inline-flex;gap:6px}
+.pill{background:#0f1a24;border:1px solid #243343;color:#8fa4b8;border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer}
+.pill.on{background:#5aa9e6;color:#08131c;border-color:#5aa9e6;font-weight:700}
 .nav{position:sticky;top:0;z-index:9;background:#0f1720;border-bottom:1px solid #243343;padding:8px 0;margin-bottom:10px;display:flex;gap:14px;flex-wrap:wrap}
 .nav a{color:#8fa4b8;text-decoration:none;font-size:13px}.nav a:hover{color:#5aa9e6}
 .card{scroll-margin-top:54px}
@@ -523,13 +526,11 @@ function secDelay(){
       ${layers.map(L=>`<option value="${L}" ${String(SEL.eqLayer)===String(L)?'selected':''}>L${L}（最佳 D${BEST[L]?BEST[L].D:'-'} · SL ${BEST[L]?BEST[L].S:'-'} · TP ${BEST[L]?BEST[L].T:'-'}）</option>`).join('')}
     </select>
     <span id="eqParams" class="mut"></span>
-    　<b>顯示模式：</b>
-    <select id="eqMode" onchange="SEL.eqMode=this.value;drawEquity()">
-      <option value="eq"  ${SEL.eqMode==='eq'?'selected':''}>只看淨值曲線</option>
-      <option value="dd"  ${SEL.eqMode==='dd'?'selected':''}>只看回撤（水下）</option>
-      <option value="both" ${(!SEL.eqMode||SEL.eqMode==='both')?'selected':''}>淨值＋回撤（上下兩格）</option>
-    </select>
-  </div>
+    　<span class="pills">
+      <button class="pill ${SEL.eqMode==='eq'?'on':''}" onclick="SEL.eqMode='eq';drawEquity()">淨值</button>
+      <button class="pill ${SEL.eqMode==='dd'?'on':''}" onclick="SEL.eqMode='dd';drawEquity()">回撤</button>
+      <button class="pill ${SEL.eqMode==='both'?'on':''}" onclick="SEL.eqMode='both';drawEquity()">淨值＋回撤</button>
+    </span>  </div>
   <canvas id="cvEq" width="1150" height="320" style="width:100%;height:auto"></canvas>
   <h3>每層對照（原來 vs 最佳組合）</h3>
   <table><tr><th>層</th><th class="n">原筆數</th><th class="n">原淨 $</th><th class="n">原 Max DD $</th><th class="n">最佳 D/S/T</th><th class="n">觸發</th><th class="n">最佳淨 $</th><th class="n">Δ $</th></tr>
@@ -669,11 +670,11 @@ function drawEquity(){
   const ddOf=(s)=>{let pk=-1e15,out=[];s.forEach(v=>{pk=Math.max(pk,v);out.push(v-pk);});return out;};
   const d1=ddOf(s1), d2=ddOf(s2);
 
-  const topPad=34, leftPad=pad, rightPad=W-pad*0.6;
-  const eqH = mode==='both'? Math.floor((H-60)*0.62) : (H-70);
-  const ddH = mode==='both'? (H-60-eqH-24) : (H-70);
+  const topPad=30, leftPad=pad, rightPad=W-pad*0.6;
+  const eqH = mode==='both'? Math.floor((H-70)*0.56) : (H-80);
+  const ddH = mode==='both'? (H-70-eqH-30) : (H-80);
   const eqTop = topPad, eqBot = topPad+eqH;
-  const ddTop = eqBot+24, ddBot = ddTop+ddH;
+  const ddTop = eqBot+22, ddBot = ddTop+ddH;
 
   const drawEq=()=>{
     const ymin=Math.min(0,...s1,...s2), ymax=Math.max(0,...s1,...s2);
@@ -689,22 +690,24 @@ function drawEquity(){
   };
 
   const drawDD=(X)=>{
-    const all=[...d1,...d2];
-    const dmin=Math.min(...all,0);
-    const Y=v=>ddTop+((v-dmin)/((-dmin)||1))*(ddH-6)*-1 + ddH; // v=0 → 底部, v=dmin → 頂
-    const Y2=v=>ddTop + (1-(v/dmin||0))*(ddH-6);
+    const maxAbs=Math.max(1,...d1.map(Math.abs),...d2.map(Math.abs));
+    const Yd=v=>ddTop+(Math.abs(v)/maxAbs)*(ddH-4);
+    // 基準線（0）
     ctx.strokeStyle='#243343';ctx.beginPath();ctx.moveTo(leftPad,ddTop);ctx.lineTo(rightPad,ddTop);ctx.stroke();
     const area=(a,fill,stroke)=>{
       ctx.beginPath(); ctx.moveTo(X(0),ddTop);
-      a.forEach((v,i)=>{ const y=ddTop+(v/(-dmin||1))*(ddH-6); ctx.lineTo(X(i),y); });
+      a.forEach((v,i)=>ctx.lineTo(X(i),Yd(v)));
       ctx.lineTo(X(a.length-1),ddTop); ctx.closePath();
       ctx.fillStyle=fill; ctx.fill();
-      ctx.strokeStyle=stroke; ctx.lineWidth=1.4; ctx.stroke();
+      ctx.strokeStyle=stroke; ctx.lineWidth=1.3; ctx.stroke();
     };
-    area(d1,'rgba(90,169,230,0.22)','#5aa9e6');
-    area(d2,'rgba(57,183,133,0.22)','#39b785');
-    ctx.fillStyle='#8fa4b8'; ctx.font='12px sans-serif';
-    ctx.fillText('回撤（水下，$）　原 Max '+fmt(dmin===0?0:Math.min(...d1),0)+'　最佳 Max '+fmt(Math.min(...d2),0), leftPad, ddTop-6);
+    area(d1,'rgba(90,169,230,0.25)','#5aa9e6');
+    area(d2,'rgba(57,183,133,0.25)','#39b785');
+    // 刻度
+    ctx.fillStyle='#8fa4b8'; ctx.font='11px sans-serif';
+    ctx.fillText('0', leftPad-18, ddTop+4);
+    ctx.fillText('-'+fmt(maxAbs,0), leftPad-38, ddTop+ddH);
+    ctx.fillText('回撤 $　原 '+fmt(Math.min(...d1),0)+'　最佳 '+fmt(Math.min(...d2),0), leftPad, ddTop-7);
   };
 
   // 畫
@@ -715,10 +718,6 @@ function drawEquity(){
     const {X}=drawEq();
     if(mode==='both') drawDD(X);
   }
-
-  ctx.fillStyle='#6f8598';ctx.font='11px sans-serif';
-  ctx.fillText('D＝由原入場價逆走 D 點才入場；SL＝新入場價再逆走 S 點；TP＝原入場價順走 T 點；未觸及 D 不入場；同棒雙觸及當先中 SL',leftPad,H-22);
-  ctx.fillText('回撤＝由當時最高淨值回落的幅度（負數越大越差）；近似模式未走路徑，只作方向參考',leftPad,H-8);
 
   const p=document.querySelector('#eqParams');
   if(p){
