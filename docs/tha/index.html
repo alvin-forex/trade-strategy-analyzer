@@ -56,7 +56,7 @@ const $=s=>document.querySelector(s);
 const fmt=(x,d=2)=>(x===null||x===undefined||isNaN(x))?'-':Number(x).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct=x=>isNaN(x)?'-':(x*100).toFixed(1)+'%';
 const money=x=>fmt(x,2);
-let TRADES=[], M1={}, TIERS=null, BEST={}, SEL={sym:null, mfeUnit:'pips'};
+let TRADES=[], M1={}, TIERS=null, BEST={}, SEL={sym:null, mfeUnit:'pips', eqLayer:'ALL'};
 
 $('#file').addEventListener('change',e=>{if(e.target.files[0])readTrades(e.target.files[0]);});
 $('#m1').addEventListener('change',e=>loadM1([...e.target.files]));
@@ -513,7 +513,15 @@ function secDelay(){
    ⑤ 到期仍未觸及 TP／SL，就以原平倉時間的價格結算（標「時間到」）。
    ⑥ <b>近似模式</b>（未上載分鐘資料）只做「原淨點數 ＋ D」的位移，<b>沒有真正模擬路徑</b>，只可作方向參考。
   </div>
-  <canvas id="cvEq" width="1150" height="300" style="width:100%;height:auto"></canvas>
+  <div style="margin:10px 0">
+    <b>顯示：</b>
+    <select id="eqLayer" onchange="SEL.eqLayer=this.value;drawEquity()">
+      <option value="ALL">ALL（全部層合計）</option>
+      ${layers.map(L=>`<option value="${L}" ${String(SEL.eqLayer)===String(L)?'selected':''}>L${L}（最佳 D${BEST[L]?BEST[L].D:'-'} · SL ${BEST[L]?BEST[L].S:'-'} · TP ${BEST[L]?BEST[L].T:'-'}）</option>`).join('')}
+    </select>
+    <span id="eqParams" class="mut"></span>
+  </div>
+  <canvas id="cvEq" width="1150" height="320" style="width:100%;height:auto"></canvas>
   <h3>每層對照（原來 vs 最佳組合）</h3>
   <table><tr><th>層</th><th class="n">原筆數</th><th class="n">原淨 $</th><th class="n">最佳 D/S/T</th><th class="n">觸發</th><th class="n">最佳淨 $</th><th class="n">Δ $</th></tr>
   ${layers.map(L=>{ const b=BEST[L]; const arr=base0.filter(t=>t.layer===L);
@@ -624,22 +632,46 @@ const lowerBound=(a,x)=>{let lo=0,hi=a.length;while(lo<hi){const m=(lo+hi)>>1;if
 
 function drawEquity(){
   const cv=document.querySelector('#cvEq'); if(!cv)return;
-  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,pad=44;
+  const GRP=SEL.grp;
+  const pool=TRADES.filter(t=>(t.magic||'（無 Magic）')===GRP);
+  const selLayer = SEL.eqLayer || 'ALL';
+  const arr = (selLayer==='ALL' ? pool.filter(t=>t.layer) : pool.filter(t=>t.layer===Number(selLayer)))
+              .sort((a,b)=>a.order-b.order);
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,pad=46;
   ctx.clearRect(0,0,W,H);
-  const arr=[...TRADES].sort((a,b)=>a.order-b.order);
+  if(!arr.length){ ctx.fillStyle='#8fa4b8';ctx.fillText('此層沒有交易',pad,40); return; }
+
+  let b = selLayer==='ALL' ? null : BEST[Number(selLayer)];
   let c1=0,c2=0; const s1=[],s2=[];
-  arr.forEach(t=>{ c1+=t.profit; s1.push(c1);
-    const b=BEST[t.layer]; const dd=b?b.detail.find(x=>x.t===t):null;
-    c2+= dd? dd.pips : 0; s2.push(c2); });
+  arr.forEach(t=>{
+    c1 += t.profit; s1.push(c1);
+    let d=null;
+    if(selLayer==='ALL'){ const bb=BEST[t.layer]; d = bb? bb.detail.find(x=>x.t===t) : null; }
+    else { d = b? b.detail.find(x=>x.t===t) : null; }
+    c2 += d? (d.pips * (t.pp!==null&&isFinite(t.pp)? t.pp : 1)) : 0;
+    s2.push(c2);
+  });
   const ymin=Math.min(0,...s1,...s2), ymax=Math.max(0,...s1,...s2);
-  const X=i=>pad+(i/(arr.length-1||1))*(W-pad*1.3), Y=v=>H-pad-((v-ymin)/((ymax-ymin)||1))*(H-pad*1.5);
+  const X=i=>pad+(i/(arr.length-1||1))*(W-pad*1.3), Y=v=>H-pad-((v-ymin)/((ymax-ymin)||1))*(H-pad*1.8);
   ctx.strokeStyle='#243343';ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(W-pad*.4,Y(0));ctx.stroke();
   const line=(a,c)=>{ctx.strokeStyle=c;ctx.lineWidth=1.6;ctx.beginPath();a.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));ctx.stroke();};
   line(s1,'#5aa9e6'); line(s2,'#39b785');
-  ctx.fillStyle='#8fa4b8';ctx.font='12px sans-serif';
-  ctx.fillText('藍＝原策略（$）　綠＝延遲策略（pips 累加，僅相對比較）',pad,18);
-  ctx.fillStyle='#6f8598';ctx.font='11px sans-serif';
-  ctx.fillText('D＝由原入場價逆走 D 點才入場；SL＝新入場價再逆走 S 點；TP＝原入場價順走 T 點；未觸及 D 不入場；同棒雙觸及當先中 SL',pad,H-8);
+  ctx.font='12px sans-serif';
+  ctx.fillStyle='#5aa9e6'; ctx.fillText('原策略 $'+fmt(s1[s1.length-1],0), pad, 26);
+  ctx.fillStyle='#39b785'; ctx.fillText('最佳組合 $'+fmt(s2[s2.length-1],0), pad+180, 26);
+  ctx.fillStyle='#6f8598'; ctx.font='11px sans-serif';
+  ctx.fillText('D＝由原入場價逆走 D 點才入場；SL＝新入場價再逆走 S 點（S 即止蝕距離）；TP＝原入場價順走 T 點；未觸及 D 不入場；同棒雙觸及當先中 SL', pad, H-22);
+  ctx.fillText('綠線以每筆「每 pip 價值」換算成 $；近似模式未走路徑，只作方向參考', pad, H-8);
+  const p=document.querySelector('#eqParams');
+  if(p){
+    if(selLayer==='ALL'){
+      const parts=[...new Set(arr.map(t=>t.layer))].sort((a,b2)=>a-b2)
+        .map(L=>BEST[L]?('L'+L+' D'+BEST[L].D+'/SL'+BEST[L].S+'/TP'+BEST[L].T):null).filter(Boolean);
+      p.textContent='（目前：全部層；各層參數 → '+parts.join('、')+'）';
+    } else {
+      p.textContent = b? ('（目前：L'+selLayer+'；D='+b.D+'、SL='+b.S+'、TP='+b.T+'；觸發 '+b.detail.length+' 筆）') : '（此層樣本不足，未有最佳組合）';
+    }
+  }
 }
 
 /* ⑮ 原始紀錄 */
