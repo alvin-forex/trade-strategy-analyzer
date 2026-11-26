@@ -1,0 +1,52 @@
+---
+方向: 規劃師 → AUTOCLAW
+日期: 2026-11-26
+性質: #36 數據層（M1 單一源）落地設計
+卡: #36
+---
+
+> 原文未經修改，僅加本表頭。
+
+# 规划师 — run b20e13f1 participant 4
+
+讀過 `m1dump_README.md`、`PowerHistory解碼報告.md`、`mt5_h1/_summary.json` 與 `panel_values.csv` 後，我按「M1 單一源」拍定三層結構。
+
+**結論**：三層分工——`m1_bar` 是唯一價格源；`bar_h1/h4/d1` 只是可整表重建的物化快取；`panel_obs` 以「來源」分鍵，與價格分表、永不跨源覆蓋。查詢走兩條索引：某對某 TF 走 `(symbol_id, ts)`，某時刻 9 幣走 `(tf, ts)`。
+非目標：不做 tick 級入庫、不改面板公式、不為面板值補插。
+
+**1) 表結構**
+- `symbol`(symbol_id PK, code UNIQUE, digits, px_scale, base_ccy, quote_ccy, m1_first_ts, m1_last_ts, bar_count)
+- `m1_bar`(symbol_id, ts, open_px, high_px, low_px, close_px, tick_vol, spread, rev)；PK(symbol_id, ts)，WITHOUT ROWID；ts 為 UTC epoch 秒，價存定點整數（×10^digits）。
+- `bar_h1/h4/d1`：同價欄 ＋ `m1_cnt`、`src_first_ts`、`src_last_ts`、`is_partial`、`build_run_id`；PK(symbol_id, ts)。
+- `panel_src`(src_id PK, kind[ph_dat｜timeline_json｜reader_csv], path, batch_ts, ccy_order, file_sha256)
+- `panel_obs`(src_id, ccy_id, tf, ts, value_num, value_int, denom)；PK(src_id, ccy_id, tf, ts)，索引 (tf, ts)。
+- `bar_gap`(symbol_id, tf, gap_start_ts, gap_end_ts, missing_cnt, kind, run_id)
+- `ingest_run`(run_id, kind, status, watermark_before/after, rows_in/new/changed, src_sha256)；`bar_revision`(symbol_id, ts, old_close, new_close, run_id)；`qc_result`(run_id, check_name, expected, actual, verdict)。
+
+**2) 分表與冗餘**
+- 預計算：H1/H4/D1；tick_vol 於入庫時加總；面板另建每小時寬表 `panel_wide`(src_id, tf, ts, v_EUR…v_XAU) 作快取。
+- 即時算：M5/M15 任意窗、跨對排名、面板差分。
+- 冗餘只限可重建者：衍生表可 drop 重建；面板不插值、不補齊、不同源合併。
+
+**3) 增量入庫**
+每日：①解最新 .hcc/.hst，記 src_sha256；②server time→UTC（offset 記入 ingest_run）、價轉定點；③取 last_ts−3 日為 overlap；④`m1_stage` 與 `m1_bar` 逐 key 比 OHLC，差異寫 `bar_revision` 後覆蓋、rev+1；⑤刪 ts≥overlap 桶首的衍生行並重建該桶，避免半根 bar；⑥面板：timeline.json 全量重讀，reader_csv 與新 .dat 只追加；⑦QC 全過才推 watermark。
+首次：①schema＋symbol/ccy 種子；②逐 symbol 按年解碼、排序 bulk insert；③建衍生表；④載 50 個 .dat（ccy 順序讀 header）＋timeline.json；⑤全量 QC＋寫 baseline_counts。
+
+**4) 校驗規則**
+- 聚合正確：隨機 1%（≥2 萬根）H1 由 M1 重算，OHLC 與 m1_cnt 零差；tick_vol 加總相等；與 `mt5_h1` 原生對拍，重疊段 ≥99.99% 落 1e-4 容差；不變量 low≤min(o,c)≤max(o,c)≤high 零違規。
+- 缺 bar：相鄰 ts 差 >60s 入 `bar_gap`；按交易時段表分類，週末/休市為預期，其餘 suspect；suspect=0 才算過；日 M1 根數偏離 baseline 之 P1–P99 即告警。
+- 面板：timeline.json 12,960 行（720×2×9）齊；D1_8 golden fixture 1,933 筆逐值全等；×7 或 ×8 整數率 ≥97%（已知 2.5% 浮點雜訊用容差）。
+
+**5) 落地順序與驗收**
+1. Schema＋種子＋ledger｜integrity_check=ok；symbol/ccy 種子數正確。
+2. M1 全量｜每 symbol 行數與解碼器計數差 0；(symbol_id, ts) 重複 0。
+3. 衍生 TF｜抽驗 0 筆不符；對拍 ≥99.99%；不變量 0 違規。
+4. 面板入庫｜D1_8 1,933 筆全等；timeline 12,960 行；跨源同 key 覆蓋 0。
+5. 每日增量＋QC＋兩條查詢視圖｜同日連跑兩次行數不變（冪等）；近 90 日 suspect gap=0；兩查詢各回 1 行、<50ms。
+
+關鍵路徑 1→2→3→5（3 依賴 2）；第 4 步可與 2/3 並行。
+
+**需要拍板**
+- 種子數：卡寫「28 對＋XAUUSD」，但 `mt5_h1/` 實見 32 檔（多 XAUAUD／XAUEUR／XAUGBP）。預設收 32，多出的 3 檔標 `kind=metal-cross` 不進面板。
+- M1 主源：預設 MT5 .hcc（已驗、2015 起），MT4 .hst 僅補洞。
+- 價格型別：預設定點整數而非 REAL。
