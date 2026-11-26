@@ -29,7 +29,7 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from ..bar import Bar
 
@@ -39,6 +39,43 @@ TIME_FMT = "<i"
 OHLC_FMT = "<4d"
 VOL_FMT = "<i"
 SPREAD_FMT = "<i"
+# MT4 header fields, verified against the real Alpari-Pro.ECN-Demo files:
+#   symbol char[16] @68, period int32 @80, digits int32 @84.
+SYMBOL_OFFSET = 68
+SYMBOL_BYTES = 16
+PERIOD_OFFSET = 80
+DIGITS_OFFSET = 84
+
+
+@dataclass(frozen=True)
+class HstHeader:
+    """Static metadata from the 148-byte header (authoritative over filenames)."""
+
+    symbol: str
+    period: int       # minutes: 1 = M1, 60 = H1, 240 = H4, 1440 = D1
+    digits: int       # decimal places of every price in this file
+
+    @property
+    def scale(self) -> int:
+        return 10 ** self.digits
+
+
+def read_hst_header(path: str) -> Optional[HstHeader]:
+    """Read symbol/period/digits from ``path``; ``None`` if too short.
+
+    The filename is not trustworthy: ``<SYM>1.hst`` can hold any timeframe, and
+    broker digit counts differ from the obvious JPY/XAU heuristics (fiat is
+    often 5 here, XAUJPY is 0). Always source the scale from this header.
+    """
+    with open(path, "rb") as fh:
+        blob = fh.read(HEADER_BYTES)
+    if len(blob) < HEADER_BYTES:
+        return None
+    raw = blob[SYMBOL_OFFSET:SYMBOL_OFFSET + SYMBOL_BYTES]
+    symbol = raw.split(b"\x00", 1)[0].decode("ascii", errors="replace").strip()
+    period = struct.unpack_from("<i", blob, PERIOD_OFFSET)[0]
+    digits = struct.unpack_from("<i", blob, DIGITS_OFFSET)[0]
+    return HstHeader(symbol=symbol, period=period, digits=digits)
 
 
 @dataclass(frozen=True)
