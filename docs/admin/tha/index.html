@@ -176,8 +176,10 @@ function stat(arr){
   const n=arr.length,wins=arr.filter(t=>t.pips>0),loss=arr.filter(t=>t.pips<=0);
   const gp=wins.reduce((s,t)=>s+t.pips,0),gl=loss.reduce((s,t)=>s+Math.abs(t.pips),0);
   const gpD=wins.reduce((s,t)=>s+t.profit,0),glD=loss.reduce((s,t)=>s+Math.abs(t.profit),0);
-  let cum=0,peak=-1e15,ddD=0;
-  [...arr].sort((a,b)=>a.order-b.order).forEach(t=>{cum+=t.profit;peak=Math.max(peak,cum);ddD=Math.min(ddD,cum-peak);});
+  let cum=0,peak=-1e15,ddD=0,cumP=0,peakP=-1e15,ddP=0;
+  [...arr].sort((a,b)=>a.order-b.order).forEach(t=>{
+    cum+=t.profit;peak=Math.max(peak,cum);ddD=Math.min(ddD,cum-peak);
+    cumP+=t.pips;peakP=Math.max(peakP,cumP);ddP=Math.min(ddP,cumP-peakP);});
   // 最大連虧
   let run=0,worst=0;
   [...arr].sort((a,b)=>a.order-b.order).forEach(t=>{ if(t.profit<0){run++;worst=Math.max(worst,run);}else run=0; });
@@ -186,7 +188,7 @@ function stat(arr){
     avg:arr.length?arr.reduce((s,t)=>s+t.profit,0)/arr.length:0,
     avgW:wins.length?gpD/wins.length:0, avgL:loss.length?glD/loss.length:0, ddD, worstRun:worst,
     avgMAE:arr.length?arr.reduce((s,t)=>s+t.maeD,0)/arr.length:0, avgMFE:arr.length?arr.reduce((s,t)=>s+t.mfeD,0)/arr.length:0,
-    avgMAEp:arr.length?arr.reduce((s,t)=>s+t.maeP,0)/arr.length:0, avgMFEp:arr.length?arr.reduce((s,t)=>s+t.mfeP,0)/arr.length:0};
+    avgMAEp:arr.length?arr.reduce((s,t)=>s+t.maeP,0)/arr.length:0, avgMFEp:arr.length?arr.reduce((s,t)=>s+t.mfeP,0)/arr.length:0, ddP};
 }
 
 /* ---------- 主渲染 ---------- */
@@ -244,14 +246,14 @@ function secTiers(){
   h+=`</table>`;
   const t=TIERS[SEL.grp];
   if(t){
-    h+=`<h3>選中：${SEL.grp}（未歸類 ${t.unclassified} 筆）</h3><table><tr><th>層</th><th class="n">理論 lot</th><th class="n">筆數</th><th class="n">佔比</th><th class="n">淨 $</th><th class="n">勝率</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>`;
+    h+=`<h3>選中：${SEL.grp}（未歸類 ${t.unclassified} 筆）</h3><table><tr><th>層</th><th class="n">理論 lot</th><th class="n">筆數</th><th class="n">佔比</th><th class="n">淨 $</th><th class="n">Max DD $</th><th class="n">勝率</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>`;
     const arr=TRADES.filter(x=>(x.magic||'（無 Magic）')===SEL.grp && x.layer);
     const byLayer={}; arr.forEach(x=>{(byLayer[x.layer]=byLayer[x.layer]||[]).push(x);});
     Object.keys(byLayer).map(Number).sort((a,b)=>a-b).forEach(L=>{
       const sub=byLayer[L], s=stat(sub);
       h+=`<tr><td>L${L}</td><td class="n">${fmt(t.base*Math.pow(t.mult,L-1),2)}</td><td class="n">${s.n}</td>
       <td class="n">${pct(s.n/t.n)}</td><td class="n ${s.netMoney>=0?'pos':'neg'}">${money(s.netMoney)}</td>
-      <td class="n">${pct(s.wr)}</td><td class="n">${fmt(s.avgMAEp,1)}</td><td class="n">${fmt(s.avgMFEp,1)}</td></tr>`;
+      <td class="n neg">${money(s.ddD)}</td><td class="n">${pct(s.wr)}</td><td class="n">${fmt(s.avgMAEp,1)}</td><td class="n">${fmt(s.avgMFEp,1)}</td></tr>`;
     });
     h+=`</table><h3>lot 分佈（前 20）</h3><table><tr><th>lot</th><th class="n">次數</th><th class="n">歸層</th></tr>`;
     t.lots.slice(0,20).forEach(l=>{
@@ -268,12 +270,13 @@ function secSymDir(){
   const syms=[...new Set(TRADES.map(t=>t.sym))].sort();
   let h=`<div class="card" id="s5"><h2>⑤ 商品 × 方向總表（含 MAE／MFE 四欄）</h2>
   <div class="scroll"><table><tr><th>商品</th><th>方向</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L $</th>
-  <th class="n">avg MAE $</th><th class="n">avg MFE $</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>`;
+  <th class="n">Max DD $</th><th class="n">avg MAE $</th><th class="n">avg MFE $</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>`;
   syms.forEach(sym=>['buy','sell'].forEach(d=>{
     const arr=TRADES.filter(t=>t.sym===sym&&t.dir===d); if(!arr.length)return;
     const s=stat(arr);
     h+=`<tr><td>${sym}</td><td>${d.toUpperCase()}</td><td class="n">${s.n}</td><td class="n">${pct(s.wr)}</td>
     <td class="n ${s.netMoney>=0?'pos':'neg'}">${money(s.netMoney)}</td>
+    <td class="n neg">${money(s.ddD)}</td>
     <td class="n">${money(s.avgMAE)}</td><td class="n">${money(s.avgMFE)}</td>
     <td class="n">${fmt(s.avgMAEp,1)}</td><td class="n">${fmt(s.avgMFEp,1)}</td></tr>`;}));
   return h+`</table></div></div>`;
@@ -354,16 +357,16 @@ function renderAnalyzer(){
     <div class="kpi"><b class="neg">${money(s.ddD)}</b><span>Max DD</span></div>
     <div class="kpi"><b>${s.worstRun}</b><span>最大連虧</span></div>
   </div>
-  <h3>B. BUY／SELL 分拆</h3><table><tr><th>方向</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">avg MAE$</th><th class="n">avg MFE$</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
+  <h3>B. BUY／SELL 分拆</h3><table><tr><th>方向</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">Max DD $</th><th class="n">avg MAE$</th><th class="n">avg MFE$</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
   ${[['BUY',buy],['SELL',sell]].map(([n,st])=>`<tr><td>${n}</td><td class="n">${st.n||0}</td><td class="n">${pct(st.wr)}</td>
-    <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n">${money(st.avgMAE)}</td>
+    <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n neg">${money(st.ddD)}</td><td class="n">${money(st.avgMAE)}</td>
     <td class="n">${money(st.avgMFE)}</td><td class="n">${fmt(st.avgMAEp,1)}</td><td class="n">${fmt(st.avgMFEp,1)}</td></tr>`).join('')}
   </table>
   <h3>C. 分層（${sym}）— 圖表</h3><canvas id="cvLayer" width="900" height="240" style="width:100%;height:auto"></canvas>
-  <table style="margin-top:8px"><tr><th>層</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
+  <table style="margin-top:8px"><tr><th>層</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">Max DD $</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
   ${Object.keys(layerRows).map(Number).sort((a,b)=>a-b).map(L=>{const st=stat(layerRows[L]);
     return `<tr><td>L${L}</td><td class="n">${st.n}</td><td class="n">${pct(st.wr)}</td>
-    <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n">${fmt(st.avgMAEp,1)}</td><td class="n">${fmt(st.avgMFEp,1)}</td></tr>`;}).join('')}
+    <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n neg">${money(st.ddD)}</td><td class="n">${fmt(st.avgMAEp,1)}</td><td class="n">${fmt(st.avgMFEp,1)}</td></tr>`;}).join('')}
   </table>
   <h3>D. 時間分佈（${sym}）— 圖表</h3><canvas id="cvTime" width="900" height="240" style="width:100%;height:auto"></canvas>
   <div class="grid2" style="margin-top:8px"><div>
@@ -523,7 +526,7 @@ function secDelay(){
   </div>
   <canvas id="cvEq" width="1150" height="320" style="width:100%;height:auto"></canvas>
   <h3>每層對照（原來 vs 最佳組合）</h3>
-  <table><tr><th>層</th><th class="n">原筆數</th><th class="n">原淨 $</th><th class="n">最佳 D/S/T</th><th class="n">觸發</th><th class="n">最佳淨 $</th><th class="n">Δ $</th></tr>
+  <table><tr><th>層</th><th class="n">原筆數</th><th class="n">原淨 $</th><th class="n">原 Max DD $</th><th class="n">最佳 D/S/T</th><th class="n">觸發</th><th class="n">最佳淨 $</th><th class="n">Δ $</th></tr>
   ${layers.map(L=>{ const b=BEST[L]; const arr=base0.filter(t=>t.layer===L);
      const oM=arr.reduce((s,t)=>s+t.profit,0);
      if(!b) return `<tr><td>L${L}</td><td class="n">${arr.length}</td><td class="n">${money(oM)}</td><td class="n mut" colspan="4">樣本不足</td></tr>`;
@@ -553,7 +556,7 @@ function secPnLCompare(){
   let h=`<div class="card" id="s16"><h2>⑯ 每層盈虧對照：原來 vs 最佳組合</h2>
   <div class="mut">「延遲後」只計有觸發的交易（等不到 D 點就不入場，盈虧視為 0）。金額用每筆自身「每 pip 價值」換算；若該筆缺資料則用該層平均。</div>
   <table style="margin-top:8px"><tr><th>層</th><th class="n">原筆數</th><th class="n">原淨 pips</th><th class="n">原淨 $</th>
-  <th class="n">最佳 D/S/T</th><th class="n">觸發筆數</th><th class="n">延遲後 pips</th><th class="n">延遲後 $</th><th class="n">Δ $</th><th class="n">Δ %</th></tr>`;
+  <th class="n">最佳 D/S/T</th><th class="n">觸發筆數</th><th class="n">延遲後 pips</th><th class="n">延遲後 $</th><th class="n">延遲後 Max DD $</th><th class="n">Δ $</th><th class="n">Δ %</th></tr>`;
   let totO=0, totD=0;
   layers.forEach(L=>{
     const arr=base0.filter(t=>t.layer===L);
@@ -561,7 +564,7 @@ function secPnLCompare(){
     const b=BEST[L];
     if(!b || arr.length<10){
       h+=`<tr><td>L${L}</td><td class="n">${arr.length}</td><td class="n ${oP>=0?'pos':'neg'}">${fmt(oP,1)}</td>
-      <td class="n ${oM>=0?'pos':'neg'}">${money(oM)}</td><td class="n mut" colspan="6">樣本不足（<10），不計入合計</td></tr>`;
+      <td class="n ${oM>=0?'pos':'neg'}">${money(oM)}</td><td class="n neg">${money(stat(arr).ddD)}</td><td class="n mut" colspan="6">樣本不足（<10），不計入合計</td></tr>`;
       return;
     }
     const pps=arr.map(t=>t.pp).filter(v=>v!==null && isFinite(v));
@@ -570,10 +573,16 @@ function secPnLCompare(){
     b.detail.forEach(d=>{ dP+=d.pips; dM+=d.pips*(d.t.pp!==null&&isFinite(d.t.pp)?d.t.pp:avgPP); });
     totO+=oM; totD+=dM;
     const delta=dM-oM, dpct=oM!==0?(delta/Math.abs(oM)*100):NaN;
+    // 延遲後回撤
+    let c=0,pk=-1e15,dd2=0;
+    [...arr].sort((x,y)=>x.order-y.order).forEach(t=>{
+      const d=b.detail.find(z=>z.t===t); const v=d? d.pips*(t.pp!==null&&isFinite(t.pp)?t.pp:avgPP) : 0;
+      c+=v; pk=Math.max(pk,c); dd2=Math.min(dd2,c-pk);});
     h+=`<tr><td>L${L}</td><td class="n">${arr.length}</td><td class="n ${oP>=0?'pos':'neg'}">${fmt(oP,1)}</td>
-      <td class="n ${oM>=0?'pos':'neg'}">${money(oM)}</td>
-      <td class="n">D${b.D} / S${b.S} / T${b.T}</td><td class="n">${b.detail.length}（${pct(b.trig)}）</td>
+      <td class="n ${oM>=0?'pos':'neg'}">${money(oM)}</td><td class="n neg">${money(stat(arr).ddD)}</td>
+      <td class="n">D${b.D} / SL${b.S} / TP${b.T}</td><td class="n">${b.detail.length}（${pct(b.trig)}）</td>
       <td class="n ${dP>=0?'pos':'neg'}">${fmt(dP,1)}</td><td class="n ${dM>=0?'pos':'neg'}">${money(dM)}</td>
+      <td class="n neg">${money(dd2)}</td>
       <td class="n ${delta>=0?'pos':'neg'}">${money(delta)}</td>
       <td class="n ${delta>=0?'pos':'neg'}">${isNaN(dpct)?'-':fmt(dpct,0)+'%'}</td></tr>`;
   });
