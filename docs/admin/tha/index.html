@@ -58,6 +58,7 @@ table.heat td{text-align:center;font-size:12px;border:1px solid #1d2a38}
 const $=s=>document.querySelector(s);
 const fmt=(x,d=2)=>(x===null||x===undefined||isNaN(x))?'-':Number(x).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct=x=>isNaN(x)?'-':(x*100).toFixed(1)+'%';
+const p1=x=>isNaN(x)?'-':(Math.round(x*10)/10).toFixed(1);
 const money=x=>fmt(x,2);
 let TRADES=[], DROPPED=0, M1={}, TIERS=null, BEST={}, SEL={sym:null, mfeUnit:'pips', eqLayer:'ALL', eqMode:'both'};
 
@@ -270,7 +271,7 @@ function secTiers(){
       const sub=byLayer[L], s=stat(sub);
       h+=`<tr><td>L${L}</td><td class="n">${fmt(t.base*Math.pow(t.mult,L-1),2)}</td><td class="n">${s.n}</td>
       <td class="n">${pct(s.n/t.n)}</td><td class="n ${s.netMoney>=0?'pos':'neg'}">${money(s.netMoney)}</td>
-      <td class="n neg">${money(s.ddD)}</td><td class="n">${pct(s.wr)}</td><td class="n">${fmt(s.avgMAEp,1)}</td><td class="n">${fmt(s.avgMFEp,1)}</td></tr>`;
+      <td class="n neg">${money(s.ddD)}</td><td class="n">${pct(s.wr)}</td><td class="n">${p1(s.avgMAEp)}</td><td class="n">${p1(s.avgMFEp)}</td></tr>`;
     });
     h+=`</table><h3>lot 分佈（前 20）</h3><table><tr><th>lot</th><th class="n">次數</th><th class="n">歸層</th></tr>`;
     t.lots.slice(0,20).forEach(l=>{
@@ -295,7 +296,7 @@ function secSymDir(){
     <td class="n ${s.netMoney>=0?'pos':'neg'}">${money(s.netMoney)}</td>
     <td class="n neg">${money(s.ddD)}</td>
     <td class="n">${money(s.avgMAE)}</td><td class="n">${money(s.avgMFE)}</td>
-    <td class="n">${fmt(s.avgMAEp,1)}</td><td class="n">${fmt(s.avgMFEp,1)}</td></tr>`;}));
+    <td class="n">${p1(s.avgMAEp)}</td><td class="n">${p1(s.avgMFEp)}</td></tr>`;}));
   return h+`</table></div></div>`;
 }
 
@@ -377,13 +378,21 @@ function renderAnalyzer(){
   <h3>B. BUY／SELL 分拆</h3><table><tr><th>方向</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">Max DD $</th><th class="n">avg MAE$</th><th class="n">avg MFE$</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
   ${[['BUY',buy],['SELL',sell]].map(([n,st])=>`<tr><td>${n}</td><td class="n">${st.n||0}</td><td class="n">${pct(st.wr)}</td>
     <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n neg">${money(st.ddD)}</td><td class="n">${money(st.avgMAE)}</td>
-    <td class="n">${money(st.avgMFE)}</td><td class="n">${fmt(st.avgMAEp,1)}</td><td class="n">${fmt(st.avgMFEp,1)}</td></tr>`).join('')}
+    <td class="n">${money(st.avgMFE)}</td><td class="n">${p1(st.avgMAEp)}</td><td class="n">${p1(st.avgMFEp)}</td></tr>`).join('')}
   </table>
-  <h3>C. 分層（${sym}）— 圖表</h3><canvas id="cvLayer" width="900" height="240" style="width:100%;height:auto"></canvas>
-  <table style="margin-top:8px"><tr><th>層</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">Max DD $</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
-  ${Object.keys(layerRows).map(Number).sort((a,b)=>a-b).map(L=>{const st=stat(layerRows[L]);
-    return `<tr><td>L${L}</td><td class="n">${st.n}</td><td class="n">${pct(st.wr)}</td>
-    <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n neg">${money(st.ddD)}</td><td class="n">${fmt(st.avgMAEp,1)}</td><td class="n">${fmt(st.avgMFEp,1)}</td></tr>`;}).join('')}
+  <h3>C. 分層 × 方向（${sym}）</h3><canvas id="cvLayer" width="900" height="240" style="width:100%;height:auto"></canvas>
+  <table style="margin-top:8px"><tr><th>層</th><th>方向</th><th class="n">筆數</th><th class="n">勝率</th><th class="n">P&L</th><th class="n">Max DD $</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>
+  ${Object.keys(layerRows).map(Number).sort((a,b)=>a-b).flatMap(L=>['buy','sell'].map(d=>{
+     const sub=layerRows[L].filter(t=>t.dir===d); if(!sub.length) return '';
+     const st=stat(sub);
+     return `<tr><td>L${L}</td><td>${d.toUpperCase()}</td><td class="n">${st.n}</td><td class="n">${pct(st.wr)}</td>
+     <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n neg">${money(st.ddD)}</td>
+     <td class="n">${p1(st.avgMAEp)}</td><td class="n">${p1(st.avgMFEp)}</td></tr>`;}).join('')).join('')}
+  ${(()=>{const unc=all.filter(t=>!t.layer); if(!unc.length) return '';
+     const st=stat(unc);
+     return `<tr><td>未分類</td><td>—</td><td class="n">${st.n}</td><td class="n">${pct(st.wr)}</td>
+     <td class="n ${st.netMoney>=0?'pos':'neg'}">${money(st.netMoney)}</td><td class="n neg">${money(st.ddD)}</td>
+     <td class="n">${p1(st.avgMAEp)}</td><td class="n">${p1(st.avgMFEp)}</td></tr>`;})()}
   </table>
   <h3>D. 時間分佈（${sym}）— 圖表</h3><canvas id="cvTime" width="900" height="240" style="width:100%;height:auto"></canvas>
   <div class="grid2" style="margin-top:8px"><div>
