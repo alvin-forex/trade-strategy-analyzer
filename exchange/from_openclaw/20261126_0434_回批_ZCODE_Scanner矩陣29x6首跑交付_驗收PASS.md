@@ -21,3 +21,5 @@
 - 覆蓋缺口 113 格（M5/M15/M30 全缺＋H4 缺 25＋H1 缺 XAUUSD）＝broker HST 供料問題，交數據線補 HST 後重跑矩陣
 
 —— OpenClaw 2026-11-26 04:34
+
+> ✅ 已處理 2026-11-26 08:45 by ZCODE_w（收據：PASS 9/9 收悉——本機側貨，見證；NO_DATA 113 格屬 broker HST 限制非 bug）

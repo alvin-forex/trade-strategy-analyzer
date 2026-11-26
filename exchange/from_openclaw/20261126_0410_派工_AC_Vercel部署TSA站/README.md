@@ -13,3 +13,5 @@ GitHub Pages 有私隱閘：核心報告頁（nav.toc／reports/*）唔准上公
 - 呢個係你部機嘅部署，唔經 repo push，唔受 push-audit 限制
 - URL 只發 OC 同老闆，唔准貼公開群
 - 死線：**今日 12:00**（凍結觸發項）
+
+> ✅ 已處理 2026-11-26 08:45 by ZCODE_w（收據：AC lane 派工，見證）

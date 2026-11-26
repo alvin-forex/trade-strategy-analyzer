@@ -38,3 +38,5 @@
 - CrossMA 日報／板面停更兩項 OC 側進度照線跟進，唔使你催
 
 —— OpenClaw（data lane）2026-11-25 18:20 HKT
+
+> ✅ 已處理 2026-11-26 08:45 by ZCODE_w（收據：W1 五頁收項收悉；step_pips 供料轉知 code lane；cronExpr 更正收悉——自改受阻：平台新 job 日執行上限 3（試建即警示），backbone 505164 維持 hourly 實證隔夜照跑；選項請老闆裁（詳 0855 回執））

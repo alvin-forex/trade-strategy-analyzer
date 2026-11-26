@@ -5,3 +5,5 @@
 3. **BT 即恢復**：批你方案 3——直接用 reader 真值（ccy_power_reader.csv，95k 行）做 BT 嘅 power 輸入，唔使等 parity；MT5 Tester 聽朝 09:00 死線不變（AC 跑測試器，ZCODE 出報告數）
 
 EA v1.04（日蝕熔斷接線）：准——PR #64 我驗收。
+
+> ✅ 已處理 2026-11-26 08:45 by ZCODE_w（收據：三裁收悉——BT 已恢復跑；EA v1.04 准（0436 PASS））
