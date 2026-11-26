@@ -59,7 +59,7 @@ const $=s=>document.querySelector(s);
 const fmt=(x,d=2)=>(x===null||x===undefined||isNaN(x))?'-':Number(x).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct=x=>isNaN(x)?'-':(x*100).toFixed(1)+'%';
 const money=x=>fmt(x,2);
-let TRADES=[], M1={}, TIERS=null, BEST={}, SEL={sym:null, mfeUnit:'pips', eqLayer:'ALL', eqMode:'both'};
+let TRADES=[], DROPPED=0, M1={}, TIERS=null, BEST={}, SEL={sym:null, mfeUnit:'pips', eqLayer:'ALL', eqMode:'both'};
 
 $('#file').addEventListener('change',e=>{if(e.target.files[0])readTrades(e.target.files[0]);});
 $('#m1').addEventListener('change',e=>loadM1([...e.target.files]));
@@ -107,6 +107,9 @@ function parseTrades(text){
       pp:(Math.abs(num(c[ci.pips]))>1e-9 ? num(c[ci.profit])/num(c[ci.pips]) : null)});
   }
   if(!TRADES.length){alert('沒有可分析交易');return;}
+  const before=TRADES.length;
+  TRADES=TRADES.filter(t=>t.lots>=0.05);
+  DROPPED=before-TRADES.length;
   TRADES.forEach((t,i)=>t.order=i);
   computeTiers(); render();
 }
@@ -123,13 +126,14 @@ function tiersFor(arr){
   const above=ladder.filter(l=>l>base*1.05);
   const steps=above.length;
   const calib=above.length?above[above.length-1]:base;
-  const mult=steps?(Math.pow(calib/base,1/steps)):1;   // 幾何平均倍數
+  const rawMult=steps?(Math.pow(calib/base,1/steps)):1;   // 幾何平均倍數
+  const mult=steps?Math.round(rawMult*100)/100:1;         // 對齊 Excel：四捨五入兩位
   let ok=0, un=0;
   arr.forEach(t=>{
     if(mult<=1.0001){ t.layer=1; ok++; return; }
     const lv=1+Math.round(Math.log(t.lots/base)/Math.log(mult));
     const exp=base*Math.pow(mult,lv-1);
-    if(lv>=1 && lv<=60 && Math.abs(exp-t.lots)/t.lots<=0.15){ t.layer=lv; ok++; }
+    if(lv>=1 && lv<=60 && Math.abs(exp-t.lots)/t.lots<=0.03){ t.layer=lv; ok++; }
     else { t.layer=null; un++; }
   });
   const used=new Set(arr.filter(t=>t.layer).map(t=>t.layer));
@@ -175,17 +179,20 @@ function loadM1(files){
 }
 
 /* ---------- 統計 ---------- */
+function pctl(a,q){ if(!a.length)return NaN; const s=a.slice().sort((x,y)=>x-y); const i=Math.min(s.length-1,Math.max(0,Math.round(q*(s.length-1)))); return s[i]; }
 function stat(arr){
-  const n=arr.length,wins=arr.filter(t=>t.pips>0),loss=arr.filter(t=>t.pips<=0);
+  const n=arr.length,wins=arr.filter(t=>t.profit>0),loss=arr.filter(t=>t.profit<=0);
   const gp=wins.reduce((s,t)=>s+t.pips,0),gl=loss.reduce((s,t)=>s+Math.abs(t.pips),0);
   const gpD=wins.reduce((s,t)=>s+t.profit,0),glD=loss.reduce((s,t)=>s+Math.abs(t.profit),0);
   let cum=0,peak=-1e15,ddD=0,cumP=0,peakP=-1e15,ddP=0;
-  [...arr].sort((a,b)=>a.order-b.order).forEach(t=>{
+  const byClose=(a,b)=>{ const x=a.ts1===null?a.ts:a.ts1, y=b.ts1===null?b.ts:b.ts1;
+    if(x===null&&y===null) return a.order-b.order; if(x===null) return 1; if(y===null) return -1; return x-y; };
+  [...arr].sort(byClose).forEach(t=>{
     cum+=t.profit;peak=Math.max(peak,cum);ddD=Math.min(ddD,cum-peak);
     cumP+=t.pips;peakP=Math.max(peakP,cumP);ddP=Math.min(ddP,cumP-peakP);});
   // 最大連虧
   let run=0,worst=0;
-  [...arr].sort((a,b)=>a.order-b.order).forEach(t=>{ if(t.profit<0){run++;worst=Math.max(worst,run);}else run=0; });
+  [...arr].sort(byClose).forEach(t=>{ if(t.profit<0){run++;worst=Math.max(worst,run);}else run=0; });
   return {n,wr:n?wins.length/n:NaN,pf:glD?gpD/glD:(gpD?Infinity:NaN),payoff:(gl&&wins.length&&loss.length)?(gpD/wins.length)/(glD/loss.length):NaN,
     netPips:arr.reduce((s,t)=>s+t.pips,0),netMoney:arr.reduce((s,t)=>s+t.profit,0),
     avg:arr.length?arr.reduce((s,t)=>s+t.profit,0)/arr.length:0,
@@ -230,7 +237,14 @@ function secOverview(s){
   <div class="kpi"><b class="neg">${money(s.ddD)}</b><span>Max DD（$）</span></div>
   <div class="kpi"><b>${s.worstRun}</b><span>最大連虧（筆）</span></div>
   <div class="kpi"><b>${fmt(s.netPips,0)}</b><span>淨點數（pips）</span></div>
-  </div></div>`;
+  <div class="kpi"><b>${fmt(Math.max(...TRADES.map(t=>t.lots)),2)}</b><span>最大 lot</span></div>
+  <div class="kpi"><b>${money(s.avgMAE)}</b><span>MAE 平均（$）</span></div>
+  <div class="kpi"><b>${money(pctl(TRADES.map(t=>t.maeD),0.5))}</b><span>MAE 中位（$）</span></div>
+  <div class="kpi"><b>${money(pctl(TRADES.map(t=>t.maeD),0.9))}</b><span>MAE P90（$）</span></div>
+  <div class="kpi"><b>${money(s.avgMFE)}</b><span>MFE 平均（$）</span></div>
+  <div class="kpi"><b>${money(pctl(TRADES.map(t=>t.mfeD),0.5))}</b><span>MFE 中位（$）</span></div>
+  <div class="kpi"><b>${money(pctl(TRADES.map(t=>t.mfeD),0.9))}</b><span>MFE P90（$）</span></div>
+  </div><div class="mut" style="margin-top:6px">已剔除 ${DROPPED} 筆（手數 < 0.05，對齊 Excel 清洗口徑）。勝負以「淨盈虧 $ > 0」判斷；Max DD 按平倉時間累加。</div></div>`;
 }
 
 /* ④ LotTiers（逐程式） */
