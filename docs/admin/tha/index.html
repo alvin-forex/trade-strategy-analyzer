@@ -104,43 +104,48 @@ function parseTrades(text){
   computeTiers(); render();
 }
 
-/* ---------- LotTiers 馬丁偵測（對照 Excel） ---------- */
-function computeTiers(){
-  const cnt={};
-  TRADES.forEach(t=>cnt[t.lots]=(cnt[t.lots]||0)+1);
+/* ---------- LotTiers 馬丁偵測（逐程式／逐 Magic；對照 Excel） ---------- */
+function tiersFor(arr){
+  const cnt={}; arr.forEach(t=>cnt[t.lots]=(cnt[t.lots]||0)+1);
   const lots=Object.keys(cnt).map(Number).sort((a,b)=>a-b);
-  // 基準 lot＝出現次數最多（同頻取最細）
-  let base=lots[0], best=0;
+  let base=lots[0], best=-1;
   lots.forEach(l=>{ if(cnt[l]>best){best=cnt[l];base=l;} });
-  // 校準 lot＝出現 ≥2 次的最大 lot
   const ge2=lots.filter(l=>cnt[l]>=2);
   const calib=ge2.length?Math.max(...ge2):base;
-  // 初步倍數：用相鄰 lot 比值的中位（>1.02 的才計）
+  // 階梯候選：出現次數 >= max(3, 基準次數 20%) 的 lot
+  const th=Math.max(3, best*0.2);
+  const ladder=lots.filter(l=>cnt[l]>=th);
   const ratios=[];
-  for(let i=1;i<lots.length;i++){const r=lots[i]/lots[i-1]; if(r>1.02) ratios.push(r);}
+  for(let i=1;i<ladder.length;i++){ const r=ladder[i]/ladder[i-1]; if(r>1.05) ratios.push(r); }
   ratios.sort((a,b)=>a-b);
-  const m0=ratios.length?ratios[Math.floor(ratios.length/2)]:1;
-  // 層差與偵測倍數
+  const m0 = ratios.length? ratios[Math.floor(ratios.length/2)] : 1;
   let gap=0, mult=1;
   if(base>0 && calib>base*1.05 && m0>1.0001){
     gap=Math.max(1,Math.round(Math.log(calib/base)/Math.log(m0)));
     mult=Math.pow(calib/base,1/gap);
   }
-  // 每筆歸層
-  let classified=0, unclassified=0;
-  const seen=new Set();
-  TRADES.forEach(t=>{
-    if(mult<=1.0001){ t.layer=1; classified++; return; }
+  let ok=0, un=0;
+  arr.forEach(t=>{
+    if(mult<=1.0001){ t.layer=1; ok++; return; }
     const lv=1+Math.round(Math.log(t.lots/base)/Math.log(mult));
     const exp=base*Math.pow(mult,lv-1);
-    if(lv>=1 && lv<=40 && Math.abs(exp-t.lots)/t.lots<=0.15){ t.layer=lv; classified++; }
-    else { t.layer=null; unclassified++; }
-    seen.add(t.lots);
+    if(lv>=1 && lv<=60 && Math.abs(exp-t.lots)/t.lots<=0.15){ t.layer=lv; ok++; }
+    else { t.layer=null; un++; }
   });
-  const layerCounts={};
-  TRADES.filter(t=>t.layer).forEach(t=>layerCounts[t.layer]=(layerCounts[t.layer]||0)+1);
-  TIERS={base,calib,m0,gap,mult,lots,cnt,layerCounts,classified,unclassified,
-    ratio:classified/TRADES.length, judged: (mult>1.05 && Object.keys(layerCounts).length>=2) ? '有馬丁' : '無馬丁／未偵測到'};
+  return {base,calib,m0,gap,mult,lots,cnt,ladder,classified:ok,unclassified:un,
+    ratio:arr.length?ok/arr.length:0, n:arr.length,
+    judged:(mult>1.05 && new Set(arr.filter(t=>t.layer).map(t=>t.layer)).size>=2)?'有馬丁':'無馬丁／未偵測到'};
+}
+
+function computeTiers(){
+  // 逐 Magic 分組（無 Magic 欄就全部當一組）
+  const groups={};
+  TRADES.forEach(t=>{ const g=t.magic||'（無 Magic）'; (groups[g]=groups[g]||[]).push(t); });
+  const keys=Object.keys(groups);
+  TIERS={};
+  keys.forEach(g=>{ TIERS[g]=tiersFor(groups[g]); });
+  // 預設選最多交易的一組
+  SEL.grp = SEL.grp && TIERS[SEL.grp] ? SEL.grp : keys.sort((a,b)=>TIERS[b].n-TIERS[a].n)[0];
 }
 
 /* ---------- 分鐘資料 ---------- */
@@ -223,33 +228,39 @@ function secOverview(s){
   </div></div>`;
 }
 
-/* ④ LotTiers */
+/* ④ LotTiers（逐程式） */
 function secTiers(){
-  const t=TIERS;
-  let h=`<div class="card"><h2>④ 馬丁偵測（對照 Excel LotTiers）</h2>
-  <div class="kpis" style="margin-bottom:10px">
-    <div class="kpi"><b>${t.base}</b><span>基準 lot（出現最多）</span></div>
-    <div class="kpi"><b>${t.calib}</b><span>校準 lot（≥2 次最大）</span></div>
-    <div class="kpi"><b>${fmt(t.mult,3)}</b><span>偵測倍數（每層 ×）</span></div>
-    <div class="kpi"><b>${t.gap}</b><span>校準層差</span></div>
-    <div class="kpi"><b>${pct(t.ratio)}</b><span>歸層比例</span></div>
-    <div class="kpi"><b>${t.unclassified}</b><span>未歸類筆數</span></div>
-    <div class="kpi"><b>${t.judged}</b><span>判定</span></div>
-  </div>
-  <table><tr><th>層</th><th class="n">理論 lot</th><th class="n">筆數</th><th class="n">佔比</th><th class="n">淨 $</th><th class="n">勝率</th></tr>`;
-  const layers=Object.keys(t.layerCounts).map(Number).sort((a,b)=>a-b);
-  layers.forEach(L=>{
-    const arr=TRADES.filter(x=>x.layer===L), s=stat(arr);
-    h+=`<tr><td>L${L}</td><td class="n">${fmt(t.base*Math.pow(t.mult,L-1),2)}</td><td class="n">${s.n}</td>
-      <td class="n">${pct(s.n/TRADES.length)}</td><td class="n ${s.netMoney>=0?'pos':'neg'}">${money(s.netMoney)}</td>
-      <td class="n">${pct(s.wr)}</td></tr>`;
+  const keys=Object.keys(TIERS);
+  let h=`<div class="card"><h2>④ 馬丁偵測（逐程式，對照 Excel LotTiers）</h2>
+  <div class="mut">同一份紀錄可能混有多支程式（以 Magic Number 區分）。每支程式的馬丁手數階梯唔同，所以逐支分開偵測。表格可點程式名切換下方詳情。</div>
+  <table style="margin-top:8px"><tr><th>程式（Magic）</th><th class="n">筆數</th><th class="n">基準 lot</th><th class="n">校準 lot</th>
+  <th class="n">偵測倍數</th><th class="n">層差</th><th class="n">歸層比例</th><th>判定</th></tr>`;
+  keys.sort((a,b)=>TIERS[b].n-TIERS[a].n).forEach(g=>{
+    const t=TIERS[g], sel=(g===SEL.grp);
+    h+=`<tr style="${sel?'background:#12212e':''}"><td><a href="#" onclick="SEL.grp='${g}';render();return false;" style="color:#5aa9e6">${g}</a></td>
+    <td class="n">${t.n}</td><td class="n">${t.base}</td><td class="n">${t.calib}</td>
+    <td class="n">${fmt(t.mult,3)}</td><td class="n">${t.gap}</td><td class="n">${pct(t.ratio)}</td><td>${t.judged}</td></tr>`;
   });
-  h+=`</table><h3>實際 lot 分佈（前 20）</h3><table><tr><th>lot</th><th class="n">次數</th><th class="n">歸層</th></tr>`;
-  t.lots.slice(0,20).forEach(l=>{
-    const sample=TRADES.find(x=>x.lots===l);
-    h+=`<tr><td>${l}</td><td class="n">${t.cnt[l]}</td><td class="n">${sample&&sample.layer?('L'+sample.layer):'未歸類'}</td></tr>`;
-  });
-  return h+`</table></div>`;
+  h+=`</table>`;
+  const t=TIERS[SEL.grp];
+  if(t){
+    h+=`<h3>選中：${SEL.grp}（未歸類 ${t.unclassified} 筆）</h3><table><tr><th>層</th><th class="n">理論 lot</th><th class="n">筆數</th><th class="n">佔比</th><th class="n">淨 $</th><th class="n">勝率</th><th class="n">avg MAE pips</th><th class="n">avg MFE pips</th></tr>`;
+    const arr=TRADES.filter(x=>(x.magic||'（無 Magic）')===SEL.grp && x.layer);
+    const byLayer={}; arr.forEach(x=>{(byLayer[x.layer]=byLayer[x.layer]||[]).push(x);});
+    Object.keys(byLayer).map(Number).sort((a,b)=>a-b).forEach(L=>{
+      const sub=byLayer[L], s=stat(sub);
+      h+=`<tr><td>L${L}</td><td class="n">${fmt(t.base*Math.pow(t.mult,L-1),2)}</td><td class="n">${s.n}</td>
+      <td class="n">${pct(s.n/t.n)}</td><td class="n ${s.netMoney>=0?'pos':'neg'}">${money(s.netMoney)}</td>
+      <td class="n">${pct(s.wr)}</td><td class="n">${fmt(s.avgMAEp,1)}</td><td class="n">${fmt(s.avgMFEp,1)}</td></tr>`;
+    });
+    h+=`</table><h3>lot 分佈（前 20）</h3><table><tr><th>lot</th><th class="n">次數</th><th class="n">歸層</th></tr>`;
+    t.lots.slice(0,20).forEach(l=>{
+      const sample=TRADES.find(x=>x.lots===l && (x.magic||'（無 Magic）')===SEL.grp);
+      h+=`<tr><td>${l}</td><td class="n">${t.cnt[l]}</td><td class="n">${sample&&sample.layer?('L'+sample.layer):'未歸類'}</td></tr>`;
+    });
+    h+=`</table>`;
+  }
+  return h+`</div>`;
 }
 
 /* ⑥ 商品 × 方向（含 MAE/MFE 四欄） */
@@ -406,10 +417,12 @@ function secDelay(){
   const hasM1=Object.keys(M1).length>0;
   const XS=[0,10,20,30,40,50,60],SS=[10,15,20],TS=[50,100];
   const tzoff=+(document.querySelector('#tzoff')?.value||0)*3600;
-  const layers=[...new Set(TRADES.filter(t=>t.layer).map(t=>t.layer))].sort((a,b)=>a-b);
+  const GRP=SEL.grp;
+  const base0=TRADES.filter(t=>(t.magic||'（無 Magic）')===GRP && t.layer);
+  const layers=[...new Set(base0.map(t=>t.layer))].sort((a,b)=>a-b);
   BEST={}; const mat={};
   layers.forEach(L=>{
-    const arr=TRADES.filter(t=>t.layer===L); if(arr.length<10)return;
+    const arr=base0.filter(t=>t.layer===L); if(arr.length<10)return;
     let best=null; mat[L]={};
     XS.forEach(D=>{let bd=null;
       SS.forEach(S=>TS.forEach(T=>{
@@ -429,7 +442,7 @@ function secDelay(){
       if(bd)mat[L][D]=bd.exp;});
     if(best)BEST[L]=best;
   });
-  let h=`<div class="card"><h2>⑪ 延遲入場（層＝LotTiers 判定；${hasM1?'精確：用分鐘路徑':'近似：用 MFE/MAE'}）</h2>
+  let h=`<div class="card"><h2>⑪ 延遲入場（程式：${GRP}；層＝LotTiers 判定；${hasM1?'精確：用分鐘路徑':'近似：用 MFE/MAE'}）</h2>
   <div class="mut">口徑：由原入場價逆走 D 點入場；新入場價再逆走 S 點止蝕；目標回到原入場價 ±T 點。期望以該層全部原始交易為分母。</div>
   <table class="heat" style="margin-top:8px"><tr><th>層</th>${XS.map(D=>`<th>D=${D}</th>`).join('')}</tr>`;
   layers.forEach(L=>{ if(!mat[L])return; h+=`<tr><td>L${L}</td>`;
@@ -440,7 +453,7 @@ function secDelay(){
   h+=`</table></div>`;
   h+=`<div class="card"><h2>⑫ 每層最佳組合</h2><table><tr><th>層</th><th class="n">D</th><th class="n">S</th><th class="n">T</th>
   <th class="n">觸發率</th><th class="n">勝率</th><th class="n">賠率</th><th class="n">每筆期望</th><th class="n">D=0 對照</th><th class="n">樣本</th></tr>`;
-  layers.forEach(L=>{const b=BEST[L]; if(!b)return; const arr=TRADES.filter(t=>t.layer===L);
+  layers.forEach(L=>{const b=BEST[L]; if(!b)return; const arr=base0.filter(t=>t.layer===L);
     const base=arr.reduce((s,t)=>s+t.pips,0)/arr.length;
     h+=`<tr><td>L${L}</td><td class="n">${b.D}</td><td class="n">${b.S}</td><td class="n">${b.T}</td>
     <td class="n">${pct(b.trig)}</td><td class="n">${pct(b.wr)}</td><td class="n">${isFinite(b.odds)?fmt(b.odds,2):'∞'}</td>
