@@ -100,7 +100,8 @@ function parseTrades(text){
       maeP:Math.abs(ci.maeP>=0?num(c[ci.maeP]):0), mfeP:Math.abs(ci.mfeP>=0?num(c[ci.mfeP]):0),
       maeD:Math.abs(ci.maeD>=0?num(c[ci.maeD]):Math.min(0,0)), mfeD:Math.abs(ci.mfeD>=0?num(c[ci.mfeD]):0),
       magic:ci.magic>=0?(c[ci.magic]||'').trim():'', comment:ci.comment>=0?(c[ci.comment]||'').trim():'',
-      ts:parseTime((c[ci.t0]||'').trim()), ts1:parseTime(ci.t1>=0?(c[ci.t1]||'').trim():'')});
+      ts:parseTime((c[ci.t0]||'').trim()), ts1:parseTime(ci.t1>=0?(c[ci.t1]||'').trim():''),
+      pp:(Math.abs(num(c[ci.pips]))>1e-9 ? num(c[ci.profit])/num(c[ci.pips]) : null)});
   }
   if(!TRADES.length){alert('沒有可分析交易');return;}
   TRADES.forEach((t,i)=>t.order=i);
@@ -192,7 +193,7 @@ function stat(arr){
 function render(){
   if(!TRADES.length)return;
   const all=stat(TRADES), h=[];
-  h.push(`<div class="nav"><a href="#s3">總覽</a><a href="#s4">馬丁分層</a><a href="#s5">商品×方向</a><a href="#s6">散點</a><a href="#s8">商品分析器</a><a href="#s9">樞紐</a><a href="#s10">月度</a><a href="#s11">延遲入場</a><a href="#s15">原始紀錄</a></div>`);
+  h.push(`<div class="nav"><a href="#s3">總覽</a><a href="#s4">馬丁分層</a><a href="#s5">商品×方向</a><a href="#s6">散點</a><a href="#s8">商品分析器</a><a href="#s9">樞紐</a><a href="#s10">月度</a><a href="#s11">延遲入場</a><a href="#s16">每層盈虧對照</a><a href="#s15">原始紀錄</a></div>`);
   h.push(secOverview(all));
   h.push(secTiers());
   h.push(secSymDir());
@@ -201,10 +202,11 @@ function render(){
   h.push(secPivots());
   h.push(secMonth());
   h.push(secDelay());
+  h.push(secPnLCompare());
   h.push(secRaw());
   h.push(`<div class="card"><div class="mut">v4：已對照 Excel v8.5 — 整倉總覽、LotTiers 馬丁偵測、ScatData（BUY/SELL × MAE/MFE，pips 與 $ 雙口徑）、商品分析器、商品方向總表（含四欄 MAE/MFE）、樞紐（日／月／星期／小時／商品）、月度 $ 熱力、延遲入場。</div></div>`);
   $('#out').innerHTML=h.join('');
-  drawScat(); drawPivotBars(); drawEquity();
+  drawScat(); drawPivotBars(); drawEquity(); drawPnLCompare();
   const sel=document.querySelector('#symSel'); if(sel) sel.value=SEL.sym||sel.options[0].value;
   renderAnalyzer();
 }
@@ -513,6 +515,74 @@ function secDelay(){
   h+=`</tbody></table></div></div>`;
   return h;
 }
+function secPnLCompare(){
+  const GRP=SEL.grp;
+  const base0=TRADES.filter(t=>(t.magic||'（無 Magic）')===GRP && t.layer);
+  const layers=[...new Set(base0.map(t=>t.layer))].sort((a,b)=>a-b);
+  let h=`<div class="card" id="s16"><h2>⑯ 每層盈虧對照：原來 vs 最佳組合</h2>
+  <div class="mut">「延遲後」只計有觸發的交易（等不到 D 點就不入場，盈虧視為 0）。金額用每筆自身「每 pip 價值」換算；若該筆缺資料則用該層平均。</div>
+  <table style="margin-top:8px"><tr><th>層</th><th class="n">原筆數</th><th class="n">原淨 pips</th><th class="n">原淨 $</th>
+  <th class="n">最佳 D/S/T</th><th class="n">觸發筆數</th><th class="n">延遲後 pips</th><th class="n">延遲後 $</th><th class="n">Δ $</th><th class="n">Δ %</th></tr>`;
+  let totO=0, totD=0;
+  layers.forEach(L=>{
+    const arr=base0.filter(t=>t.layer===L);
+    const oP=arr.reduce((s,t)=>s+t.pips,0), oM=arr.reduce((s,t)=>s+t.profit,0);
+    const b=BEST[L];
+    if(!b || arr.length<10){
+      h+=`<tr><td>L${L}</td><td class="n">${arr.length}</td><td class="n ${oP>=0?'pos':'neg'}">${fmt(oP,1)}</td>
+      <td class="n ${oM>=0?'pos':'neg'}">${money(oM)}</td><td class="n mut" colspan="6">樣本不足（<10），不計最佳組合</td></tr>`;
+      totO+=oM; return;
+    }
+    const pps=arr.map(t=>t.pp).filter(v=>v!==null && isFinite(v));
+    const avgPP=pps.length?pps.reduce((a,b)=>a+b,0)/pps.length:0;
+    let dP=0,dM=0;
+    b.detail.forEach(d=>{ dP+=d.pips; dM+=d.pips*(d.t.pp!==null&&isFinite(d.t.pp)?d.t.pp:avgPP); });
+    totO+=oM; totD+=dM;
+    const delta=dM-oM, dpct=oM!==0?(delta/Math.abs(oM)*100):NaN;
+    h+=`<tr><td>L${L}</td><td class="n">${arr.length}</td><td class="n ${oP>=0?'pos':'neg'}">${fmt(oP,1)}</td>
+      <td class="n ${oM>=0?'pos':'neg'}">${money(oM)}</td>
+      <td class="n">D${b.D} / S${b.S} / T${b.T}</td><td class="n">${b.detail.length}（${pct(b.trig)}）</td>
+      <td class="n ${dP>=0?'pos':'neg'}">${fmt(dP,1)}</td><td class="n ${dM>=0?'pos':'neg'}">${money(dM)}</td>
+      <td class="n ${delta>=0?'pos':'neg'}">${money(delta)}</td>
+      <td class="n ${delta>=0?'pos':'neg'}">${isNaN(dpct)?'-':fmt(dpct,0)+'%'}</td></tr>`;
+  });
+  h+=`<tr style="font-weight:700"><td>合計</td><td class="n"></td><td class="n"></td><td class="n">${money(totO)}</td>
+  <td class="n"></td><td class="n"></td><td class="n"></td><td class="n">${money(totD)}</td>
+  <td class="n ${(totD-totO)>=0?'pos':'neg'}">${money(totD-totO)}</td><td class="n"></td></tr>`;
+  h+=`</table><canvas id="cvPnL" width="1100" height="260" style="width:100%;height:auto;margin-top:12px"></canvas></div>`;
+  return h;
+}
+
+function drawPnLCompare(){
+  const cv=document.querySelector('#cvPnL'); if(!cv)return;
+  const GRP=SEL.grp;
+  const base0=TRADES.filter(t=>(t.magic||'（無 Magic）')===GRP && t.layer);
+  const layers=[...new Set(base0.map(t=>t.layer))].sort((a,b)=>a-b).filter(L=>BEST[L]);
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,pad=46;
+  ctx.clearRect(0,0,W,H);
+  const orig=[],del=[];
+  layers.forEach(L=>{
+    const arr=base0.filter(t=>t.layer===L);
+    orig.push(arr.reduce((s,t)=>s+t.profit,0));
+    const pps=arr.map(t=>t.pp).filter(v=>v!==null&&isFinite(v));
+    const avgPP=pps.length?pps.reduce((a,b)=>a+b,0)/pps.length:0;
+    let dM=0; BEST[L].detail.forEach(d=>dM+=d.pips*(d.t.pp!==null&&isFinite(d.t.pp)?d.t.pp:avgPP));
+    del.push(dM);
+  });
+  const ymin=Math.min(0,...orig,...del), ymax=Math.max(0,...orig,...del);
+  const bw=(W-pad*1.4)/Math.max(1,layers.length);
+  const Y=v=>H-pad-((v-ymin)/((ymax-ymin)||1))*(H-pad*1.6);
+  ctx.strokeStyle='#243343';ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(W-pad*.4,Y(0));ctx.stroke();
+  layers.forEach((L,i)=>{
+    const x=pad+i*bw;
+    ctx.fillStyle='rgba(90,169,230,.8)'; const y0=Y(0),y1=Y(orig[i]); ctx.fillRect(x+bw*0.14,Math.min(y0,y1),bw*0.3,Math.abs(y1-y0));
+    ctx.fillStyle='rgba(57,183,133,.85)'; const y2=Y(del[i]); ctx.fillRect(x+bw*0.52,Math.min(y0,y2),bw*0.3,Math.abs(y2-y0));
+    ctx.fillStyle='#8fa4b8';ctx.font='11px sans-serif';ctx.fillText('L'+L,x+bw*0.3,H-pad+14);
+  });
+  ctx.fillStyle='#8fa4b8';ctx.font='12px sans-serif';
+  ctx.fillText('藍＝原來　綠＝最佳組合（$）',pad,18);
+}
+
 function simExact(t,D,S,T,tzoff){
   const m=M1[(t.sym||'').toUpperCase()]; if(!m||t.ts===null)return null;
   const pip=t.sym.startsWith('XAU')?0.1:(t.sym.endsWith('JPY')?0.01:0.0001);
