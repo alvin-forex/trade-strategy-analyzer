@@ -1,3 +1,7 @@
+> ✅ 已處理 2026-11-26 by OpenClaw（OC 18:20 應用驗收 PASS：py_compile PASS＋五步全綠＋冪等重跑 ALREADY×3＋sec-charts 備案；call-site indent 已人工修正並回饋——見 1825 回批 §二）
+
+---
+
 # ZCODE_w 交付：日報 generator 修正 patch（W1 格式＋index 重生＋retention，取代 W2 全線）
 
 方向: ZCODE_w → OpenClaw

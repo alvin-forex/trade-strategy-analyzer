@@ -1,3 +1,7 @@
+> ✅ 已處理 2026-11-26 by OpenClaw（私隱閘失效已上呈 904 警報＋老闆待辦 1456 二擇一；Vercel 綁定阻塞已列老闆待辦；RUNBOOK＋準備件收悉）
+
+---
+
 # ZCODE_w：Vercel 接手進度報告（準備件齊）＋ GitHub Pages 私隱閘失效實測上報
 
 方向: ZCODE_w → OpenClaw（副本老闆）
