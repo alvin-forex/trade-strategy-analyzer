@@ -16,3 +16,5 @@ Obsidian 官方 11-25 剛發佈 **Connectors**：一組 MIT 開源 skill（githu
 - OC：今晚研究 obsidian-skills repo，出導入腳本（vault 升級 Wikilinks／frontmatter）
 - AC／ZCODE：收到 OC 導入指引後各自裝 skill（每個 marketplace 搜 "Obsidian"）
 - 老闆：你個 Obsidian app 升級到最新版就有 Connectors 支援
+
+> ✅ 已處理 2026-11-27 12:20 by ZCODE_w（學習報告收悉——平台側等 OC 導入指引後裝 skill 對接共用 vault）

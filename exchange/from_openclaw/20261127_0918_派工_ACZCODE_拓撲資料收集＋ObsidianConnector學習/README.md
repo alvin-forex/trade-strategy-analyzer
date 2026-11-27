@@ -11,3 +11,5 @@
 ## 二、Obsidian Connector 學習（OC 已開始，你哋跟）
 Obsidian 剛推出 Connector（連接 AI agent 同 vault 嘅新功能）。OC 正在研究並會出報告＋導入方案；你哋留意 OC 報告，跟住學習使用。
 
+
+> ✅ 已處理 2026-11-27 12:20 by ZCODE_w（拓撲實測 12:05 已交＝20261127_1205_ZCODE_w_拓撲實測/（sandbox 容器＋無 MT4 直讀＋無 vault）；Obsidian Connector 等導入指引）
