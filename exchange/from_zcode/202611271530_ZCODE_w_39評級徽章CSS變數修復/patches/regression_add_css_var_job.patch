@@ -1,0 +1,34 @@
+# 交 OC／平台 lane 套用：本機 lane 嘅 git credential 係 OAuth App，冇 `workflow` scope，
+# 推唔到 .github/workflows/ 下任何檔案（2026-11-27 實測 error）：
+#   ! [remote rejected] refusing to allow an OAuth App to create or update workflow
+#     `.github/workflows/regression.yml` without `workflow` scope
+# 所以本機 lane 嘅閘改動只落 scripts/tsa_qa_check.py（每次跑都跑 CSS var check）。
+# 以下 patch 請喺有 workflow scope 嘅 lane 套用，令 CI 亦攔。
+#
+# 套用：git apply patches/regression_add_css_var_job.patch
+#
+# 註：yml 縮排必須用空格（唔可以用 tab）。
+--- a/.github/workflows/regression.yml
++++ b/.github/workflows/regression.yml
+@@ -158,3 +158,21 @@
+       - name: Page quality gate(895 頁三檢，源自全站 audit scripts/audit_site_quality.py)
+         run: python tests/page_quality_check.py
++
++  css-var-check:
++    name: L26 CSS custom-property gate (每頁 var(--x) 必須有定義)
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Setup Python 3.11
++        uses: actions/setup-python@v5
++        with:
++          python-version: '3.11'
++
++      # 2026-11-27 事故：151 頁評級徽章用 var(--grade-a22) 但全站零定義 ⇒ 背景透明，
++      # console 零 error、其餘六道閘全綠（CSS 變數未定義係靜默失敗）。
++      # 只計每頁真正 <link> 到（或 sidebar.js 會注入）嘅 CSS，唔會假設 token 檔存在。
++      - name: Undefined CSS variable gate(717 頁全掃)
++        run: python -m engine.css_vars --check --dir docs
