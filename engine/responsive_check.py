@@ -58,7 +58,7 @@ function nx(){
 
 
 def build_probe_html(pages: Sequence[str], width: int = DEFAULT_WIDTH,
-                     prefix: str = "/") -> str:
+                     prefix: str = "./") -> str:
     """產生一個 HTML probe 頁，逐頁塞入 width 寬的 iframe 並量溢出。
 
     `prefix` 係頁面 URL 前綴：`--dir docs` 時用 `/`（rel path 已經由 docs 根算），
@@ -171,11 +171,14 @@ def summarise(rows: Iterable[Dict]) -> Dict:
 def is_plausible_page_prefix(prefix: str) -> bool:
     """檢查 page-prefix 係唔係合理的 URL 前綴。
 
-    ⚠️ 實測陷阱（Windows Git Bash）：`--page-prefix /ccy/` 會被 MSYS 的
-    路徑自動轉換改寫成 `C:/Program Files/Git/ccy/`，於是 iframe 全部 404、
-    量到 34 字元的空殼頁、總結報「0 頁溢出」。**假綠**。
-    對策：①prefix 必須以 `/` 開頭 ②唔可以有 `:`（drive letter）。
-    Git Bash 下用 `MSYS_NO_PATHCONV=1` 或用 `--page-prefix=./ccy/`。
+    ⚠️ 實測陷阱（Windows Git Bash）：`--page-prefix /ccy/` 會被 MSYS 的路徑
+    自動轉換改寫成 `C:/Program Files/Git/ccy/`——**連 `--page-prefix=/ccy/`
+    等號形式都一樣中招**（實測四種寫法只有 `./ccy/`、`ccy/`、
+    `MSYS2_ARG_CONV_EXCL='*'` 或 `MSYS_NO_PATHCONV=1` 逃得過）。後果係 iframe
+    全部 404、量到 `title="Error response"` 的空殼、總結報「0 頁溢出」——**假綠**。
+
+    對策：默認用 `./`（相對 probe 頁，`--outdir` 與 `--dir` 相同時剛好等價，
+    而且冇前導斜線 ⇒ MSYS 唔會改寫）。呢個 guard 就係攔 `C:/...` 呢類。
     """
     if not prefix:
         return False
@@ -183,7 +186,7 @@ def is_plausible_page_prefix(prefix: str) -> bool:
         return False
     if prefix.startswith("//"):
         return True
-    return prefix.startswith("/")
+    return prefix.startswith("/") or prefix.startswith("./") or not prefix.startswith("-")
 
 
 def chrome_path() -> Optional[str]:
@@ -217,9 +220,10 @@ def main(argv=None) -> int:                       # pragma: no cover — 需真 
                     help="probe 頁本身的 URL 前綴，要對應 --outdir 喺 http server "
                          "根下的位置（--dir docs 時 http://127.0.0.1:8794；"
                          "--dir docs/ccy 時 .../ccy）")
-    ap.add_argument("--page-prefix", default="/",
-                    help="iframe 內頁面的 URL 前綴。--dir docs 時用 /（默認）；"
-                         "--dir docs/ccy 時要傳 /ccy/ 否則全部 404 而報假綠")
+    ap.add_argument("--page-prefix", default="./",
+                    help="iframe 內頁面的 URL 前綴（相對於 probe 頁）。"
+                         "默認 ./ ⇒ 與 --outdir 同層時剛好指到同目錄的頁。"
+                         "Windows Git Bash 唔好用前導 /（會被 MSYS 改成 C:/...）")
     ap.add_argument("--outdir", help="probe 頁落點（要喺 --dir 內並經 http 服務）")
     ap.add_argument("--budget", type=int, default=40000,
                     help="Chrome --virtual-time-budget（毫秒）。大頁（66 萬字元）"

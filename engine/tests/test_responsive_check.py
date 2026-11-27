@@ -45,17 +45,19 @@ class TestBuildProbe(unittest.TestCase):
         self.assertIn("outsideScroller", html)
 
     def test_page_prefix_is_applied(self):
-        """`--dir docs/ccy` 要用 `/ccy/` 前綴；默認 `/` 會令所有頁 404。
-
-        實測：忘了傳前綴時 35 頁全部報「零溢出」，其實全部係 404 空殼。
-        """
-        html = build_probe_html(["EURUSD.html"], width=375, prefix="/ccy/")
-        self.assertIn('"/ccy/"', html)
+        """`--dir docs/ccy` 要用 `./ccy/`（或 `ccy/`）前綴；留空／用 `/` 都會
+        令所有頁 404。實測：忘了傳前綴時 36 頁全部報「零溢出」，其實全部係
+        `title="Error response"` 空殼。"""
+        html = build_probe_html(["EURUSD.html"], width=375, prefix="./ccy/")
+        self.assertIn('"./ccy/"', html)
         self.assertIn("f.src=PRE+p", html)
 
-    def test_default_prefix_is_root(self):
+    def test_default_prefix_is_relative_not_root(self):
+        """默認係 `./` 唔係 `/`：實測 Git Bash 會把前導 `/` 改成
+        `C:/Program Files/Git/...`（連 `--page-prefix=/ccy/` 等號形式都一樣），
+        令 iframe 全部 404 而報假綠。`./` 冇前導斜線 ⇒ MSYS 唔會改寫。"""
         html = build_probe_html(["a.html"], width=375)
-        self.assertIn('"/"', html)
+        self.assertIn('const PRE="./"', html)
 
     def test_probe_reports_body_text_length(self):
         """要回報 txt／title，否則分唔開「真量到」同「載入 404 空殼」。"""
@@ -266,3 +268,21 @@ class TestPythonHttpServerGhost(unittest.TestCase):
         self.assertEqual(s["measured"], 1)
         self.assertEqual(s["real"], 1)
         self.assertEqual(sorted(s["suspicious"]), ["ghost1.html", "ghost2.html"])
+
+
+class TestDefaultPagePrefix(unittest.TestCase):
+    """默認前綴要係 `./` 而唔係 `/`（實測 `/ccy/` 連等號形式都被 MSYS 改壞）。"""
+
+    def test_default_prefix_is_relative(self):
+        from engine.responsive_check import build_probe_html
+        html = build_probe_html(["a.html"])
+        self.assertIn('const PRE="./"', html)
+
+    def test_relative_prefix_accepted(self):
+        from engine.responsive_check import is_plausible_page_prefix
+        self.assertTrue(is_plausible_page_prefix("./"))
+        self.assertTrue(is_plausible_page_prefix("./ccy/"))
+
+    def test_bare_relative_accepted(self):
+        from engine.responsive_check import is_plausible_page_prefix
+        self.assertTrue(is_plausible_page_prefix("ccy/"))
