@@ -55,50 +55,60 @@ def _is_encrypted(html):
     return "staticrypt" in html.lower()
 
 def check_sidebar_consistency():
-    """Check all pages have sidebar.css and sidebar.js"""
+    """Check every page in docs/ has the sidebar (script + static CSS).
+
+    2026-11-27（卡 #39 第二件）：舊版只查 EXPECTED_PAGES＋SUBDIR_PAGES＝**6 頁硬編碼
+    清單**，其餘 710 頁一頁都冇驗。所以「全站 sidebar 零缺」一直冇機器證據，靠人手
+    grep——實測當時真係有 7 頁缺。改為掃全站，並分清四種狀態：
+
+      ❌ 真缺（非加密、非 standalone、非 sidebar 實體持有人）
+      ⚠️ 設計上唔載（STANDALONE_PAGES）／有 script 冇靜態 CSS 但頁面無 </head>
+         （修不到結構，sidebar.js 會動態注入 CSS，只是慢網會 FOUC）
+      ℹ️ 加密頁（密文殼，只對 EXPECTED_PAGES 報，免得刷 700 行）
+      ✅ 其餘
+    """
     issues = []
 
-    for page in EXPECTED_PAGES:
-        path = os.path.join(TSA_DIR, page)
-        if not os.path.exists(path):
+    # 1) 核心頁存在性（舊行為保留）
+    for page in EXPECTED_PAGES + [p for p, _ in SUBDIR_PAGES]:
+        if not os.path.exists(os.path.join(TSA_DIR, page)):
             issues.append(f"❌ MISSING PAGE: {page}")
-            continue
-        with open(path, encoding="utf-8") as f:
-            html = f.read()
-        if _is_encrypted(html):
-            issues.append(f"ℹ️ SKIP: {page} is StatiCrypt-encrypted — sidebar/content checks not applicable")
-            continue
-        if 'sidebar.css' not in html:
-            if page in STANDALONE_PAGES:
-                issues.append(f"⚠️ STANDALONE: {page} has no sidebar.css (standalone page by design)")
-            else:
-                issues.append(f"❌ NO SIDEBAR CSS: {page}")
-        if 'sidebar.js' not in html:
-            if page in STANDALONE_PAGES:
-                issues.append(f"⚠️ STANDALONE: {page} has no sidebar.js (standalone page by design)")
-            else:
-                issues.append(f"❌ NO SIDEBAR JS: {page}")
 
-    for page, subdir in SUBDIR_PAGES:
-        path = os.path.join(TSA_DIR, page)
-        if not os.path.exists(path):
-            issues.append(f"❌ MISSING PAGE: {page}")
-            continue
-        with open(path, encoding="utf-8") as f:
-            html = f.read()
-        if _is_encrypted(html):
-            issues.append(f"ℹ️ SKIP: {page} is StatiCrypt-encrypted — sidebar/content checks not applicable")
-            continue
-        if 'sidebar.css' not in html:
-            if page in STANDALONE_PAGES:
-                issues.append(f"⚠️ STANDALONE: {page} has no sidebar.css (standalone page by design)")
+    # 2) 全站掃描
+    js_re = re.compile(r'<script\b[^>]*src\s*=\s*["\'][^"\']*sidebar\.js["\']', re.I)
+    css_re = re.compile(r'<link\b[^>]*href\s*=\s*["\'][^"\']*sidebar\.css["\']', re.I)
+    host_re = re.compile(r'<nav\b[^>]*id\s*=\s*["\']tsa-sidebar["\']', re.I)
+
+    for dirpath, _dirnames, filenames in os.walk(TSA_DIR):
+        for name in filenames:
+            if not name.endswith(".html"):
+                continue
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, TSA_DIR).replace(os.sep, "/")
+            try:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    html = fh.read()
+            except OSError as exc:
+                issues.append(f"❌ UNREADABLE: {rel} ({exc})")
+                continue
+
+            if _is_encrypted(html):
+                if rel in EXPECTED_PAGES:
+                    issues.append(f"ℹ️ SKIP: {rel} is StatiCrypt-encrypted — sidebar/content checks not applicable")
+                continue
+            if host_re.search(html):
+                continue                      # docs/shell.html：自己就係 sidebar 實體
+            if js_re.search(html):
+                if not css_re.search(html):
+                    if re.search(r"</head\s*>", html, re.I):
+                        issues.append(f"❌ NO SIDEBAR CSS: {rel}（有 script 冇靜態 CSS ⇒ 慢網 FOUC）")
+                    else:
+                        issues.append(f"⚠️ NO STATIC SIDEBAR CSS: {rel}（頁面無 </head>，只能靠 JS 動態注入）")
+                continue
+            if rel in STANDALONE_PAGES:
+                issues.append(f"⚠️ STANDALONE: {rel} has no sidebar.js (standalone page by design)")
             else:
-                issues.append(f"❌ NO SIDEBAR CSS: {page}")
-        if 'sidebar.js' not in html:
-            if page in STANDALONE_PAGES:
-                issues.append(f"⚠️ STANDALONE: {page} has no sidebar.js (standalone page by design)")
-            else:
-                issues.append(f"❌ NO SIDEBAR JS: {page}")
+                issues.append(f"❌ NO SIDEBAR JS: {rel}")
 
     return issues
 
