@@ -301,6 +301,46 @@ def check_nav_consistency():
     return issues
 
 
+def check_css_vars():
+    """Check every page's `var(--x)` has a definition that page actually loads.
+
+    2026-11-27 事故：151 頁評級徽章用 `var(--grade-a22)` 但全站零定義 ⇒ 背景透明，
+    console 零 error、所有既有閘全綠。呢個 check 補返個洞。
+    只計頁面真正 `<link>` 到（或 sidebar.js 會注入）嘅 CSS，唔會假設 token 檔存在。
+    """
+    issues = []
+    try:
+        if _REPO_ROOT not in sys.path:
+            sys.path.insert(0, _REPO_ROOT)
+        from engine.css_vars import find_undefined_vars, resolve_page_tokens
+    except Exception as exc:                       # noqa: BLE001 — 唔可以因工具問題擋閘
+        return [f"⚠️ SKIP: engine.css_vars import failed ({exc})"]
+
+    if not os.path.isdir(TSA_DIR):
+        return ["⚠️ SKIP: docs/ not found"]
+
+    bad = {}
+    for dirpath, _dirnames, filenames in os.walk(TSA_DIR):
+        for name in filenames:
+            if not name.endswith(".html"):
+                continue
+            path = os.path.join(dirpath, name)
+            try:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    html = fh.read()
+            except OSError:
+                continue
+            if _is_encrypted(html[:3000]):
+                continue
+            und = find_undefined_vars(html, resolve_page_tokens(html, path, TSA_DIR))
+            if und:
+                bad[os.path.relpath(path, _REPO_ROOT)] = und
+
+    for path, names in sorted(bad.items()):
+        issues.append(f"❌ UNDEFINED CSS VAR: {path} → {', '.join(names)}")
+    return issues
+
+
 def run_all_checks():
     """Run all QA checks and print report"""
     all_issues = []
@@ -314,6 +354,7 @@ def run_all_checks():
         ("Sidebar on All Pages", check_sidebar_consistency),
         ("Signal Links", check_signal_links),
         ("Data Freshness", check_data_freshness),
+        ("CSS Var Definitions", check_css_vars),
     ]
     
     for name, check_fn in checks:
