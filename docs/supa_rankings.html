@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>📈 Portfolio 排名 · Supabase 即時版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="./sidebar.css">
+<style>
+    :root { --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif; --radius: 8px; }
+    [data-theme="dark"] {
+        --bg: #0F1520; --bg-card: #161E2E; --bg-hover: #1C2638;
+        --text: #E6EDF5; --text2: #A8B4C4;
+        --primary: #5CA8FF; --accent: #38BDF8;
+        --green: #22c55e; --red: #ef4444; --yellow: #eab308; --orange: #f97316;
+        --border: #2A3650;
+    }
+    [data-theme="light"] {
+        --bg: #f1f5f9; --bg-card: #ffffff; --bg-hover: #e2e8f0;
+        --text: #1e293b; --text2: #64748b;
+        --primary: #2563eb; --accent: #0ea5e9;
+        --green: #16a34a; --red: #dc2626; --yellow: #ca8a04; --orange: #ea580c;
+        --border: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font-main); background: var(--bg); color: var(--text); min-height: 100vh; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+    .hdr { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .hdr h1 { font-size: 1.25rem; }
+    .hdr .sub { color: var(--text2); font-size: .8rem; margin-top: .25rem; }
+    .badge { display: inline-block; border-radius: 999px; padding: .2rem .7rem; font-size: .72rem; border: 1px solid var(--border); color: var(--text2); }
+    .badge.live { color: var(--green); border-color: var(--green); background: rgba(34,197,94,.12); }
+    .badge.err  { color: var(--red); border-color: var(--red); background: rgba(239,68,68,.12); }
+    .badge.gA { color: var(--green); border-color: var(--green); }
+    .badge.gB { color: var(--yellow); border-color: var(--yellow); }
+    .badge.gC { color: var(--orange); border-color: var(--orange); }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+    .kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: .8rem 1rem; }
+    .kpi .t { color: var(--text2); font-size: .72rem; }
+    .kpi .v { font-size: 1.15rem; font-weight: 700; margin-top: .2rem; }
+    .kpi .n { color: var(--text2); font-size: .7rem; margin-top: .15rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; }
+    .chip { cursor: pointer; border: 1px solid var(--border); background: var(--bg-card); color: var(--text2); border-radius: 999px; padding: .3rem .9rem; font-size: .78rem; }
+    .chip[aria-pressed="true"] { color: var(--primary); border-color: var(--primary); background: rgba(92,168,255,.1); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1rem; }
+    .pcard { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .pcard .head { padding: .8rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+    .pcard .head .nm { font-weight: 700; font-size: .95rem; }
+    .pcard .head .id { color: var(--text2); font-size: .72rem; margin-top: .15rem; }
+    .pcard .tags { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .pcard table { width: 100%; border-collapse: collapse; font-size: .76rem; }
+    .pcard th, .pcard td { padding: .4rem .6rem; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; }
+    .pcard th { color: var(--text2); font-weight: 500; font-size: .68rem; border-top: 0; }
+    .pcard td:first-child, .pcard th:first-child { text-align: left; }
+    .pcard td.mono { font-variant-numeric: tabular-nums; }
+    .pos { color: var(--green); }
+    .rk1 { color: var(--yellow); font-weight: 700; }
+    .foot { color: var(--text2); font-size: .72rem; margin-top: 1.25rem; line-height: 1.6; }
+    .foot a { color: var(--primary); }
+    .fallback { display: none; background: var(--bg-card); border: 1px solid var(--red); border-radius: var(--radius); padding: 1.5rem; margin: 1rem 0; }
+    .fallback.show { display: block; }
+    .fallback h2 { font-size: 1rem; color: var(--red); margin-bottom: .5rem; }
+    .fallback p { color: var(--text2); font-size: .82rem; line-height: 1.7; }
+    .fallback a { color: var(--primary); }
+    .retry { cursor: pointer; margin-top: .9rem; border: 1px solid var(--primary); color: var(--primary); background: transparent; border-radius: var(--radius); padding: .45rem 1.2rem; font-size: .82rem; }
+    .retry:hover { background: rgba(92,168,255,.12); }
+    .loading { color: var(--text2); padding: 2rem 0; text-align: center; font-size: .85rem; }
+</style>
+</head>
+<body>
+<main class="wrap">
+    <div class="hdr">
+        <div>
+            <h1>📈 Portfolio 排名（Supabase 即時）</h1>
+            <div class="sub">每張卡＝一個組合；表內每行＝組合內一個帳號嘅近期表現</div>
+        </div>
+        <div>
+            <span class="badge" id="srcBadge">連線中…</span>
+            <span class="badge" id="asofBadge">—</span>
+        </div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+    <div class="chips" id="chips" role="group" aria-label="評級篩選"></div>
+    <div class="grid" id="grid"><div class="loading">載入中…（數據源 Supabase REST）</div></div>
+
+    <div class="fallback" id="fallback">
+        <h2>⚠️ Supabase 無回應——已切換靜態 fallback</h2>
+        <p id="fbReason">即時數據載入失敗（可能斷網或數據源維護中）。請改用以下現有靜態頁面，資料完整不會白屏：</p>
+        <p style="margin-top:.5rem">
+            <a href="./ccy_ranking.html">💱 CCY 排名（靜態加密頁）</a> ·
+            <a href="./portfolios/portfolio_master_report_v2.html">💼 Portfolio 統一版（靜態）</a> ·
+            <a href="./index.html">🦀 TSA 首頁</a>
+        </p>
+        <button class="retry" id="retryBtn" type="button">↻ 重試 Supabase</button>
+    </div>
+
+    <div class="foot" id="foot">
+        數據源：Supabase REST 匿名只讀（RLS「public read」；寫入由 OpenClaw service_role 每 15 分鐘 delta 執行，不經前端）。
+        同源靜態頁：<a href="./ccy_ranking.html">ccy_ranking.html</a>、
+        <a href="./portfolios/portfolio_master_report_v2.html">portfolio_master_report_v2.html</a>。
+        卡 #4（前端改讀 Supabase）第一版：rankings 已用，signals／positions 接口已留（<a href="https://github.com/alvin-forex/trade-strategy-analyzer/issues/4" rel="noopener">issue #4</a>）。
+    </div>
+</main>
+
+<script src="./supa_client.js"></script>
+<script>
+'use strict';
+(function () {
+    var st = { grade: 'all', all: [], asOf: null };
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    function money(v) { return v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function num(v) { return v == null ? '—' : Number(v).toLocaleString('en-US'); }
+    function pct(v) { return v == null ? '—' : Number(v).toFixed(1) + '%'; }
+    function pf(v) { return v == null ? '—' : Number(v).toFixed(2); }
+    function hk(iso) { try { return new Date(iso).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong', hour12: false }); } catch (e) { return String(iso); } }
+
+    function badgeGrade(g) { return '<span class="badge g' + esc(g) + '">' + esc(g) + ' 級</span>'; }
+    function badgeRisk(r) { return '<span class="badge">' + esc(r) + '</span>'; }
+
+    function render() {
+        var rows = st.asOf == null ? [] : st.all.filter(function (r) {
+            var p = r.payload || {};
+            return st.grade === 'all' || String(p.grade) === st.grade;
+        });
+        /* 分組 → 卡片，依組合 3 月 PnL 總和降序 */
+        var byP = {};
+        rows.forEach(function (r) {
+            var p = r.payload || {}, k = String(p.portfolio_id || '?');
+            (byP[k] = byP[k] || { id: k, rows: [] }).rows.push(r);
+        });
+        var cards = Object.keys(byP).map(function (k) {
+            var c = byP[k];
+            c.sum = c.rows.reduce(function (s, r) { return s + (Number((r.payload || {}).recent_3mo_pnl) || 0); }, 0);
+            c.meta = c.rows[0].payload || {};
+            c.rows.sort(function (a, b) { return (a.rank || 0) - (b.rank || 0); });
+            return c;
+        }).sort(function (a, b) { return b.sum - a.sum; });
+
+        document.getElementById('grid').innerHTML = cards.map(function (c) {
+            var m = c.meta;
+            var pHref = `./portfolios/portfolio_${c.id}.html`;
+            return '<div class="pcard"><div class="head"><div><div class="nm">' + esc(m.portfolio_name) +
+                '</div><div class="id">' + esc(c.id) + ' · ' + esc(m.ea_types || '—') +
+                ' · <a href="' + pHref + '">靜態詳情 →</a></div></div>' +
+                '<div class="tags">' + badgeGrade(m.grade) + badgeRisk(m.risk_level) + '</div></div>' +
+                '<table><thead><tr><th>#</th><th>帳號</th><th>分</th><th>勝率3M</th><th>PnL 3M</th><th>PF 3M</th><th>上月</th><th>手數</th></tr></thead><tbody>' +
+                c.rows.map(function (r) {
+                    var p = r.payload || {};
+                    return '<tr><td class="' + (r.rank === 1 ? 'rk1' : '') + '">' + esc(r.rank) + '</td>' +
+                        '<td class="mono">' + esc(r.symbol) + '</td>' +
+                        '<td class="mono">' + esc(r.score) + '</td>' +
+                        '<td class="mono">' + pct(p.win_rate_3mo) + '</td>' +
+                        '<td class="mono pos">' + money(p.recent_3mo_pnl) + '</td>' +
+                        '<td class="mono">' + pf(p.recent_3mo_pf) + '</td>' +
+                        '<td class="mono">' + money(p.last_month_pnl) + '</td>' +
+                        '<td class="mono">' + num(p.total_trades) + '</td></tr>';
+                }).join('') +
+                '</tbody><tfoot><tr><td colspan="4">組合 3M PnL</td><td class="mono pos" style="text-align:right">' + money(c.sum) + '</td><td colspan="3"></td></tr></tfoot></table></div>';
+        }).join('') || '<div class="loading">無符合評級嘅組合</div>';
+    }
+
+    function renderKpis() {
+        var ids = {}, grades = {}, sum = 0;
+        st.all.forEach(function (r) {
+            var p = r.payload || {};
+            ids[p.portfolio_id] = 1; grades[p.grade] = (grades[p.grade] || 0) + 1;
+            sum += Number(p.recent_3mo_pnl) || 0;
+        });
+        var gd = Object.keys(grades).sort().map(function (g) { return g + '×' + grades[g]; }).join('／') || '—';
+        document.getElementById('kpis').innerHTML = [
+            ['組合數', Object.keys(ids).length || '—', 'P1–P10'],
+            ['帳號組合對', st.all.length || '—', '每行＝組合×帳號'],
+            ['評級分佈', gd, 'A／B／C'],
+            ['3 月 PnL 總計', sum ? money(sum) : '—', '全部組合加總']
+        ].map(function (k) {
+            return '<div class="kpi"><div class="t">' + k[0] + '</div><div class="v">' + k[1] + '</div><div class="n">' + k[2] + '</div></div>';
+        }).join('');
+    }
+
+    function renderChips() {
+        var gs = {};
+        st.all.forEach(function (r) { var g = (r.payload || {}).grade; if (g) gs[g] = 1; });
+        var order = ['all'].concat(Object.keys(gs).sort());
+        document.getElementById('chips').innerHTML = order.map(function (g) {
+            return '<button class="chip" type="button" data-g="' + esc(g) + '" aria-pressed="' +
+                String(st.grade === g) + '">' + (g === 'all' ? '全部評級' : g + ' 級') + '</button>';
+        }).join('');
+        document.querySelectorAll('#chips .chip').forEach(function (c) {
+            c.addEventListener('click', function () {
+                st.grade = c.getAttribute('data-g');
+                document.querySelectorAll('#chips .chip').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+                c.setAttribute('aria-pressed', 'true');
+                render();
+            });
+        });
+    }
+
+    function ok(group) {
+        st.all = group.rows; st.asOf = group.asOf;
+        document.getElementById('fallback').classList.remove('show');
+        var sb = document.getElementById('srcBadge');
+        sb.textContent = '● Supabase 即時'; sb.className = 'badge live';
+        document.getElementById('asofBadge').textContent = '資料更新於 ' + hk(st.asOf) + '（HKT）';
+        renderKpis(); renderChips(); render();
+    }
+
+    function fail(e) {
+        var fb = document.getElementById('fallback');
+        document.getElementById('fbReason').textContent =
+            '即時數據載入失敗：' + (e && e.message ? e.message : '未知錯誤') +
+            '。已切換靜態 fallback，請改用以下現有頁面，資料完整不會白屏：';
+        fb.classList.add('show');
+        document.getElementById('grid').innerHTML =
+            '<div class="loading">即時數據未能載入——請用上方靜態連結，或按「重試 Supabase」。</div>';
+        var sb = document.getElementById('srcBadge');
+        sb.textContent = '○ Supabase 無回應'; sb.className = 'badge err';
+        document.getElementById('asofBadge').textContent = '—';
+    }
+
+    function load() {
+        document.getElementById('grid').innerHTML = '<div class="loading">載入中…（數據源 Supabase REST）</div>';
+        document.getElementById('fallback').classList.remove('show');
+        window.TSA.supa.fetchRankings(200).then(ok).catch(fail);
+    }
+
+    document.getElementById('retryBtn').addEventListener('click', load);
+    load();
+})();
+</script>
+<script src="./sidebar.js"></script>
+</body>
+</html>
