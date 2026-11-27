@@ -7,6 +7,8 @@
 # CrossMA 日報 2026-11-27
 
 數據來源：`docs/admin/crossma/crossma_daily_20261127.csv`（174 行＝29 symbol × 6 TF，全部 rank1）
+> 今日（20261128）數據未出版，本報用 20261127 作最新數據。
+
 
 ## ① XAUUSD Top 5（按 Net pips）
 
