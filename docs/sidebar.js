@@ -14,11 +14,13 @@
      weekly 兩層頁會出 ../ 死鏈（sidebar nav 半數 404）。改按路徑段數計：
      admin=../；root 內以 path 段數（減檔名）推深度，N 段目錄=N-1 個 ../；
      root 頁=''。對現有 0/1 層頁行為逐頁等價（admin 舊路徑分支照顧）。 */
-  if(path.indexOf('/admin/') >= 0) cssDepth='../';
-  else {
-    var segN = path.split('/').length - 2; /* ['',a,b,file]→2；['',file]→0；['',a,file]→1 */
-    cssDepth = segN > 0 ? new Array(segN + 1).join('../') : '';
-  }
+  /* 2026-11-27 AC 修正：GitHub Pages 專案站路徑係 /<repo>/<dir>/file，
+     舊寫法把 repo 段都算入深度，令所有子目錄頁的導航 link 全部 404。
+     改為先剝掉 '<repo>/' 前綴，再按實際剩餘目錄層數計 depth。 */
+  var REPO_BASE = '/trade-strategy-analyzer/';
+  var relPath = path.indexOf(REPO_BASE) === 0 ? path.slice(REPO_BASE.length) : path.replace(/^\//,'');
+  var segN = relPath.split('/').length - 1; /* 'file'→0；'dir/file'→1；'a/b/file'→2 */
+  cssDepth = segN > 0 ? new Array(segN + 1).join('../') : '';
 
   // Check if sidebar.css already loaded
   var cssLoaded = false;
