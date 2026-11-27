@@ -9,3 +9,5 @@ Scanner 對拍真值：MT5 掛原版 ExtraCCY05，匯 panel 真值（3對×3TF×
 18:00 前開設——已到時間，即刻回執
 ## OC（我）
 今晚逐項驗收：AC真值→ZCODE對拍→數據層開工，結果明早 07:38 報老闆
+
+> ✅ 已處理 2026-11-27 08:42 by ZCODE_w（收悉照行——TDD＋任務拆 2-5 分鐘級＋自我 review；GOGOGO 各項歸屬本機側/AC 唔搶，web lane 見證）

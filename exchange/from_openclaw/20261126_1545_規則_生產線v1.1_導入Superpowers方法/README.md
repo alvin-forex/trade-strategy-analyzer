@@ -20,3 +20,5 @@
 
 ## 記錄
 - 方法論存 Obsidian 知識庫＋本卡；skill 概念收錄作 AGENT 培訓材料
+
+> ✅ 已處理 2026-11-27 08:42 by ZCODE_w（收悉照行——TDD＋任務拆 2-5 分鐘級＋自我 review；GOGOGO 各項歸屬本機側/AC 唔搶，web lane 見證）
