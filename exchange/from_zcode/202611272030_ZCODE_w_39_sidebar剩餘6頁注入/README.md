@@ -121,6 +121,57 @@ around: b'...</div>\n\xef\xbf\xbd\xef\xbf\xbd<\x00!\x00D\x00O\x00C\x00T\x00Y\x00
 
 - branch `local/t39-sidebar-remaining`（base `origin/main c454e0b61`）
 - 6 頁各加 1 行 ＋ 新工具 2 檔
-- 未 commit／未 push（先出 review）
+- **20:44 已 commit／push，PR #75**
 
-— ZCODE（本機 lane）2026-11-27 20:3x HKT
+## 八、review 第二輪修正（23:xx，commit 待推）
+
+第二輪 review 提 4 項，全部實測過才動手：
+
+| # | 問題 | 實測 | 修法 |
+|---|---|---|---|
+| I-3 | 全站 710 頁有靜態 `<link sidebar.css>`，呢 6 頁冇 ⇒ 慢網 FOUC（`<nav class="sidebar">` 未樣式化時 1264px 寬透明底壓住正文） | `sidebar.js` 第 31-36 行才動態 append CSS | 注入時同步補 `<link>`；`<head>` 存在才補，5/6 頁成功 |
+| I-2 | `--check` 把 REFUSED 一律當 OK ⇒ 全站仍缺一頁都報 0 | 臨時目錄驗 | 加 `KNOWN_REFUSED` 白名單，唔在名單的 REFUSED 令 exit 1 |
+| I-4 | `--apply` 用**注入前** report 計 `unexplained` ⇒ 成功注入都 exit 1（實測兩頁 `applied=2`、`unexplained` 兩頁齊、rc=1） | 臨時目錄實跑 | 寫回後用新內容重跑一次 `inject_sidebar`，離開碼反映**動作之後**狀態 |
+| M-3 | Windows cp1252 stdout 打中文會 crash | — | JSON 經 utf-8 bytes 過濾再寫 stdout |
+
+新增 11 條測試（17→28），其中 `TestCliExitCode` 5 條專門鎖離開碼語義。
+
+## 九、更正：`--numstat` 全部 `1 0` 呢句對 ac 頁**唔成立**
+
+第三節寫「`--numstat` 全部 `1 0`」，**呢句錯**。`git diff --numstat` 對
+`ac_bt_report_20261125.html` 出 `-  -`（git 判為 binary，因為檔中有 12.3 萬個
+`\x00`），實際係 byte 級純追加，已用 python 直接驗：
+
+```
+HEAD~1 len 248659  HEAD len 248701
+prefix_equal True
+appended: b'\n<script src="../../sidebar.js"></script>\n'
+old has sidebar.js: False | new: True
+```
+
+即 42 bytes 純追加、前 248,659 bytes 逐 byte 不變。**內容仍然係壞檔**（見第六節），
+我只加 sidebar，冇修內容。
+
+## 十、更正：「6 頁渲染 sidebar=1 js_err=0」唔代表 ac 頁視覺正常
+
+第五節的 headless 表列出 ac 頁 `sidebar=1 js_err=0`——**呢個只證明 sidebar 本身
+掛到、冇 JS 錯誤**，唔代表該頁可讀。實測同一份 DOM：
+
+```
+dom len 218828
+FFFD（U+FFFD 替換字元）12911
+C1 控制字元 51
+```
+
+原文係「頭 2,040 byte UTF-8 ＋之後 UTF-16LE」混合編碼（`\x00!\x00D\x00O\x00C…`
+= `<!DOC…` 的 UTF-16LE 形式，被當 UTF-8 讀），Chrome 把整份「Strategy Tester
+Report」內文渲染成 12,911 個替換字元。**要 AC 重出，屬另一張單。**
+
+另外呢頁**冇 `<meta charset>`**（全站 715 頁有 sidebar script 的頁中唯一一頁），
+本地 `python -m http.server`（`Content-Type: text/html` 無 charset）會令
+連 sidebar 的中文標籤都變 `ðŸ&nbsp;` / `é¦–é&nbsp;`。實測加 `charset="utf-8"`
+到 script 標籤有效；但**GitHub Pages 有宣告 `charset=utf-8`**
+（`curl -sI` 實測 `Content-Type: text/html; charset=utf-8`），所以生產無事，
+我冇改嗰行（避免同 AC 重出衝突）。
+
+— ZCODE（本機 lane）2026-11-27 23:1x HKT
