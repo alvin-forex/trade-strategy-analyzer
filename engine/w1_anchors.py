@@ -7,7 +7,7 @@
   - 插入 `details.card` CSS 兩行
 
 **正文 byte 級零變**：只改 wrapper 開標籤行、對應 `</div>` 收口行、h3 開標籤行、CSS 插入行。
-唔重生成、唔格式化、唔改內文。
+唔重生成、唔格式化、唔改內文、唔改 EOL。
 
 規格來源：exchange/from_openclaw/20261127_1120_加急_W1剩餘頁今下午完成/
 參考實作：exchange/from_zcode/20261127_0840_ZCODE_w_generator_patch_v1.1_indent修正/
@@ -15,11 +15,17 @@
 參考產物：commit 534074b6c（11-26 晚報，2 details＋5 錨點零正文變）
 
 設計取捨（比 generator patch 版嚴格）：
-  1. generator 版靠 `if 'id="sec-news"' in html and 'id="sec-events"' in html: return html`
-     做冪等判斷——但 11-26 晚報只有 sec-news 一個時會喺第二輪被當成已套而漏 sec-events。
-     本版改為逐項檢查，任何一項未套都會補。
-  2. 找不到任何 wrapper 時回 `changed=False` ＋ warning，唔扮成功（避免靜默無操作被當交付）。
-  3. wrapper 收口靠 div 深度計數；配唔上就原樣保留 ＋ warning，絕不亂改。
+  1. 冪等判斷逐項做——generator 版靠「兩個錨點都在就 return」，只有一個時會漏另一個。
+  2. **配唔上就完全唔動**：wrapper 收口行必須係獨立一行且只有一個 `</div>`，
+     否則整個 wrapper 原樣保留，**連 `<details>` 開標籤都唔寫**（開咗就必然唔閉合）。
+  3. div 深度計數有下界檢查（depth < 0 即刻放棄），唔靠撞 depth == 0。
+  4. 深度計數前先把 HTML 註解遮掉，避免 `<!-- </div> -->` 之類殘留搞亂。
+  5. h3 錨點去重：同一個 slug 全頁只准出現一次（SPEC §1.3）。
+  6. CSS 只插喺 `<style>` 開標籤之後（唔猜 `.news-section` 規則位置——
+     該規則跨行時會把宣告塊劈開）；`<style>` 與 `</style>` 同一行則拒改並報警。
+  7. `details.card` 已存在時用容許空白的 regex 判斷（`details.card{` 亦算）。
+  8. status 同 warnings 唔准矛盾：仍有未轉換 wrapper ⇒ REFUSED（未改）／PARTIAL（改了一部分），
+     唔會扮 ALREADY。
 """
 import re
 from typing import Dict, List, Tuple
@@ -48,53 +54,109 @@ CSS_SNIPPET = (
     "details.card > summary { cursor: pointer; }"
 )
 
-# 只認整行 wrapper 開標籤（行首可縮排），避免誤中 CSS 或單行寫法
-_WRAP_OPEN = re.compile(r'^(\s*)<div class="([a-z-]+-section)">\s*$')
+# 只認整行 wrapper 開標籤（行首可縮排，可帶額外屬性）
+_WRAP_OPEN = re.compile(r'^(\s*)<div class="([a-z][a-z0-9-]*-section)"([^>]*)>\s*$')
+# 收口行必須係獨立一行、只得一個 </div>
+_CLOSE_ONLY = re.compile(r'^\s*</div>\s*$')
+_COMMENT = re.compile(r"<!--.*?-->", re.S)
+_OPEN_DIV = re.compile(r"<div\b")
+_CLOSE_DIV = re.compile(r"</div>")
+_STYLE_OPEN = re.compile(r"^\s*<style\b", re.I)
 
 
-def _convert_wrappers(lines: List[str], report: Dict) -> List[str]:
+def _mask_comments(text: str) -> str:
+    """把 HTML 註解換成等量換行，令行號不變但註解內的標籤唔會被計入深度。"""
+    def repl(m):
+        return "\n" * m.group(0).count("\n")
+    return _COMMENT.sub(repl, text)
+
+
+def _depth_delta(line: str) -> int:
+    return len(_OPEN_DIV.findall(line)) - len(_CLOSE_DIV.findall(line))
+
+
+def _convert_wrappers(lines: List[str], masked: List[str],
+                      report: Dict, seen_ids: set) -> Tuple[List[str], List[str]]:
+    """回 (新 lines, 新 masked)。配唔上就整段唔動。"""
     out: List[str] = []
+    out_masked: List[str] = []
     i, n = 0, len(lines)
     while i < n:
         line = lines[i]
         m = _WRAP_OPEN.match(line)
-        if m and m.group(2) in WRAP_IDS:
-            indent, cls = m.group(1), m.group(2)
-            slug = WRAP_IDS[cls]
-            if 'id="{0}"'.format(slug) in line:
-                out.append(line)
-                i += 1
-                continue
-            depth = len(re.findall(r"<div\b", line)) - len(re.findall(r"</div>", line))
-            j, close_idx = i + 1, None
-            while j < n:
-                depth += (len(re.findall(r"<div\b", lines[j]))
-                          - len(re.findall(r"</div>", lines[j])))
-                if depth == 0:
-                    close_idx = j
-                    break
-                j += 1
-            if close_idx is None:
-                out.append(line)
-                report["warnings"].append(
-                    "unmatched wrapper: {0} 冇對應 </div>，原樣保留".format(cls))
-                i += 1
-                continue
-            out.append('{0}<details class="card" id="{1}" open>'.format(indent, slug))
-            i += 1
-            while i < close_idx:
-                out.append(lines[i])
-                i += 1
-            out.append(lines[close_idx].replace("</div>", "</details>", 1))
-            report["wrappers"].append({"from": cls, "to": slug})
+        if not m or m.group(2) not in WRAP_IDS:
+            out.append(line)
+            out_masked.append(masked[i])
             i += 1
             continue
-        out.append(line)
+
+        indent, cls, attrs = m.group(1), m.group(2), m.group(3)
+        slug = WRAP_IDS[cls]
+        if 'id="{0}"'.format(slug) in attrs:
+            # 生成器舊寫法 `<div class="news-section" id="sec-news">`：已帶錨點但未轉卡
+            report["warnings"].append(
+                "{0}: 已帶 id=\"%s\" 但仍是 div，未轉 details（需人手確認）".format(cls, )
+                % slug)
+            report["leftovers"].append(cls)
+            seen_ids.add(slug)
+            out.append(line)
+            out_masked.append(masked[i])
+            i += 1
+            continue
+
+        depth = _depth_delta(masked[i])       # 開標籤行本身
+        j, close_idx = i + 1, None
+        while j < n:
+            depth += _depth_delta(masked[j])
+            if depth < 0:                     # 收口過多／註解殘留：即刻放棄
+                break
+            if depth == 0:
+                close_idx = j
+                break
+            j += 1
+
+        bad = None
+        if close_idx is None:
+            bad = "搵唔到對應 </div>（或中途收口數目異常）"
+        elif not _CLOSE_ONLY.match(lines[close_idx]):
+            bad = "收口行唔係獨立 </div>：{0!r}".format(lines[close_idx][:60])
+        elif lines[close_idx].count("</div>") != 1:
+            bad = "收口行有多個 </div>"
+        if bad:
+            report["warnings"].append("unmatched wrapper: {0} — {1}；整段原樣保留".format(cls, bad))
+            report["leftovers"].append(cls)
+            out.append(line)
+            out_masked.append(masked[i])
+            i += 1
+            continue
+
+        if slug in seen_ids:
+            # 頁內已有同名錨點（例如舊代 <section id="sec-news">）→ 會產生重複 id
+            report["warnings"].append(
+                "{0}: 頁內已有 id=\"{1}\"，再轉會產生重複 id（SPEC §1.3）；整段原樣保留".format(
+                    cls, slug))
+            report["leftovers"].append(cls)
+            out.append(line)
+            out_masked.append(masked[i])
+            i += 1
+            continue
+
+        out.append('{0}<details class="card" id="{1}" open>'.format(indent, slug))
+        out_masked.append("")                  # 淨開標籤，深度 delta = 0
         i += 1
-    return out
+        while i < close_idx:
+            out.append(lines[i])
+            out_masked.append(masked[i])
+            i += 1
+        out.append(indent + "</details>")
+        out_masked.append("")
+        seen_ids.add(slug)
+        report["wrappers"].append({"from": cls, "to": slug})
+        i += 1
+    return out, out_masked
 
 
-def _convert_headings(lines: List[str], report: Dict) -> List[str]:
+def _convert_headings(lines: List[str], report: Dict, seen_ids: set) -> List[str]:
     out: List[str] = []
     for line in lines:
         new_line = line
@@ -103,11 +165,18 @@ def _convert_headings(lines: List[str], report: Dict) -> List[str]:
                 if key not in line:
                     continue
                 if 'id="{0}"'.format(slug) in line:
-                    break                      # 已掛，原樣保留
+                    seen_ids.add(slug)         # 本行已有，記住唔好再掛
+                    break
+                if slug in seen_ids:
+                    report["warnings"].append(
+                        "{0}: 頁內已有 id=\"{1}\"，唔再重複掛（SPEC §1.3 一頁一次）".format(
+                            key, slug))
+                    break
                 if "<h3>" in line:
                     new_line = line.replace("<h3>", '<h3 id="{0}">'.format(slug), 1)
                 else:
                     new_line = re.sub(r"<h3\s", '<h3 id="{0}" '.format(slug), line, count=1)
+                seen_ids.add(slug)
                 report["headings"].append({"key": key, "to": slug})
                 break
         out.append(new_line)
@@ -116,29 +185,53 @@ def _convert_headings(lines: List[str], report: Dict) -> List[str]:
 
 def _insert_css(lines: List[str], report: Dict) -> List[str]:
     joined = "\n".join(lines)
-    if "details.card {" in joined:
+    if re.search(r"details\.card\s*\{", joined):
         report["css"] = "ALREADY"
         return lines
     for idx, line in enumerate(lines):
-        if re.match(r"^\s*\.news-section\s*\{", line):
-            lines = lines[:idx + 1] + CSS_SNIPPET.split("\n") + lines[idx + 1:]
-            report["css"] = "OK（插於 .news-section 樣式後）"
+        if not _STYLE_OPEN.match(line):
+            continue
+        if "</style>" in line:
+            report["css"] = "SKIP：<style> 與 </style> 同行，唔敢猜插入點"
+            report["warnings"].append("css: 單行 <style>，需人手處理")
             return lines
-    for idx, line in enumerate(lines):
-        if "<style>" in line:
-            lines = lines[:idx + 1] + CSS_SNIPPET.split("\n") + lines[idx + 1:]
-            report["css"] = "OK（插於 <style> 開頭）"
-            return lines
-    report["css"] = "SKIP：找不到 CSS 插入點"
-    report["warnings"].append("css: 找不到插入點，頁面無 details.card 樣式")
+        lines = lines[:idx + 1] + CSS_SNIPPET.split("\n") + lines[idx + 1:]
+        report["css"] = "OK（插於 <style> 開標籤後）"
+        return lines
+    report["css"] = "SKIP：找不到 <style>"
+    report["warnings"].append("css: 頁面無 <style> 區塊，細節卡會無樣式")
     return lines
+
+
+def _count_leftovers(masked_text: str) -> List[str]:
+    """仍以 div 形式存在嘅 wrapper。"""
+    found = []
+    for cls in WRAP_IDS:
+        if re.search(r'<div class="{0}"'.format(cls), masked_text):
+            found.append(cls)
+    return found
+
+
+def _has_w1_type(masked_text: str) -> bool:
+    for cls, slug in WRAP_IDS.items():
+        if re.search(r'<div class="{0}"'.format(cls), masked_text):
+            return True
+        if re.search(r'<details[^>]*id="{0}"'.format(slug), masked_text):
+            return True
+    return False
 
 
 def apply_w1_anchors(html: str) -> Tuple[str, Dict]:
     """對一頁 HTML 套 W1 錨點。回 (新 HTML, report)。
 
-    report 鍵：status / changed / wrappers / headings / css / warnings
-    status: "ALREADY" | "APPLIED" | "NOOP"
+    report 鍵：status / changed / wrappers / headings / css / warnings / leftovers
+    status:
+      ALREADY    已套齊，無改動、無殘留
+      APPLIED    有改動，兩個 wrapper 都轉齊
+      CSS_ONLY   只補了 CSS（錨點本來已齊）
+      PARTIAL    有改動，但仍有 wrapper 未轉
+      REFUSED    wrapper 未轉齊且完全冇改動（有嘢要做但做唔到）
+      NOOP       唔屬 C 族 W1 頁型（無 wrapper、無已轉換 details）
     """
     report: Dict = {
         "status": "ALREADY",
@@ -147,56 +240,59 @@ def apply_w1_anchors(html: str) -> Tuple[str, Dict]:
         "headings": [],
         "css": "ALREADY",
         "warnings": [],
+        "leftovers": [],
     }
     if not html:
         report["status"] = "NOOP"
         return html, report
 
-    lines = html.split("\n")
-    # C 族頁型必須兩個 wrapper 齊（原始或已轉換），否則拒改，唔准只改一半
-    missing = []
-    for cls, slug in WRAP_IDS.items():
-        if ('<div class="{0}">'.format(cls) not in html
-                and 'id="{0}"'.format(slug) not in html):
-            missing.append(cls)
-    if missing:
-        report["warnings"].append(
-            "缺 {0}：呢頁唔屬 C 族 W1 頁型（或 wrapper 唔喺獨立行），整頁拒改".format(
-                "／".join(missing)))
+    masked_text = _mask_comments(html)
+    if not _has_w1_type(masked_text):
         report["status"] = "NOOP"
-        report["changed"] = False
-        report["css"] = "SKIP：頁型唔合，唔插 CSS"
+        report["css"] = "SKIP：非 W1 頁型，唔插 CSS"
+        report["warnings"].append("無 news/events wrapper：呢頁唔屬 C 族 W1 範圍")
         return html, report
 
-    # 先 wrapper（會改變行數），再 heading，最後 CSS（再插兩行）
-    lines = _convert_wrappers(lines, report)
-    lines = _convert_headings(lines, report)
-    lines = _insert_css(lines, report)
+    seen_ids = set(re.findall(r'id="(sec-[a-z0-9-]+)"', masked_text))
+
+    lines = html.split("\n")
+    masked = masked_text.split("\n")
+    lines, masked = _convert_wrappers(lines, masked, report, seen_ids)
+    lines = _convert_headings(lines, report, seen_ids)
+    if report["wrappers"] or report["headings"]:
+        lines = _insert_css(lines, report)
+    else:
+        lines = _insert_css(lines, report)     # 可能只缺 CSS（CSS_ONLY 情境）
 
     out = "\n".join(lines)
+    leftover = _count_leftovers(_mask_comments(out))
+    report["leftovers"] = sorted(set(report["leftovers"]) | set(leftover))
+
     if out == html:
-        report["status"] = "ALREADY"
-        if not report["wrappers"] and not report["headings"]:
-            report["warnings"].append("no-op：此頁已套齊 W1 錨點")
         report["changed"] = False
+        # 已套齊且無殘留 = 正常 no-op，唔算 warning
+        report["status"] = "REFUSED" if report["leftovers"] else "ALREADY"
         return html, report
 
     report["changed"] = True
-    # 只補 CSS（wrappers/headings 都係空）＝錨點已齊但缺 details.card 樣式
-    report["status"] = "CSS_ONLY" if not report["wrappers"] and not report["headings"] else "APPLIED"
-    for cls in WRAP_IDS:
-        if ('<div class="{0}">'.format(cls) in out
-                and not any(w["from"] == cls for w in report["wrappers"])):
-            report["warnings"].append(
-                "{0}: 仍有未轉換嘅 wrapper（可能唔止一個或多行寫法）".format(cls))
+    if report["leftovers"]:
+        report["status"] = "PARTIAL"
+    elif not report["wrappers"] and not report["headings"]:
+        report["status"] = "CSS_ONLY"
+    else:
+        report["status"] = "APPLIED"
     return out, report
+
+
+def _detect_eol(text: str) -> str:
+    return "\r\n" if "\r\n" in text else "\n"
 
 
 def _iter_pages(reports_dir: str) -> List[str]:
     import glob
     import os
     return sorted(p for p in glob.glob(os.path.join(reports_dir, "*.html"))
-                  if not p.endswith("index.html"))
+                  if os.path.basename(p) != "index.html")
 
 
 def main(argv=None) -> int:
@@ -206,6 +302,8 @@ def main(argv=None) -> int:
         python -m engine.w1_anchors --check     # 只報狀態，唔寫檔
         python -m engine.w1_anchors --apply     # 就地套用
         python -m engine.w1_anchors --apply --dir docs/forex_reports
+
+    離開碼：0 = 全部 OK；1 = 有 REFUSED／PARTIAL／warnings。
     """
     import argparse
     import json
@@ -220,26 +318,35 @@ def main(argv=None) -> int:
         ap.error("要指定 --check 或 --apply")
 
     rows = []
-    changed = 0
+    applied = 0
+    groups: Dict[str, int] = {}
+    problems = 0
     for path in _iter_pages(args.dir):
-        with open(path, encoding="utf-8") as fh:
-            src = fh.read()
+        with open(path, encoding="utf-8", newline="") as fh:
+            raw = fh.read()
+        eol = _detect_eol(raw)
+        src = raw.replace("\r\n", "\n")
         out, rep = apply_w1_anchors(src)
+        groups[rep["status"]] = groups.get(rep["status"], 0) + 1
+        if rep["status"] in ("REFUSED", "PARTIAL") or rep["warnings"]:
+            problems += 1
         if args.apply and rep["changed"]:
             with open(path, "w", encoding="utf-8", newline="") as fh:
-                fh.write(out)
-            changed += 1
+                fh.write(out.replace("\n", eol))
+            applied += 1
         rows.append({
             "page": path.replace("\\", "/").rsplit("/", 1)[-1],
             "status": rep["status"],
-            "wrappers": len(rep["wrappers"]),
+            "wrappers": [w["to"] for w in rep["wrappers"]],
             "headings": [h["to"] for h in rep["headings"]],
+            "leftovers": rep["leftovers"],
             "css": rep["css"],
             "warnings": rep["warnings"],
         })
-    print(json.dumps({"dir": args.dir, "applied": changed, "rows": rows},
-                     ensure_ascii=False, indent=1))
-    return 0
+    print(json.dumps({"dir": args.dir, "applied": applied,
+                      "by_status": groups, "problem_rows": problems,
+                      "rows": rows}, ensure_ascii=False, indent=1))
+    return 0 if problems == 0 else 1
 
 
 if __name__ == "__main__":
