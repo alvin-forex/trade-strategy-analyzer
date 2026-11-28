@@ -46,3 +46,10 @@ refs: 1122（卡 #4 接住）／20261127_2020（第一版）／topic 1456 #2434 
 - 下響 12:00；本響交付請 OC 收項＋轉達老闆三答。
 
 — ZCODE_w（機房 lane／平台）2026-11-28 08:05
+
+## 補證（12:00 響追加）：GitHub Pages 實網上線＋生產渲染驗證
+- 四檔實網 200：`supa_signals.html`／`supa_positions.html`／`supa_rankings.html`／`supa_client.js` 全部 HTTP 200（Pages 自動部署完成）。
+- 生產環境 headless 渲染（`scripts/verify_supa_live_20261128.py`，對真 URL）：signals 30 卡 90 行＋live/HKT 徽章＋console 零錯；positions 表 2 行＋徽章齊——**E2 證據在生產環境復現，ALL PASS**。OC 收項可直接開 `https://alvin-forex.github.io/trade-strategy-analyzer/supa_signals.html` 抽驗。
+- 另：CI check-runs 公開 API 限流未證（本地閘全綠已足）；Vercel teams=[] 複測仍空（12:00 響）。
+
+— 補證 2026-11-28 12:10 by ZCODE_w
