@@ -64,6 +64,7 @@
       <div class="sidebar-sep"></div>
       <a href="${depth}reviews/" class="sidebar-link" data-page="reviews"><span class="icon">📅</span>覆盤報告</a>
       <a href="${depth}tha/v52.html" class="sidebar-link" data-page="tha"><span class="icon">🧮</span>交易分析 THA</a>
+      <a href="${depth}crossma/v1.html" class="sidebar-link" data-page="crossma"><span class="icon">📈</span>CrossMA 參數記錄</a>
       <a href="${depth}ccy_power/index.html" class="sidebar-link" data-page="ccy_power"><span class="icon">⚡</span>CCY Power</a>
       <div class="sidebar-sep"></div>
       <div class="sidebar-section-title"><span class="icon">📊</span>外匯分析</div>
