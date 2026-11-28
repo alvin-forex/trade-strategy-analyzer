@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CrossMA 參數記錄 — 每日每商品每時框</title>
+<style>
+:root{--bg:#0f1720;--card:#17222e;--line:#243343;--ink:#e6eef7;--mut:#8fa4b8;--good:#39b785;--bad:#d9534f;--acc:#5aa9e6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:18px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 10px;color:var(--acc)}
+.sub{color:var(--mut);font-size:12px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-size:12px}.n{text-align:right}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+select,input{background:#0f1a24;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px}
+button{background:var(--acc);border:0;color:#08131c;font-weight:700;border-radius:6px;padding:6px 12px;cursor:pointer}
+.scroll{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.mut{color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CrossMA 參數記錄</h1>
+  <div class="sub">每個商品 × 每個時框，逐日記錄 <b>Fast／Slow 參數、勝率、淨點數、交易數</b>。資料由每日掃描 CSV 累積，可查歷史、可下載。<span id="gen"></span></div>
+
+  <div class="card">
+    <h2>① 篩選</h2>
+    商品 <select id="fsym"><option value="">全部</option></select>
+    　時框 <select id="ftf"><option value="">全部</option></select>
+    　日期 <select id="fday"><option value="">全部</option></select>
+    　<button onclick="render()">套用</button>
+    　<button onclick="downloadCSV()">下載 CSV</button>
+    <div class="mut" id="stat" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>② 最新一日（每商品 × 時框）</h2>
+    <div class="scroll"><table id="tblLatest"><thead><tr>
+      <th>商品</th><th>時框</th><th class="n">Fast</th><th class="n">Slow</th>
+      <th class="n">勝率</th><th class="n">淨點數</th><th class="n">交易數</th><th>日期</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h2>③ 歷史記錄（逐日）</h2>
+    <div class="scroll"><table id="tblHist"><thead><tr>
+      <th>日期</th><th>商品</th><th>時框</th><th class="n">Fast</th><th class="n">Slow</th>
+      <th class="n">勝率</th><th class="n">淨點數</th><th class="n">交易數</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const fmt=(x,d=2)=>Number(x).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+let DATA=null, ROWS=[];
+
+fetch('../admin/crossma/all.json').then(r=>r.json()).then(d=>{
+  DATA=d; ROWS=d.rows||[];
+  $('#gen').textContent = '（資料更新：'+(d.generated||'-')+'，共 '+(d.days||[]).length+' 日）';
+  const syms=[...new Set(ROWS.map(r=>r.sym))].sort();
+  const tfs=[...new Set(ROWS.map(r=>r.tf))].sort();
+  syms.forEach(s=>$('#fsym').insertAdjacentHTML('beforeend',`<option>${s}</option>`));
+  tfs.forEach(t=>$('#ftf').insertAdjacentHTML('beforeend',`<option>${t}</option>`));
+  (d.days||[]).slice().reverse().forEach(x=>$('#fday').insertAdjacentHTML('beforeend',`<option>${x}</option>`));
+  render();
+}).catch(e=>{ $('#stat').textContent='載入失敗：'+e; });
+
+function filtered(){
+  const s=$('#fsym').value, t=$('#ftf').value, d=$('#fday').value;
+  return ROWS.filter(r=>(!s||r.sym===s)&&(!t||r.tf===t)&&(!d||r.d===d));
+}
+
+function render(){
+  const rows=filtered();
+  $('#stat').textContent='符合：'+rows.length+' 列';
+  // 最新一日
+  const latestDay=(DATA.days||[]).slice().sort().pop();
+  const latest=ROWS.filter(r=>r.d===latestDay);
+  const map={};
+  latest.forEach(r=>{ map[r.sym+'|'+r.tf]=r; });
+  const lb=$('#tblLatest tbody');
+  lb.innerHTML = Object.keys(map).sort().map(k=>{
+    const r=map[k];
+    return `<tr><td>${r.sym}</td><td>${r.tf}</td><td class="n">${r.fast}</td><td class="n">${r.slow}</td>
+      <td class="n">${fmt(r.wr,1)}%</td><td class="n ${r.pips>=0?'pos':'neg'}">${fmt(r.pips,0)}</td>
+      <td class="n">${r.trades}</td><td>${r.d}</td></tr>`;
+  }).join('') || '<tr><td colspan="8" class="mut">（篩選下無資料）</td></tr>';
+
+  // 歷史
+  const hist=rows.slice().sort((a,b)=> b.d.localeCompare(a.d) || a.sym.localeCompare(b.sym) || a.tf.localeCompare(b.tf)).slice(0,800);
+  $('#tblHist tbody').innerHTML = hist.map(r=>
+    `<tr><td>${r.d}</td><td>${r.sym}</td><td>${r.tf}</td><td class="n">${r.fast}</td><td class="n">${r.slow}</td>
+     <td class="n">${fmt(r.wr,1)}%</td><td class="n ${r.pips>=0?'pos':'neg'}">${fmt(r.pips,0)}</td><td class="n">${r.trades}</td></tr>`
+  ).join('') || '<tr><td colspan="8" class="mut">（無資料）</td></tr>';
+}
+
+function downloadCSV(){
+  const rows=filtered();
+  const head=['date','symbol','tf','fast','slow','win_rate','net_pips','trades'];
+  const lines=[head.join(',')].concat(rows.map(r=>[r.d,r.sym,r.tf,r.fast,r.slow,r.wr,r.pips,r.trades].join(',')));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='crossma_records.csv'; a.click();
+}
+</script>
+</body>
+</html>
