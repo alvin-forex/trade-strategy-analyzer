@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>三方對照表 — 八國方向 × 波幅 × CrossMA 參數</title>
+<style>
+:root{--bg:#0f1720;--card:#17222e;--line:#243343;--ink:#e6eef7;--mut:#8fa4b8;--good:#39b785;--bad:#d9534f;--acc:#5aa9e6;--warn:#e0a13c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:1320px;margin:0 auto;padding:18px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 10px;color:var(--acc)}
+.sub{color:var(--mut);font-size:12px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:5px 7px;text-align:left;font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-size:12px}.n{text-align:right}
+.pos{color:var(--good)}.neg{color:var(--bad)}.mut{color:var(--mut)}
+.tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:700;color:#08131c}
+.t-trend{background:var(--good)}.t-range{background:var(--warn)}.t-wait{background:#6b7d90}
+.scroll{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.kpis{display:flex;gap:10px;flex-wrap:wrap}
+.kpi{flex:1;min-width:150px;background:#0f1a24;border:1px solid var(--line);border-radius:8px;padding:10px}
+.kpi b{display:block;font-size:17px}.kpi span{font-size:11px;color:var(--mut)}
+select{background:#0f1a24;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>三方對照表</h1>
+  <div class="sub">八國方向性 × 波幅（ATR／P80／P95）× CrossMA 最佳參數 → 每條對的層距與策略建議。<span id="gen"></span></div>
+
+  <div class="card">
+    <h2>① 今日八國強弱（即時面板）</h2>
+    <div class="kpis" id="spread"></div>
+    <div class="mut" style="margin-top:8px">「強弱差」＝最強幣分數 −&#160;最弱幣分數；差越大，強對弱那條對越有方向。</div>
+  </div>
+
+  <div class="card">
+    <h2>② 對照表</h2>
+    <div>排序：
+      <select id="sortBy" onchange="render()">
+        <option value="consist">方向一致性</option>
+        <option value="gap">方向差（絕對值）</option>
+        <option value="atr">波幅 ATR</option>
+        <option value="cm">CrossMA 淨點</option>
+      </select>
+      　建議篩選：
+      <select id="filt" onchange="render()">
+        <option value="all">全部</option>
+        <option value="trend">只看順勢建議</option>
+        <option value="range">只看馬丁／區間建議</option>
+        <option value="wait">只看觀察</option>
+      </select>
+    </div>
+    <div class="scroll" style="margin-top:10px"><table id="tbl"><thead><tr>
+      <th>商品</th><th class="n">D1 差</th><th class="n">H4 差</th><th class="n">H1 差</th><th class="n">一致性</th>
+      <th class="n">ATR14(pips)</th><th class="n">P80</th><th class="n">P95</th>
+      <th class="n">建議層距</th><th class="n">建議止蝕</th>
+      <th>CrossMA 最佳</th><th>建議</th>
+    </tr></thead><tbody></tbody></table></div>
+    <div class="mut" style="margin-top:8px">層距＝0.8×ATR(H1)（取 5 的倍數）；止蝕＝0.5×ATR(H1)，下限 10 點。CrossMA 為該商品最新一日最佳時框。</div>
+  </div>
+
+  <div class="card">
+    <h2>③ 判讀規則（現時採用）</h2>
+    <div class="mut">
+      ・<b>一致性 ≥ 0.99 且 |H1 差| ≥ 2</b>：三時框同向 → 標「順勢」，適合順勢入場。<br>
+      ・<b>一致性 ≥ 0.99 但 |H1 差| &lt; 2</b>：方向一致但力度弱 → 標「觀察」。<br>
+      ・<b>一致性 ≤ 0.5</b>：時框互相矛盾 → 標「馬丁／區間」，只適合小注、靠層距。<br>
+      ・<b>ATR14 &lt; 12 pips</b>：波幅偏窄，層距不宜大，否則一層都等不到。
+    </div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+let D=null;
+fetch('threeway.json').then(r=>r.json()).then(d=>{D=d;render();}).catch(e=>{$('#gen').textContent='載入失敗：'+e;});
+
+function kpi(label,val,cls){return `<div class="kpi"><b class="${cls||''}">${val}</b><span>${label}</span></div>`;}
+
+function recommend(r){
+  const h1=Math.abs(r.diff.H1||0);
+  if(r.consist>=0.99 && h1>=2) return ['t-trend','順勢'];
+  if(r.consist>=0.99) return ['t-wait','觀察'];
+  if(r.consist<=0.5) return ['t-range','馬丁／區間'];
+  return ['t-wait','觀察'];
+}
+
+function render(){
+  if(!D) return;
+  $('#gen').textContent='（資料時間：'+D.generated+'；CrossMA 日='+(D.crossma_day||'-')+'）';
+  const sp=D.spread||{};
+  $('#spread').innerHTML = ['H1','H4','D1'].map(tf=>{
+    const s=sp[tf]; if(!s) return '';
+    return kpi(tf+'：'+s.strong+' '+s.strong_v.toFixed(2)+' vs '+s.weak+' '+s.weak_v.toFixed(2)+'（差 '+s.gap.toFixed(2)+'）', '');
+  }).join('');
+
+  const by=$('#sortBy').value, f=$('#filt').value;
+  let rows=D.rows.slice();
+  rows = rows.map(r=>{ const rec=recommend(r); r._rec=rec; return r; }).filter(r=> f==='all'?true:r._rec[0]==='t-'+f);
+  const key={consist:r=>-r.consist, gap:r=>-Math.abs(r.diff.H1||0), atr:r=>-r.atr14, cm:r=>-(r.cm?r.cm.pips:0)}[by];
+  rows.sort((a,b)=>key(a)-key(b)||a.sym.localeCompare(b.sym));
+
+  $('#tbl tbody').innerHTML = rows.map(r=>{
+    const c=r.cm;
+    const cmTxt = c? `${c.tf} ${c.fast}/${c.slow}　勝率 ${c.wr.toFixed(1)}%　${c.pips>=0?'+':''}${Math.round(c.pips)} pips` : '<span class="mut">—</span>';
+    return `<tr>
+      <td><b>${r.sym}</b></td>
+      <td class="n ${r.diff.D1>=0?'pos':'neg'}">${r.diff.D1??'-'}</td>
+      <td class="n ${r.diff.H4>=0?'pos':'neg'}">${r.diff.H4??'-'}</td>
+      <td class="n ${r.diff.H1>=0?'pos':'neg'}">${r.diff.H1??'-'}</td>
+      <td class="n">${(r.consist*100).toFixed(0)}%</td>
+      <td class="n">${r.atr14}</td><td class="n">${r.p80}</td><td class="n">${r.p95}</td>
+      <td class="n">${r.step}</td><td class="n">${r.sl}</td>
+      <td>${cmTxt}</td>
+      <td><span class="tag ${r._rec[0]}">${r._rec[1]}</span></td>
+    </tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
