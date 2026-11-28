@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>💼 即時持倉 · Supabase 版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="./sidebar.css">
+<style>
+    :root { --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif; --radius: 8px; }
+    [data-theme="dark"] {
+        --bg: #0F1520; --bg-card: #161E2E; --bg-hover: #1C2638;
+        --text: #E6EDF5; --text2: #A8B4C4;
+        --primary: #5CA8FF; --accent: #38BDF8;
+        --green: #22c55e; --red: #ef4444; --yellow: #eab308; --orange: #f97316;
+        --border: #2A3650;
+    }
+    [data-theme="light"] {
+        --bg: #f1f5f9; --bg-card: #ffffff; --bg-hover: #e2e8f0;
+        --text: #1e293b; --text2: #64748b;
+        --primary: #2563eb; --accent: #0ea5e9;
+        --green: #16a34a; --red: #dc2626; --yellow: #ca8a04; --orange: #ea580c;
+        --border: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font-main); background: var(--bg); color: var(--text); min-height: 100vh; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+    .hdr { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .hdr h1 { font-size: 1.25rem; }
+    .hdr .sub { color: var(--text2); font-size: .8rem; margin-top: .25rem; }
+    .badge { display: inline-block; border-radius: 999px; padding: .2rem .7rem; font-size: .72rem; border: 1px solid var(--border); color: var(--text2); }
+    .badge.live { color: var(--green); border-color: var(--green); background: rgba(34,197,94,.12); }
+    .badge.err  { color: var(--red); border-color: var(--red); background: rgba(239,68,68,.12); }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+    .kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: .8rem 1rem; }
+    .kpi .t { color: var(--text2); font-size: .72rem; }
+    .kpi .v { font-size: 1.15rem; font-weight: 700; margin-top: .2rem; }
+    .kpi .n { color: var(--text2); font-size: .7rem; margin-top: .15rem; }
+    .tblwrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    th, td { padding: .5rem .75rem; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--text2); font-weight: 500; font-size: .7rem; border-top: 0; text-align: left; }
+    td:first-child { text-align: left; }
+    td.mono { font-variant-numeric: tabular-nums; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .foot { color: var(--text2); font-size: .72rem; margin-top: 1.25rem; line-height: 1.6; }
+    .foot a { color: var(--primary); }
+    .fallback { display: none; background: var(--bg-card); border: 1px solid var(--red); border-radius: var(--radius); padding: 1.5rem; margin: 1rem 0; }
+    .fallback.show { display: block; }
+    .fallback h2 { font-size: 1rem; color: var(--red); margin-bottom: .5rem; }
+    .fallback p { color: var(--text2); font-size: .82rem; line-height: 1.7; }
+    .fallback a { color: var(--primary); }
+    .retry { cursor: pointer; margin-top: .9rem; border: 1px solid var(--primary); color: var(--primary); background: transparent; border-radius: var(--radius); padding: .45rem 1.2rem; font-size: .82rem; }
+    .retry:hover { background: rgba(92,168,255,.12); }
+    .loading { color: var(--text2); padding: 2rem 0; text-align: center; font-size: .85rem; }
+</style>
+</head>
+<body>
+<main class="wrap">
+    <div class="hdr">
+        <div>
+            <h1>💼 即時持倉（Supabase 版）</h1>
+            <div class="sub">最新 as_of 快照批次內嘅全部持倉（來源：MT4／MT5 匯出同步）</div>
+        </div>
+        <div>
+            <span class="badge" id="srcBadge">連線中…</span>
+            <span class="badge" id="asofBadge">—</span>
+        </div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+    <div class="tblwrap" id="tblwrap"><div class="loading">載入中…（數據源 Supabase REST）</div></div>
+
+    <div class="fallback" id="fallback">
+        <h2>⚠️ Supabase 無回應——已切換靜態 fallback</h2>
+        <p id="fbReason">即時數據載入失敗（可能斷網或數據源維護中）。請改用以下現有頁面，資料完整不會白屏：</p>
+        <p style="margin-top:.5rem">
+            <a href="./portfolios/portfolio_master_report_v2.html">💼 Portfolio 統一版（靜態）</a> ·
+            <a href="./index.html">🦀 TSA 首頁</a>
+        </p>
+        <button class="retry" id="retryBtn" type="button">↻ 重試 Supabase</button>
+    </div>
+
+    <div class="foot" id="foot">
+        數據源：Supabase REST 匿名只讀（RLS「public read」；寫入由 OpenClaw service_role 定期同步，不經前端）。
+        持倉來源：MT4／MT5 匯出（payload.source 記錄原始鏈路；comment 帶策略批次標記）。
+        同域靜態頁：<a href="./portfolios/portfolio_master_report_v2.html">portfolio_master_report_v2.html</a>。
+        卡 #4（前端改讀 Supabase）第二版：positions 即時頁（<a href="https://github.com/alvin-forex/trade-strategy-analyzer/issues/4" rel="noopener">issue #4</a>）；第一版＝<a href="./supa_rankings.html">supa_rankings.html</a>。
+    </div>
+</main>
+
+<script src="./supa_client.js"></script>
+<script>
+'use strict';
+(function () {
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    function money(v) { return v == null || isNaN(Number(v)) ? '—' : '$' + Number(v).toFixed(2); }
+    function fx(v) {
+        if (v == null || isNaN(Number(v))) return '—';
+        var n = Number(v);
+        var dp = Math.abs(n) >= 1000 ? 2 : 5;
+        return n.toFixed(dp);
+    }
+    function hk(iso) { try { return new Date(iso).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong', hour12: false }); } catch (e) { return String(iso); } }
+
+    function renderKpis(rows) {
+        var accts = {}, lots = 0, pnl = 0;
+        rows.forEach(function (r) {
+            accts[r.account] = 1;
+            lots += Number(r.lots) || 0;
+            pnl += Number(r.pnl) || 0;
+        });
+        document.getElementById('kpis').innerHTML = [
+            ['持倉數', rows.length || '0', '最新批次快照'],
+            ['帳號數', Object.keys(accts).length || '0', '涉倉帳號'],
+            ['總手數', lots ? lots.toFixed(2) : '—', '批次合計'],
+            ['浮動 PnL 合計', rows.length ? money(pnl) : '—', '正負未平倉盈虧']
+        ].map(function (k) {
+            return '<div class="kpi"><div class="t">' + k[0] + '</div><div class="v">' + k[1] + '</div><div class="n">' + k[2] + '</div></div>';
+        }).join('');
+    }
+
+    function render(rows) {
+        document.getElementById('tblwrap').innerHTML = rows.length ?
+            '<table><thead><tr><th>帳號</th><th>貨幣對</th><th>手數</th><th>浮動 PnL</th><th>開倉價</th><th>標記</th></tr></thead><tbody>' +
+            rows.map(function (r) {
+                var p = r.payload || {};
+                var pnlCls = Number(r.pnl) >= 0 ? 'pos' : 'neg';
+                return '<tr><td class="mono">' + esc(r.account) + '</td>' +
+                    '<td>' + esc(r.symbol) + '</td>' +
+                    '<td class="mono">' + esc(r.lots) + '</td>' +
+                    '<td class="mono ' + pnlCls + '">' + money(r.pnl) + '</td>' +
+                    '<td class="mono">' + fx(p.open_price) + '</td>' +
+                    '<td>' + esc(String(p.comment || '').split('|')[0]) + '</td></tr>';
+            }).join('') +
+            '</tbody></table>' :
+            '<div class="loading">最新批次無持倉（空倉或同步未到）</div>';
+    }
+
+    function ok(group) {
+        document.getElementById('fallback').classList.remove('show');
+        var sb = document.getElementById('srcBadge');
+        sb.textContent = '● Supabase 即時'; sb.className = 'badge live';
+        document.getElementById('asofBadge').textContent = '資料更新於 ' + hk(group.asOf) + '（HKT）';
+        renderKpis(group.rows); render(group.rows);
+    }
+
+    function fail(e) {
+        var fb = document.getElementById('fallback');
+        document.getElementById('fbReason').textContent =
+            '即時數據載入失敗：' + (e && e.message ? e.message : '未知錯誤') +
+            '。已切換靜態 fallback，請改用以下現有頁面，資料完整不會白屏：';
+        fb.classList.add('show');
+        document.getElementById('tblwrap').innerHTML =
+            '<div class="loading">即時數據未能載入——請用上方靜態連結，或按「重試 Supabase」。</div>';
+        var sb = document.getElementById('srcBadge');
+        sb.textContent = '○ Supabase 無回應'; sb.className = 'badge err';
+        document.getElementById('asofBadge').textContent = '—';
+    }
+
+    function load() {
+        document.getElementById('tblwrap').innerHTML = '<div class="loading">載入中…（數據源 Supabase REST）</div>';
+        document.getElementById('fallback').classList.remove('show');
+        window.TSA.supa.fetchPositions(200).then(ok).catch(fail);
+    }
+
+    document.getElementById('retryBtn').addEventListener('click', load);
+    load();
+})();
+</script>
+<script src="./sidebar.js"></script>
+</body>
+</html>
